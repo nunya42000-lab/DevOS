@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DevOS Nexus</title>
+    <link rel="manifest" href="./manifest.json">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script> <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.js"></script>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body class="theme-dracula state-locked"> <div id="bio-lock-screen">
+        <div class="lock-icon">🔒</div>
+        <button id="auth-btn">Unlock DevOS</button>
+    </div>
+
+    <div id="sync-status" class="sync-indicator offline">●</div>
+
+    <div class="app-container">
+        <aside id="ui-sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h3>DevOS Nexus</h3>
+                <button onclick="toggleSidebar()">✕</button>
+            </div>
+            <div id="file-explorer"></div>
+            <div id="nexus-tools">
+                <button onclick="openSyncPortal()">🔗 Device Sync</button>
+                <button onclick="openMathEngine()">∑ Math Engine</button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <div id="universal-terminal" class="terminal-drawer">
+                <div class="terminal-header" id="terminal-drag-handle">
+                    <span class="term-title">Universal Terminal</span>
+                    <div class="term-controls">
+                        <button onclick="setTerminalMode('float')">❐</button>
+                        <button onclick="setTerminalMode('drawer')">▼</button>
+                    </div>
+                </div>
+                <div id="terminal-output"></div>
+                <div class="terminal-input-row">
+                    <span>></span>
+                    <input type="text" id="terminal-command" placeholder="Type a command or 'help'...">
+                </div>
+            </div>
+
+            <section class="editor-section">
+                <div id="tab-bar" class="scroll-tabs"></div>
+                <div id="editor-wrapper"></div>
+            </section>
+        </main>
+        
+        <div id="devos-keyboard" class="hidden"></div>
+    </div>
+
+    <script src="./nexus-core.js"></script>
+</body>
+</html>
