@@ -73,7 +73,10 @@ const Nexus = {
     executeCommand(cmd) {
     this.updateTerminal(`> ${cmd}`, 'var(--accent)');
     const input = cmd.toLowerCase().trim();
-
+// Inside Nexus.executeCommand(cmd)
+if (input === 'rebuild' || input === 'import') {
+    NexusReconstructor.openPortal();
+                }
     if (input.startsWith('math ')) {
         NexusMath.generateLogic(cmd.replace('math ', ''));
     } else if (input.startsWith('branch ')) {
