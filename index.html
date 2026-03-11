@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DevOS Ultimate Nexus</title>
+    
+    <!-- External Dependencies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    
+    <!-- CodeMirror 5 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+            --accent: #2f81f7; --success: #3fb950; --danger: #f85149;
+            --warn: #d29922; --text: #c9d1d9; --border: #30363d;
+            --gold: #d29922; --sidebar-width: 320px;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            overflow: hidden;
+        }
+
+        .main-container { display: flex; height: 100%; width: 100%; overflow: hidden; }
+
+        /* Sidebar Architecture */
+        .sidebar {
+            width: var(--sidebar-width); background: var(--panel);
+            border-right: 1px solid var(--border); display: flex; flex-direction: column;
+            transition: transform 0.3s ease; z-index: 1000;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar { position: fixed; left: -100%; top: 0; height: 100%; }
+            .sidebar.active { transform: translateX(100%); }
+        }
+
+        .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); background: var(--bg); }
+        .sidebar-header h2 { margin: 0; font-size: 18px; color: var(--accent); letter-spacing: 1px; }
+
+        .btn-row { display: flex; gap: 8px; padding: 12px; }
+        .btn-sidebar { flex: 1; padding: 10px; border-radius: 6px; border: none; font-weight: bold; font-size: 11px; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .btn-primary { background: var(--accent); }
+        .btn-gold { background: var(--gold); }
+
+        /* Accordion System */
+        .sidebar-scroll { flex: 1; overflow-y: auto; scrollbar-width: thin; }
+        .accordion-item { border-bottom: 1px solid var(--border); }
+        .accordion-header { 
+            padding: 12px 15px; background: var(--surface); cursor: pointer; 
+            display: flex; justify-content: space-between; font-size: 12px; font-weight: bold;
+            text-transform: uppercase; color: var(--muted);
+        }
+        .accordion-content { display: none; padding: 5px 0; background: var(--panel); }
+        .accordion-content.active { display: block; }
+        .list-entry { padding: 8px 15px; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid transparent; }
+        .list-entry:hover { background: var(--surface); }
+        .list-entry.active { border-left-color: var(--accent); background: var(--surface); color: white; }
+
+        /* Workspace & Toolbar */
+        .workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: #000; }
+        
+        .toolbar {
+            display: flex; background: var(--panel); padding: 8px; gap: 8px;
+            border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none;
+        }
+        .tool-btn {
+            padding: 8px 14px; border-radius: 6px; border: none; font-size: 11px;
+            font-weight: bold; color: white; cursor: pointer; white-space: nowrap;
+            display: flex; align-items: center; gap: 5px; transition: opacity 0.2s;
+        }
+        .tool-btn:active { transform: scale(0.95); }
+        .btn-copy { background: #30363d; }
+        .btn-preview { background: #238636; }
+        .btn-compare { background: #8957e5; }
+        .btn-intel { background: var(--accent); }
+        .btn-visual { background: var(--gold); }
+        .btn-time { background: #6e7681; }
+
+        /* Tab Bar */
+        .tab-bar { display: flex; background: var(--bg); height: 35px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .tab { padding: 0 15px; display: flex; align-items: center; font-size: 12px; border-right: 1px solid var(--border); cursor: pointer; color: var(--muted); }
+        .tab.active { background: var(--panel); color: white; border-top: 2px solid var(--accent); }
+
+        /* Editor */
+        .editor-container { flex: 1; position: relative; overflow: hidden; }
+        .CodeMirror { height: 100% !important; font-family: 'Fira Code', monospace; font-size: 14px; }
+
+        /* Terminal Drawer */
+        .terminal { height: 130px; background: #000; border-top: 2px solid var(--border); display: flex; flex-direction: column; }
+        #term-log { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px; color: var(--success); }
+        .term-input-row { display: flex; padding: 6px 12px; background: #111; border-top: 1px solid #222; }
+        .term-input-row input { flex: 1; background: transparent; border: none; color: white; outline: none; font-family: monospace; font-size: 13px; }
+
+        /* DISMISSIBLE KEYBOARD */
+        #kb-drawer {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: #000;
+            z-index: 5000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(100%); border-top: 2px solid var(--accent);
+        }
+        #kb-drawer.active { transform: translateY(0); }
+        #kb-toggle {
+            position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+            background: var(--accent); color: white; padding: 5px 20px;
+            border-radius: 10px 10px 0 0; font-size: 10px; font-weight: bold; cursor: pointer;
+        }
+        .kb-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; padding: 8px; height: 180px; overflow-y: auto; }
+        .kb-grid button { height: 42px; background: var(--surface); color: white; border: 1px solid #333; border-radius: 6px; font-size: 14px; font-weight: bold; }
+
+        /* Modals */
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal { width: 100%; max-width: 500px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; max-height: 80vh; }
+        .modal-header { padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-weight: bold; color: var(--gold); }
+        .modal-body { padding: 15px; overflow-y: auto; flex: 1; }
+
+        /* Mobile Trigger */
+        #mobile-menu { position: fixed; bottom: 80px; right: 20px; width: 55px; height: 55px; border-radius: 50%; background: var(--accent); color: white; border: none; z-index: 6000; font-size: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none; }
+        @media (max-width: 768px) { #mobile-menu { display: flex; align-items: center; justify-content: center; } }
+    </style>
+</head>
+<body>
+
+    <button id="mobile-menu" onclick="Nexus.toggleSidebar()">☰</button>
+
+    <div class="main-container">
+        <!-- Sidebar: Restored from Screenshot -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>DevOS Ultimate</h2>
+            </div>
+            
+            <div class="btn-row">
+                <button class="btn-sidebar btn-primary" onclick="Nexus.createFile()">+ New</button>
+                <button class="btn-sidebar btn-primary" onclick="Nexus.openReconstructor()">💾 Import</button>
+                <button class="btn-sidebar btn-gold" onclick="Nexus.log('Help: Type commands in terminal')">? Help</button>
+            </div>
+
+            <div class="sidebar-scroll">
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="Nexus.toggleAccordion(this)">🌿 Branches <span>▼</span></div>
+                    <div class="accordion-content active" id="branch-list"></div>
+                </div>
+
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="Nexus.toggleAccordion(this)">🔒 Vault <span>▶</span></div>
+                    <div class="accordion-content" id="vault-list"></div>
+                </div>
+
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="Nexus.toggleAccordion(this)">🔍 Search <span>▶</span></div>
+                    <div class="accordion-content" style="padding:10px;">
+                        <input type="text" placeholder="Global Search..." onkeyup="Nexus.searchFiles(this.value)" style="width:100%; background:#000; border:1px solid #333; color:white; padding:8px; border-radius:4px;">
+                        <div id="search-results" style="margin-top:10px; font-size:11px;"></div>
+                    </div>
+                </div>
+
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="Nexus.toggleAccordion(this)">🆔 Declarations <span>▶</span></div>
+                    <div class="accordion-content" id="decl-list"></div>
+                </div>
+
+                <div class="accordion-item">
+                    <div class="accordion-header" onclick="Nexus.toggleAccordion(this)">📄 Files <span>▼</span></div>
+                    <div class="accordion-content active" id="file-explorer"></div>
+                </div>
+            </div>
+
+            <div style="padding: 15px; border-top: 1px solid var(--border);">
+                <button class="btn-sidebar btn-gold" style="width: 100%; height: 48px; font-size: 13px;" onclick="Nexus.openSettings()">
+                    ⚙️ Settings & Shortcuts
+                </button>
+            </div>
+        </aside>
+
+        <!-- Workspace: Restored from Screenshot -->
+        <main class="workspace">
+            <div class="toolbar">
+                <button class="tool-btn btn-copy" onclick="Nexus.copyToClipboard()">📋 Copy</button>
+                <button class="tool-btn btn-preview" onclick="Nexus.runPreview()">▶ Preview</button>
+                <button class="tool-btn btn-compare" onclick="Nexus.toggleDiffMode()">⚖️ Compare</button>
+                <button class="tool-btn btn-intel" onclick="Nexus.runIntel()">🧠 Intel</button>
+                <button class="tool-btn btn-visual" onclick="Nexus.openVisualDesigner()">🎨 Visual</button>
+                <button class="tool-btn btn-time" onclick="Nexus.openTimeMachine()">🕒 Time</button>
+            </div>
+
+            <div class="tab-bar" id="tab-bar"></div>
+
+            <div class="editor-container">
+                <textarea id="editor"></textarea>
+            </div>
+
+            <div class="terminal">
+                <div id="term-log"></div>
+                <div class="term-input-row">
+                    <span>&gt;</span>
+                    <input type="text" id="term-input" placeholder="Enter command or '=' for math...">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="overlay" onclick="Nexus.closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header" id="modal-title">Settings</div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Keyboard Tab -->
+    <div id="kb-drawer">
+        <div id="kb-toggle" onclick="Nexus.toggleKeyboard()">CODE KEYS</div>
+        <div class="kb-grid" id="kb-grid"></div>
+    </div>
+
+    <script>
+        /**
+         * DEVOS NEXUS ULTIMATE - FEATURE COMPLETE SINGLE CORE
+         */
+        const Nexus = {
+            state: {
+                vfs: {}, activeFile: 'index.html', openTabs: [],
+                cm: null, branch: 'main', history: [], vault: []
+            },
+
+            async boot() {
+                localforage.config({ name: 'DevOS' });
+                
+                // Load System Data
+                this.state.vfs = await localforage.getItem('nexus_vfs') || {
+                    'index.html': '<h1>DevOS Ultimate</h1>',
+                    'main.js': 'console.log("Ready.");',
+                    'styles.css': 'body { background: #000; }'
+                };
+                this.state.vault = await localforage.getItem('nexus_vault') || [{name: 'Auth Boilerplate', code: 'const auth = async () => {};'}];
+                
+                // Initialize CodeMirror 5
+                this.state.cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
+                    theme: 'dracula', mode: 'htmlmixed',
+                    lineNumbers: true, lineWrapping: true, tabSize: 4
+                });
+
+                this.state.cm.on('change', () => {
+                    this.state.vfs[this.state.activeFile] = this.state.cm.getValue();
+                    this.persist();
+                    this.takeSnapshot();
+                });
+
+                this.initTerminal();
+                this.openTab('index.html');
+                this.renderAll();
+                this.log("Nexus Ultimate Engine Online.", "var(--accent)");
+            },
+
+            log(msg, color = "var(--text)") {
+                const out = document.getElementById('term-log');
+                const line = document.createElement('div');
+                line.style.color = color;
+                line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                out.appendChild(line);
+                out.scrollTop = out.scrollHeight;
+            },
+
+            initTerminal() {
+                const input = document.getElementById('term-input');
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        this.execute(input.value);
+                        input.value = '';
+                    }
+                };
+            },
+
+            execute(cmd) {
+                const raw = cmd.trim();
+                if (raw.startsWith('=')) {
+                    try { this.log(`∑ Result: ${math.evaluate(raw.substring(1))}`, "var(--warn)"); }
+                    catch(e) { this.log("Math Error", "var(--danger)"); }
+                } else if (raw === 'clear') { document.getElementById('term-log').innerHTML = ''; }
+                else if (raw === 'rebuild') { this.openReconstructor(); }
+                else { this.log(`> ${raw}`); }
+            },
+
+            async persist() {
+                await localforage.setItem('nexus_vfs', this.state.vfs);
+                await localforage.setItem('nexus_vault', this.state.vault);
+            },
+
+            // --- RECONSTRUCTOR ENGINE ---
+            async openReconstructor() {
+                const text = prompt("Paste conversation history to rebuild:");
+                if (!text) return;
+                const pattern = /([\w\-\.]+\.(?:js|html|css|json|md))[:\*\s]*\n+```\w*\n([\s\S]*?)```/gi;
+                let match, count = 0;
+                while ((match = pattern.exec(text)) !== null) {
+                    this.state.vfs[match[1]] = match[2].trim();
+                    count++;
+                }
+                if (count > 0) {
+                    await this.persist();
+                    this.log(`Imported ${count} files.`, "var(--success)");
+                    this.renderAll();
+                }
+            },
+
+            // --- TAB SYSTEM ---
+            openTab(name) {
+                if (!this.state.openTabs.includes(name)) this.state.openTabs.push(name);
+                this.state.activeFile = name;
+                this.state.cm.setValue(this.state.vfs[name] || '');
+                const ext = name.split('.').pop();
+                const modeMap = { html: 'htmlmixed', css: 'css', js: 'javascript' };
+                this.state.cm.setOption('mode', modeMap[ext] || 'javascript');
+                this.renderAll();
+            },
+
+            // --- FEATURE MODULES ---
+            runIntel() {
+                const code = this.state.cm.getValue();
+                const decls = code.match(/(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/g) || [];
+                document.getElementById('decl-list').innerHTML = decls.map(d => `<div class="list-entry">${d}</div>`).join('');
+                this.toggleAccordion(document.querySelector('[onclick*="decl-list"]').parentElement.querySelector('.accordion-header'), true);
+                this.log("Intel scan finished.");
+            },
+
+            openTimeMachine() {
+                const body = `<h3>Last 10 Changes</h3>` + this.state.history.slice(-10).map((h, i) => `
+                    <div class="list-entry" onclick="Nexus.restoreSnapshot(${i})">
+                        Snapshot ${i+1} - ${h.time} <span style="color:var(--accent)">Restore</span>
+                    </div>
+                `).join('');
+                this.showModal("Time Machine", body);
+            },
+
+            takeSnapshot() {
+                const code = this.state.cm.getValue();
+                if (this.state.history.length > 50) this.state.history.shift();
+                this.state.history.push({ time: new Date().toLocaleTimeString(), code, file: this.state.activeFile });
+            },
+
+            restoreSnapshot(index) {
+                const snap = this.state.history[index];
+                if (snap) {
+                    this.state.vfs[snap.file] = snap.code;
+                    if (this.state.activeFile === snap.file) this.state.cm.setValue(snap.code);
+                    this.closeModal();
+                    this.log("Restored snapshot from " + snap.time);
+                }
+            },
+
+            openSettings() {
+                const body = `
+                    <div style="display:grid; gap:10px;">
+                        <button class="btn-sidebar btn-primary" onclick="Nexus.formatCode()">✨ Format Code</button>
+                        <button class="btn-sidebar btn-primary" onclick="Nexus.exportProject()">📦 Export ZIP Bundle</button>
+                        <button class="btn-sidebar btn-gold" onclick="localStorage.clear(); location.reload();">☢️ Hard Reset Environment</button>
+                    </div>
+                `;
+                this.showModal("Settings & Shortcuts", body);
+            },
+
+            formatCode() {
+                const ext = this.state.activeFile.split('.').pop();
+                const code = this.state.cm.getValue();
+                this.state.cm.setValue(js_beautify(code));
+                this.closeModal();
+                this.log("Code formatted.");
+            },
+
+            // --- UI RENDERERS ---
+            renderAll() {
+                document.getElementById('file-explorer').innerHTML = Object.keys(this.state.vfs).sort().map(f => `
+                    <div class="list-entry ${this.state.activeFile === f ? 'active' : ''}" onclick="Nexus.openTab('${f}')">📄 ${f}</div>
+                `).join('');
+
+                document.getElementById('branch-list').innerHTML = `<div class="list-entry active">● ${this.state.branch} (current)</div>`;
+                
+                document.getElementById('vault-list').innerHTML = this.state.vault.map(v => `
+                    <div class="list-entry" onclick="Nexus.cm.replaceSelection('${v.code}')">📦 ${v.name}</div>
+                `).join('');
+
+                document.getElementById('tab-bar').innerHTML = this.state.openTabs.map(t => `
+                    <div class="tab ${this.state.activeFile === t ? 'active' : ''}" onclick="Nexus.openTab('${t}')">${t}</div>
+                `).join('');
+
+                this.renderKeyboard();
+            },
+
+            renderKeyboard() {
+                const kb = document.getElementById('kb-grid');
+                const keys = ["{", "}", "(", ")", ";", "=>", "&&", "||", "!", "=", "$", "_", ... "qwertyuiopasdfghjklzxcvbnm".split("")];
+                kb.innerHTML = keys.map(k => `<button onclick="Nexus.type('${k}')">${k}</button>`).join('');
+            },
+
+            type(k) {
+                const doc = this.state.cm.getDoc();
+                doc.replaceRange(k, doc.getCursor());
+                this.state.cm.focus();
+                if (navigator.vibrate) navigator.vibrate(10);
+            },
+
+            toggleAccordion(header, forceOpen) {
+                const content = header.nextElementSibling;
+                const isOpen = content.classList.contains('active');
+                if (forceOpen || !isOpen) content.classList.add('active');
+                else content.classList.remove('active');
+                header.querySelector('span').innerText = content.classList.contains('active') ? '▼' : '▶';
+            },
+
+            toggleKeyboard() { document.getElementById('kb-drawer').classList.toggle('active'); },
+            toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); },
+            showModal(title, body) {
+                document.getElementById('modal-title').innerText = title;
+                document.getElementById('modal-body').innerHTML = body;
+                document.getElementById('modal-overlay').style.display = 'flex';
+            },
+            closeModal() { document.getElementById('modal-overlay').style.display = 'none'; },
+            
+            copyToClipboard() {
+                const text = this.state.cm.getValue();
+                const el = document.createElement('textarea');
+                el.value = text; document.body.appendChild(el); el.select();
+                document.execCommand('copy'); document.body.removeChild(el);
+                this.log("Code copied.");
+            }
+        };
+
+        window.onload = () => Nexus.boot();
+    </script>
+</body>
+</html>
