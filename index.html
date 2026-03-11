@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DevOS Nexus Ultimate</title>
+    <link rel="manifest" href="./manifest.json">
+
+    <!-- External Libraries -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
+    
+    <!-- CodeMirror 5 (For stable mobile touch handling) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+            --accent: #2f81f7; --success: #3fb950; --danger: #f85149;
+            --warn: #d29922; --text: #c9d1d9; --border: #30363d;
+            --sidebar-width: 280px;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            overflow: hidden; display: flex; flex-direction: column;
+        }
+
+        /* Layout Architecture */
+        .nexus-wrapper { display: flex; flex: 1; overflow: hidden; width: 100%; }
+        
+        @media (orientation: portrait) {
+            .nexus-wrapper { flex-direction: column; }
+            .sidebar { position: fixed; left: -100%; top: 0; height: 100%; width: 85%; z-index: 1000; transition: 0.3s; background: var(--panel); border-right: 1px solid var(--border); }
+            .sidebar.active { left: 0; }
+        }
+
+        @media (orientation: landscape) {
+            .sidebar { width: var(--sidebar-width); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
+        }
+
+        .workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+
+        /* Tabs UI */
+        .tab-bar { display: flex; background: var(--panel); overflow-x: auto; border-bottom: 1px solid var(--border); height: 40px; align-items: center; }
+        .tab { padding: 8px 15px; font-size: 13px; border-right: 1px solid var(--border); cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+        .tab.active { background: var(--bg); border-bottom: 2px solid var(--accent); color: white; }
+        .tab .close-tab { font-size: 10px; opacity: 0.5; }
+
+        /* Toolbar */
+        .toolbar { display: flex; background: var(--surface); padding: 5px 10px; gap: 10px; overflow-x: auto; border-bottom: 1px solid var(--border); }
+        .toolbar button { background: transparent; border: 1px solid var(--border); color: var(--text); padding: 5px 12px; border-radius: 4px; font-size: 12px; white-space: nowrap; }
+
+        /* Editor Area */
+        .editor-container { flex: 1; position: relative; overflow: hidden; }
+        .CodeMirror { height: 100% !important; font-size: 15px; line-height: 1.4; }
+
+        /* Terminal Drawer */
+        #nexus-terminal {
+            height: 140px; background: #000; border-top: 1px solid var(--border);
+            display: flex; flex-direction: column; z-index: 10;
+        }
+        #terminal-output { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 12px; color: var(--success); }
+        .terminal-input-row { display: flex; padding: 8px; border-top: 1px solid var(--border); background: #111; }
+        .terminal-input-row input { flex: 1; background: transparent; border: none; color: white; outline: none; margin-left: 8px; font-family: monospace; }
+
+        /* DISMISSIBLE KEYBOARD */
+        #keyboard-wrapper {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: #000;
+            z-index: 5000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: translateY(100%);
+        }
+        #keyboard-wrapper.active { transform: translateY(0); }
+        
+        #keyboard-handle {
+            position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+            background: var(--accent); color: white; padding: 5px 20px;
+            border-radius: 10px 10px 0 0; font-size: 10px; font-weight: bold; cursor: pointer;
+        }
+
+        #devos-keyboard {
+            display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; padding: 8px; height: 200px; overflow-y: auto;
+        }
+        #devos-keyboard button {
+            height: 44px; background: #222; color: white; border: 1px solid #333; border-radius: 6px; font-size: 14px;
+        }
+
+        /* Sidebar Lists */
+        .sidebar-section { padding: 15px 10px; border-bottom: 1px solid var(--border); }
+        .section-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: flex; justify-content: space-between; }
+        .list-item { padding: 8px 10px; border-radius: 4px; font-size: 13px; cursor: pointer; display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .list-item:active { background: var(--surface); }
+        .list-item.active { background: var(--surface); border-left: 3px solid var(--accent); }
+
+        /* Mobile Menu */
+        #menu-btn { position: fixed; bottom: 20px; right: 20px; width: 50px; height: 50px; border-radius: 50%; background: var(--accent); color: white; border: none; z-index: 6000; font-size: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        @media (orientation: landscape) { #menu-btn { display: none; } }
+
+        /* Preview Overlay */
+        #preview-overlay { position: fixed; inset: 0; background: var(--bg); z-index: 10000; display: none; flex-direction: column; }
+        #preview-frame { flex: 1; border: none; background: white; }
+    </style>
+</head>
+<body class="theme-dracula">
+
+    <button id="menu-btn" onclick="Nexus.toggleSidebar()">☰</button>
+
+    <!-- Preview View -->
+    <div id="preview-overlay">
+        <div style="background: var(--panel); padding: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <b>LIVE PREVIEW</b>
+            <button onclick="Nexus.closePreview()" style="background: var(--danger); border: none; padding: 5px 15px; color: white; border-radius: 4px;">Close</button>
+        </div>
+        <iframe id="preview-frame"></iframe>
+    </div>
+
+    <div class="nexus-wrapper">
+        <aside id="ui-sidebar" class="sidebar">
+            <div style="padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <h2 style="margin:0; font-size: 18px; color: var(--accent);">Nexus Gold</h2>
+            </div>
+            
+            <div class="sidebar-section">
+                <div class="section-title">Files <span onclick="Nexus.createFile()">+</span></div>
+                <div id="file-explorer"></div>
+            </div>
+
+            <div class="sidebar-section">
+                <div class="section-title">Branches</div>
+                <div id="branch-list"></div>
+            </div>
+
+            <div class="sidebar-section" style="border: none;">
+                <button onclick="Nexus.executeCommand('import')" style="width: 100%; background: var(--surface); border: 1px solid var(--border); color: white; padding: 12px; border-radius: 6px; margin-bottom: 10px;">🛠️ Auto-Rebuild System</button>
+                <button onclick="Nexus.executeCommand('build')" style="width: 100%; background: var(--accent); border: none; color: white; padding: 12px; border-radius: 6px;">📦 Export Production ZIP</button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <div class="tab-bar" id="tab-bar"></div>
+            
+            <div class="toolbar">
+                <button onclick="Nexus.formatCode()">✨ Format</button>
+                <button onclick="Nexus.runPreview()">▶ Run</button>
+                <button onclick="Nexus.executeCommand('math')">∑ Math</button>
+                <button onclick="Nexus.toggleKeyboard()">⌨️ Keys</button>
+            </div>
+
+            <div class="editor-container">
+                <textarea id="real-editor"></textarea>
+            </div>
+
+            <div id="nexus-terminal">
+                <div id="terminal-output"></div>
+                <div class="terminal-input-row">
+                    <span>&gt;</span>
+                    <input type="text" id="term-input" placeholder="Type 'help' or '= 5+5'...">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- DISMISSIBLE KEYBOARD WRAPPER -->
+    <div id="keyboard-wrapper" id="kb-wrap">
+        <div id="keyboard-handle" onclick="Nexus.toggleKeyboard()">CODE KEYS</div>
+        <div id="devos-keyboard"></div>
+    </div>
+
+    <script>
+        /**
+         * DEVOS NEXUS GOLD - ULTIMATE INTEGRATED CORE
+         */
+        const Nexus = {
+            state: {
+                vfs: {},
+                tabs: [],
+                activeTab: null,
+                cm: null,
+                branches: { main: {} },
+                currentBranch: 'main'
+            },
+
+            async boot() {
+                localforage.config({ name: 'DevOS' });
+                
+                // 1. Load VFS
+                this.state.vfs = await localforage.getItem('nexus_vfs') || {
+                    'index.html': '<!DOCTYPE html>\n<html>\n<head>\n<style>\n body { background: #000; color: #3fb950; text-align: center; font-family: sans-serif; padding-top: 50px; }\n</style>\n</head>\n<body>\n <h1>Nexus Gold Active</h1>\n <p>Start coding to see it live.</p>\n</body>\n</html>',
+                    'main.js': 'console.log("Nexus Gold Engine initialized.");',
+                    'styles.css': 'body { margin: 0; }'
+                };
+
+                // 2. Initialize Editor
+                this.state.cm = CodeMirror.fromTextArea(document.getElementById('real-editor'), {
+                    theme: 'dracula',
+                    mode: 'javascript',
+                    lineNumbers: true,
+                    lineWrapping: true,
+                    tabSize: 4,
+                    indentUnit: 4,
+                    viewportMargin: Infinity
+                });
+
+                this.state.cm.on('change', () => {
+                    if (this.state.activeTab) {
+                        this.state.vfs[this.state.activeTab] = this.state.cm.getValue();
+                        this.saveVFS();
+                    }
+                });
+
+                // 3. Setup Components
+                this.initTerminal();
+                this.renderExplorer();
+                this.renderKeyboard('js');
+                this.openTab('index.html');
+                
+                this.log("DevOS Nexus Gold online. Multi-module core loaded.", "var(--accent)");
+            },
+
+            log(msg, color = "var(--text)") {
+                const out = document.getElementById('terminal-output');
+                const line = document.createElement('div');
+                line.style.color = color;
+                line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+                out.appendChild(line);
+                out.scrollTop = out.scrollHeight;
+            },
+
+            initTerminal() {
+                const input = document.getElementById('term-input');
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        this.executeCommand(input.value);
+                        input.value = '';
+                    }
+                };
+            },
+
+            executeCommand(cmd) {
+                const raw = cmd.trim();
+                const input = raw.toLowerCase();
+                this.log(`> ${raw}`, "var(--accent)");
+
+                if (input.startsWith('=')) {
+                    this.solveMath(raw.substring(1));
+                } else if (input === 'help') {
+                    this.log("Nexus Commands: help, clear, import, math, build, branch, nuke");
+                } else if (input === 'clear') {
+                    document.getElementById('terminal-output').innerHTML = '';
+                } else if (input === 'import' || input === 'rebuild') {
+                    this.openImporter();
+                } else if (input === 'math') {
+                    const expr = prompt("Enter equation (e.g. sin(45) * 10):");
+                    if (expr) this.solveMath(expr);
+                } else if (input === 'build') {
+                    this.bundleProduction();
+                } else if (input === 'nuke') {
+                    if (confirm("NUKE EVERYTHING? This wipes all files.")) {
+                        localforage.clear().then(() => location.reload());
+                    }
+                } else {
+                    this.log(`Command not recognized: ${input}`, "var(--danger)");
+                }
+            },
+
+            async saveVFS() {
+                await localforage.setItem('nexus_vfs', this.state.vfs);
+            },
+
+            // --- TAB SYSTEM ---
+            openTab(name) {
+                if (!this.state.tabs.includes(name)) {
+                    this.state.tabs.push(name);
+                }
+                this.state.activeTab = name;
+                
+                const ext = name.split('.').pop();
+                const modeMap = { 'js': 'javascript', 'html': 'htmlmixed', 'css': 'css' };
+                this.state.cm.setOption('mode', modeMap[ext] || 'javascript');
+                this.state.cm.setValue(this.state.vfs[name] || '');
+                
+                this.renderTabs();
+                this.renderExplorer();
+                this.renderKeyboard(ext);
+                if (window.innerWidth < 768) this.toggleSidebar(false);
+            },
+
+            renderTabs() {
+                const bar = document.getElementById('tab-bar');
+                bar.innerHTML = this.state.tabs.map(t => `
+                    <div class="tab ${this.state.activeTab === t ? 'active' : ''}" onclick="Nexus.openTab('${t}')">
+                        ${t} <span class="close-tab" onclick="Nexus.closeTab('${t}', event)">✕</span>
+                    </div>
+                `).join('');
+            },
+
+            closeTab(name, e) {
+                e.stopPropagation();
+                this.state.tabs = this.state.tabs.filter(t => t !== name);
+                if (this.state.activeTab === name) {
+                    this.state.activeTab = this.state.tabs[this.state.tabs.length - 1] || null;
+                }
+                if (this.state.activeTab) this.openTab(this.state.activeTab);
+                else {
+                    this.state.cm.setValue('');
+                    this.renderTabs();
+                }
+            },
+
+            // --- UI RENDERERS ---
+            renderExplorer() {
+                const ex = document.getElementById('file-explorer');
+                ex.innerHTML = Object.keys(this.state.vfs).sort().map(f => `
+                    <div class="list-item ${this.state.activeTab === f ? 'active' : ''}" onclick="Nexus.openTab('${f}')">
+                        <span>📄 ${f}</span>
+                        <span onclick="Nexus.deleteFile('${f}', event)" style="color:var(--danger); opacity:0.5;">✕</span>
+                    </div>
+                `).join('');
+            },
+
+            // --- KEYBOARD LOGIC ---
+            renderKeyboard(ext) {
+                const kb = document.getElementById('devos-keyboard');
+                const alpha = "qwertyuiopasdfghjklzxcvbnm".split("");
+                const symbols = (ext === 'html') ? ['<', '>', '/', '=', '"', '!', 'div', 'p'] : ['{', '}', '(', ')', ';', '=>', '&&', '||'];
+                
+                kb.innerHTML = [...symbols, ...alpha].map(k => `
+                    <button onclick="Nexus.type('${k}')">${k}</button>
+                `).join('');
+            },
+
+            type(char) {
+                const doc = this.state.cm.getDoc();
+                const cursor = doc.getCursor();
+                doc.replaceRange(char, cursor);
+                this.state.cm.focus();
+                this.haptic(10);
+            },
+
+            toggleKeyboard() {
+                document.getElementById('keyboard-wrapper').classList.toggle('active');
+            },
+
+            // --- TOOLS ---
+            formatCode() {
+                const ext = this.state.activeTab?.split('.').pop();
+                const code = this.state.cm.getValue();
+                let formatted = code;
+                
+                if (ext === 'js') formatted = js_beautify(code);
+                else if (ext === 'html') formatted = html_beautify(code);
+                else if (ext === 'css') formatted = css_beautify(code);
+                
+                this.state.cm.setValue(formatted);
+                this.log("Code Beautified ✨");
+            },
+
+            runPreview() {
+                const overlay = document.getElementById('preview-overlay');
+                const frame = document.getElementById('preview-frame');
+                
+                const html = this.state.vfs['index.html'] || '';
+                const css = `<style>${this.state.vfs['styles.css'] || ''}</style>`;
+                const js = `<script>${this.state.vfs['main.js'] || ''}<\/script>`;
+                
+                const blob = new Blob([html + css + js], { type: 'text/html' });
+                frame.src = URL.createObjectURL(blob);
+                overlay.style.display = 'flex';
+                this.haptic(30);
+            },
+
+            closePreview() { document.getElementById('preview-overlay').style.display = 'none'; },
+
+            solveMath(expr) {
+                try {
+                    const result = math.evaluate(expr);
+                    this.log(`∑ Result: ${result}`, "var(--warn)");
+                } catch (e) { this.log("Math Error", "var(--danger)"); }
+            },
+
+            async openImporter() {
+                const text = prompt("Paste conversation/nexus data:");
+                if (!text) return;
+                const pattern = /([\w\-\.]+\.(?:js|html|css|json|md))[:\*\s]*\n+```\w*\n([\s\S]*?)```/gi;
+                let match, count = 0;
+                while ((match = pattern.exec(text)) !== null) {
+                    this.state.vfs[match[1]] = match[2].trim();
+                    count++;
+                }
+                if (count > 0) {
+                    await this.saveVFS();
+                    this.log(`Imported ${count} modules. Reloading...`, "var(--success)");
+                    setTimeout(() => location.reload(), 800);
+                }
+            },
+
+                        // --- FILE MANAGEMENT ---
+            createFile() {
+                const name = prompt("Filename (e.g. utils.js):");
+                if (name && !this.state.vfs[name]) {
+                    this.state.vfs[name] = "";
+                    this.saveVFS();
+                    this.openTab(name);
+                    this.log(`Created: ${name}`, "var(--success)");
+                } else if (name) {
+                    this.log("Error: File already exists.", "var(--danger)");
+                }
+            },
+
+            deleteFile(name, e) {
+                if (e) e.stopPropagation();
+                if (confirm(`☢️ Delete ${name}? This cannot be undone.`)) {
+                    delete this.state.vfs[name];
+                    // Clean up tabs
+                    this.state.tabs = this.state.tabs.filter(t => t !== name);
+                    if (this.state.activeTab === name) {
+                        this.state.activeTab = this.state.tabs[0] || null;
+                    }
+                    
+                    this.saveVFS();
+                    this.renderExplorer();
+                    this.renderTabs();
+                    
+                    if (this.state.activeTab) {
+                        this.openTab(this.state.activeTab);
+                    } else {
+                        this.state.cm.setValue('');
+                    }
+                    this.log(`Deleted: ${name}`, "var(--warn)");
+                }
+            },
+
+            // --- PRODUCTION BUNDLER ---
+            async bundleProduction() {
+                this.log("⚙️ Starting Production Build...");
+                try {
+                    const zip = new JSZip();
+                    // Add all VFS files to the zip
+                    Object.entries(this.state.vfs).forEach(([name, code]) => {
+                        zip.file(name, code);
+                    });
+
+                    const content = await zip.generateAsync({ type: "blob" });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = `nexus-project-${Date.now()}.zip`;
+                    link.click();
+                    
+                    this.log("📦 ZIP Bundle generated and downloaded.", "var(--success)");
+                    this.haptic([50, 30, 50]);
+                } catch (err) {
+                    this.log("Build Error: " + err.message, "var(--danger)");
+                }
+            },
+
+            // --- UI HELPERS ---
+            toggleSidebar(force) {
+                const sb = document.getElementById('ui-sidebar');
+                if (force === undefined) {
+                    sb.classList.toggle('active');
+                } else {
+                    force ? sb.classList.add('active') : sb.classList.remove('active');
+                }
+            },
+
+            haptic(pattern) {
+                if (navigator.vibrate) {
+                    navigator.vibrate(pattern);
+                }
+            }
+        };
+
+        // Initialize Nexus on Window Load
+        window.onload = () => {
+            Nexus.boot().catch(err => {
+                console.error("Boot Failure:", err);
+                alert("Nexus failed to boot. Check console for details.");
+            });
+        };
+    </script>
+</body>
+</html>
+
+
+This snippet closes the `Nexus` object, attaches the `window.onload` listener to start the engine, and closes out the HTML structure. You're now ready to run the full environment!
+
