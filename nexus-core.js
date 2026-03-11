@@ -71,19 +71,23 @@ const Nexus = {
     },
 
     executeCommand(cmd) {
-        this.updateTerminal(`> ${cmd}`, 'var(--accent)');
-        const input = cmd.toLowerCase().trim();
+    this.updateTerminal(`> ${cmd}`, 'var(--accent)');
+    const input = cmd.toLowerCase().trim();
 
-        if (input === 'help') {
-            this.updateTerminal("Available: sync, math, theme, clear, layout");
-        } else if (input.startsWith('math ')) {
-            this.solveMath(cmd.replace('math ', ''));
-        } else if (input === 'sync') {
-            this.startSync();
-        } else {
-            this.updateTerminal(`Unknown command: ${input}`, 'var(--warn)');
-        }
-    },
+    if (input.startsWith('math ')) {
+        NexusMath.generateLogic(cmd.replace('math ', ''));
+    } else if (input.startsWith('branch ')) {
+        NexusGit.createBranch(cmd.replace('branch ', ''));
+    } else if (input === 'analyze') {
+        Intelligence.analyze();
+    } else if (input === 'build') {
+        Vault.compile();
+    } else if (input === 'sync') {
+        NexusSync.init();
+    } else {
+        Nexus.terminal.process(input); // Fallback to terminal.js router
+    }
+            }
 
     checkOrientation() {
         this.state.orientation = window.innerWidth > window.innerHeight ? 'landscape' : 'portrait';
