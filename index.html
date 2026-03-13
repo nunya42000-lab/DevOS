@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DevOS Nexus Prime</title>
+    <link rel="manifest" href="./manifest.json">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    
+    <script type="module">
+        import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
+        import { EditorView } from "https://esm.sh/@codemirror/view";
+        import { EditorState } from "https://esm.sh/@codemirror/state";
+        import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
+        import { html } from "https://esm.sh/@codemirror/lang-html";
+        import { css } from "https://esm.sh/@codemirror/lang-css";
+        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
+
+        // Bind to window so the Nexus object can use it
+        window.CM6 = { basicSetup, EditorView, EditorState, javascript, html, css, oneDark };
+        
+        // Signal to Nexus that CodeMirror 6 is ready to boot
+        window.dispatchEvent(new Event('cm6-ready'));
+    </script>
+
+    <style>
+        :root {
+            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+            --accent: #2f81f7; --success: #3fb950; --danger: #f85149;
+            --warn: #d29922; --text: #c9d1d9; --border: #30363d;
+            --gold: #d29922; --sidebar-width: 300px; --term-height: 180px;
+            --ui-scale: 1;
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: none; }
+
+        .sidebar-scroll, #term-out, .modal-body, .cm-scroller { touch-action: pan-y; }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%;
+            background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            overflow: hidden; font-size: calc(14px * var(--ui-scale));
+        }
+
+        .nexus-root { display: flex; height: 100%; width: 100%; overflow: hidden; transform-origin: top left; }
+
+        /* Sidebar Default (Handles Mobile Portrait & Landscape) */
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: -100%; /* Hidden off-screen */
+            bottom: 0;
+            height: 100%;
+            width: 280px; 
+            max-width: 85vw; /* Prevents overflow on small phones */
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10000;
+        }
+
+        /* Slide in when active */
+        .sidebar.active {
+            left: 0; 
+        }
+
+        /* Dock into layout ONLY on large screens */
+        @media (min-width: 1024px) {
+            .sidebar {
+                position: relative;
+                left: 0;
+                flex-shrink: 0;
+            }
+        }
+
+        .sidebar-header { padding: 15px; border-bottom: 1px solid var(--border); background: var(--bg); flex-shrink: 0; }
+        .sidebar-header h2 { margin: 0; font-size: 1.2rem; color: var(--gold); }
+
+        .sidebar-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+        
+        .acc-item { border-bottom: 1px solid var(--border); }
+        .acc-head { padding: 12px 15px; background: var(--surface); cursor: pointer; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; color: #8b949e; display: flex; justify-content: space-between; align-items: center; }
+        .acc-body { display: none; padding: 0; background: var(--panel); }
+        .acc-body.active { display: block; }
+
+        .list-entry { padding: 10px 15px; font-size: 0.85rem; color: var(--text); cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid transparent; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .list-entry.active { background: var(--surface); border-left-color: var(--gold); color: white; }
+
+        .workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+        
+        .toolbar { display: flex; background: var(--panel); padding: 8px; gap: 8px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex-shrink: 0; touch-action: pan-x; }
+        .tool-btn { padding: 8px 14px; border-radius: 6px; border: none; font-size: 0.7rem; font-weight: bold; color: white; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+        .btn-blue { background: var(--accent); } .btn-gold { background: var(--gold); } .btn-green { background: var(--success); } .btn-gray { background: #30363d; }
+
+        .tab-bar { display: flex; background: var(--bg); height: 35px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex-shrink: 0; touch-action: pan-x; }
+        .tab { padding: 0 12px; display: flex; align-items: center; font-size: 0.75rem; border-right: 1px solid var(--border); cursor: pointer; color: #8b949e; background: var(--panel); min-width: 80px; }
+        .tab.active { background: var(--bg); color: white; border-top: 2px solid var(--gold); }
+
+        .editor-area { flex: 1; overflow: hidden; position: relative; background: #000; }
+        
+        /* Ensure CodeMirror 6 fills the area */
+        .cm-editor { height: 100%; font-size: 14px; font-family: 'Fira Code', monospace; }
+
+        #resizer { height: 8px; background: var(--border); cursor: ns-resize; flex-shrink: 0; position: relative; z-index: 5; }
+        #resizer::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 40px; height: 2px; background: var(--border); border-radius: 2px; }
+        
+        .terminal { height: var(--term-height); background: #000; display: flex; flex-direction: column; flex-shrink: 0; }
+        #term-out { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px; color: var(--success); }
+        .term-input { display: flex; padding: 6px 12px; background: #111; border-top: 1px solid #222; align-items: center; }
+        .term-input input { flex: 1; background: transparent; border: none; color: white; outline: none; font-family: monospace; font-size: 14px; margin-left: 5px; }
+
+        #kb-drawer { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; z-index: 5000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(100%); border-top: 2px solid var(--gold); }
+        #kb-drawer.active { transform: translateY(0); }
+        #kb-handle { position: absolute; top: -32px; left: 50%; transform: translateX(-50%); background: var(--gold); color: white; padding: 5px 22px; border-radius: 10px 10px 0 0; font-size: 10px; font-weight: bold; cursor: pointer; }
+        .kb-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; padding: 8px; height: 190px; overflow-y: auto; touch-action: pan-y; }
+        .kb-grid button { height: 42px; background: #222; color: white; border: 1px solid #333; border-radius: 6px; font-size: 14px; font-weight: bold; }
+
+        .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .modal { width: 100%; max-width: 550px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; touch-action: pan-y; }
+
+        #mobile-nav { position: fixed; bottom: 100px; right: 20px; width: 55px; height: 55px; border-radius: 50%; background: var(--gold); color: white; border: none; z-index: 6000; font-size: 22px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; }
+        @media (max-width: 1024px) { #mobile-nav { display: flex; } }
+
+        .scale-indicator { position: fixed; top: 10px; right: 10px; background: var(--gold); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; opacity: 0; transition: opacity 0.5s; z-index: 9999; pointer-events: none; }
+    </style>
+</head>
+<body>
+
+    <div id="scale-toast" class="scale-indicator">100%</div>
+    <button id="mobile-nav" onclick="Nexus.toggleSidebar()">☰</button>
+
+    <div class="nexus-root" id="app-root">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Nexus Prime</h2>
+            </div>
+            
+            <div style="padding: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; flex-shrink: 0;">
+                <button class="tool-btn btn-blue" onclick="Nexus.createFile()">+ New File</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.triggerImport()">💾 Import</button>
+                <button class="tool-btn btn-gray" onclick="Nexus.exportZIP()">📦 ZIP Pro</button>
+                <button class="tool-btn btn-gray" onclick="Nexus.exportTXT()">📄 TXT Out</button>
+            </div>
+
+            <div class="sidebar-scroll">
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">🌿 Branches <span>▼</span></div>
+                    <div class="acc-body active" id="branch-list"></div>
+                </div>
+
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">🔍 Global Search <span>▶</span></div>
+                    <div class="acc-body" style="padding:10px;">
+                        <input type="text" id="find-box" placeholder="Find text..." style="width:100%; background:#000; border:1px solid #333; color:white; padding:8px; border-radius:4px; margin-bottom:5px;">
+                        <input type="text" id="replace-box" placeholder="Replace..." style="width:100%; background:#000; border:1px solid #333; color:white; padding:8px; border-radius:4px; margin-bottom:5px;">
+                        <div style="display:flex; gap:5px;">
+                            <button onclick="Nexus.searchAll()" style="flex:1; background:var(--accent); border:none; color:white; padding:6px; border-radius:4px; font-size:10px;">Search</button>
+                            <button onclick="Nexus.replaceAll()" style="flex:1; background:var(--danger); border:none; color:white; padding:6px; border-radius:4px; font-size:10px;">Replace All</button>
+                        </div>
+                        <div id="search-results" style="margin-top:10px; max-height:200px; overflow-y:auto;"></div>
+                    </div>
+                </div>
+
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">🆔 Intelligence <span>▶</span></div>
+                    <div class="acc-body" id="intel-list"></div>
+                </div>
+
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">📄 Explorer <span>▼</span></div>
+                    <div class="acc-body active" id="explorer"></div>
+                </div>
+            </div>
+
+            <div style="padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 5px;">
+                <button class="tool-btn btn-gold" style="flex: 1; height: 45px; justify-content: center;" onclick="Nexus.openHelp()">📖 Help</button>
+                <button class="tool-btn btn-gold" style="flex: 1; height: 45px; justify-content: center;" onclick="Nexus.openSettings()">⚙️ Settings</button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <div class="toolbar">
+                <button class="tool-btn btn-gray" onclick="Nexus.copy()">📋 Copy</button>
+                <button class="tool-btn btn-gray" onclick="Nexus.cut()">✂️ Cut</button>
+                <button class="tool-btn btn-green" onclick="Nexus.run()">▶ Preview</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.runIntel()">🧠 Intel</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.visual()">🎨 Visual</button>
+                <button class="tool-btn btn-gray" onclick="Nexus.history()">🕒 Time</button>
+            </div>
+
+            <div class="tab-bar" id="tabs"></div>
+
+            <div class="editor-area">
+                <textarea id="editor"></textarea>
+            </div>
+
+            <div id="resizer"></div>
+
+            <div class="terminal" id="terminal">
+                <div id="term-out"></div>
+                <div class="term-input">
+                    <button onclick="Nexus.startVoice()" id="voice-btn" style="background:none; border:none; font-size:1.2rem;">🎙️</button>
+                    <input type="text" id="term-in" placeholder="Command or '=' for math...">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="modal-overlay" class="overlay" onclick="Nexus.closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h3 id="modal-title" style="margin:0; color:var(--gold);">Modal</h3>
+                <button onclick="Nexus.closeModal()" style="background:none; border:none; color:white; font-size:20px;">✕</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <div id="kb-drawer">
+        <div id="kb-handle" onclick="Nexus.toggleKb()">NEXUS KEYS</div>
+        <div class="kb-grid" id="kb-grid"></div>
+    </div>
+
+    <input type="file" id="import-input" style="display:none;" accept=".zip,.txt">
+
+    <script>
+        const Nexus = {
+            state: {
+                vfs: {}, active: 'index.html', tabs: [], cm: null,
+                snapshots: [], branches: ['main'], currentBranch: 'main',
+                config: { 
+                    haptics: true, 
+                    scale: 1, 
+                    termHeight: 180, 
+                    gesturesEnabled: true,
+                    kb: ['{', '}', '(', ')', ';', '=>', '&&', '||', '!', '=', '$', '_', '.', ',', '+', '-', '*', '/', '<', '>'] 
+                }
+            },
+
+            async boot() {
+                localforage.config({ name: 'Nexus_Prime_V2' });
+                this.state.vfs = await localforage.getItem('vfs') || {
+                    'index.html': '<h1>Nexus Prime</h1>',
+                    'main.js': 'console.log("Ready.");',
+                    'styles.css': 'body { background: #000; }'
+                };
+                this.state.config = await localforage.getItem('config') || this.state.config;
+
+                this.applyUIProperties();
+
+                // Wait for CodeMirror 6 modules to finish loading
+                if (!window.CM6) {
+                    await new Promise(r => window.addEventListener('cm6-ready', r));
+                }
+
+                this.initEditor(this.state.vfs['index.html'] || '');
+                this.initResizer();
+                this.initGestures();
+                this.initImporter();
+                this.initTerm();
+                this.renderAll();
+                this.openFile('index.html');
+                this.log("Nexus Prime v6.0 Active (CM6 Enabled).", "var(--gold)");
+            },
+
+            initEditor(initialContent) {
+                const editorArea = document.querySelector('.editor-area');
+                editorArea.innerHTML = ''; // Wipe out the old textarea
+
+                const updateListener = window.CM6.EditorView.updateListener.of((update) => {
+                    if (update.docChanged) {
+                        this.state.vfs[this.state.active] = update.state.doc.toString();
+                        this.save();
+                    }
+                });
+
+                this.state.cm = new window.CM6.EditorView({
+                    state: window.CM6.EditorState.create({
+                        doc: initialContent,
+                        extensions: [
+                            window.CM6.basicSetup,
+                            window.CM6.oneDark,
+                            window.CM6.html(), 
+                            updateListener
+                        ]
+                    }),
+                    parent: editorArea
+                });
+            },
+
+            async save() { 
+                await localforage.setItem('vfs', this.state.vfs);
+                await localforage.setItem('config', this.state.config); 
+            },
+
+            applyUIProperties() {
+                document.documentElement.style.setProperty('--ui-scale', this.state.config.scale);
+                document.documentElement.style.setProperty('--term-height', this.state.config.termHeight + 'px');
+            },
+
+            openFile(filename) {
+                this.state.active = filename;
+                const content = this.state.vfs[filename] || '';
+                
+                // CodeMirror 6 dispatch replacement
+                if (this.state.cm) {
+                    this.state.cm.dispatch({
+                        changes: { from: 0, to: this.state.cm.state.doc.length, insert: content }
+                    });
+                }
+                
+                this.renderAll();
+                
+                // Auto-close sidebar on smaller screens when file is clicked
+                if (window.innerWidth < 1024) {
+                    document.getElementById('sidebar').classList.remove('active');
+                }
+            },
+
+            type(val) {
+                if (!this.state.cm) return;
+                
+                const cursor = this.state.cm.state.selection.main.head;
+                
+                if (val === 'BACKSPACE') {
+                    if (cursor > 0) {
+                        this.state.cm.dispatch({
+                            changes: { from: cursor - 1, to: cursor, insert: "" }
+                        });
+                    }
+                } else {
+                    this.state.cm.dispatch({
+                        changes: { from: cursor, insert: val },
+                        selection: { anchor: cursor + val.length } 
+                    });
+                }
+                
+                if (this.state.config.haptics && window.navigator.vibrate) {
+                    window.navigator.vibrate(50);
+                }
+                // Sync check
+                if (typeof NexusSync !== 'undefined' && NexusSync.conn) NexusSync.sendKeystroke(val);
+            },
+
+            toggleSidebar() {
+                document.getElementById('sidebar').classList.toggle('active');
+            },
+
+            triggerImport() {
+                document.getElementById('import-input').click();
+            },
+
+            // --- GESTURE ENGINE (Pinch-to-Zoom) ---
+            initGestures() {
+                let initialDist = 0; let initialScale = 1;
+                const toast = document.getElementById('scale-toast');
+
+                window.addEventListener('touchstart', (e) => {
+                    if (!this.state.config.gesturesEnabled) return;
+                    if (e.touches.length === 2) {
+                        initialDist = Math.hypot( e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY );
+                        initialScale = this.state.config.scale;
+                    }
+                }, { passive: false });
+                window.addEventListener('touchmove', (e) => {
+                    if (!this.state.config.gesturesEnabled || e.touches.length !== 2) return;
+                    e.preventDefault(); 
+                    const currentDist = Math.hypot( e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY );
+                    const factor = currentDist / initialDist;
+                    const newScale = Math.max(0.6, Math.min(2.0, initialScale * factor));
+                    this.state.config.scale = parseFloat(newScale.toFixed(2));
+                    this.applyUIProperties();
+                    toast.innerText = Math.round(this.state.config.scale * 100) + '%';
+                    toast.style.opacity = '1';
+                }, { passive: false });
+                window.addEventListener('touchend', () => {
+                    if (!this.state.config.gesturesEnabled) return;
+                    setTimeout(() => toast.style.opacity = '0', 1000);
+                    this.save();
+                });
+            },
+
+            // --- RESIZER LOGIC ---
+            initResizer() {
+                const resizer = document.getElementById('resizer');
+                let startY, startH;
+                const onDown = (e) => {
+                    startY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                    startH = this.state.config.termHeight;
+                    document.addEventListener('mousemove', onMove);
+                    document.addEventListener('mouseup', onUp);
+                    document.addEventListener('touchmove', onMove, { passive: false });
+                    document.addEventListener('touchend', onUp);
+                };
+                const onMove = (e) => {
+                    const currentY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+                    const delta = startY - currentY;
+                    this.state.config.termHeight = Math.max(100, Math.min(window.innerHeight * 0.7, startH + delta));
+                    this.applyUIProperties();
+                };
+                const onUp = () => {
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                    document.removeEventListener('touchmove', onMove);
+                    document.removeEventListener('touchend', onUp);
+                    this.save();
+                };
+                resizer.addEventListener('mousedown', onDown);
+                resizer.addEventListener('touchstart', onDown);
+            },
+
+            // --- SETTINGS ---
+            openSettings() {
+                const body = `
+                    <div style="display:grid; gap:15px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>Pinch Zoom Gestures</span>
+                            <input type="checkbox" id="gest-tog" ${this.state.config.gesturesEnabled ? 'checked' : ''}>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>Haptic Vibrate</span>
+                            <input type="checkbox" id="hap-tog" ${this.state.config.haptics ? 'checked' : ''}>
+                        </div>
+                        <div>
+                            <label style="font-size:12px; display:block; margin-bottom:5px;">Manual UI Scale (0.6 - 2.0)</label>
+                            <input type="range" id="ui-scale-rng" min="0.6" max="2.0" step="0.05" value="${this.state.config.scale}" style="width:100%;">
+                        </div>
+                        <button class="tool-btn btn-gold" style="width:100%; height:45px; justify-content:center;" onclick="Nexus.saveSettings()">APPLY CONFIG</button>
+                    </div>
+                `;
+                this.showModal("Control Center", body);
+            },
+
+            saveSettings() {
+                this.state.config.gesturesEnabled = document.getElementById('gest-tog').checked;
+                this.state.config.haptics = document.getElementById('hap-tog').checked;
+                this.state.config.scale = parseFloat(document.getElementById('ui-scale-rng').value);
+                this.save();
+                this.applyUIProperties();
+                this.closeModal();
+                this.log("Settings updated.", "var(--success)");
+            },
+
+            // --- FILE PORTER ---
+            initImporter() {
+                const input = document.getElementById('import-input');
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    if (file.name.endsWith('.zip')) {
+                        const zip = await JSZip.loadAsync(file);
+                        zip.forEach(async (path, zipFile) => {
+                            if (!zipFile.dir) {
+                                const content = await zipFile.async("string");
+                                this.state.vfs[path] = content;
+                                this.renderAll();
+                            }
+                        });
+                        this.log(`Imported ZIP: ${file.name}`, "var(--success)");
+                    } else if (file.name.endsWith('.txt')) {
+                        const reader = new FileReader();
+                        reader.onload = (re) => this.digestImport(re.target.result);
+                        reader.readAsText(file);
+                    }
+                    input.value = "";
+                };
+            },
+
+            digestImport(text) {
+                const pattern = /([\w\-\.]+\.(?:js|html|css|json|md|txt))[:\*\s]*\n+\`\`\`\w*\n([\s\S]*?)\`\`\`/gi;
+                let match, count = 0;
+                while ((match = pattern.exec(text)) !== null) {
+                    this.state.vfs[match[1]] = match[2].trim();
+                    count++;
+                }
+                if (count > 0) {
+                    this.save();
+                    this.renderAll();
+                    this.log(`Imported ${count} files.`, "var(--success)");
+                }
+            },
+
+            async exportZIP() {
+                const zip = new JSZip();
+                Object.entries(this.state.vfs).forEach(([n, c]) => zip.file(n, c));
+                const blob = await zip.generateAsync({ type: "blob" });
+                this.download(blob, `nexus-bundle.zip`);
+            },
+
+            exportTXT() {
+                let out = "";
+                Object.entries(this.state.vfs).forEach(([n, c]) => {
+                    out += `${n}\n\`\`\`\n${c}\n\`\`\`\n\n`;
+                });
+                this.download(new Blob([out], { type: "text/plain" }), "nexus-log.txt");
+            },
+
+            download(blob, name) {
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = name;
+                a.click();
+            },
+
+            // --- CORE LOGIC ---
+            searchAll() {
+                const q = document.getElementById('find-box').value.toLowerCase();
+                const res = document.getElementById('search-results');
+                res.innerHTML = "";
+                if (!q) return;
+                Object.entries(this.state.vfs).forEach(([file, code]) => {
+                    code.split('\n').forEach((line, i) => {
+                        if (line.toLowerCase().includes(q)) {
+                            const div = document.createElement('div');
+                            div.className = "list-entry";
+                            div.style.fontSize = "10px";
+                            div.innerText = `${file}:${i+1} > ${line.trim().substring(0, 30)}`;
+                            div.onclick = () => {
+                                this.openFile(file);
+                            };
+                            res.appendChild(div);
+                        }
+                    });
+                });
+            },
+
+            replaceAll() {
+                const f = document.getElementById('find-box').value;
+                const r = document.getElementById('replace-box').value;
+                if (!f) return;
+                Object.keys(this.state.vfs).forEach(file => {
+                    this.state.vfs[file] = this.state.vfs[file].split(f).join(r);
+                });
+                this.save();
+                this.openFile(this.state.active);
+                this.log("Global replace complete.");
+            },
+
+            runIntel() {
+                const code = this.state.cm.state.doc.toString();
+                const decls = code.match(/(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/g) || [];
+                document.getElementById('intel-list').innerHTML = [...new Set(decls)].map(d => `
+                    <div class="list-entry">${d}</div>
+                `).join('');
+                this.log("Intelligence mapping ready.");
+            },
+
+            // Modals & UI Toggles
+            showModal(title, bodyHTML) {
+                document.getElementById('modal-title').innerText = title;
+                document.getElementById('modal-body').innerHTML = bodyHTML;
+                document.getElementById('modal-overlay').style.display = 'flex';
+            },
+
+            closeModal() {
+                document.getElementById('modal-overlay').style.display = 'none';
+            },
+
+            toggleAcc(el) {
+                const body = el.nextElementSibling;
+                body.classList.toggle('active');
+                el.querySelector('span').innerText = body.classList.contains('active') ? '▼' : '▶';
+            },
+
+            toggleKb() {
+                document.getElementById('kb-drawer').classList.toggle('active');
+            },
+
+            // Terminal
+            initTerm() {
+                const input = document.getElementById('term-in');
+                input.onkeydown = (e) => {
+                    if (e.key === 'Enter') {
+                        const val = input.value;
+                        if (val) {
+                            this.log(`> ${val}`, "white");
+                            this.processCommand(val);
+                            input.value = "";
+                        }
+                    }
+                };
+            },
+
+            log(msg, color = "var(--text)") {
+                const out = document.getElementById('term-out');
+                const div = document.createElement('div');
+                div.style.color = color;
+                div.innerText = msg;
+                out.appendChild(div);
+                out.scrollTop = out.scrollHeight;
+            },
+
+            processCommand(cmd) {
+                if (cmd.startsWith('=')) {
+                    try {
+                        const res = math.evaluate(cmd.substring(1));
+                        this.log(`= ${res}`, "var(--success)");
+                    } catch (e) {
+                        this.log("Math Error", "var(--danger)");
+                    }
+                } else if (cmd === 'clear') {
+                    document.getElementById('term-out').innerHTML = "";
+                } else if (cmd === 'help') {
+                    this.log("Available: clear, =, help", "var(--gold)");
+                } else {
+                    this.log("Unknown command.", "var(--danger)");
+                }
+            },
+
+            // UI Render Updates
+            renderAll() {
+                this.renderTabs();
+                this.renderExplorer();
+                this.renderBranches();
+            },
+
+            renderTabs() {
+                const t = document.getElementById('tabs');
+                t.innerHTML = "";
+                this.state.tabs.forEach(tab => {
+                    const div = document.createElement('div');
+                    div.className = `tab ${tab === this.state.active ? 'active' : ''}`;
+                    div.innerHTML = `${tab} <span style="margin-left:8px;color:#888;" onclick="event.stopPropagation(); Nexus.closeTab('${tab}')">✕</span>`;
+                    div.onclick = () => this.openFile(tab);
+                    t.appendChild(div);
+                });
+            },
+
+            closeTab(tab) {
+                this.state.tabs = this.state.tabs.filter(t => t !== tab);
+                if (this.state.active === tab) {
+                    this.openFile(this.state.tabs[0] || 'index.html');
+                } else {
+                    this.renderTabs();
+                }
+            },
+
+            renderExplorer() {
+                const e = document.getElementById('explorer');
+                e.innerHTML = "";
+                Object.keys(this.state.vfs).forEach(file => {
+                    const div = document.createElement('div');
+                    div.className = `list-entry ${file === this.state.active ? 'active' : ''}`;
+                    div.innerHTML = `<span>${file}</span> <span style="color:var(--danger);" onclick="event.stopPropagation(); Nexus.deleteFile('${file}')">🗑</span>`;
+                    div.onclick = () => {
+                        if (!this.state.tabs.includes(file)) this.state.tabs.push(file);
+                        this.openFile(file);
+                    };
+                    e.appendChild(div);
+                });
+            },
+
+            createFile() {
+                const name = prompt("File name (e.g., script.js):");
+                if (name && !this.state.vfs[name]) {
+                    this.state.vfs[name] = "";
+                    this.state.tabs.push(name);
+                    this.save();
+                    this.openFile(name);
+                }
+            },
+
+            deleteFile(name) {
+                if (confirm(`Delete ${name}?`)) {
+                    delete this.state.vfs[name];
+                    this.closeTab(name);
+                    this.save();
+                    this.renderAll();
+                }
+            },
+
+            renderBranches() {
+                const b = document.getElementById('branch-list');
+                b.innerHTML = "";
+                this.state.branches.forEach(br => {
+                    const div = document.createElement('div');
+                    div.className = `list-entry ${br === this.state.currentBranch ? 'active' : ''}`;
+                    div.innerText = br;
+                    div.onclick = () => this.log(`Switched to branch: ${br}`, "var(--success)");
+                    b.appendChild(div);
+                });
+            }
+        };
+
+        // Initialize App
+        window.onload = () => Nexus.boot();
+    </script>
+</body>
+</html>
