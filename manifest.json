@@ -1,13 +1,19 @@
 {
-  "name": "DevOS Ultimate Nexus",
-  "short_name": "DevOS",
+  "name": "DevOS Nexus Prime",
+  "short_name": "Nexus",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#0d1117",
-  "theme_color": "#2f81f7",
+  "theme_color": "#d29922",
+  "orientation": "any",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/1150/1150626.png",
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
