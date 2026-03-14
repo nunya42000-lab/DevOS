@@ -1,14 +1,13 @@
-const CACHE_NAME = 'nexus-cache-v4';
+const CACHE_NAME = 'nexus-cache-v6-ultimate';
 const ASSETS = [
   './index.html',
   './manifest.json',
-  './styles.ces',
+  './styles.css',
   './nexus.js',
-  './virtual-keyboard.js',
   'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css',
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js',
   'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js'
 ];
 
@@ -26,7 +25,8 @@ self.addEventListener('activate', (e) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName); // Purges v3 and older module caches
+            console.log("Purging old cache:", cacheName);
+            return caches.delete(cacheName); // Deletes the old v3 cache with the 14 files
           }
         })
       );
@@ -38,17 +38,15 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((response) => {
-      // Fallback to network if cache misses, then cache the result
       return response || fetch(e.request).then((fetchResponse) => {
         return caches.open(CACHE_NAME).then((cache) => {
-            if (e.request.url.startsWith('http')) { // Only cache valid HTTP/HTTPS requests
+            if (e.request.url.startsWith('http')) { 
                 cache.put(e.request, fetchResponse.clone());
             }
             return fetchResponse;
         });
       });
     }).catch(() => {
-      // Fallback for failed offline navigation requests
       if (e.request.mode === 'navigate') {
           return caches.match('./index.html');
       }
