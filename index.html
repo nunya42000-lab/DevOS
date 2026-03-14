@@ -13,6 +13,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
     
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 
@@ -25,10 +26,7 @@
         import { css } from "https://esm.sh/@codemirror/lang-css";
         import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
 
-        // Bind to window so the Nexus object can use it
         window.CM6 = { basicSetup, EditorView, EditorState, Compartment, javascript, html, css, oneDark };
-        
-        // Signal to Nexus that CodeMirror 6 is ready to boot
         window.dispatchEvent(new Event('cm6-ready'));
     </script>
 
@@ -43,7 +41,7 @@
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: none; }
 
-        .sidebar-scroll, #term-out, .modal-body, .cm-scroller { touch-action: pan-y; }
+        .sidebar-scroll, #term-out, .modal-body, .cm-scroller, .toolbar-track { touch-action: pan-y pan-x; }
 
         body, html {
             margin: 0; padding: 0; height: 100%; width: 100%;
@@ -74,7 +72,18 @@
         .list-entry.active { background: var(--surface); border-left-color: var(--gold); color: white; }
 
         .workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
-        .toolbar { display: flex; background: var(--panel); padding: 8px; gap: 8px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex-shrink: 0; touch-action: pan-x; }
+        
+        /* Infinite Ribbon Toolbar Setup */
+        .toolbar-viewport {
+            background: var(--panel); border-bottom: 1px solid var(--border); 
+            width: 100%; overflow: hidden; flex-shrink: 0;
+        }
+        .toolbar-track {
+            display: flex; gap: 8px; padding: 8px; overflow-x: auto; 
+            white-space: nowrap; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+        }
+        .toolbar-track::-webkit-scrollbar { display: none; }
+        
         .tool-btn { padding: 8px 14px; border-radius: 6px; border: none; font-size: 0.7rem; font-weight: bold; color: white; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
         .btn-blue { background: var(--accent); } .btn-gold { background: var(--gold); } .btn-green { background: var(--success); } .btn-gray { background: #30363d; } .btn-red { background: var(--danger); }
 
@@ -84,7 +93,6 @@
 
         .editor-area { flex: 1; overflow: hidden; position: relative; background: #000; display: flex; flex-direction: column; }
         
-        /* Fixed Scrolling & Height for CodeMirror 6 */
         .cm-editor { height: 100%; width: 100%; outline: none !important; }
         .cm-scroller { overflow: auto !important; height: 100%; font-family: 'Fira Code', monospace; font-size: 14px; }
 
@@ -156,11 +164,6 @@
                 </div>
 
                 <div class="acc-item">
-                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">🆔 Intelligence <span>▶</span></div>
-                    <div class="acc-body" id="intel-list"></div>
-                </div>
-
-                <div class="acc-item">
                     <div class="acc-head" onclick="Nexus.toggleAcc(this)">📄 Explorer <span>▼</span></div>
                     <div class="acc-body active" id="explorer"></div>
                 </div>
@@ -173,21 +176,25 @@
         </aside>
 
         <main class="workspace">
-            <div class="toolbar">
-                <button class="tool-btn btn-gray" onclick="Nexus.copy()">📋 Copy</button>
-                <button class="tool-btn btn-gray" onclick="Nexus.cut()">✂️ Cut</button>
-                <button class="tool-btn btn-gray" onclick="Nexus.formatCode()">✨ Format</button>
-                <button class="tool-btn btn-green" onclick="Nexus.run()">▶ Preview</button>
-                <button class="tool-btn btn-blue" onclick="Nexus.runIntel()">🧠 Intel</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.visual()">🎨 Visual</button>
-                <button class="tool-btn btn-gray" onclick="Nexus.history()">🕒 Time</button>
-                <button class="tool-btn btn-red" onclick="System.nuke()" style="margin-left: auto;">☢️ Nuke</button>
+            <div class="toolbar-viewport">
+                <div class="toolbar-track" id="infinite-ribbon">
+                    <div class="ribbon-block" style="display:flex; gap:8px;">
+                        <button class="tool-btn btn-gray" onclick="Nexus.copy()">📋 Copy</button>
+                        <button class="tool-btn btn-gray" onclick="Nexus.cut()">✂️ Cut</button>
+                        <button class="tool-btn btn-gray" onclick="Nexus.formatCode()">✨ Format</button>
+                        <button class="tool-btn btn-green" onclick="Nexus.run()">▶ Preview</button>
+                        <button class="tool-btn btn-blue" onclick="Nexus.runIntel()">🧠 Intel</button>
+                        <button class="tool-btn btn-gold" onclick="Nexus.visual()">🎨 Visual</button>
+                        <button class="tool-btn btn-gray" onclick="Nexus.history()">🕒 Time</button>
+                        <button class="tool-btn btn-gray" onclick="Vault.compile()">🔐 Vault</button>
+                        <button class="tool-btn btn-gray" onclick="Nexus.openDiff()">⚖️ Compare</button>
+                        <button class="tool-btn btn-red" onclick="System.nuke()">☢️ Nuke</button>
+                    </div>
+                </div>
             </div>
 
             <div class="tab-bar" id="tabs"></div>
-
             <div class="editor-area"></div>
-
             <div id="resizer"></div>
 
             <div class="terminal" id="terminal">
@@ -311,8 +318,8 @@
         // --- CORE NEXUS OBJECT ---
         const Nexus = {
             state: {
-                vfs: {}, active: 'index.html', tabs: [], cm: null,
-                languageConf: null, // Holds Compartment for dynamic syntax switching
+                vfs: {}, active: null, tabs: [], cm: null,
+                languageConf: null, 
                 branchesData: {}, currentBranch: 'main',
                 config: { 
                     haptics: true, scale: 1, termHeight: 180, gesturesEnabled: true,
@@ -322,11 +329,9 @@
 
             async boot() {
                 localforage.config({ name: 'Nexus_Prime_V6' });
-                this.state.vfs = await localforage.getItem('vfs') || {
-                    'index.html': '<h1>Nexus Prime Ultimate</h1>\n<p>Code here...</p>',
-                    'main.js': 'console.log("Ready.");',
-                    'styles.css': 'body { background: #000; color: #fff; }'
-                };
+                
+                // Init VFS completely empty
+                this.state.vfs = await localforage.getItem('vfs') || {};
                 this.state.config = await localforage.getItem('config') || this.state.config;
                 
                 this.state.branchesData = await localforage.getItem('nexus_branches') || { 'main': { ...this.state.vfs } };
@@ -339,16 +344,44 @@
                     await new Promise(r => window.addEventListener('cm6-ready', r));
                 }
 
-                this.initEditor(this.state.vfs['index.html'] || '');
+                this.initEditor('');
                 this.initResizer();
                 this.initGestures();
                 this.initImporter();
                 this.initTerm();
+                this.initInfiniteRibbon();
                 
                 this.renderAll();
                 this.renderKb();
-                this.openFile('index.html');
-                this.log("Nexus Prime Ultimate Active. Engine Online.", "var(--gold)");
+                
+                // Open first file if exists, otherwise stay blank
+                const files = Object.keys(this.state.vfs);
+                if (files.length > 0) {
+                    this.openFile(files[0]);
+                } else {
+                    this.log("VFS Empty. Import or create a file to start.", "var(--gold)");
+                }
+            },
+
+            initInfiniteRibbon() {
+                const ribbon = document.getElementById('infinite-ribbon');
+                const block = ribbon.innerHTML;
+                // Triplicate the block for a seamless loop
+                ribbon.innerHTML = block + block + block;
+                
+                setTimeout(() => {
+                    const blockWidth = ribbon.scrollWidth / 3;
+                    ribbon.scrollLeft = blockWidth; // Start at the middle block
+
+                    ribbon.addEventListener('scroll', () => {
+                        // Snap logic for infinite illusion
+                        if (ribbon.scrollLeft <= 10) {
+                            ribbon.scrollLeft += blockWidth;
+                        } else if (ribbon.scrollLeft >= (blockWidth * 2) - 10) {
+                            ribbon.scrollLeft -= blockWidth;
+                        }
+                    });
+                }, 100);
             },
 
             initEditor(initialContent) {
@@ -358,7 +391,7 @@
                 this.state.languageConf = new window.CM6.Compartment();
 
                 const updateListener = window.CM6.EditorView.updateListener.of((update) => {
-                    if (update.docChanged) {
+                    if (update.docChanged && this.state.active) {
                         const code = update.state.doc.toString();
                         this.state.vfs[this.state.active] = code;
                         NexusHistory.takeSnapshot(this.state.active, code);
@@ -371,7 +404,7 @@
                         extensions: [
                             window.CM6.basicSetup,
                             window.CM6.oneDark,
-                            this.state.languageConf.of(window.CM6.html()), 
+                            this.state.languageConf.of(window.CM6.javascript()), 
                             updateListener,
                             window.CM6.EditorView.lineWrapping
                         ]
@@ -391,11 +424,11 @@
             },
 
             openFile(filename) {
+                if (!this.state.vfs.hasOwnProperty(filename)) return;
                 this.state.active = filename;
                 const content = this.state.vfs[filename] || '';
                 
                 if (this.state.cm) {
-                    // Dynamically set parsing language based on file extension
                     const ext = filename.split('.').pop().toLowerCase();
                     let langExt = window.CM6.javascript();
                     if (ext === 'html') langExt = window.CM6.html();
@@ -412,7 +445,7 @@
             },
 
             type(val, fromSync = false) {
-                if (!this.state.cm) return;
+                if (!this.state.cm || !this.state.active) return;
                 const cursor = this.state.cm.state.selection.main.head;
                 
                 if (val === 'BACKSPACE') {
@@ -431,7 +464,6 @@
             toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); },
             triggerImport() { document.getElementById('import-input').click(); },
 
-            // --- GESTURE ENGINE ---
             initGestures() {
                 let initialDist = 0; let initialScale = 1;
                 const toast = document.getElementById('scale-toast');
@@ -461,7 +493,6 @@
                 });
             },
 
-            // --- RESIZER LOGIC ---
             initResizer() {
                 const resizer = document.getElementById('resizer');
                 let startY, startH;
@@ -490,7 +521,6 @@
                 resizer.addEventListener('touchstart', onDown);
             },
 
-            // --- SETTINGS & HELP ---
             openSettings() {
                 const body = `
                     <div style="display:grid; gap:15px;">
@@ -525,20 +555,17 @@
             openHelp() {
                 const helpHTML = `
                     <div style="line-height: 1.6;">
-                        <h4 style="margin-top:0;">Nexus Prime Ultimate - Quick Guide</h4>
+                        <h4 style="margin-top:0;">Nexus Prime Ultimate</h4>
                         <ul style="padding-left: 20px;">
-                            <li><b>File Importer:</b> Use the 'Import' button to load multiple files (.js, .html, .css) or full .zip projects simultaneously.</li>
-                            <li><b>Voice Commands (🎙️):</b> Click the mic and dictate commands like "build", "nuke", "clear", or "pwa".</li>
-                            <li><b>Math Engine:</b> In the terminal, type <code>= 50 * 4</code> to compute equations instantly.</li>
-                            <li><b>Gestures:</b> Pinch with two fingers to zoom the UI in/out.</li>
-                            <li><b>Terminal:</b> Drag the grey horizontal bar above the terminal to resize it.</li>
+                            <li><b>Infinite Ribbon:</b> Swipe left on the top toolbar to access Vault, Diff, and Nuke.</li>
+                            <li><b>Voice Dictation:</b> Click the mic to speak terminal commands like "build", "clear", or "nuke".</li>
+                            <li><b>Intelligence:</b> Click 'Intel' for multiple data and dependency scanning tools.</li>
                         </ul>
                     </div>
                 `;
-                this.showModal("📖 Help & Documentation", helpHTML);
+                this.showModal("📖 Quick Guide", helpHTML);
             },
 
-            // --- FILE PORTER ---
             initImporter() {
                 const input = document.getElementById('import-input');
                 input.onchange = async (e) => {
@@ -564,16 +591,20 @@
             },
 
             async exportZIP() {
+                let name = prompt("Enter ZIP file name:", "nexus-project");
+                if(!name) return;
                 const zip = new JSZip();
                 Object.entries(this.state.vfs).forEach(([n, c]) => zip.file(n, c));
                 const blob = await zip.generateAsync({ type: "blob" });
-                this.download(blob, `nexus-project.zip`);
+                this.download(blob, name.endsWith('.zip') ? name : name + '.zip');
             },
 
             exportTXT() {
+                let name = prompt("Enter TXT file name:", "nexus-log");
+                if(!name) return;
                 let out = "";
                 Object.entries(this.state.vfs).forEach(([n, c]) => { out += `${n}\n\`\`\`\n${c}\n\`\`\`\n\n`; });
-                this.download(new Blob([out], { type: "text/plain" }), "nexus-log.txt");
+                this.download(new Blob([out], { type: "text/plain" }), name.endsWith('.txt') ? name : name + '.txt');
             },
 
             download(blob, name) {
@@ -583,7 +614,6 @@
                 a.click();
             },
 
-            // --- CORE LOGIC ---
             formatCode() {
                 if (!this.state.active || !this.state.cm) return;
                 const code = this.state.cm.state.doc.toString();
@@ -611,13 +641,100 @@
                     </div>
                     <iframe src="${url}" style="width:100%; height:60vh; border:none; background:#fff; border-radius:8px;"></iframe>
                 `;
-                this.showModal("Live App Sandbox", frameHtml);
-                this.log("Sandbox Preview launched.", "var(--success)");
+                this.showModal("Live Sandbox", frameHtml);
             },
 
-            visual() { this.showModal("Visual Builders", "<p style='color:var(--text)'>Visual State Machine builder module pending initialization.</p>"); },
-            
+            visual() { 
+                let html = `
+                    <div style="display:flex; flex-direction:column; gap:15px;">
+                        <div style="background:var(--surface); padding:15px; border-radius:8px;">
+                            <h4 style="margin-top:0;">State Machine Builder</h4>
+                            <p style="font-size:12px; color:var(--muted);">Generate boilerplate switch logic for app states.</p>
+                            <input type="text" id="sm-states" placeholder="States (e.g. INIT, RUN, END)" style="width:100%; padding:8px; margin-bottom:10px; background:var(--bg); border:1px solid var(--border); color:white;">
+                            <button class="tool-btn btn-blue" onclick="Nexus.genStateMachine()">Generate Logic</button>
+                        </div>
+                        <div style="background:var(--surface); padding:15px; border-radius:8px;">
+                            <h4 style="margin-top:0;">Audio Synthesizer</h4>
+                            <p style="font-size:12px; color:var(--muted);">Generate JS AudioContext beep function directly into code.</p>
+                            <button class="tool-btn btn-gold" onclick="Nexus.genAudioSynth()">Insert Synth API</button>
+                        </div>
+                    </div>
+                `;
+                this.showModal("🎨 Visual Builders", html); 
+            },
+
+            genStateMachine() {
+                const val = document.getElementById('sm-states').value;
+                if(!val || !this.state.cm) return;
+                const states = val.split(',').map(s => s.trim().toUpperCase());
+                let code = `const STATES = {\n${states.map(s => `  ${s}: '${s}'`).join(',\n')}\n};\n\nlet currentState = STATES.${states[0]};\n\nfunction handleState() {\n  switch(currentState) {\n`;
+                states.forEach(s => code += `    case STATES.${s}:\n      // Logic for ${s}\n      break;\n`);
+                code += `  }\n}\n`;
+                this.state.cm.dispatch({ changes: { from: this.state.cm.state.selection.main.head, insert: code } });
+                this.closeModal();
+                this.log("State Machine logic injected.", "var(--success)");
+            },
+
+            genAudioSynth() {
+                if(!this.state.cm) return;
+                const code = `\nconst playTone = (freq = 440, type = 'sine', duration = 100) => {\n  const ctx = new (window.AudioContext || window.webkitAudioContext)();\n  const osc = ctx.createOscillator();\n  osc.type = type;\n  osc.frequency.setValueAtTime(freq, ctx.currentTime);\n  osc.connect(ctx.destination);\n  osc.start();\n  setTimeout(() => osc.stop(), duration);\n};\n`;
+                this.state.cm.dispatch({ changes: { from: this.state.cm.state.selection.main.head, insert: code } });
+                this.closeModal();
+                this.log("Audio Synth injected.", "var(--success)");
+            },
+
+            runIntel() {
+                let html = `
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                        <button class="tool-btn btn-blue" onclick="Nexus.intelDeps()" style="height:60px; justify-content:center;">Dependencies</button>
+                        <button class="tool-btn btn-gold" onclick="Nexus.intelStorage()" style="height:60px; justify-content:center;">Storage Inspector</button>
+                    </div>
+                    <div id="intel-output" style="margin-top:15px; background:var(--bg); padding:10px; border-radius:6px; min-height:150px; font-family:monospace; font-size:12px; white-space:pre-wrap; color:var(--success);">Ready. Select an analysis tool.</div>
+                `;
+                this.showModal("🧠 Intelligence Tools", html);
+            },
+
+            intelDeps() {
+                if(!this.state.active) return;
+                const code = this.state.vfs[this.state.active];
+                const decls = code.match(/(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/g) || [];
+                const unique = [...new Set(decls.map(d => d.split(/\s+/).pop()))];
+                document.getElementById('intel-output').innerText = `Declarations in ${this.state.active}:\n\n` + unique.join('\n');
+            },
+
+            intelStorage() {
+                let size = JSON.stringify(this.state.vfs).length;
+                let kb = (size / 1024).toFixed(2);
+                document.getElementById('intel-output').innerText = `LocalForage VFS Payload:\n\nTotal Size: ${kb} KB\nFiles: ${Object.keys(this.state.vfs).length}\nBranches: ${Object.keys(this.state.branchesData).length}`;
+            },
+
+            openDiff() {
+                const files = Object.keys(this.state.vfs);
+                if(files.length < 2) return this.log("Need at least 2 files to diff.", "var(--warn)");
+                let opts = files.map(f => `<option value="${f}">${f}</option>`).join('');
+                let html = `
+                    <div style="display:flex; gap:10px; margin-bottom:10px;">
+                        <select id="diff-f1" style="flex:1; background:var(--bg); color:white; border:1px solid var(--border); padding:5px;">${opts}</select>
+                        <select id="diff-f2" style="flex:1; background:var(--bg); color:white; border:1px solid var(--border); padding:5px;">${opts}</select>
+                        <button class="tool-btn btn-accent" onclick="Nexus.runDiff()">Compare</button>
+                    </div>
+                    <div id="diff-output" style="background:#000; padding:10px; height:300px; overflow:auto; font-family:monospace; font-size:12px;">Select files to compare semantic differences.</div>
+                `;
+                this.showModal("⚖️ Compare Files", html);
+            },
+
+            runDiff() {
+                if (typeof diff_match_patch === 'undefined') return document.getElementById('diff-output').innerText = "Diff library not loaded.";
+                const f1 = document.getElementById('diff-f1').value;
+                const f2 = document.getElementById('diff-f2').value;
+                const dmp = new diff_match_patch();
+                const diffs = dmp.diff_main(this.state.vfs[f1], this.state.vfs[f2]);
+                dmp.diff_cleanupSemantic(diffs);
+                document.getElementById('diff-output').innerHTML = dmp.diff_prettyHtml(diffs);
+            },
+
             history() {
+                if(!this.state.active) return;
                 const hist = NexusHistory.history[this.state.active] || [];
                 let html = `<h4 style="margin-top:0;">History for ${this.state.active}</h4><div style="display:flex;flex-direction:column;gap:5px;">`;
                 if(hist.length === 0) html += "<p>No snapshots found.</p>";
@@ -655,18 +772,10 @@
                     this.state.vfs[file] = this.state.vfs[file].split(f).join(r);
                 });
                 this.save();
-                this.openFile(this.state.active);
+                if(this.state.active) this.openFile(this.state.active);
                 this.log("Global replace complete.");
             },
 
-            runIntel() {
-                const code = this.state.cm.state.doc.toString();
-                const decls = code.match(/(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/g) || [];
-                document.getElementById('intel-list').innerHTML = [...new Set(decls)].map(d => `<div class="list-entry">${d}</div>`).join('');
-                this.log("Intelligence mapping ready.", "var(--accent)");
-            },
-
-            // Modals & Drawers
             showModal(title, bodyHTML) {
                 document.getElementById('modal-title').innerText = title;
                 document.getElementById('modal-body').innerHTML = bodyHTML;
@@ -682,58 +791,50 @@
                 const kb = document.getElementById('kb-drawer');
                 const navBtn = document.getElementById('mobile-nav');
                 kb.classList.toggle('active'); 
-                if (kb.classList.contains('active')) {
-                    navBtn.style.bottom = '260px';
-                } else {
-                    navBtn.style.bottom = '100px';
-                }
+                if (kb.classList.contains('active')) navBtn.style.bottom = '260px';
+                else navBtn.style.bottom = '100px';
             },
-            copy() { navigator.clipboard.writeText(this.state.cm.state.sliceDoc(this.state.cm.state.selection.main.from, this.state.cm.state.selection.main.to) || this.state.cm.state.doc.toString()); this.log("Copied."); },
-            cut() { 
+            copy() { 
+                if(!this.state.cm) return;
                 const s = this.state.cm.state.selection.main;
-                if (s.from !== s.to) {
-                    navigator.clipboard.writeText(this.state.cm.state.sliceDoc(s.from, s.to));
+                const text = s.empty ? this.state.cm.state.doc.toString() : this.state.cm.state.sliceDoc(s.from, s.to);
+                navigator.clipboard.writeText(text); 
+                this.log("Copied to clipboard."); 
+            },
+            cut() { 
+                if (!this.state.cm) return;
+                const s = this.state.cm.state.selection.main;
+                if (!s.empty) {
+                    const text = this.state.cm.state.sliceDoc(s.from, s.to);
+                    navigator.clipboard.writeText(text);
                     this.state.cm.dispatch({ changes: { from: s.from, to: s.to, insert: "" } });
-                    this.log("Cut.");
+                    this.log("Cut to clipboard.");
+                } else {
+                    this.log("Highlight text to cut.", "var(--warn)");
                 }
             },
 
-            // Terminal
             initTerm() {
                 const input = document.getElementById('term-in');
                 input.onkeydown = (e) => {
-                    if (e.key === 'Enter') {
-                        const val = input.value;
-                        if (val) {
-                            this.log(`> ${val}`, "white");
-                            this.processCommand(val);
-                            input.value = "";
-                        }
+                    if (e.key === 'Enter' && input.value) {
+                        this.log(`> ${input.value}`, "white");
+                        this.processCommand(input.value);
+                        input.value = "";
                     }
                 };
             },
 
-            // Speech API for Voice Trigger
             startVoice() {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (!SpeechRecognition) {
-                    this.log("Voice dictation not supported in this browser.", "var(--danger)");
-                    return;
-                }
+                if (!SpeechRecognition) return this.log("Voice not supported here.", "var(--danger)");
                 const recognition = new SpeechRecognition();
-                recognition.continuous = false;
-                recognition.interimResults = false;
-                
                 this.log("🎙️ Listening...", "var(--accent)");
-                
-                recognition.onresult = (event) => {
-                    const transcript = event.results[0][0].transcript;
-                    this.log(`Heard: "${transcript}"`, "var(--text)");
-                    document.getElementById('term-in').value = transcript;
-                    this.processCommand(transcript);
+                recognition.onresult = (e) => {
+                    const txt = e.results[0][0].transcript;
+                    this.log(`Heard: "${txt}"`);
+                    this.processCommand(txt);
                 };
-                
-                recognition.onerror = (e) => this.log(`🎙️ Error: ${e.error}`, "var(--danger)");
                 recognition.start();
             },
 
@@ -761,7 +862,6 @@
                 else this.log("Unknown command. Type 'help'.", "var(--danger)");
             },
 
-            // UI Render Updates
             renderAll() {
                 this.renderTabs();
                 this.renderExplorer();
@@ -782,7 +882,7 @@
 
             closeTab(tab) {
                 this.state.tabs = this.state.tabs.filter(t => t !== tab);
-                if (this.state.active === tab) this.openFile(this.state.tabs[0] || 'index.html');
+                if (this.state.active === tab) this.openFile(this.state.tabs[0] || null);
                 else this.renderTabs();
             },
 
@@ -820,15 +920,12 @@
                 }
             },
 
-            // Git / Branching Logic
             async createBranch(name) {
                 const id = name.toLowerCase().replace(/\s+/g, '-');
                 if (this.state.branchesData[id]) return this.log("Branch already exists.", 'var(--warn)');
-                
                 this.state.branchesData[this.state.currentBranch] = { ...this.state.vfs };
                 this.state.branchesData[id] = { ...this.state.vfs };
                 this.state.currentBranch = id;
-                
                 await localforage.setItem('nexus_branches', this.state.branchesData);
                 await localforage.setItem('nexus_active_branch', this.state.currentBranch);
                 this.log(`Switched to new branch: ${id}`, 'var(--success)');
@@ -840,14 +937,13 @@
                 this.state.branchesData[this.state.currentBranch] = { ...this.state.vfs };
                 this.state.currentBranch = id;
                 this.state.vfs = { ...this.state.branchesData[id] };
-                
                 await this.save();
                 await localforage.setItem('nexus_branches', this.state.branchesData);
                 await localforage.setItem('nexus_active_branch', this.state.currentBranch);
-                
                 this.log(`Active Branch: ${id}`);
                 this.renderAll();
-                this.openFile('index.html');
+                const files = Object.keys(this.state.vfs);
+                if (files.length) this.openFile(files[0]);
             },
 
             renderBranches() {
@@ -883,15 +979,11 @@
             }
         };
 
-        // Initialize App
         window.onload = () => Nexus.boot();
 
-        // Register Service Worker for PWA & Offline Support
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Nexus Service Worker Active'))
-                    .catch(err => console.error('Service Worker Failed:', err));
+                navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
             });
         }
     </script>
