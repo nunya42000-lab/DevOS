@@ -13,11 +13,15 @@
 
 body, html {
     margin: 0; padding: 0;
-    height: 100%; width: 100%;
+    /* Use vh/vw to lock the viewport size */
+    height: 100vh; 
+    width: 100vw;
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Scrollbar Customization for Workspace */
@@ -33,16 +37,18 @@ body, html {
     flex-direction: column; 
     overflow: hidden; 
     position: relative; 
-    min-height: 0; /* Prevents stretching past viewport */
+    /* Critical: min-height 0 allows the flex child to shrink below its content size */
+    min-height: 0; 
 }
 
 .editor-area { 
     flex: 1; 
     position: relative; 
     background: #000; 
-    min-height: 0; /* Forces child to respect container limits */
+    min-height: 0; 
     display: flex; 
     flex-direction: column;
+    overflow: hidden; /* Keeps the editor contained */
 }
 
 /* CodeMirror 6 Mobile Scroll Overrides */
@@ -51,17 +57,19 @@ body, html {
     display: flex !important;
     flex-direction: column !important;
     outline: none !important;
-    height: 100% !important;
-    width: 100% !important;
+    /* Force the editor to fill the parent container height */
+    height: 100% !important; 
+    min-height: 0;
 }
 
 .cm-scroller {
     flex: 1 1 auto !important;
-    overflow: auto !important;
+    /* This is where the actual scrolling happens */
+    overflow: auto !important; 
     height: 100% !important;
     font-family: 'Fira Code', monospace;
     font-size: 14px;
-    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS */
+    -webkit-overflow-scrolling: touch; 
 }
 
 /* Drawer Transitions */
