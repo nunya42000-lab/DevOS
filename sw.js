@@ -1,48 +1,57 @@
 const CACHE_NAME = 'nexus-cache-v4';
-const STATIC_ASSETS = [
+const ASSETS = [
   './index.html',
   './manifest.json',
+  './styles.ces',
+  './nexus.js',
+  './virtual-keyboard.js',
   'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js'
+  'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css',
+  'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js'
 ];
 
-// Install Event: Cache Core Static Files
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(STATIC_ASSETS)));
-  self.skipWaiting();
+  e.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(ASSETS))
+      .then(() => self.skipWaiting())
+  );
 });
 
-// Activate Event: Cleanup Old Caches
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then(keys => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName); // Purges v3 and older module caches
+          }
+        })
       );
     })
   );
-  self.clients.claim();
+  return self.clients.claim();
 });
 
-// Fetch Event: Dynamic "Stale-While-Revalidate" Caching
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      const fetchPromise = fetch(e.request).then((networkResponse) => {
-        // Cache new esm.sh modules or CDNs dynamically as they are fetched
-        if (networkResponse && networkResponse.status === 200 && e.request.method === 'GET') {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(e.request, networkResponse.clone());
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // Ignore network errors when offline
+    caches.match(e.request).then((response) => {
+      // Fallback to network if cache misses, then cache the result
+      return response || fetch(e.request).then((fetchResponse) => {
+        return caches.open(CACHE_NAME).then((cache) => {
+            if (e.request.url.startsWith('http')) { // Only cache valid HTTP/HTTPS requests
+                cache.put(e.request, fetchResponse.clone());
+            }
+            return fetchResponse;
+        });
       });
-      return cachedResponse || fetchPromise;
+    }).catch(() => {
+      // Fallback for failed offline navigation requests
+      if (e.request.mode === 'navigate') {
+          return caches.match('./index.html');
+      }
     })
   );
 });
-          
