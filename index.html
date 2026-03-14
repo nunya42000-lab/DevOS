@@ -89,7 +89,7 @@
         .tab { padding: 0 12px; display: flex; align-items: center; font-size: 0.75rem; border-right: 1px solid var(--border); cursor: pointer; color: #8b949e; background: var(--panel); min-width: 80px; }
         .tab.active { background: var(--bg); color: white; border-top: 2px solid var(--gold); }
 
-        /* SCROLL FIX: Absolute Positioning guarantees editor fits container */
+        /* SCROLL FIX: Absolute Positioning guarantees editor strictly obeys constraints and natively scrolls */
         .editor-area { flex: 1; overflow: hidden; position: relative; background: #000; }
         .cm-editor { position: absolute; top: 0; bottom: 0; left: 0; right: 0; outline: none !important; }
         .cm-scroller { overflow: auto !important; height: 100%; font-family: 'Fira Code', monospace; font-size: 14px; -webkit-overflow-scrolling: touch; }
@@ -97,18 +97,18 @@
         #resizer { height: 8px; background: var(--border); cursor: ns-resize; flex-shrink: 0; position: relative; z-index: 5; }
         #resizer::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 40px; height: 2px; background: var(--border); border-radius: 2px; }
         
-        /* Terminal is Hidden by Default */
-        .terminal { display: none; height: var(--term-height); background: #000; flex-direction: column; flex-shrink: 0; }
+        /* Terminal is Hidden by Default, now strictly inside Flex Column */
+        .terminal { display: none; height: var(--term-height); background: #000; flex-direction: column; flex-shrink: 0; border-top: 1px solid var(--border); }
         .terminal.active { display: flex; }
         
         #term-out { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 11px; color: var(--success); }
         .term-input { display: flex; padding: 6px 12px; background: #111; border-top: 1px solid #222; align-items: center; }
         .term-input input { flex: 1; background: transparent; border: none; color: white; outline: none; font-family: monospace; font-size: 14px; margin-left: 5px; }
 
-        #kb-drawer { position: fixed; bottom: 0; left: 0; width: 100%; background: #000; z-index: 5000; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); transform: translateY(100%); border-top: 2px solid var(--gold); }
-        #kb-drawer.active { transform: translateY(0); }
-        #kb-handle { position: absolute; top: -32px; left: 50%; transform: translateX(-50%); background: var(--gold); color: white; padding: 5px 22px; border-radius: 10px 10px 0 0; font-size: 10px; font-weight: bold; cursor: pointer; }
-        .kb-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; padding: 8px; height: 190px; overflow-y: auto; touch-action: pan-y; }
+        /* Virtual Keyboard, now strictly inside Flex Column to PREVENT all overlaps */
+        #kb-drawer { flex-shrink: 0; max-height: 0; overflow: hidden; background: #000; transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #kb-drawer.active { max-height: 300px; border-top: 2px solid var(--gold); }
+        .kb-grid { display: grid; grid-template-columns: repeat(10, 1fr); gap: 4px; padding: 8px; overflow-y: auto; touch-action: pan-y; }
         .kb-grid button { height: 42px; background: #222; color: white; border: 1px solid #333; border-radius: 6px; font-size: 14px; font-weight: bold; }
 
         .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; }
@@ -116,16 +116,12 @@
         .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
         .modal-body { padding: 20px; overflow-y: auto; flex: 1; touch-action: pan-y; color: var(--text); }
 
-        #mobile-nav { position: fixed; bottom: 100px; right: 20px; width: 55px; height: 55px; border-radius: 50%; background: var(--gold); color: white; border: none; z-index: 6000; font-size: 22px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        @media (max-width: 1024px) { #mobile-nav { display: flex; } }
-
         .scale-indicator { position: fixed; top: 10px; right: 10px; background: var(--gold); color: white; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; opacity: 0; transition: opacity 0.5s; z-index: 9999; pointer-events: none; }
     </style>
 </head>
 <body>
 
     <div id="scale-toast" class="scale-indicator">100%</div>
-    <button id="mobile-nav" onclick="Nexus.toggleSidebar()">☰</button>
 
     <div class="nexus-root" id="app-root">
         <aside class="sidebar" id="sidebar">
@@ -189,6 +185,7 @@
                     <div class="ribbon-block" style="display:flex; gap:8px;">
                         <button class="tool-btn btn-blue" onclick="Nexus.toggleSidebar()">☰ Menu</button>
                         <button class="tool-btn btn-danger" onclick="Nexus.toggleTerminal()">⌨️ CMD</button>
+                        <button class="tool-btn btn-gold" onclick="Nexus.toggleKb()">🔠 Keys</button>
                         <button class="tool-btn btn-gray" onclick="Nexus.copy()">📋 Copy</button>
                         <button class="tool-btn btn-gray" onclick="Nexus.cut()">✂️ Cut</button>
                         <button class="tool-btn btn-gray" onclick="Nexus.formatCode()">✨ Format</button>
@@ -204,7 +201,9 @@
             </div>
 
             <div class="tab-bar" id="tabs"></div>
+            
             <div class="editor-area"></div>
+            
             <div id="resizer"></div>
 
             <div class="terminal" id="terminal">
@@ -213,6 +212,10 @@
                     <button onclick="Nexus.startVoice()" id="voice-btn" style="background:none; border:none; font-size:1.2rem; cursor:pointer;" title="Voice Command">🎙️</button>
                     <input type="text" id="term-in" placeholder="Command (nuke, pwa, build, sync) or '=' for math...">
                 </div>
+            </div>
+
+            <div id="kb-drawer">
+                <div class="kb-grid" id="kb-grid"></div>
             </div>
         </main>
     </div>
@@ -227,11 +230,6 @@
         </div>
     </div>
 
-    <div id="kb-drawer">
-        <div id="kb-handle" onclick="Nexus.toggleKb()">NEXUS KEYS</div>
-        <div class="kb-grid" id="kb-grid"></div>
-    </div>
-
     <input type="file" id="import-input" style="display:none;" multiple accept=".zip,.txt,.js,.html,.css,.json">
 
     <script>
@@ -241,9 +239,7 @@
                 if (confirm("WARNING: This will permanently erase ALL files, history, branches, and settings. Proceed?")) {
                     await localforage.clear();
                     const cacheKeys = await caches.keys();
-                    for (let key of cacheKeys) {
-                        await caches.delete(key);
-                    }
+                    for (let key of cacheKeys) { await caches.delete(key); }
                     window.location.reload();
                 }
             },
@@ -279,7 +275,7 @@
                 this.snippets.push({ id: Date.now(), name, code });
                 await localforage.setItem('nexus_snippets', this.snippets);
                 Nexus.log(`Snippet "${name}" saved to Vault.`, "var(--success)");
-                this.openModal(); // Refresh modal UI
+                this.openModal(); 
             },
             async deleteSnippet(id) {
                 this.snippets = this.snippets.filter(s => s.id !== id);
@@ -303,7 +299,7 @@
                     html += `<p style="color:var(--muted); font-size:12px;">No snippets saved yet. Highlight code and click the button above to save snippets.</p>`;
                 } else {
                     this.snippets.forEach(s => {
-                        const safeCode = s.code.replace(/`/g, '\\`'); // Escape backticks for injection
+                        const safeCode = s.code.replace(/`/g, '\\`'); 
                         html += `
                         <div style="background:var(--surface); padding:10px; border-radius:6px; border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
                             <span style="font-weight:bold; color:var(--text);">${s.name}</span>
@@ -369,9 +365,7 @@
             },
             setupListeners() {
                 this.conn.on('data', (data) => {
-                    if (data.type === 'KEYSTROKE') {
-                        Nexus.type(data.value, true);
-                    }
+                    if (data.type === 'KEYSTROKE') Nexus.type(data.value, true);
                 });
             },
             sendKeystroke(key) {
@@ -386,8 +380,7 @@
                 languageConf: null, 
                 branchesData: {}, currentBranch: 'main',
                 config: { 
-                    haptics: true, scale: 1, termHeight: 180, gesturesEnabled: true,
-                    kbEnabled: true,
+                    haptics: true, scale: 1, termHeight: 180, gesturesEnabled: true, kbEnabled: true,
                     kb: ['{', '}', '(', ')', ';', '=>', '&&', '||', '!', '=', '$', '_', '.', ',', '+', '-', '*', '/', '<', '>'] 
                 }
             },
@@ -396,11 +389,8 @@
                 localforage.config({ name: 'Nexus_Prime_V6' });
                 
                 this.state.vfs = await localforage.getItem('vfs') || {};
-                
                 const storedConfig = await localforage.getItem('config');
-                if (storedConfig) {
-                    this.state.config = { ...this.state.config, ...storedConfig };
-                }
+                if (storedConfig) this.state.config = { ...this.state.config, ...storedConfig };
                 
                 this.state.branchesData = await localforage.getItem('nexus_branches') || { 'main': { ...this.state.vfs } };
                 this.state.currentBranch = await localforage.getItem('nexus_active_branch') || 'main';
@@ -409,9 +399,7 @@
                 await Vault.init(); 
                 this.applyUIProperties();
 
-                if (!window.CM6) {
-                    await new Promise(r => window.addEventListener('cm6-ready', r));
-                }
+                if (!window.CM6) await new Promise(r => window.addEventListener('cm6-ready', r));
 
                 this.initEditor('');
                 this.initResizer();
@@ -424,19 +412,24 @@
                 this.renderKb();
                 
                 const files = Object.keys(this.state.vfs);
-                if (files.length > 0) {
-                    this.openFile(files[0]);
-                } else {
-                    this.log("VFS Empty. Import or create a file to start.", "var(--gold)");
-                }
+                if (files.length > 0) this.openFile(files[0]);
+                else this.log("VFS Empty. Import or create a file to start.", "var(--gold)");
             },
 
             toggleTerminal() {
                 const term = document.getElementById('terminal');
                 term.classList.toggle('active');
-                if (term.classList.contains('active')) {
-                    document.getElementById('term-in').focus();
+                if (term.classList.contains('active')) document.getElementById('term-in').focus();
+                if (this.state.cm) this.state.cm.requestMeasure();
+            },
+
+            toggleKb() { 
+                if (!this.state.config.kbEnabled) {
+                    this.log("Nexus Keys are disabled in Settings.", "var(--warn)");
+                    return;
                 }
+                const kb = document.getElementById('kb-drawer');
+                kb.classList.toggle('active'); 
                 if (this.state.cm) this.state.cm.requestMeasure();
             },
 
@@ -448,13 +441,9 @@
                 setTimeout(() => {
                     const blockWidth = ribbon.scrollWidth / 3;
                     ribbon.scrollLeft = blockWidth; 
-
                     ribbon.addEventListener('scroll', () => {
-                        if (ribbon.scrollLeft <= 10) {
-                            ribbon.scrollLeft += blockWidth;
-                        } else if (ribbon.scrollLeft >= (blockWidth * 2) - 10) {
-                            ribbon.scrollLeft -= blockWidth;
-                        }
+                        if (ribbon.scrollLeft <= 10) ribbon.scrollLeft += blockWidth;
+                        else if (ribbon.scrollLeft >= (blockWidth * 2) - 10) ribbon.scrollLeft -= blockWidth;
                     });
                 }, 100);
             },
@@ -470,7 +459,7 @@
                         const code = update.state.doc.toString();
                         this.state.vfs[this.state.active] = code;
                         NexusHistory.takeSnapshot(this.state.active, code);
-                        this.updateIntel(); // Auto-update side tab declarations
+                        this.updateIntel();
                     }
                 });
 
@@ -478,11 +467,9 @@
                     state: window.CM6.EditorState.create({
                         doc: initialContent,
                         extensions: [
-                            window.CM6.basicSetup,
-                            window.CM6.oneDark,
+                            window.CM6.basicSetup, window.CM6.oneDark,
                             this.state.languageConf.of(window.CM6.javascript()), 
-                            updateListener,
-                            window.CM6.EditorView.lineWrapping
+                            updateListener, window.CM6.EditorView.lineWrapping
                         ]
                     }),
                     parent: editorArea
@@ -521,7 +508,6 @@
                 if (window.innerWidth < 1024) document.getElementById('sidebar').classList.remove('active');
             },
 
-            // Live-Parses AST/Declarations and updates the Sidebar Intelligence Tab
             updateIntel() {
                 if(!this.state.active) return;
                 const code = this.state.vfs[this.state.active] || "";
@@ -530,9 +516,8 @@
                 
                 const list = document.getElementById('intel-list');
                 if (list) {
-                    if (unique.length === 0) {
-                        list.innerHTML = '<div style="padding:10px; font-size:12px; color:var(--muted);">No declarations found.</div>';
-                    } else {
+                    if (unique.length === 0) list.innerHTML = '<div style="padding:10px; font-size:12px; color:var(--muted);">No declarations found.</div>';
+                    else {
                         list.innerHTML = unique.map(d => `
                             <div class="list-entry" style="font-size:12px; padding:8px 15px;" onclick="Nexus.type('${d}')">
                                 <span><span style="color:var(--accent);">let</span> ${d}</span>
@@ -550,10 +535,7 @@
                 if (val === 'BACKSPACE') {
                     if (cursor > 0) this.state.cm.dispatch({ changes: { from: cursor - 1, to: cursor, insert: "" } });
                 } else {
-                    this.state.cm.dispatch({
-                        changes: { from: cursor, insert: val },
-                        selection: { anchor: cursor + val.length } 
-                    });
+                    this.state.cm.dispatch({ changes: { from: cursor, insert: val }, selection: { anchor: cursor + val.length } });
                 }
                 
                 if (this.state.config.haptics && window.navigator.vibrate) window.navigator.vibrate(50);
@@ -610,14 +592,11 @@
                     this.applyUIProperties();
                 };
                 const onUp = () => {
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                    document.removeEventListener('touchmove', onMove);
-                    document.removeEventListener('touchend', onUp);
+                    document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp);
+                    document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onUp);
                     this.save();
                 };
-                resizer.addEventListener('mousedown', onDown);
-                resizer.addEventListener('touchstart', onDown);
+                resizer.addEventListener('mousedown', onDown); resizer.addEventListener('touchstart', onDown);
             },
 
             openSettings() {
@@ -661,10 +640,7 @@
                 const keysRaw = document.getElementById('kb-keys').value;
                 this.state.config.kb = keysRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
                 
-                this.save();
-                this.applyUIProperties();
-                this.renderKb(); 
-                this.closeModal();
+                this.save(); this.applyUIProperties(); this.renderKb(); this.closeModal();
                 this.log("Settings updated.", "var(--success)");
             },
 
@@ -674,10 +650,9 @@
                         <h4 style="margin-top:0;">Nexus Prime Ultimate</h4>
                         <ul style="padding-left: 20px;">
                             <li><b>CMD Drawer:</b> Click '⌨️ CMD' to open/close the terminal drawer.</li>
-                            <li><b>Infinite Ribbon:</b> Swipe left on the top toolbar to access Vault, Diff, and Nuke.</li>
-                            <li><b>Programmable Keys:</b> Open Settings to freely map the 'Nexus Keys' pull-up drawer.</li>
-                            <li><b>Snippet Vault:</b> Highlight code, click Vault, and save it for future insertion.</li>
-                            <li><b>Intelligence:</b> Click 'Intel' for multiple data and dependency scanning tools. Variables also appear live in the sidebar!</li>
+                            <li><b>Nexus Keys:</b> Click '🔠 Keys' to toggle your custom programmable Virtual Keyboard.</li>
+                            <li><b>Infinite Ribbon:</b> Swipe left on the top toolbar to access all tools seamlessly.</li>
+                            <li><b>Intelligence:</b> Your variables automatically appear live in the Sidebar's Intelligence tab.</li>
                         </ul>
                     </div>
                 `;
@@ -693,18 +668,12 @@
                         if (file.name.endsWith('.zip')) {
                             const zip = await JSZip.loadAsync(file);
                             for (let path in zip.files) {
-                                if (!zip.files[path].dir) {
-                                    this.state.vfs[zip.files[path].name] = await zip.files[path].async("string");
-                                }
+                                if (!zip.files[path].dir) this.state.vfs[zip.files[path].name] = await zip.files[path].async("string");
                             }
                             this.log(`Extracted ZIP: ${file.name}`, "var(--success)");
-                        } else {
-                            this.state.vfs[file.name] = await file.text();
-                        }
+                        } else this.state.vfs[file.name] = await file.text();
                     }
-                    this.save();
-                    this.renderAll();
-                    input.value = "";
+                    this.save(); this.renderAll(); input.value = "";
                 };
             },
 
@@ -728,8 +697,7 @@
             download(blob, name) {
                 const a = document.createElement('a');
                 a.href = URL.createObjectURL(blob);
-                a.download = name;
-                a.click();
+                a.download = name; a.click();
             },
 
             formatCode() {
@@ -789,16 +757,14 @@
                 states.forEach(s => code += `    case STATES.${s}:\n      // Logic for ${s}\n      break;\n`);
                 code += `  }\n}\n`;
                 this.state.cm.dispatch({ changes: { from: this.state.cm.state.selection.main.head, insert: code } });
-                this.closeModal();
-                this.log("State Machine logic injected.", "var(--success)");
+                this.closeModal(); this.log("State Machine logic injected.", "var(--success)");
             },
 
             genAudioSynth() {
                 if(!this.state.cm) return;
                 const code = `\nconst playTone = (freq = 440, type = 'sine', duration = 100) => {\n  const ctx = new (window.AudioContext || window.webkitAudioContext)();\n  const osc = ctx.createOscillator();\n  osc.type = type;\n  osc.frequency.setValueAtTime(freq, ctx.currentTime);\n  osc.connect(ctx.destination);\n  osc.start();\n  setTimeout(() => osc.stop(), duration);\n};\n`;
                 this.state.cm.dispatch({ changes: { from: this.state.cm.state.selection.main.head, insert: code } });
-                this.closeModal();
-                this.log("Audio Synth injected.", "var(--success)");
+                this.closeModal(); this.log("Audio Synth injected.", "var(--success)");
             },
 
             runIntel() {
@@ -828,10 +794,7 @@
 
             openDiff() {
                 const files = Object.keys(this.state.vfs);
-                if(files.length < 2) {
-                    this.log("Need at least 2 files to diff.", "var(--warn)");
-                    return;
-                }
+                if(files.length < 2) return this.log("Need at least 2 files to diff.", "var(--warn)");
                 let opts = files.map(f => `<option value="${f}">${f}</option>`).join('');
                 let html = `
                     <div style="display:flex; gap:10px; margin-bottom:10px;">
@@ -889,9 +852,7 @@
                 const f = document.getElementById('find-box').value;
                 const r = document.getElementById('replace-box').value;
                 if (!f) return;
-                Object.keys(this.state.vfs).forEach(file => {
-                    this.state.vfs[file] = this.state.vfs[file].split(f).join(r);
-                });
+                Object.keys(this.state.vfs).forEach(file => { this.state.vfs[file] = this.state.vfs[file].split(f).join(r); });
                 this.save();
                 if(this.state.active) this.openFile(this.state.active);
                 this.log("Global replace complete.");
@@ -904,23 +865,15 @@
             },
             closeModal() { document.getElementById('modal-overlay').style.display = 'none'; },
             toggleAcc(el) {
-                const body = el.nextElementSibling;
-                body.classList.toggle('active');
+                const body = el.nextElementSibling; body.classList.toggle('active');
                 el.querySelector('span').innerText = body.classList.contains('active') ? '▼' : '▶';
             },
-            toggleKb() { 
-                const kb = document.getElementById('kb-drawer');
-                const navBtn = document.getElementById('mobile-nav');
-                kb.classList.toggle('active'); 
-                if (kb.classList.contains('active')) navBtn.style.bottom = '260px';
-                else navBtn.style.bottom = '100px';
-            },
+            
             copy() { 
                 if(!this.state.cm) return;
                 const s = this.state.cm.state.selection.main;
                 const text = s.empty ? this.state.cm.state.doc.toString() : this.state.cm.state.sliceDoc(s.from, s.to);
-                navigator.clipboard.writeText(text); 
-                this.log("Copied to clipboard."); 
+                navigator.clipboard.writeText(text); this.log("Copied to clipboard."); 
             },
             cut() { 
                 if (!this.state.cm) return;
@@ -930,9 +883,7 @@
                     navigator.clipboard.writeText(text);
                     this.state.cm.dispatch({ changes: { from: s.from, to: s.to, insert: "" } });
                     this.log("Cut to clipboard.");
-                } else {
-                    this.log("Highlight text to cut.", "var(--warn)");
-                }
+                } else this.log("Highlight text to cut.", "var(--warn)");
             },
 
             initTerm() {
@@ -940,8 +891,7 @@
                 input.onkeydown = (e) => {
                     if (e.key === 'Enter' && input.value) {
                         this.log(`> ${input.value}`, "white");
-                        this.processCommand(input.value);
-                        input.value = "";
+                        this.processCommand(input.value); input.value = "";
                     }
                 };
             },
@@ -962,10 +912,8 @@
             log(msg, color = "var(--text)") {
                 const out = document.getElementById('term-out');
                 const div = document.createElement('div');
-                div.style.color = color;
-                div.innerText = msg;
-                out.appendChild(div);
-                out.scrollTop = out.scrollHeight;
+                div.style.color = color; div.innerText = msg;
+                out.appendChild(div); out.scrollTop = out.scrollHeight;
             },
 
             processCommand(cmd) {
@@ -983,15 +931,10 @@
                 else this.log("Unknown command. Type 'help'.", "var(--danger)");
             },
 
-            renderAll() {
-                this.renderTabs();
-                this.renderExplorer();
-                this.renderBranches();
-            },
+            renderAll() { this.renderTabs(); this.renderExplorer(); this.renderBranches(); },
 
             renderTabs() {
-                const t = document.getElementById('tabs');
-                t.innerHTML = "";
+                const t = document.getElementById('tabs'); t.innerHTML = "";
                 this.state.tabs.forEach(tab => {
                     const div = document.createElement('div');
                     div.className = `tab ${tab === this.state.active ? 'active' : ''}`;
@@ -1008,8 +951,7 @@
             },
 
             renderExplorer() {
-                const e = document.getElementById('explorer');
-                e.innerHTML = "";
+                const e = document.getElementById('explorer'); e.innerHTML = "";
                 Object.keys(this.state.vfs).forEach(file => {
                     const div = document.createElement('div');
                     div.className = `list-entry ${file === this.state.active ? 'active' : ''}`;
@@ -1025,19 +967,15 @@
             createFile() {
                 const name = prompt("File name (e.g., script.js):");
                 if (name && !this.state.vfs[name]) {
-                    this.state.vfs[name] = "";
-                    this.state.tabs.push(name);
-                    this.save();
-                    this.openFile(name);
+                    this.state.vfs[name] = ""; this.state.tabs.push(name);
+                    this.save(); this.openFile(name);
                 }
             },
 
             deleteFile(name) {
                 if (confirm(`Delete ${name}?`)) {
-                    delete this.state.vfs[name];
-                    this.closeTab(name);
-                    this.save();
-                    this.renderAll();
+                    delete this.state.vfs[name]; this.closeTab(name);
+                    this.save(); this.renderAll();
                 }
             },
 
@@ -1068,8 +1006,7 @@
             },
 
             renderBranches() {
-                const b = document.getElementById('branch-list');
-                b.innerHTML = "";
+                const b = document.getElementById('branch-list'); b.innerHTML = "";
                 Object.keys(this.state.branchesData).forEach(br => {
                     const div = document.createElement('div');
                     div.className = `list-entry ${br === this.state.currentBranch ? 'active' : ''}`;
@@ -1082,18 +1019,15 @@
             renderKb() {
                 const drawer = document.getElementById('kb-drawer');
                 if (!this.state.config.kbEnabled) {
-                    drawer.style.display = 'none';
+                    drawer.classList.remove('active');
                     return;
                 }
-                drawer.style.display = 'block';
-
                 const grid = document.getElementById('kb-grid');
                 if(!grid) return;
                 grid.innerHTML = "";
                 this.state.config.kb.forEach(k => {
                     const btn = document.createElement('button');
-                    btn.innerText = k;
-                    btn.onclick = () => this.type(k);
+                    btn.innerText = k; btn.onclick = () => this.type(k);
                     grid.appendChild(btn);
                 });
                 ['Space: ', 'Enter:\n', 'Del:BACKSPACE'].forEach(sys => {
@@ -1108,11 +1042,8 @@
         };
 
         window.onload = () => Nexus.boot();
-
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
-            });
+            window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(e=>console.error(e)));
         }
     </script>
 </body>
