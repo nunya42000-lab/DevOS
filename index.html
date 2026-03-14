@@ -691,8 +691,19 @@
             }
         };
 
-        // Initialize App
+        
+                // Initialize App
         window.onload = () => Nexus.boot();
+
+        // Register Service Worker for PWA & Offline Support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('Nexus Service Worker Active'))
+                    .catch(err => console.error('Service Worker Failed:', err));
+            });
+        }
+        
     </script>
 </body>
 </html>
