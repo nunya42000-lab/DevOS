@@ -135,7 +135,7 @@ const Nexus = {
         this.log("Nexus Prime Ultimate Active. Engine Online.", "var(--gold)");
     },
 
-    initEditor(initialContent) {
+        initEditor(initialContent) {
         const editorArea = document.querySelector('.editor-area');
         editorArea.innerHTML = ''; 
 
@@ -149,12 +149,19 @@ const Nexus = {
             }
         });
 
+        // 1. Define a strict scroll theme for CodeMirror 6
+        const scrollTheme = window.CM6.EditorView.theme({
+            "&": { height: "100%", maxHeight: "100%" },
+            ".cm-scroller": { overflow: "auto" }
+        });
+
         this.state.cm = new window.CM6.EditorView({
             state: window.CM6.EditorState.create({
                 doc: initialContent,
                 extensions: [
                     window.CM6.basicSetup,
                     window.CM6.oneDark,
+                    scrollTheme, // 2. Inject the scroll theme here
                     this.state.languageConf.of(window.CM6.html()), 
                     updateListener,
                     window.CM6.EditorView.lineWrapping
@@ -163,6 +170,7 @@ const Nexus = {
             parent: editorArea
         });
     },
+
 
     async save() { 
         await localforage.setItem('vfs', this.state.vfs);
