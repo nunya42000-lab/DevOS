@@ -1,10 +1,14 @@
 :root {
     --bg: #0d1117;
     --panel: #161b22;
+    --surface: #21262d;
     --accent: #2f81f7;
+    --success: #3fb950;
+    --danger: #f85149;
+    --warn: #d29922;
     --text: #c9d1d9;
     --border: #30363d;
-    --terminal-height: 200px;
+    --gold: #d29922;
 }
 
 body, html {
@@ -12,70 +16,34 @@ body, html {
     height: 100%; width: 100%;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden;
 }
 
-/* Portrait vs Landscape Grid Control */
-.app-container {
-    display: flex;
-    height: 100%;
-    width: 100%;
+/* Scrollbar Customization for Workspace */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+/* CodeMirror 6 Overrides to ensure scrolling works on Mobile */
+.cm-editor {
+    height: 100% !important;
+    width: 100% !important;
+    outline: none !important;
+}
+.cm-scroller {
+    overflow: auto !important;
+    height: 100% !important;
+    font-family: 'Fira Code', monospace;
+    font-size: 14px;
+    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS */
 }
 
-@media (orientation: portrait) {
-    .app-container { flex-direction: column; }
-    .sidebar { 
-        position: fixed; left: -100%; top: 0; height: 100%; width: 80%; 
-        z-index: 100; transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .sidebar.active { left: 0; }
-}
+/* Drawer Transitions */
+.terminal-drawer { transition: height 0.3s ease; }
+.sidebar { transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
 
-@media (orientation: landscape) {
-    .app-container { flex-direction: row; }
-    .sidebar { width: 260px; border-right: 1px solid var(--border); }
-}
-
-/* Terminal Styles: Drawer vs Floating */
-#universal-terminal {
-    background: rgba(22, 27, 34, 0.95);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-}
-
-/* Drawer Mode (Fixed Bottom) */
-#universal-terminal.terminal-drawer {
-    position: fixed;
-    bottom: 0; left: 0; width: 100%;
-    height: var(--terminal-height);
-    z-index: 50;
-}
-
-/* Floating Mode */
-#universal-terminal.terminal-float {
-    position: absolute;
-    top: 50px; left: 50px;
-    width: 400px; height: 300px;
-    border-radius: 8px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    z-index: 60;
-}
-
-/* Biometric Lock Screen */
-#bio-lock-screen {
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-}
-
-body:not(.state-locked) #bio-lock-screen {
-    display: none;
-      }
+/* Button Hover States */
+.tool-btn:active { transform: scale(0.95); opacity: 0.8; }
+.list-entry:hover { background: rgba(255,255,255,0.05); }
