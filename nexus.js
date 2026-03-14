@@ -1,15 +1,47 @@
 /* ========================================
-   FILE: nexus.js (Unified)
+   FILE: nexus.js (Fully Unified & Patched Ultimate Edition)
    ======================================== */
 
-// --- 1. CORE ---
+// --- 1. SYSTEM & CORE ---
+const System = {
+    async nuke() {
+        if (confirm("WARNING: This will permanently erase ALL files, history, branches, and settings. Proceed?")) {
+            await localforage.clear();
+            const cacheKeys = await caches.keys();
+            for (let key of cacheKeys) {
+                await caches.delete(key);
+            }
+            window.location.reload();
+        }
+    },
+
+    generatePWA() {
+        const manifest = {
+            name: "DevOS Custom App",
+            short_name: "App",
+            display: "standalone",
+            start_url: "./index.html",
+            background_color: "#000000",
+            theme_color: "#2f81f7",
+            icons: [{"src": "icon.png", "sizes": "512x512", "type": "image/png"}]
+        };
+
+        const sw = `const CACHE = 'app-cache-v1';
+self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html']))));
+self.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(res => res || fetch(e.request))));`;
+
+        VFS.files['manifest.json'] = JSON.stringify(manifest, null, 2);
+        VFS.files['sw.js'] = sw;
+        VFS.save();
+        Nexus.updateTerminal("Manifest and Service Worker generated.", "var(--success)");
+    }
+};
+
 const Nexus = {
     state: {
-        locked: true,
+        locked: false,
         orientation: 'portrait',
-        activeFile: null,
-        terminalMode: 'drawer',
-        peer: null // For WebRTC Sync
+        terminalMode: 'drawer'
     },
 
     async boot() {
@@ -17,26 +49,52 @@ const Nexus = {
         this.checkOrientation();
         this.initEventListeners();
         
-        // Load VFS and Settings
-        const vfs = await localforage.getItem('nexus_vfs') || {};
-        console.log("VFS Loaded", Object.keys(vfs).length, "files");
+        // Initialize all subsystems
+        Vault.init();
+        NexusHistory.init();
+        NexusGit.init();
+        Hardware.init();
+        Editor.init();
+        Preview.init();
+        NexusSync.init();
+        await VFS.init();
 
-        this.updateTerminal("DevOS Nexus v2.0 Online. Type 'help' to start.");
+        this.updateTerminal("DevOS Nexus Ultimate Online. Type 'help' to start.");
+
+        // Attach Drag & Drop Listeners
+        const dropZone = document.getElementById('drop-overlay');
+        if (dropZone) {
+            window.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('active'); });
+            window.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.classList.remove('active'); });
+            window.addEventListener('drop', (e) => { 
+                e.preventDefault(); 
+                dropZone.classList.remove('active'); 
+                VFS.importFiles({ target: { files: e.dataTransfer.files, value: '' } }); 
+            });
+        }
+
+        // Attach File Import Input Listener
+        const importInput = document.getElementById('file-import-input');
+        if (importInput) {
+            importInput.addEventListener('change', (e) => VFS.importFiles(e));
+        }
     },
 
     initEventListeners() {
         window.addEventListener('resize', () => this.checkOrientation());
         
-        // Biometric Unlock Trigger
-        document.getElementById('auth-btn').onclick = () => this.authenticate();
+        const authBtn = document.getElementById('auth-btn');
+        if (authBtn) authBtn.onclick = () => this.authenticate();
         
-        // Terminal Input Handling
-        document.getElementById('terminal-command').onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                this.executeCommand(e.target.value);
-                e.target.value = '';
-            }
-        };
+        const termCmd = document.getElementById('terminal-command');
+        if (termCmd) {
+            termCmd.onkeydown = (e) => {
+                if (e.key === 'Enter') {
+                    this.executeCommand(e.target.value);
+                    e.target.value = '';
+                }
+            };
+        }
     },
 
     async authenticate() {
@@ -50,7 +108,7 @@ const Nexus = {
             }
         } else {
             const pin = prompt("Enter Master PIN:");
-            if (pin === "1234") { // Placeholder
+            if (pin === "1234") { 
                 document.body.classList.remove('state-locked');
                 this.state.locked = false;
             }
@@ -59,6 +117,7 @@ const Nexus = {
 
     updateTerminal(msg, color = 'var(--text)') {
         const output = document.getElementById('terminal-output');
+        if (!output) return;
         const line = document.createElement('div');
         line.style.color = color;
         line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
@@ -67,24 +126,19 @@ const Nexus = {
     },
 
     executeCommand(cmd) {
+        if (!cmd) return;
         this.updateTerminal(`> ${cmd}`, 'var(--accent)');
         const input = cmd.toLowerCase().trim();
         
-        if (input === 'rebuild' || input === 'import') {
-            NexusReconstructor.openPortal();
-        } else if (input.startsWith('math ')) {
-            NexusMath.generateLogic(cmd.replace('math ', ''));
-        } else if (input.startsWith('branch ')) {
-            NexusGit.createBranch(cmd.replace('branch ', ''));
-        } else if (input === 'analyze') {
-            Intelligence.analyze();
-        } else if (input === 'build') {
-            Vault.compile();
-        } else if (input === 'sync') {
-            NexusSync.init();
-        } else {
-            Nexus.terminal.process(input);
-        }
+        if (input === 'rebuild' || input === 'import') NexusReconstructor.openPortal();
+        else if (input.startsWith('math ')) NexusMath.generateLogic(cmd.replace('math ', ''));
+        else if (input.startsWith('branch ')) NexusGit.createBranch(cmd.replace('branch ', ''));
+        else if (input === 'analyze') Intelligence.analyze();
+        else if (input === 'sync') NexusSync.init();
+        else if (input === 'clear') document.getElementById('terminal-output').innerHTML = '';
+        else if (input === 'nuke') System.nuke();
+        else if (input === 'pwa') System.generatePWA();
+        else this.terminal.process(input);
     },
 
     checkOrientation() {
@@ -99,42 +153,257 @@ const Nexus = {
     }
 };
 
-// --- 2. EDITOR ---
+// --- 2. VIRTUAL FILE SYSTEM (VFS) ---
+const VFS = {
+    files: {},
+    activeFile: null,
+
+    async init() {
+        this.files = await localforage.getItem('nexus_vfs') || {};
+        this.renderExplorer();
+    },
+
+    async save() {
+        await localforage.setItem('nexus_vfs', this.files);
+        this.renderExplorer();
+    },
+
+    openFile(filename) {
+        this.activeFile = filename;
+        const content = this.files[filename] || '';
+        Editor.loadContent(content, filename);
+        
+        const ext = filename.split('.').pop();
+        if (window.VirtualKeyboard && window.VirtualKeyboard.render) VirtualKeyboard.render(ext);
+        
+        Nexus.updateTerminal(`Opened: ${filename}`);
+        this.renderExplorer();
+    },
+
+    createFile() {
+        const name = prompt("Enter file name (e.g., script.js, index.html):");
+        if (name && !this.files[name]) {
+            this.files[name] = "";
+            this.save();
+            this.openFile(name);
+        }
+    },
+
+    async deleteFile(name) {
+        if(confirm(`Delete ${name}?`)) {
+            delete this.files[name];
+            if(this.activeFile === name) {
+                this.activeFile = null;
+                if (Editor.cm) Editor.cm.setValue("");
+            }
+            await this.save();
+        }
+    },
+
+    async importFiles(event) {
+        const fileList = event.target.files;
+        if (!fileList || !fileList.length) return;
+
+        Nexus.updateTerminal(`Importing ${fileList.length} item(s)...`, 'var(--accent)');
+
+        for (let file of fileList) {
+            if (file.name.endsWith('.zip')) {
+                try {
+                    const zip = await JSZip.loadAsync(file);
+                    for (let relativePath in zip.files) {
+                        const zipEntry = zip.files[relativePath];
+                        if (!zipEntry.dir) {
+                            const content = await zipEntry.async('string');
+                            this.files[zipEntry.name] = content;
+                        }
+                    }
+                    Nexus.updateTerminal(`Extracted ZIP: ${file.name}`, 'var(--success)');
+                } catch (err) {
+                    Nexus.updateTerminal(`ZIP Error: ${err.message}`, 'var(--warn)');
+                }
+            } else {
+                const content = await file.text();
+                this.files[file.name] = content;
+            }
+        }
+        
+        await this.save();
+        if (event.target.value !== undefined) event.target.value = ''; 
+    },
+
+    renderExplorer() {
+        const exp = document.getElementById('explorer');
+        this.renderTabs();
+        
+        if (!exp) return;
+        if (Object.keys(this.files).length === 0) {
+            exp.innerHTML = `<div style="padding:10px; color:var(--muted); text-align:center;">No files found.</div>`;
+            return;
+        }
+
+        exp.innerHTML = Object.keys(this.files).map(f => `
+            <div class="file-item ${this.activeFile === f ? 'active' : ''}" 
+                 onclick="VFS.openFile('${f}')" 
+                 style="padding: 8px; cursor: pointer; border-bottom: 1px solid var(--border); ${this.activeFile === f ? 'background: var(--border); color: var(--accent);' : ''}">
+                📄 ${f}
+            </div>
+        `).join('');
+    },
+
+    renderTabs() {
+        const tc = document.getElementById('tabs-container');
+        if (!tc) return;
+        tc.innerHTML = Object.keys(this.files).map(f => `
+            <div onclick="VFS.openFile('${f}')" style="display:inline-block; padding: 5px 15px; background: ${this.activeFile === f ? 'var(--bg)' : 'transparent'}; border: 1px solid var(--border); border-bottom: none; cursor: pointer; border-radius: 4px 4px 0 0; color: ${this.activeFile === f ? 'var(--accent)' : 'var(--text)'};">
+                ${f} <span onclick="event.stopPropagation(); VFS.deleteFile('${f}')" style="margin-left: 5px; color: var(--danger); font-weight: bold;">×</span>
+            </div>
+        `).join('');
+    }
+};
+
+// --- 3. EDITOR ---
 const Editor = {
-    view: null,
+    cm: null,
 
     init() {
-        this.view = new CodeMirror.EditorView({
-            parent: document.getElementById('editor-wrapper'),
-            extensions: [
-                CodeMirror.basicSetup,
-                CodeMirror.javascript(),
-                CodeMirror.EditorView.updateListener.of((v) => {
-                    if (v.docChanged) {
-                        VFS.files[VFS.activeFile] = v.state.doc.toString();
-                    }
-                })
-            ]
+        const wrapper = document.getElementById('editor-wrapper');
+        if (!wrapper) return;
+
+        this.cm = CodeMirror(wrapper, {
+            value: "// Welcome to Nexus Prime Ultimate\n// Select, create, or import a file to begin.",
+            mode: "javascript",
+            theme: "dracula",
+            lineNumbers: true,
+            autoCloseBrackets: true,
+            autoCloseTags: true,
+            matchBrackets: true,
+            foldGutter: true,
+            gutters: ["CodeMirror-linenumbers", "CodeMirror-foldgutter"],
+            viewportMargin: Infinity
+        });
+
+        this.cm.on('change', () => {
+            if (VFS.activeFile) {
+                VFS.files[VFS.activeFile] = this.cm.getValue();
+                NexusHistory.takeSnapshot(VFS.activeFile, this.cm.getValue());
+            }
         });
     },
 
     loadContent(content, filename) {
-        const transaction = this.view.state.update({
-            changes: {from: 0, to: this.view.state.doc.length, insert: content}
-        });
-        this.view.dispatch(transaction);
+        if (!this.cm) return;
+        const ext = filename.split('.').pop();
+        const modes = { js: 'javascript', html: 'htmlmixed', css: 'css', json: 'javascript', md: 'markdown' };
+        
+        this.cm.setOption("mode", modes[ext] || "javascript");
+        this.cm.setValue(content);
     },
 
     insertText(text) {
-        const range = this.view.state.selection.main;
-        this.view.dispatch({
-            changes: {from: range.from, to: range.to, insert: text},
-            selection: {anchor: range.from + text.length}
+        if (this.cm) {
+            this.cm.replaceSelection(text);
+            this.cm.focus();
+        }
+    },
+
+    formatCode() {
+        if (!VFS.activeFile || !this.cm) return;
+        const code = this.cm.getValue();
+        const ext = VFS.activeFile.split('.').pop();
+        let formatted = code;
+
+        try {
+            if (ext === 'js' || ext === 'json') formatted = js_beautify(code, { indent_size: 4 });
+            else if (ext === 'html') formatted = html_beautify(code, { indent_size: 4 });
+            else if (ext === 'css') formatted = css_beautify(code, { indent_size: 4 });
+            
+            this.cm.setValue(formatted);
+            Nexus.updateTerminal("Code Formatted.", "var(--success)");
+            Nexus.haptic('success');
+        } catch (e) {
+            Nexus.updateTerminal("Format error.", "var(--danger)");
+        }
+    }
+};
+
+// --- 4. PREVIEW & HARDWARE ---
+const Preview = {
+    fps: 0,
+    lastTime: performance.now(),
+
+    init() {
+        this.startFPSCounter();
+    },
+
+    refresh() {
+        const frame = document.getElementById('live-preview-frame');
+        if (!frame) return;
+        const html = VFS.files['index.html'] || '<h2 style="color:white;text-align:center;font-family:sans-serif;margin-top:20%;">No index.html found in VFS</h2>';
+        const css = `<style>${VFS.files['styles.css'] || ''}</style>`;
+        const js = `<script>${VFS.files['main.js'] || ''}<\/script>`;
+        
+        const blob = new Blob([html + css + js], { type: 'text/html' });
+        frame.src = URL.createObjectURL(blob);
+        
+        Nexus.updateTerminal("Sandbox Refreshed", 'var(--success)');
+        Nexus.haptic('medium');
+    },
+
+    resize(dimensions) {
+        const frame = document.getElementById('live-preview-frame');
+        if (!frame) return;
+        
+        if (dimensions.includes('x') && !dimensions.includes('100%')) {
+            const [w, h] = dimensions.split('x');
+            frame.style.width = w.trim();
+            frame.style.height = h.trim();
+            frame.style.border = "10px solid #333";
+            frame.style.borderRadius = "30px";
+        } else {
+            frame.style.width = "100%";
+            frame.style.height = "100%";
+            frame.style.border = "none";
+            frame.style.borderRadius = "0";
+        }
+        Nexus.updateTerminal(`Preview Resized: ${dimensions}`);
+    },
+
+    startFPSCounter() {
+        const track = (now) => {
+            const delta = now - this.lastTime;
+            this.lastTime = now;
+            this.fps = Math.round(1000 / delta);
+            requestAnimationFrame(track);
+        };
+        requestAnimationFrame(track);
+    }
+};
+
+const Hardware = {
+    init() {
+        this.initShakeToUndo();
+    },
+
+    initShakeToUndo() {
+        let lastX, lastY, lastZ;
+        let threshold = 15;
+
+        window.addEventListener('devicemotion', (e) => {
+            let acc = e.accelerationIncludingGravity;
+            if (!acc || !acc.x) return;
+
+            let delta = Math.abs(acc.x + acc.y + acc.z - lastX - lastY - lastZ);
+            if (delta > threshold) {
+                Nexus.updateTerminal("Shake detected: Undoing last action...");
+                if (Editor.cm) Editor.cm.undo();
+                Nexus.haptic('medium');
+            }
+            lastX = acc.x; lastY = acc.y; lastZ = acc.z;
         });
     }
 };
 
-// --- 3. GIT & HISTORY ---
+// --- 5. GIT & HISTORY ---
 const NexusGit = {
     branches: {},
     current: 'main',
@@ -163,7 +432,7 @@ const NexusGit = {
         this.current = id;
         
         VFS.files = { ...this.branches[id] };
-        await VFS.saveVFS();
+        await VFS.save();
         await this.persist();
         
         Nexus.updateTerminal(`Active Branch: ${id}`);
@@ -180,7 +449,7 @@ const NexusGit = {
         const container = document.getElementById('branch-list');
         if (!container) return;
         container.innerHTML = Object.keys(this.branches).map(b => `
-            <div class="branch-item ${this.current === b ? 'active' : ''}" onclick="NexusGit.switchBranch('${b}')">
+            <div class="branch-item ${this.current === b ? 'active' : ''}" onclick="NexusGit.switchBranch('${b}')" style="cursor:pointer; padding:5px;">
                 ${this.current === b ? '●' : '○'} ${b}
             </div>
         `).join('');
@@ -210,188 +479,27 @@ const NexusHistory = {
         const snap = this.history[filename].find(h => h.ts === timestamp);
         if (snap) {
             VFS.files[filename] = snap.code;
-            VFS.saveVFS();
+            VFS.save();
             Editor.loadContent(snap.code, filename);
             Nexus.updateTerminal(`Restored ${filename} to ${new Date(timestamp).toLocaleTimeString()}`);
         }
     }
 };
 
-// --- 4. HARDWARE & PREVIEW ---
-const Hardware = {
-    init() {
-        this.initShakeToUndo();
-        // this.initOrientationTriggers(); // Called in original, implementation missing
-    },
-
-    initShakeToUndo() {
-        let lastX, lastY, lastZ;
-        let threshold = 15;
-
-        window.addEventListener('devicemotion', (e) => {
-            let acc = e.accelerationIncludingGravity;
-            if (!acc.x) return;
-
-            let delta = Math.abs(acc.x + acc.y + acc.z - lastX - lastY - lastZ);
-            if (delta > threshold) {
-                Nexus.updateTerminal("Shake detected: Undoing last action...");
-                CodeMirror.undo(Editor.view);
-                Nexus.haptic('medium');
-            }
-            lastX = acc.x; lastY = acc.y; lastZ = acc.z;
-        });
-    },
-
-    async requestBiometric() {
-        if (!window.PublicKeyCredential) return true;
-
-        try {
-            Nexus.updateTerminal("Verifying Identity...");
-            return true;
-        } catch (err) {
-            Nexus.updateTerminal("Biometric Error: " + err.message, 'var(--warn)');
-            return false;
-        }
-    }
-};
-
-const Preview = {
-    fps: 0,
-    lastTime: performance.now(),
-
-    init() {
-        this.startFPSCounter();
-    },
-
-    refresh() {
-        const frame = document.getElementById('live-preview-frame');
-        if (!frame) return;
-        const html = VFS.files['index.html'] || '';
-        const css = `<style>${VFS.files['styles.css'] || ''}</style>`;
-        const js = `<script>${VFS.files['main.js'] || ''}<\/script>`;
-        const blob = new Blob([html + css + js], { type: 'text/html' });
-        frame.src = URL.createObjectURL(blob);
-        
-        Nexus.updateTerminal("Sandbox Refreshed", 'var(--success)');
-        Nexus.haptic('medium');
-    },
-
-    startFPSCounter() {
-        const track = (now) => {
-            const delta = now - this.lastTime;
-            this.lastTime = now;
-            this.fps = Math.round(1000 / delta);
-            requestAnimationFrame(track);
-        };
-        requestAnimationFrame(track);
-    }
-};
-
-// --- 5. UTILITIES ---
-const NexusImporter = {
-    async parseFromClipboard() {
-        try {
-            const text = await navigator.clipboard.readText();
-            this.process(text);
-        } catch (err) {
-            Nexus.updateTerminal("Clipboard access denied. Paste into terminal manually.", 'var(--warn)');
-        }
-    },
-
-    async process(text) {
-        const filePattern = /### ([\w.-]+)\n```\w*\n([\s\S]*?)```/g;
-        let match;
-        let count = 0;
-
-        while ((match = filePattern.exec(text)) !== null) {
-            const fileName = match[1];
-            const fileContent = match[2].trim();
-            
-            VFS.files[fileName] = fileContent;
-            count++;
-        }
-
-        if (count > 0) {
-            await localforage.setItem('nexus_vfs', VFS.files);
-            VFS.renderExplorer();
-            Nexus.updateTerminal(`Reconstruction Complete: ${count} files updated.`, 'var(--success)');
-            Nexus.haptic('success');
-        } else {
-            Nexus.updateTerminal("No valid file blocks detected in text.", 'var(--warn)');
-        }
-    }
-};
-
-const NexusReconstructor = {
-    async digest(text) {
-        const blockPattern = /### ([\w.-]+)\n```\w*\n([\s\S]*?)```/g;
-        let match;
-        let updatedFiles = [];
-
-        Nexus.updateTerminal("Starting reconstruction process...", 'var(--accent)');
-        while ((match = blockPattern.exec(text)) !== null) {
-            const fileName = match[1];
-            const fileContent = match[2].trim();
-            
-            VFS.files[fileName] = fileContent;
-            updatedFiles.push(fileName);
-        }
-
-        if (updatedFiles.length > 0) {
-            await localforage.setItem('nexus_vfs', VFS.files);
-            VFS.renderExplorer();
-            Nexus.updateTerminal(`Successfully reconstructed ${updatedFiles.length} files:`, 'var(--success)');
-            updatedFiles.forEach(f => Nexus.updateTerminal(` -> ${f}`, 'var(--text)'));
-            Nexus.haptic('success');
-        } else {
-            Nexus.updateTerminal("Reconstruction failed: No valid file blocks found.", 'var(--warn)');
-            Nexus.updateTerminal("Ensure the text includes '### filename' headers.", 'var(--muted)');
-        }
-    },
-
-    openPortal() {
-        const text = prompt("Paste the chat history or file blocks here to rebuild:");
-        if (text) {
-            this.digest(text);
-        }
-    }
-};
-
-const Intelligence = {
-    map: {},
-
-    analyze() {
-        this.map = {};
-        Object.entries(VFS.files).forEach(([name, content]) => {
-            if (!name.endsWith('.js')) return;
-            
-            const provides = content.match(/(?:function\s+|const\s+|let\s+)([a-zA-Z_$][\w$]*)/g) || [];
-            const requires = content.match(/([a-zA-Z_$][\w$]*)\s*\(/g) || [];
-
-            this.map[name] = {
-                provides: provides.map(p => p.split(/\s+/).pop()),
-                requires: requires.map(r => r.replace('(', '').trim())
-            };
-        });
-        
-        this.renderStats();
-    },
-
-    renderStats() {
-        const totalLines = Object.values(VFS.files).reduce((a, b) => a + b.split('\n').length, 0);
-        Nexus.updateTerminal(`Project Intelligence: ${Object.keys(VFS.files).length} files, ${totalLines} lines of logic.`);
-    }
-};
-
+// --- 6. UTILITIES (MATH, SEARCH, INTELLIGENCE) ---
 const NexusMath = {
     generateLogic(expression) {
+        if (typeof math === 'undefined') {
+            Nexus.updateTerminal("Math.js library not loaded.", 'var(--warn)');
+            return;
+        }
         try {
             const node = math.parse(expression);
             const variables = [];
             
-            node.traverse((node) => {
-                if (node.isSymbolNode && !math[node.name]) {
-                    variables.push(node.name);
+            node.traverse((n) => {
+                if (n.isSymbolNode && !math[n.name]) {
+                    variables.push(n.name);
                 }
             });
             const uniqueVars = [...new Set(variables)];
@@ -434,6 +542,73 @@ const NexusSearch = {
     }
 };
 
+const Intelligence = {
+    map: {},
+
+    analyze() {
+        this.map = {};
+        Object.entries(VFS.files).forEach(([name, content]) => {
+            if (!name.endsWith('.js')) return;
+            
+            const provides = content.match(/(?:function\s+|const\s+|let\s+)([a-zA-Z_$][\w$]*)/g) || [];
+            const requires = content.match(/([a-zA-Z_$][\w$]*)\s*\(/g) || [];
+
+            this.map[name] = {
+                provides: provides.map(p => p.split(/\s+/).pop()),
+                requires: requires.map(r => r.replace('(', '').trim())
+            };
+        });
+        
+        this.renderStats();
+    },
+
+    renderStats() {
+        const totalLines = Object.values(VFS.files).reduce((a, b) => a + b.split('\n').length, 0);
+        Nexus.updateTerminal(`Project Intelligence: ${Object.keys(VFS.files).length} files, ${totalLines} lines of logic.`);
+    }
+};
+
+// --- 7. IMPORTER & RECONSTRUCTOR ---
+const NexusImporter = {
+    async parseFromClipboard() {
+        try {
+            const text = await navigator.clipboard.readText();
+            this.process(text);
+        } catch (err) {
+            Nexus.updateTerminal("Clipboard access denied. Paste into terminal manually.", 'var(--warn)');
+        }
+    },
+
+    async process(text) {
+        const filePattern = /### ([\w.-]+)\n```\w*\n([\s\S]*?)```/g;
+        let match;
+        let count = 0;
+
+        while ((match = filePattern.exec(text)) !== null) {
+            const fileName = match[1];
+            const fileContent = match[2].trim();
+            VFS.files[fileName] = fileContent;
+            count++;
+        }
+
+        if (count > 0) {
+            await VFS.save();
+            Nexus.updateTerminal(`Reconstruction Complete: ${count} files updated.`, 'var(--success)');
+            Nexus.haptic('success');
+        } else {
+            Nexus.updateTerminal("No valid file blocks detected in text.", 'var(--warn)');
+        }
+    }
+};
+
+const NexusReconstructor = {
+    openPortal() {
+        const text = prompt("Paste the chat history or file blocks here to rebuild:");
+        if (text) NexusImporter.process(text);
+    }
+};
+
+// --- 8. VAULT COMPILER ---
 const Vault = {
     snippets: [],
 
@@ -472,18 +647,21 @@ const Vault = {
     }
 };
 
-// --- 6. SYNC ---
+// --- 9. SYNC (WEBRTC) ---
 const NexusSync = {
     peer: null,
     conn: null,
 
     init() {
+        if (typeof Peer === 'undefined') {
+            Nexus.updateTerminal("PeerJS library not loaded. Sync unavailable.", 'var(--warn)');
+            return;
+        }
         const deviceId = 'devos-' + Math.floor(Math.random() * 10000);
         this.peer = new Peer(deviceId);
 
         this.peer.on('open', (id) => {
             Nexus.updateTerminal(`Device ID: ${id}. Share this to sync.`, 'var(--accent)');
-            document.getElementById('sync-status').classList.replace('offline', 'online');
         });
         
         this.peer.on('connection', (connection) => {
@@ -494,6 +672,7 @@ const NexusSync = {
     },
 
     connectTo(remoteId) {
+        if (!this.peer) return;
         this.conn = this.peer.connect(remoteId);
         this.setupListeners();
     },
@@ -519,12 +698,13 @@ const NexusSync = {
     }
 };
 
-// --- 7. TERMINAL ROUTER ---
+// --- 10. TERMINAL ROUTER ---
 Nexus.terminal = {
     mode: 'drawer',
     context: 'js',
 
     solveMath(expression) {
+        if (typeof math === 'undefined') return;
         try {
             const result = math.evaluate(expression);
             const cleanExpr = expression.replace(/x/g, 'val');
@@ -539,28 +719,23 @@ Nexus.terminal = {
         }
     },
 
-    setContext(ext) {
-        this.context = ext;
-        Nexus.updateTerminal(`Context Switched: ${ext.toUpperCase()}`);
-        if (window.VirtualKeyboard) VirtualKeyboard.render(ext);
-    },
-
     process(input) {
-        // Integrated Search logic
         if (input.startsWith('find ')) {
             NexusSearch.query(input.replace('find ', ''));
             return;
         }
-
-        // Integrated Math Logic
         if (input.startsWith('=')) { 
             this.solveMath(input.substring(1));
             return;
         }
 
         switch(input) {
-            case 'clear':
-                document.getElementById('terminal-output').innerHTML = '';
+            case 'build':
+                Nexus.updateTerminal("Compiling Vault...", 'var(--warn)');
+                Vault.compile(); 
+                break;
+            case 'export':
+                Vault.exportAIContext();
                 break;
             case 'float':
                 document.getElementById('universal-terminal').className = 'terminal-float';
@@ -568,25 +743,14 @@ Nexus.terminal = {
             case 'drawer':
                 document.getElementById('universal-terminal').className = 'terminal-drawer';
                 break;
-            case 'build':
-                Nexus.updateTerminal("Compiling PWA...", 'var(--warn)');
-                Vault.compile(); 
+            case 'help':
+                Nexus.updateTerminal("Commands: build, export, find [term], nuke, pwa, = [math]");
                 break;
             default:
-                Nexus.updateTerminal(`Unknown: ${input}. Try '= 2+2', 'find [term]' or 'float'`);
+                Nexus.updateTerminal(`Unknown: ${input}. Type 'help'.`);
         }
     }
 };
 
-// --- 8. INITIALIZATION ---
-// Initialize subsystems before the core boot
-Vault.init();
-NexusHistory.init();
-NexusGit.init();
-Hardware.init();
-Editor.init();
-Preview.init();
-NexusSync.init();
-
-// Boot Core Nexus System
-Nexus.boot();
+// --- BOOT TRIGGER ---
+window.onload = () => Nexus.boot();
