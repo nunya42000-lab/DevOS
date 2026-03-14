@@ -9,8 +9,13 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
+    
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
     <script type="module">
         import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
         import { EditorView } from "https://esm.sh/@codemirror/view";
@@ -97,7 +102,7 @@
         
         .toolbar { display: flex; background: var(--panel); padding: 8px; gap: 8px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex-shrink: 0; touch-action: pan-x; }
         .tool-btn { padding: 8px 14px; border-radius: 6px; border: none; font-size: 0.7rem; font-weight: bold; color: white; cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
-        .btn-blue { background: var(--accent); } .btn-gold { background: var(--gold); } .btn-green { background: var(--success); } .btn-gray { background: #30363d; }
+        .btn-blue { background: var(--accent); } .btn-gold { background: var(--gold); } .btn-green { background: var(--success); } .btn-gray { background: #30363d; } .btn-red { background: var(--danger); }
 
         .tab-bar { display: flex; background: var(--bg); height: 35px; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; flex-shrink: 0; touch-action: pan-x; }
         .tab { padding: 0 12px; display: flex; align-items: center; font-size: 0.75rem; border-right: 1px solid var(--border); cursor: pointer; color: #8b949e; background: var(--panel); min-width: 80px; }
@@ -123,9 +128,9 @@
         .kb-grid button { height: 42px; background: #222; color: white; border: 1px solid #333; border-radius: 6px; font-size: 14px; font-weight: bold; }
 
         .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: none; align-items: center; justify-content: center; padding: 20px; }
-        .modal { width: 100%; max-width: 550px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
+        .modal { width: 100%; max-width: 650px; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; max-height: 85vh; overflow: hidden; }
         .modal-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--bg); }
-        .modal-body { padding: 20px; overflow-y: auto; flex: 1; touch-action: pan-y; }
+        .modal-body { padding: 20px; overflow-y: auto; flex: 1; touch-action: pan-y; color: var(--text); }
 
         #mobile-nav { position: fixed; bottom: 100px; right: 20px; width: 55px; height: 55px; border-radius: 50%; background: var(--gold); color: white; border: none; z-index: 6000; font-size: 22px; box-shadow: 0 4px 20px rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; }
         @media (max-width: 1024px) { #mobile-nav { display: flex; } }
@@ -154,7 +159,12 @@
             <div class="sidebar-scroll">
                 <div class="acc-item">
                     <div class="acc-head" onclick="Nexus.toggleAcc(this)">🌿 Branches <span>▼</span></div>
-                    <div class="acc-body active" id="branch-list"></div>
+                    <div class="acc-body active">
+                        <div style="padding:10px;">
+                            <button onclick="const n = prompt('Branch Name:'); if(n) Nexus.createBranch(n);" style="width:100%; background:var(--accent); border:none; color:white; padding:8px; border-radius:4px; font-size:12px; margin-bottom:10px;">+ New Branch</button>
+                            <div id="branch-list"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="acc-item">
@@ -191,10 +201,12 @@
             <div class="toolbar">
                 <button class="tool-btn btn-gray" onclick="Nexus.copy()">📋 Copy</button>
                 <button class="tool-btn btn-gray" onclick="Nexus.cut()">✂️ Cut</button>
+                <button class="tool-btn btn-gray" onclick="Nexus.formatCode()">✨ Format</button>
                 <button class="tool-btn btn-green" onclick="Nexus.run()">▶ Preview</button>
                 <button class="tool-btn btn-blue" onclick="Nexus.runIntel()">🧠 Intel</button>
                 <button class="tool-btn btn-gold" onclick="Nexus.visual()">🎨 Visual</button>
                 <button class="tool-btn btn-gray" onclick="Nexus.history()">🕒 Time</button>
+                <button class="tool-btn btn-red" onclick="System.nuke()" style="margin-left: auto;">☢️ Nuke</button>
             </div>
 
             <div class="tab-bar" id="tabs"></div>
@@ -208,8 +220,8 @@
             <div class="terminal" id="terminal">
                 <div id="term-out"></div>
                 <div class="term-input">
-                    <button onclick="Nexus.startVoice()" id="voice-btn" style="background:none; border:none; font-size:1.2rem;">🎙️</button>
-                    <input type="text" id="term-in" placeholder="Command or '=' for math...">
+                    <button onclick="Nexus.startVoice()" id="voice-btn" style="background:none; border:none; font-size:1.2rem; cursor:pointer;" title="Sync / Voice">🎙️</button>
+                    <input type="text" id="term-in" placeholder="Command (nuke, pwa, build, sync) or '=' for math...">
                 </div>
             </div>
         </main>
@@ -219,7 +231,7 @@
         <div class="modal" onclick="event.stopPropagation()">
             <div class="modal-header">
                 <h3 id="modal-title" style="margin:0; color:var(--gold);">Modal</h3>
-                <button onclick="Nexus.closeModal()" style="background:none; border:none; color:white; font-size:20px;">✕</button>
+                <button onclick="Nexus.closeModal()" style="background:none; border:none; color:white; font-size:20px; cursor:pointer;">✕</button>
             </div>
             <div class="modal-body" id="modal-body"></div>
         </div>
@@ -230,34 +242,126 @@
         <div class="kb-grid" id="kb-grid"></div>
     </div>
 
-    <input type="file" id="import-input" style="display:none;" accept=".zip,.txt">
+    <input type="file" id="import-input" style="display:none;" accept=".zip,.txt,.js,.html,.css,.json">
 
     <script>
+        // --- BACKEND SYSTEMS ---
+        const System = {
+            async nuke() {
+                if (confirm("WARNING: This will permanently erase ALL files, history, branches, and settings. Proceed?")) {
+                    await localforage.clear();
+                    const cacheKeys = await caches.keys();
+                    for (let key of cacheKeys) {
+                        await caches.delete(key);
+                    }
+                    window.location.reload();
+                }
+            },
+            generatePWA() {
+                const manifest = {
+                    name: "DevOS Custom App", short_name: "App", display: "standalone",
+                    start_url: "./index.html", background_color: "#000000", theme_color: "#2f81f7",
+                    icons: [{"src": "icon.png", "sizes": "512x512", "type": "image/png"}]
+                };
+                const sw = `const CACHE = 'app-cache-v1';\nself.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./', './index.html']))));\nself.addEventListener('fetch', e => e.respondWith(caches.match(e.request).then(res => res || fetch(e.request))));`;
+                Nexus.state.vfs['manifest.json'] = JSON.stringify(manifest, null, 2);
+                Nexus.state.vfs['sw.js'] = sw;
+                Nexus.save();
+                Nexus.renderAll();
+                Nexus.log("PWA Manifest & Service Worker generated.", "var(--success)");
+            }
+        };
+
+        const Vault = {
+            compile() {
+                Nexus.log("Starting Production Bundle...", 'var(--gold)');
+                const bundle = Object.entries(Nexus.state.vfs)
+                    .map(([name, content]) => `/* File: ${name} */\n${content}`).join('\n\n');
+                const blob = new Blob([bundle], { type: 'text/javascript' });
+                Nexus.download(blob, 'devos-bundle.js');
+                Nexus.log("Build Complete. Download started.", 'var(--success)');
+            }
+        };
+
+        const NexusHistory = {
+            history: {}, limit: 30,
+            async init() { this.history = await localforage.getItem('nexus_history') || {}; },
+            async takeSnapshot(filename, code) {
+                if (!this.history[filename]) this.history[filename] = [];
+                const last = this.history[filename][this.history[filename].length - 1];
+                if (last && last.code === code) return;
+                this.history[filename].push({ ts: Date.now(), code });
+                if (this.history[filename].length > this.limit) this.history[filename].shift();
+                await localforage.setItem('nexus_history', this.history);
+            },
+            restore(filename, timestamp) {
+                const snap = this.history[filename].find(h => h.ts === timestamp);
+                if (snap) {
+                    Nexus.state.vfs[filename] = snap.code;
+                    Nexus.save();
+                    Nexus.openFile(filename);
+                    Nexus.log(`Restored ${filename}`, "var(--success)");
+                }
+            }
+        };
+
+        const NexusSync = {
+            peer: null, conn: null,
+            init() {
+                if (typeof Peer === 'undefined') return Nexus.log("PeerJS missing.", 'var(--danger)');
+                const deviceId = 'devos-' + Math.floor(Math.random() * 10000);
+                this.peer = new Peer(deviceId);
+                this.peer.on('open', (id) => Nexus.log(`Sync ID: ${id}. Share to link devices.`, 'var(--accent)'));
+                this.peer.on('connection', (connection) => {
+                    this.conn = connection;
+                    this.setupListeners();
+                    Nexus.log("REMOTE DEVICE LINKED", 'var(--success)');
+                });
+            },
+            connectTo(remoteId) {
+                if (!this.peer) return;
+                this.conn = this.peer.connect(remoteId);
+                this.setupListeners();
+            },
+            setupListeners() {
+                this.conn.on('data', (data) => {
+                    if (data.type === 'KEYSTROKE') {
+                        Nexus.type(data.value, true);
+                    }
+                });
+            },
+            sendKeystroke(key) {
+                if (this.conn && this.conn.open) this.conn.send({ type: 'KEYSTROKE', value: key });
+            }
+        };
+
+        // --- CORE NEXUS OBJECT ---
         const Nexus = {
             state: {
                 vfs: {}, active: 'index.html', tabs: [], cm: null,
-                snapshots: [], branches: ['main'], currentBranch: 'main',
+                branchesData: {}, currentBranch: 'main',
                 config: { 
-                    haptics: true, 
-                    scale: 1, 
-                    termHeight: 180, 
-                    gesturesEnabled: true,
+                    haptics: true, scale: 1, termHeight: 180, gesturesEnabled: true,
                     kb: ['{', '}', '(', ')', ';', '=>', '&&', '||', '!', '=', '$', '_', '.', ',', '+', '-', '*', '/', '<', '>'] 
                 }
             },
 
             async boot() {
-                localforage.config({ name: 'Nexus_Prime_V2' });
+                localforage.config({ name: 'Nexus_Prime_V6' });
                 this.state.vfs = await localforage.getItem('vfs') || {
-                    'index.html': '<h1>Nexus Prime</h1>',
+                    'index.html': '<h1>Nexus Prime Ultimate</h1>\n<p>Code here...</p>',
                     'main.js': 'console.log("Ready.");',
-                    'styles.css': 'body { background: #000; }'
+                    'styles.css': 'body { background: #000; color: #fff; }'
                 };
                 this.state.config = await localforage.getItem('config') || this.state.config;
+                
+                // Load Branches Data
+                this.state.branchesData = await localforage.getItem('nexus_branches') || { 'main': { ...this.state.vfs } };
+                this.state.currentBranch = await localforage.getItem('nexus_active_branch') || 'main';
 
+                await NexusHistory.init();
                 this.applyUIProperties();
 
-                // Wait for CodeMirror 6 modules to finish loading
                 if (!window.CM6) {
                     await new Promise(r => window.addEventListener('cm6-ready', r));
                 }
@@ -267,19 +371,22 @@
                 this.initGestures();
                 this.initImporter();
                 this.initTerm();
+                
                 this.renderAll();
+                this.renderKb();
                 this.openFile('index.html');
-                this.log("Nexus Prime v6.0 Active (CM6 Enabled).", "var(--gold)");
+                this.log("Nexus Prime Ultimate Active. CodeMirror 6 Engine Online.", "var(--gold)");
             },
 
             initEditor(initialContent) {
                 const editorArea = document.querySelector('.editor-area');
-                editorArea.innerHTML = ''; // Wipe out the old textarea
+                editorArea.innerHTML = ''; 
 
                 const updateListener = window.CM6.EditorView.updateListener.of((update) => {
                     if (update.docChanged) {
-                        this.state.vfs[this.state.active] = update.state.doc.toString();
-                        this.save();
+                        const code = update.state.doc.toString();
+                        this.state.vfs[this.state.active] = code;
+                        NexusHistory.takeSnapshot(this.state.active, code);
                     }
                 });
 
@@ -311,7 +418,6 @@
                 this.state.active = filename;
                 const content = this.state.vfs[filename] || '';
                 
-                // CodeMirror 6 dispatch replacement
                 if (this.state.cm) {
                     this.state.cm.dispatch({
                         changes: { from: 0, to: this.state.cm.state.doc.length, insert: content }
@@ -319,24 +425,15 @@
                 }
                 
                 this.renderAll();
-                
-                // Auto-close sidebar on smaller screens when file is clicked
-                if (window.innerWidth < 1024) {
-                    document.getElementById('sidebar').classList.remove('active');
-                }
+                if (window.innerWidth < 1024) document.getElementById('sidebar').classList.remove('active');
             },
 
-            type(val) {
+            type(val, fromSync = false) {
                 if (!this.state.cm) return;
-                
                 const cursor = this.state.cm.state.selection.main.head;
                 
                 if (val === 'BACKSPACE') {
-                    if (cursor > 0) {
-                        this.state.cm.dispatch({
-                            changes: { from: cursor - 1, to: cursor, insert: "" }
-                        });
-                    }
+                    if (cursor > 0) this.state.cm.dispatch({ changes: { from: cursor - 1, to: cursor, insert: "" } });
                 } else {
                     this.state.cm.dispatch({
                         changes: { from: cursor, insert: val },
@@ -344,22 +441,14 @@
                     });
                 }
                 
-                if (this.state.config.haptics && window.navigator.vibrate) {
-                    window.navigator.vibrate(50);
-                }
-                // Sync check
-                if (typeof NexusSync !== 'undefined' && NexusSync.conn) NexusSync.sendKeystroke(val);
+                if (this.state.config.haptics && window.navigator.vibrate) window.navigator.vibrate(50);
+                if (!fromSync && NexusSync.conn) NexusSync.sendKeystroke(val);
             },
 
-            toggleSidebar() {
-                document.getElementById('sidebar').classList.toggle('active');
-            },
+            toggleSidebar() { document.getElementById('sidebar').classList.toggle('active'); },
+            triggerImport() { document.getElementById('import-input').click(); },
 
-            triggerImport() {
-                document.getElementById('import-input').click();
-            },
-
-            // --- GESTURE ENGINE (Pinch-to-Zoom) ---
+            // --- GESTURE ENGINE ---
             initGestures() {
                 let initialDist = 0; let initialScale = 1;
                 const toast = document.getElementById('scale-toast');
@@ -454,53 +543,37 @@
             initImporter() {
                 const input = document.getElementById('import-input');
                 input.onchange = async (e) => {
-                    const file = e.target.files[0];
-                    if (!file) return;
-                    if (file.name.endsWith('.zip')) {
-                        const zip = await JSZip.loadAsync(file);
-                        zip.forEach(async (path, zipFile) => {
-                            if (!zipFile.dir) {
-                                const content = await zipFile.async("string");
-                                this.state.vfs[path] = content;
-                                this.renderAll();
+                    const files = e.target.files;
+                    if (!files.length) return;
+                    for(let file of files) {
+                        if (file.name.endsWith('.zip')) {
+                            const zip = await JSZip.loadAsync(file);
+                            for (let path in zip.files) {
+                                if (!zip.files[path].dir) {
+                                    this.state.vfs[zip.files[path].name] = await zip.files[path].async("string");
+                                }
                             }
-                        });
-                        this.log(`Imported ZIP: ${file.name}`, "var(--success)");
-                    } else if (file.name.endsWith('.txt')) {
-                        const reader = new FileReader();
-                        reader.onload = (re) => this.digestImport(re.target.result);
-                        reader.readAsText(file);
+                            this.log(`Extracted ZIP: ${file.name}`, "var(--success)");
+                        } else {
+                            this.state.vfs[file.name] = await file.text();
+                        }
                     }
-                    input.value = "";
-                };
-            },
-
-            digestImport(text) {
-                const pattern = /([\w\-\.]+\.(?:js|html|css|json|md|txt))[:\*\s]*\n+\`\`\`\w*\n([\s\S]*?)\`\`\`/gi;
-                let match, count = 0;
-                while ((match = pattern.exec(text)) !== null) {
-                    this.state.vfs[match[1]] = match[2].trim();
-                    count++;
-                }
-                if (count > 0) {
                     this.save();
                     this.renderAll();
-                    this.log(`Imported ${count} files.`, "var(--success)");
-                }
+                    input.value = "";
+                };
             },
 
             async exportZIP() {
                 const zip = new JSZip();
                 Object.entries(this.state.vfs).forEach(([n, c]) => zip.file(n, c));
                 const blob = await zip.generateAsync({ type: "blob" });
-                this.download(blob, `nexus-bundle.zip`);
+                this.download(blob, `nexus-project.zip`);
             },
 
             exportTXT() {
                 let out = "";
-                Object.entries(this.state.vfs).forEach(([n, c]) => {
-                    out += `${n}\n\`\`\`\n${c}\n\`\`\`\n\n`;
-                });
+                Object.entries(this.state.vfs).forEach(([n, c]) => { out += `${n}\n\`\`\`\n${c}\n\`\`\`\n\n`; });
                 this.download(new Blob([out], { type: "text/plain" }), "nexus-log.txt");
             },
 
@@ -512,6 +585,50 @@
             },
 
             // --- CORE LOGIC ---
+            formatCode() {
+                if (!this.state.active || !this.state.cm) return;
+                const code = this.state.cm.state.doc.toString();
+                const ext = this.state.active.split('.').pop();
+                let formatted = code;
+                try {
+                    if (ext === 'js' || ext === 'json') formatted = js_beautify(code, { indent_size: 4 });
+                    else if (ext === 'html') formatted = html_beautify(code, { indent_size: 4 });
+                    else if (ext === 'css') formatted = css_beautify(code, { indent_size: 4 });
+                    this.state.cm.dispatch({ changes: { from: 0, to: code.length, insert: formatted } });
+                    this.log("Code Formatted ✨", "var(--success)");
+                } catch(e) { this.log("Format error", "var(--danger)"); }
+            },
+
+            run() {
+                const html = this.state.vfs['index.html'] || '<h1>No index.html</h1>';
+                const css = `<style>${this.state.vfs['styles.css'] || ''}</style>`;
+                const js = `<script>${this.state.vfs['main.js'] || ''}<\/script>`;
+                const blob = new Blob([html + css + js], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                
+                const frameHtml = `
+                    <div style="display:flex; justify-content:flex-end; padding-bottom:10px;">
+                        <a href="${url}" target="_blank" style="color:var(--accent); text-decoration:none; font-size:12px;">Open in New Tab ↗</a>
+                    </div>
+                    <iframe src="${url}" style="width:100%; height:60vh; border:none; background:#fff; border-radius:8px;"></iframe>
+                `;
+                this.showModal("Live App Sandbox", frameHtml);
+                this.log("Sandbox Preview launched.", "var(--success)");
+            },
+
+            visual() { this.showModal("Visual Builders", "<p style='color:var(--text)'>Visual State Machine builder module pending initialization.</p>"); },
+            
+            history() {
+                const hist = NexusHistory.history[this.state.active] || [];
+                let html = `<h4 style="margin-top:0;">History for ${this.state.active}</h4><div style="display:flex;flex-direction:column;gap:5px;">`;
+                if(hist.length === 0) html += "<p>No snapshots found.</p>";
+                hist.slice().reverse().forEach(h => {
+                    html += `<button onclick="NexusHistory.restore('${this.state.active}', ${h.ts}); Nexus.closeModal();" style="padding:10px; background:var(--surface); color:white; border:1px solid var(--border); border-radius:6px; cursor:pointer; text-align:left;">Restore: ${new Date(h.ts).toLocaleString()}</button>`;
+                });
+                html += "</div>";
+                this.showModal("🕒 Time Machine", html);
+            },
+
             searchAll() {
                 const q = document.getElementById('find-box').value.toLowerCase();
                 const res = document.getElementById('search-results');
@@ -524,9 +641,7 @@
                             div.className = "list-entry";
                             div.style.fontSize = "10px";
                             div.innerText = `${file}:${i+1} > ${line.trim().substring(0, 30)}`;
-                            div.onclick = () => {
-                                this.openFile(file);
-                            };
+                            div.onclick = () => this.openFile(file);
                             res.appendChild(div);
                         }
                     });
@@ -548,31 +663,31 @@
             runIntel() {
                 const code = this.state.cm.state.doc.toString();
                 const decls = code.match(/(?:const|let|var|function|class)\s+([a-zA-Z_$][\w$]*)/g) || [];
-                document.getElementById('intel-list').innerHTML = [...new Set(decls)].map(d => `
-                    <div class="list-entry">${d}</div>
-                `).join('');
-                this.log("Intelligence mapping ready.");
+                document.getElementById('intel-list').innerHTML = [...new Set(decls)].map(d => `<div class="list-entry">${d}</div>`).join('');
+                this.log("Intelligence mapping ready.", "var(--accent)");
             },
 
-            // Modals & UI Toggles
+            // Modals & Drawers
             showModal(title, bodyHTML) {
                 document.getElementById('modal-title').innerText = title;
                 document.getElementById('modal-body').innerHTML = bodyHTML;
                 document.getElementById('modal-overlay').style.display = 'flex';
             },
-
-            closeModal() {
-                document.getElementById('modal-overlay').style.display = 'none';
-            },
-
+            closeModal() { document.getElementById('modal-overlay').style.display = 'none'; },
             toggleAcc(el) {
                 const body = el.nextElementSibling;
                 body.classList.toggle('active');
                 el.querySelector('span').innerText = body.classList.contains('active') ? '▼' : '▶';
             },
-
-            toggleKb() {
-                document.getElementById('kb-drawer').classList.toggle('active');
+            toggleKb() { document.getElementById('kb-drawer').classList.toggle('active'); },
+            copy() { navigator.clipboard.writeText(this.state.cm.state.sliceDoc(this.state.cm.state.selection.main.from, this.state.cm.state.selection.main.to) || this.state.cm.state.doc.toString()); this.log("Copied."); },
+            cut() { 
+                const s = this.state.cm.state.selection.main;
+                if (s.from !== s.to) {
+                    navigator.clipboard.writeText(this.state.cm.state.sliceDoc(s.from, s.to));
+                    this.state.cm.dispatch({ changes: { from: s.from, to: s.to, insert: "" } });
+                    this.log("Cut.");
+                }
             },
 
             // Terminal
@@ -600,20 +715,18 @@
             },
 
             processCommand(cmd) {
-                if (cmd.startsWith('=')) {
-                    try {
-                        const res = math.evaluate(cmd.substring(1));
-                        this.log(`= ${res}`, "var(--success)");
-                    } catch (e) {
-                        this.log("Math Error", "var(--danger)");
-                    }
-                } else if (cmd === 'clear') {
-                    document.getElementById('term-out').innerHTML = "";
-                } else if (cmd === 'help') {
-                    this.log("Available: clear, =, help", "var(--gold)");
-                } else {
-                    this.log("Unknown command.", "var(--danger)");
-                }
+                const c = cmd.trim().toLowerCase();
+                if (c.startsWith('=')) {
+                    try { this.log(`= ${math.evaluate(cmd.substring(1))}`, "var(--success)"); } 
+                    catch (e) { this.log("Math Error", "var(--danger)"); }
+                } 
+                else if (c === 'clear') document.getElementById('term-out').innerHTML = "";
+                else if (c === 'nuke') System.nuke();
+                else if (c === 'pwa') System.generatePWA();
+                else if (c === 'build') Vault.compile();
+                else if (c === 'sync') NexusSync.init();
+                else if (c === 'help') this.log("Available: clear, nuke, pwa, build, sync, =, help", "var(--gold)");
+                else this.log("Unknown command. Type 'help'.", "var(--danger)");
             },
 
             // UI Render Updates
@@ -637,11 +750,8 @@
 
             closeTab(tab) {
                 this.state.tabs = this.state.tabs.filter(t => t !== tab);
-                if (this.state.active === tab) {
-                    this.openFile(this.state.tabs[0] || 'index.html');
-                } else {
-                    this.renderTabs();
-                }
+                if (this.state.active === tab) this.openFile(this.state.tabs[0] || 'index.html');
+                else this.renderTabs();
             },
 
             renderExplorer() {
@@ -650,7 +760,7 @@
                 Object.keys(this.state.vfs).forEach(file => {
                     const div = document.createElement('div');
                     div.className = `list-entry ${file === this.state.active ? 'active' : ''}`;
-                    div.innerHTML = `<span>${file}</span> <span style="color:var(--danger);" onclick="event.stopPropagation(); Nexus.deleteFile('${file}')">🗑</span>`;
+                    div.innerHTML = `<span>📄 ${file}</span> <span style="color:var(--danger);" onclick="event.stopPropagation(); Nexus.deleteFile('${file}')">🗑</span>`;
                     div.onclick = () => {
                         if (!this.state.tabs.includes(file)) this.state.tabs.push(file);
                         this.openFile(file);
@@ -678,21 +788,70 @@
                 }
             },
 
+            // Git / Branching Logic Upgraded
+            async createBranch(name) {
+                const id = name.toLowerCase().replace(/\s+/g, '-');
+                if (this.state.branchesData[id]) return this.log("Branch already exists.", 'var(--warn)');
+                
+                this.state.branchesData[this.state.currentBranch] = { ...this.state.vfs };
+                this.state.branchesData[id] = { ...this.state.vfs };
+                this.state.currentBranch = id;
+                
+                await localforage.setItem('nexus_branches', this.state.branchesData);
+                await localforage.setItem('nexus_active_branch', this.state.currentBranch);
+                this.log(`Switched to new branch: ${id}`, 'var(--success)');
+                this.renderBranches();
+            },
+
+            async switchBranch(id) {
+                if (!this.state.branchesData[id]) return;
+                this.state.branchesData[this.state.currentBranch] = { ...this.state.vfs };
+                this.state.currentBranch = id;
+                this.state.vfs = { ...this.state.branchesData[id] };
+                
+                await this.save();
+                await localforage.setItem('nexus_branches', this.state.branchesData);
+                await localforage.setItem('nexus_active_branch', this.state.currentBranch);
+                
+                this.log(`Active Branch: ${id}`);
+                this.renderAll();
+                this.openFile('index.html');
+            },
+
             renderBranches() {
                 const b = document.getElementById('branch-list');
                 b.innerHTML = "";
-                this.state.branches.forEach(br => {
+                Object.keys(this.state.branchesData).forEach(br => {
                     const div = document.createElement('div');
                     div.className = `list-entry ${br === this.state.currentBranch ? 'active' : ''}`;
-                    div.innerText = br;
-                    div.onclick = () => this.log(`Switched to branch: ${br}`, "var(--success)");
+                    div.innerHTML = `${br === this.state.currentBranch ? '●' : '○'} ${br}`;
+                    div.onclick = () => this.switchBranch(br);
                     b.appendChild(div);
+                });
+            },
+
+            renderKb() {
+                const grid = document.getElementById('kb-grid');
+                if(!grid) return;
+                grid.innerHTML = "";
+                this.state.config.kb.forEach(k => {
+                    const btn = document.createElement('button');
+                    btn.innerText = k;
+                    btn.onclick = () => this.type(k);
+                    grid.appendChild(btn);
+                });
+                ['Space: ', 'Enter:\n', 'Del:BACKSPACE'].forEach(sys => {
+                    const [label, val] = sys.split(':');
+                    const btn = document.createElement('button');
+                    btn.innerText = label;
+                    if(label === 'Space') btn.style.gridColumn = "span 2";
+                    btn.onclick = () => this.type(val);
+                    grid.appendChild(btn);
                 });
             }
         };
 
-        
-                // Initialize App
+        // Initialize App
         window.onload = () => Nexus.boot();
 
         // Register Service Worker for PWA & Offline Support
@@ -703,7 +862,6 @@
                     .catch(err => console.error('Service Worker Failed:', err));
             });
         }
-        
     </script>
 </body>
 </html>
