@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DevOS Nexus Prime</title>
-    
     <link rel="manifest" href="./manifest.json">
     <link rel="stylesheet" href="./styles.css">
     
@@ -42,8 +41,36 @@
             <div class="sidebar-scroll">
                 <div class="acc-item">
                     <div class="acc-head" onclick="Nexus.toggleAcc(this)">📄 Explorer <span>▼</span></div>
-                    <div class="acc-body active" id="explorer">
-                        </div>
+                    <div class="acc-body active" id="explorer"></div>
+                </div>
+
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">🗂️ Branches <span>▼</span></div>
+                    <div class="acc-body" id="branches-container" style="padding: 10px;">
+                        <button class="tool-btn btn-blue" style="width: 100%; margin-bottom: 5px;" onclick="NexusBranches.createBranch()">+ New Branch</button>
+                        <div id="branch-list"></div>
+                    </div>
+                </div>
+
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">⏳ Time Machine <span>▼</span></div>
+                    <div class="acc-body" id="history-container" style="padding: 10px;">
+                        <button class="tool-btn btn-gold" style="width: 100%; margin-bottom: 5px;" onclick="NexusHistory.saveSnapshot()">📸 Snapshot</button>
+                        <div id="history-list"></div>
+                    </div>
+                </div>
+
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">⚙️ Operations <span>▼</span></div>
+                    <div class="acc-body" style="display:flex; flex-direction:column; gap:8px; padding: 10px;">
+                        <input type="file" id="import-input" multiple style="display: none;" onchange="Nexus.importFiles(event)">
+                        <button class="tool-btn btn-blue" onclick="document.getElementById('import-input').click()">📂 Import Files</button>
+                        <button class="tool-btn btn-green" onclick="Nexus.exportProject()">📦 Export Project</button>
+                        <button class="tool-btn btn-gold" onclick="Nexus.exportCurrentFile()">📄 Export Current File</button>
+                        <hr style="border-color: var(--border); width: 100%;">
+                        <button class="tool-btn btn-accent" onclick="window.NexusSync.init()">📡 Start Sync Host</button>
+                        <button class="tool-btn btn-gray" onclick="const id = prompt('Enter Host ID:'); if(id) window.NexusSync.connect(id);">🔗 Connect to Host</button>
+                    </div>
                 </div>
             </div>
 
@@ -54,15 +81,22 @@
         </aside>
 
         <main class="workspace">
+            
             <div class="toolbar-viewport">
                 <div class="toolbar-track">
                     <button class="tool-btn btn-gray" onclick="Nexus.toggleSidebar()">☰ Menu</button>
                     <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
-                    <button class="tool-btn btn-green" onclick="Nexus.formatCode()">✨ Format</button>
-                    <button class="tool-btn btn-gold" onclick="Nexus.runIntel()">🧠 Intel</button>
+                    <button class="tool-btn btn-green" onclick="Nexus.formatCode()">✨ Beautify</button>
+                    <button class="tool-btn btn-red" onclick="Nexus.runLinters()">🐛 Linter</button>
+                    <button class="tool-btn btn-gold" onclick="NexusVault.openModal()">🗄️ Vault</button>
+                    <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Find/Replace</button>
+                    <button class="tool-btn btn-green" onclick="Nexus.runIntel()">🧠 Intel</button>
                     <button class="tool-btn btn-gray" onclick="Nexus.toggleKb()">⌨️ Keyboard</button>
+                    <button class="tool-btn btn-red" onclick="NexusMic.toggle()">🎤 Mic</button>
                 </div>
             </div>
+
+            <div class="tab-bar" id="tab-bar"></div>
 
             <div id="editor-wrapper" class="editor-area">
                 <div id="quick-nav-bar">
@@ -73,28 +107,26 @@
                 </div>
                 </div>
 
-            <div id="resizer"></div>
+            <div id="resizer" style="height: 5px; background: var(--border); cursor: row-resize;"></div>
 
             <div id="terminal-zone" class="terminal">
                 <div id="intel-output" style="padding-bottom: 10px;"></div>
                 <div id="term-out"></div>
-                <div class="term-input">
+                <div class="term-input" style="display:flex; gap:8px; margin-top:5px;">
                     <span style="color:var(--gold)">$</span>
-                    <input type="text" id="term-in" placeholder="Enter command...">
+                    <input type="text" id="term-in" placeholder="Enter CLI command..." style="background:transparent; border:none; color:var(--text); font-family:monospace; flex:1; outline:none;">
                 </div>
             </div>
         </main>
 
-        <div id="kb-drawer">
-            <div class="kb-header" onclick="Nexus.toggleKb()">
-                <span>▼</span> CLOSE <span>▼</span>
-            </div>
-            <div id="kb-grid" class="kb-grid"></div>
+        <div id="kb-drawer" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:var(--panel); border-top:2px solid var(--gold); z-index:1000;">
+            <div class="kb-header" onclick="Nexus.toggleKb()" style="background:var(--surface); color:var(--gold); text-align:center; padding:8px; cursor:pointer;">▼ CLOSE ▼</div>
+            <div id="kb-grid" class="kb-grid" style="display:grid; grid-template-columns:repeat(10, 1fr); gap:4px; padding:8px; height:190px; overflow-y:auto;"></div>
         </div>
 
-        <div id="modal-overlay" class="overlay">
-            <div class="modal-box">
-                <h3 id="modal-title"></h3>
+        <div id="modal-overlay" class="overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:3000; align-items:center; justify-content:center;">
+            <div class="modal-box" style="background:var(--panel); border:1px solid var(--border); border-radius:8px; padding:20px; width:90%; max-width:500px;">
+                <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;"></h3>
                 <div id="modal-body"></div>
                 <button class="tool-btn btn-red" style="margin-top: 15px; width: 100%; justify-content: center;" onclick="Nexus.closeModal()">Close</button>
             </div>
@@ -102,6 +134,7 @@
     </div>
 
     <script src="./nexus.js"></script>
+    <script src="./sync.js"></script>
     <script src="./virtual-keyboard.js"></script>
     <script src="./injector.js"></script>
     
