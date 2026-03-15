@@ -38,4 +38,4 @@ class CodeInjector {
         const merged = `${contentBefore}\n${patchContent}\n${contentAfter}`;
         return { status: "SUCCESS", content: merged };
     }
-          }
+}
