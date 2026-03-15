@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DevOS Nexus Prime</title>
+    
+    <link rel="manifest" href="./manifest.json">
+    <link rel="stylesheet" href="./styles.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+
+    <script type="module">
+        import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
+        import { EditorView } from "https://esm.sh/@codemirror/view";
+        import { EditorState, Compartment } from "https://esm.sh/@codemirror/state";
+        import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
+        import { html } from "https://esm.sh/@codemirror/lang-html";
+        import { css } from "https://esm.sh/@codemirror/lang-css";
+        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
+
+        window.CM6 = { basicSetup, EditorView, EditorState, Compartment, javascript, html, css, oneDark };
+        window.dispatchEvent(new Event('cm6-ready'));
+    </script>
+</head>
+<body>
+    <div id="nexus-app-root" class="nexus-root">
+        
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2>Nexus Prime</h2>
+                <button onclick="Nexus.toggleSidebar()" style="background:none; border:none; color:var(--text); font-size:18px;">✕</button>
+            </div>
+            
+            <div class="sidebar-scroll">
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">📄 Explorer <span>▼</span></div>
+                    <div class="acc-body active" id="explorer">
+                        </div>
+                </div>
+            </div>
+
+            <div style="padding: 12px; border-top: 1px solid var(--border); flex-shrink: 0; display: flex; gap: 5px;">
+                <button class="tool-btn btn-gold" style="flex: 1; height: 45px; justify-content: center;" onclick="Nexus.openHelp()">📖 Help</button>
+                <button class="tool-btn btn-gold" style="flex: 1; height: 45px; justify-content: center;" onclick="Nexus.openSettings()">⚙ Settings</button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <div class="toolbar-viewport">
+                <div class="toolbar-track">
+                    <button class="tool-btn btn-gray" onclick="Nexus.toggleSidebar()">☰ Menu</button>
+                    <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
+                    <button class="tool-btn btn-green" onclick="Nexus.formatCode()">✨ Format</button>
+                    <button class="tool-btn btn-gold" onclick="Nexus.runIntel()">🧠 Intel</button>
+                    <button class="tool-btn btn-gray" onclick="Nexus.toggleKb()">⌨️ Keyboard</button>
+                </div>
+            </div>
+
+            <div id="editor-wrapper" class="editor-area">
+                <div id="quick-nav-bar">
+                    <button onclick="ScrollEngine.jump('TOP')" title="Top">⇪</button>
+                    <button onclick="ScrollEngine.jump(-15)" title="Up">↑</button>
+                    <button onclick="ScrollEngine.jump(15)" title="Down">↓</button>
+                    <button onclick="ScrollEngine.jump('BOTTOM')" title="Bottom">⇩</button>
+                </div>
+                </div>
+
+            <div id="resizer"></div>
+
+            <div id="terminal-zone" class="terminal">
+                <div id="intel-output" style="padding-bottom: 10px;"></div>
+                <div id="term-out"></div>
+                <div class="term-input">
+                    <span style="color:var(--gold)">$</span>
+                    <input type="text" id="term-in" placeholder="Enter command...">
+                </div>
+            </div>
+        </main>
+
+        <div id="kb-drawer">
+            <div class="kb-header" onclick="Nexus.toggleKb()">
+                <span>▼</span> CLOSE <span>▼</span>
+            </div>
+            <div id="kb-grid" class="kb-grid"></div>
+        </div>
+
+        <div id="modal-overlay" class="overlay">
+            <div class="modal-box">
+                <h3 id="modal-title"></h3>
+                <div id="modal-body"></div>
+                <button class="tool-btn btn-red" style="margin-top: 15px; width: 100%; justify-content: center;" onclick="Nexus.closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="./nexus.js"></script>
+    <script src="./virtual-keyboard.js"></script>
+    <script src="./injector.js"></script>
+    
+    <script>
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.error(err));
+            });
+        }
+    </script>
+</body>
+</html>
