@@ -4,19 +4,107 @@
 
 window.Nexus = {
     state: { vfs: {}, activeFile: "main.js", cm: null, history: [] },
+/* --- PERMANENT CORE ENGINE UPDATE --- */
+boot() {
+    this.log("DevOS Nexus Prime: Omni-Engine Online.", "var(--accent)");
+    this.initGestures();
+    
+    // Auto-Repair & Verification
+    this.verifyIntelligence();
 
-    boot() {
-        this.log("Omni-Engine Restored.", "var(--accent)");
-        this.initGestures();
-        window.addEventListener('cm6-ready', () => {
-            this.initEditor();
-            this.renderExplorer();
-        });
-        document.getElementById('term-in').onkeydown = (e) => {
-            if (e.key === 'Enter') { this.executeCommand(e.target.value); e.target.value = ''; }
-        };
-    },
+    window.addEventListener('cm6-ready', () => {
+        this.initEditor();
+        this.renderExplorer();
+        this.syncUI(); // Hard-wire buttons immediately
+    });
 
+    document.getElementById('term-in').onkeydown = (e) => {
+        if (e.key === 'Enter') { this.executeCommand(e.target.value); e.target.value = ''; }
+    };
+},
+
+// NEW: Ensures system files always exist in VFS
+async verifyIntelligence() {
+    const suite = {
+        'DevOSSentinel.js': `/* Sentinel Engine v3.5 Source */`,
+        'SentinelFixer.js': `/* Fixer Logic Source */`,
+        'NexusContext.js': `/* Context Map Source */`
+    };
+    let repaired = false;
+    for (const [name, code] of Object.entries(suite)) {
+        if (!this.state.vfs[name]) {
+            this.state.vfs[name] = code;
+            repaired = true;
+        }
+    }
+    if (repaired && window.localforage) {
+        await localforage.setItem('nexus_vfs', this.state.vfs);
+    }
+},
+/* --- PERMANENT WORKSTATION TOOLS --- */
+openMerger() {
+    const html = `
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <textarea id="merger-input" style="width:100%; height:200px; background:#000; color:#22c55e; font-family:monospace; padding:10px; border:1px solid var(--border);"></textarea>
+            <div style="display:flex; gap:10px;">
+                <button class="tool-btn btn-blue" style="flex:1" onclick="Nexus.applyMerge('replace')">Replace File</button>
+                <button class="tool-btn btn-accent" style="flex:1" onclick="Nexus.applyMerge('cursor')">Insert at Cursor</button>
+            </div>
+        </div>`;
+    this.showModal("⚡ Project Merger", html);
+},
+
+applyMerge(mode) {
+    const code = document.getElementById('merger-input').value;
+    const view = this.state.cm;
+    if (!code || !view) return;
+    if (mode === 'replace') {
+        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+    } else {
+        const pos = view.state.selection.main.from;
+        view.dispatch({ changes: { from: pos, insert: code } });
+    }
+    this.closeModal();
+    this.log("Code Merged Successfully.", "var(--success)");
+},
+
+compareFiles() {
+    const f1 = this.state.activeFile;
+    const f2 = prompt("Enter file to compare against:");
+    if (!this.state.vfs[f1] || !this.state.vfs[f2]) return this.log("File missing.", "var(--danger)");
+    
+    const dmp = new diff_match_patch();
+    const diffs = dmp.diff_main(this.state.vfs[f1], this.state.vfs[f2]);
+    dmp.diff_cleanupSemantic(diffs);
+    
+    this.showModal("⚖️ Comparison Results", `<div style="font-family:monospace; font-size:12px; white-space:pre-wrap; background:#000; padding:15px; overflow-y:auto; max-height:400px;">${dmp.diff_prettyHtml(diffs)}</div>`);
+        }
+   
+// NEW: The Permanent Button Fixer
+syncUI() {
+    const ribbon = document.querySelector('.toolbar-track');
+    if (!ribbon) return;
+
+    const bindings = {
+        "Merge": () => this.openMerger(),
+        "Intel": () => this.openIntel(),
+        "Compare": () => this.compareFiles(),
+        "Visual": () => this.toggleVisual(),
+        "Vault": () => this.openVault()
+    };
+
+    Array.from(ribbon.querySelectorAll('.tool-btn')).forEach(btn => {
+        for (let label in bindings) {
+            if (btn.innerText.includes(label)) {
+                btn.onclick = (e) => { e.preventDefault(); bindings[label](); };
+                btn.style.borderBottom = "2px solid var(--success)";
+            }
+        }
+    });
+    this.log("UI Systems Synchronized.", "var(--success)");
+},
+   
+    
     initEditor() {
         const parent = document.getElementById('editor-wrapper');
         if (this.state.cm) this.state.cm.destroy();
