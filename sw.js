@@ -1,9 +1,15 @@
-const CACHE_NAME = 'nexus-cache-v6-ultimate';
+const CACHE_NAME = 'nexus-cache-v7';
 const ASSETS = [
+  './',
   './index.html',
   './manifest.json',
   './styles.css',
   './nexus.js',
+  './sync.js',
+  './injector.js',
+  './virtual-keyboard.js',
+  './icon-192.png',
+  './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js',
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
@@ -25,8 +31,7 @@ self.addEventListener('activate', (e) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            console.log("Purging old cache:", cacheName);
-            return caches.delete(cacheName); // Deletes the old v3 cache with the 14 files
+            return caches.delete(cacheName);
           }
         })
       );
@@ -38,18 +43,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((response) => {
-      return response || fetch(e.request).then((fetchResponse) => {
-        return caches.open(CACHE_NAME).then((cache) => {
-            if (e.request.url.startsWith('http')) { 
-                cache.put(e.request, fetchResponse.clone());
-            }
-            return fetchResponse;
-        });
-      });
-    }).catch(() => {
-      if (e.request.mode === 'navigate') {
-          return caches.match('./index.html');
-      }
+      return response || fetch(e.request);
     })
   );
 });
