@@ -10,7 +10,7 @@ const VirtualKeyboard = {
     alpha: "qwertyuiopasdfghjklzxcvbnm".split(""),
 
     render(context = 'js') {
-        const kb = document.getElementById('devos-keyboard');
+        const kb = document.getElementById('kb-grid');
         if (!kb) return;
         kb.innerHTML = '';
 
