@@ -39,32 +39,37 @@ const Nexus = {
         this.openFile(this.state.active);
         this.log("Nexus Prime Online.", "var(--gold)");
     },
+initEditor(initialContent) {
+    const editorArea = document.querySelector('.editor-area');
+    editorArea.innerHTML = ''; 
 
-    initEditor(initialContent) {
-        const editorArea = document.querySelector('.editor-area');
-        editorArea.innerHTML = ''; 
+    // This forces the editor's internal container to be 100% height
+    const scrollTheme = window.CM6.EditorView.theme({
+        "&": { height: "100%" },
+        ".cm-scroller": { overflow: "auto" }
+    });
 
-        this.state.languageConf = new window.CM6.Compartment();
+    this.state.languageConf = new window.CM6.Compartment();
 
-        this.state.cm = new window.CM6.EditorView({
-            state: window.CM6.EditorState.create({
-                doc: initialContent,
-                extensions: [
-                    window.CM6.basicSetup,
-                    window.CM6.oneDark,
-                    this.state.languageConf.of(window.CM6.html()), 
-                    window.CM6.EditorView.lineWrapping, // Prevents code from running off the screen
-                    window.CM6.EditorView.updateListener.of((update) => {
-                        if (update.docChanged) {
-                            this.state.vfs[this.state.active] = update.state.doc.toString();
-                        }
-                    })
-                ]
-            }),
-            parent: editorArea
-        });
-    },
-
+    this.state.cm = new window.CM6.EditorView({
+        state: window.CM6.EditorState.create({
+            doc: initialContent,
+            extensions: [
+                window.CM6.basicSetup,
+                window.CM6.oneDark,
+                scrollTheme, // Added the height theme
+                this.state.languageConf.of(window.CM6.html()), 
+                window.CM6.EditorView.lineWrapping,
+                window.CM6.EditorView.updateListener.of((update) => {
+                    if (update.docChanged) {
+                        this.state.vfs[this.state.active] = update.state.doc.toString();
+                    }
+                })
+            ]
+        }),
+        parent: editorArea
+    });
+   }
     openFile(filename) {
         this.state.active = filename;
         if (!this.state.tabs.includes(filename)) this.state.tabs.push(filename);
