@@ -72,6 +72,46 @@ body, html {
     min-height: 0;
     overflow: hidden;
 }
+/* --- The Scroll Pillar --- */
+.scroll-pillar {
+    position: fixed;
+    right: 0;
+    top: 0;
+    width: 50px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(22, 27, 34, 0.5);
+    backdrop-filter: blur(4px);
+    border-left: 1px solid var(--border);
+    z-index: 10000; /* Above modals and keyboards */
+}
+
+.scroll-btn {
+    flex: 1;
+    border: none;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: transparent;
+    color: var(--text);
+    font-size: 10px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    text-transform: uppercase;
+    padding: 2px;
+}
+
+.scroll-btn:active {
+    background: var(--accent);
+    color: white;
+}
+
+/* Make sure the editor doesn't hide behind the pillar */
+.editor-area, .editor-popup-body {
+    padding-right: 50px;
+}
 
 /* Force CodeMirror to fill the box and scroll internally */
 .cm-editor {
