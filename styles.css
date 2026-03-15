@@ -1,3 +1,7 @@
+/* ========================================
+   FILE: styles.css (DevOS Nexus Prime)
+   ======================================== */
+
 :root {
     --bg: #0d1117;
     --panel: #161b22;
@@ -13,14 +17,14 @@
     --term-height: 180px;
 }
 
-/* Base Constraints */
+/* 1. Reset & App Root */
 body, html {
     margin: 0; padding: 0;
     height: 100%; width: 100%;
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    overflow: hidden; /* Stops PWA from scrolling/bouncing */
+    overflow: hidden; /* Prevents the whole PWA from scrolling/bouncing */
 }
 
 #nexus-app-root {
@@ -32,13 +36,13 @@ body, html {
     position: relative;
 }
 
-/* Scrollbar Customization */
+/* 2. Scrollbar Customization */
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg); }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-/* Tabs Logic */
+/* 3. Header & Tabs Bar */
 #tabs {
     display: flex;
     background: var(--panel);
@@ -47,6 +51,7 @@ body, html {
     flex-shrink: 0;
     scrollbar-width: none;
 }
+
 #tabs::-webkit-scrollbar { display: none; }
 
 .tab {
@@ -56,64 +61,27 @@ body, html {
     cursor: pointer;
     white-space: nowrap;
     color: #888;
+    background: var(--panel);
 }
+
 .tab.active {
     background: var(--bg);
     color: var(--accent);
     border-bottom: 2px solid var(--accent);
 }
 
-/* Standard Editor Area - Absolute Logic Fix */
+/* 4. The Editor Area (Scrolling Fix) */
 .editor-area {
     flex: 1;
-    position: relative; /* Essential for absolute children */
+    position: relative; /* REQUIRED: Anchor for absolute CodeMirror */
     width: 100%;
     background: var(--bg);
-    min-height: 0;
+    min-height: 0; /* REQUIRED: Prevents flex item from growing with content */
     overflow: hidden;
-}
-/* --- The Scroll Pillar --- */
-.scroll-pillar {
-    position: fixed;
-    right: 0;
-    top: 0;
-    width: 50px;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-    background: rgba(22, 27, 34, 0.5);
-    backdrop-filter: blur(4px);
-    border-left: 1px solid var(--border);
-    z-index: 10000; /* Above modals and keyboards */
+    padding-right: 45px; /* Leave space for the Scroll Pillar */
 }
 
-.scroll-btn {
-    flex: 1;
-    border: none;
-    border-bottom: 1px solid rgba(255,255,255,0.05);
-    background: transparent;
-    color: var(--text);
-    font-size: 10px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    text-transform: uppercase;
-    padding: 2px;
-}
-
-.scroll-btn:active {
-    background: var(--accent);
-    color: white;
-}
-
-/* Make sure the editor doesn't hide behind the pillar */
-.editor-area, .editor-popup-body {
-    padding-right: 50px;
-}
-
-/* Force CodeMirror to fill the box and scroll internally */
+/* Force CodeMirror 6 to fill the container and manage its own scroll */
 .cm-editor {
     position: absolute !important;
     top: 0; bottom: 0; left: 0; right: 0;
@@ -133,7 +101,93 @@ body, html {
     min-height: 100% !important;
 }
 
-/* --- THE POPUP EDITOR MODAL --- */
+/* 5. Programmatic Scroll Pillar (Far Right) */
+.scroll-pillar {
+    position: fixed;
+    right: 0; top: 0;
+    width: 45px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(10px);
+    border-left: 1px solid var(--border);
+    z-index: 10000;
+}
+
+.scroll-btn {
+    flex: 1;
+    border: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: transparent;
+    color: var(--text);
+    font-size: 9px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-transform: uppercase;
+}
+
+.scroll-btn:active {
+    background: var(--accent);
+    color: #fff;
+}
+
+/* 6. Sidebar (Explorer/Branches) */
+.sidebar {
+    position: fixed;
+    top: 0; left: -280px;
+    width: 280px; height: 100%;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    z-index: 2000;
+    transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.active { left: 0; box-shadow: 10px 0 30px rgba(0,0,0,0.5); }
+
+/* 7. Terminal & Resizer */
+.terminal-drawer {
+    height: var(--term-height);
+    background: var(--panel);
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+}
+
+#resizer {
+    height: 6px;
+    background: var(--border);
+    cursor: ns-resize;
+    flex-shrink: 0;
+}
+
+#resizer:hover, #resizer:active { background: var(--accent); }
+
+#term-out {
+    flex: 1;
+    padding: 10px;
+    font-family: 'Fira Code', monospace;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#term-in {
+    background: var(--surface);
+    border: none;
+    border-top: 1px solid var(--border);
+    color: var(--text);
+    padding: 12px;
+    outline: none;
+    width: 100%;
+}
+
+/* 8. Editor Modal/Popup */
 .editor-modal-overlay {
     position: fixed;
     top: 0; left: 0;
@@ -164,58 +218,11 @@ body, html {
 .editor-popup-body {
     flex: 1;
     position: relative;
-    overflow: hidden; /* Scroller handled by popupCm */
+    overflow: hidden;
+    padding-right: 45px; /* Modal also needs Pillar space */
 }
 
-/* Terminal Drawer */
-.terminal-drawer {
-    height: var(--term-height);
-    background: var(--panel);
-    border-top: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    flex-shrink: 0;
-}
-
-#resizer {
-    height: 6px;
-    background: var(--border);
-    cursor: ns-resize;
-    flex-shrink: 0;
-}
-#resizer:active { background: var(--accent); }
-
-#term-out {
-    flex: 1;
-    padding: 10px;
-    font-family: 'Fira Code', monospace;
-    overflow-y: auto;
-    font-size: 13px;
-}
-
-#term-in {
-    background: var(--surface);
-    border: none;
-    border-top: 1px solid var(--border);
-    color: var(--text);
-    padding: 12px;
-    outline: none;
-    width: 100%;
-}
-
-/* Buttons */
-.tool-btn {
-    padding: 8px 16px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-}
-.tool-btn:active { transform: scale(0.95); opacity: 0.8; }
-.btn-gold { border-color: var(--gold); color: var(--gold); }
-
-/* Virtual Keyboard UI */
+/* 9. Virtual Keyboard */
 #kb-drawer {
     position: fixed;
     bottom: -300px;
@@ -226,6 +233,7 @@ body, html {
     transition: bottom 0.3s ease;
     padding-bottom: env(safe-area-inset-bottom);
 }
+
 #kb-drawer.active { bottom: 0; }
 
 #kb-grid {
@@ -233,10 +241,51 @@ body, html {
     grid-template-columns: repeat(10, 1fr);
     gap: 4px; padding: 8px;
 }
+
 #kb-grid button {
     height: 45px;
     background: var(--surface);
     border: 1px solid var(--border);
     color: white;
     border-radius: 4px;
+    font-size: 14px;
+}
+
+/* 10. General UI */
+.tool-btn {
+    padding: 8px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex; align-items: center; gap: 8px;
+}
+
+.tool-btn:active { transform: scale(0.95); opacity: 0.8; }
+.btn-gold { border-color: var(--gold); color: var(--gold); }
+
+.list-entry {
+    padding: 10px 15px;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+}
+
+.list-entry:hover { background: rgba(255,255,255,0.05); }
+.list-entry.active { background: rgba(47, 129, 247, 0.1); color: var(--accent); }
+
+#scale-toast {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    padding: 15px 30px;
+    border-radius: 30px;
+    z-index: 20000;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
 }
