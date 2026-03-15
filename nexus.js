@@ -44,7 +44,7 @@ Nexus.maximizeEditor = function() {
         parent: document.getElementById('popup-editor-target')
     });
     
-    // Crucial: Force the editor to calculate its scroll height
+    // Force measurement for scrolling
     setTimeout(() => this.state.popupCm.requestMeasure(), 50);
 };
 
