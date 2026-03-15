@@ -1,6 +1,5 @@
 /**
  * virtual-keyboard.js - Context-Aware Input Ribbon
- * Replaces the system keyboard with a programmable IDE interface.
  */
 
 const VirtualKeyboard = {
@@ -13,6 +12,7 @@ const VirtualKeyboard = {
 
     render(context = 'js') {
         const kb = document.getElementById('devos-keyboard');
+        if (!kb) return;
         kb.classList.remove('hidden');
         kb.innerHTML = '';
 
@@ -22,7 +22,6 @@ const VirtualKeyboard = {
             const btn = document.createElement('button');
             btn.innerText = key;
             
-            // Long Press Logic for secondary symbols
             let pressTimer;
             btn.onpointerdown = () => {
                 pressTimer = setTimeout(() => this.handleLongPress(key), 500);
@@ -35,43 +34,19 @@ const VirtualKeyboard = {
             kb.appendChild(btn);
         });
 
-        // Add System Keys
         this.addSystemKey('Space', ' ', 'wide-key');
         this.addSystemKey('Enter', '\n', 'action-key');
         this.addSystemKey('DEL', 'BACKSPACE', 'delete-key');
     },
-// Replace the type() function in virtual-keyboard.js
-type(val) {
-    // Check if the popup editor exists, otherwise use the main one
-    const activeView = Nexus.state.popupCm || Nexus.state.cm;
-    if (!activeView) return;
 
-    const cursor = activeView.state.selection.main.head;
-    
-    if (val === 'BACKSPACE') {
-        if (cursor > 0) {
-            activeView.dispatch({ 
-                changes: { from: cursor - 1, to: cursor, insert: "" } 
-            });
-        }
-    } else {
-        activeView.dispatch({
-            changes: { from: cursor, insert: val },
-            selection: { anchor: cursor + val.length }
-        });
-    }
-
-    // Optional: Keep your haptics and sync
-    if (window.navigator.vibrate) window.navigator.vibrate(50);
-    if (window.NexusSync && NexusSync.conn) NexusSync.sendKeystroke(val);
-}
-    
+    type(val) {
+        // Uniform entry point for all typing
+        Nexus.type(val);
+    },
 
     handleLongPress(key) {
-        Nexus.haptic('medium');
-        // Logic to toggle uppercase or alternative symbols
-        const alt = key.toUpperCase();
-        this.type(alt);
+        if (window.navigator.vibrate) window.navigator.vibrate(50);
+        this.type(key.toUpperCase());
     },
 
     addSystemKey(label, val, className) {
@@ -79,6 +54,7 @@ type(val) {
         btn.innerText = label;
         btn.className = className;
         btn.onclick = () => this.type(val);
-        document.getElementById('devos-keyboard').appendChild(btn);
+        const kb = document.getElementById('devos-keyboard');
+        if (kb) kb.appendChild(btn);
     }
 };
