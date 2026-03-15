@@ -40,19 +40,31 @@ const VirtualKeyboard = {
         this.addSystemKey('Enter', '\n', 'action-key');
         this.addSystemKey('DEL', 'BACKSPACE', 'delete-key');
     },
+// Replace the type() function in virtual-keyboard.js
+type(val) {
+    // Determine which editor is currently active
+    const activeView = Nexus.state.popupCm || Nexus.state.cm;
+    if (!activeView) return;
 
-    type(val) {
-        if (val === 'BACKSPACE') {
-            const cursor = Editor.view.state.selection.main.head;
-            Editor.view.dispatch({ changes: { from: cursor - 1, to: cursor, insert: "" } });
-        } else {
-            Editor.insertText(val);
+    const cursor = activeView.state.selection.main.head;
+    
+    if (val === 'BACKSPACE') {
+        if (cursor > 0) {
+            activeView.dispatch({ 
+                changes: { from: cursor - 1, to: cursor, insert: "" } 
+            });
         }
-        Nexus.haptic('light');
-        
-        // If syncing, send to the other device immediately
-        if (NexusSync.conn) NexusSync.sendKeystroke(val);
-    },
+    } else {
+        activeView.dispatch({
+            changes: { from: cursor, insert: val },
+            selection: { anchor: cursor + val.length }
+        });
+    }
+
+    Nexus.haptic('light');
+    if (window.NexusSync && NexusSync.conn) NexusSync.sendKeystroke(val);
+}
+    
 
     handleLongPress(key) {
         Nexus.haptic('medium');
