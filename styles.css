@@ -19,10 +19,10 @@ body, html {
     background: var(--bg);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    overflow: hidden; /* Prevent the whole page from scrolling */
+    overflow: hidden; /* CRITICAL: Prevents the browser from scrolling the whole PWA */
 }
 
-/* Main App Wrapper - Force Flex Layout */
+/* Main Application Wrapper */
 #nexus-app-root {
     display: flex;
     flex-direction: column;
@@ -37,16 +37,16 @@ body, html {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
-/* Editor Area - This must be constrained to enable internal scrolling */
+/* Editor Area - This MUST be constrained for scrolling to work */
 .editor-area {
     flex: 1;
     min-height: 0; /* CRITICAL: Allows flex item to be smaller than its content */
     position: relative;
-    overflow: hidden;
+    overflow: hidden; /* CM6 manages its own internal scrolling */
     background: var(--bg);
 }
 
-/* CodeMirror 6 Overrides */
+/* CodeMirror 6 Scroller Logic */
 .cm-editor {
     height: 100% !important;
     width: 100% !important;
@@ -58,18 +58,16 @@ body, html {
     height: 100% !important;
     font-family: 'Fira Code', monospace;
     font-size: calc(14px * var(--ui-scale));
-    -webkit-overflow-scrolling: touch; /* Momentum scrolling for mobile */
-    overscroll-behavior: contain; /* Prevent pull-to-refresh/bounce */
+    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS */
+    overscroll-behavior: contain; /* Prevents pull-to-refresh/bounce on mobile */
 }
 
-/* Drawer & UI Elements */
+/* Terminal Drawer */
 .terminal-drawer { 
     height: var(--term-height); 
     background: var(--panel);
     border-top: 1px solid var(--border);
-    transition: height 0.1s ease; /* Faster transition for resizing */
-    display: flex;
-    flex-direction: column;
+    transition: height 0.1s ease; /* Faster transition for responsive resizing */
 }
 
 .sidebar { transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
