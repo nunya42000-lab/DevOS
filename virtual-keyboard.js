@@ -37,7 +37,7 @@ const VirtualKeyboard = {
         btn.innerText = label;
         btn.className = className;
         btn.onclick = () => this.type(val);
-        const kb = document.getElementById('devos-keyboard');
+        const kb = document.getElementById('kb-grid');
         if (kb) kb.appendChild(btn);
     }
 };
