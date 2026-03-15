@@ -42,7 +42,7 @@ const VirtualKeyboard = {
     },
 // Replace the type() function in virtual-keyboard.js
 type(val) {
-    // Determine which editor is currently active
+    // Check if the popup editor exists, otherwise use the main one
     const activeView = Nexus.state.popupCm || Nexus.state.cm;
     if (!activeView) return;
 
@@ -61,7 +61,8 @@ type(val) {
         });
     }
 
-    Nexus.haptic('light');
+    // Optional: Keep your haptics and sync
+    if (window.navigator.vibrate) window.navigator.vibrate(50);
     if (window.NexusSync && NexusSync.conn) NexusSync.sendKeystroke(val);
 }
     
