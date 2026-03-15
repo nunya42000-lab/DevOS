@@ -12,7 +12,51 @@ const Nexus = {
             kb: ['{', '}', '(', ')', ';', '=>', '&&', '||', '!', '=', '$', '_', '.', ',', '+', '-', '*', '/', '<', '>'] 
         }
     },
+Nexus.maximizeEditor = function() {
+    const filename = this.state.active;
+    const content = this.state.vfs[filename];
 
+    const modalHTML = `
+        <div class="editor-modal-overlay" id="nexus-editor-modal">
+            <div class="editor-popup-window">
+                <div class="editor-popup-header">
+                    <span style="color:var(--accent); font-weight:bold;">MAXIMIZED: ${filename}</span>
+                    <button class="tool-btn" onclick="Nexus.closePopupEditor()">SAVE & EXIT [X]</button>
+                </div>
+                <div class="editor-popup-body" id="popup-editor-target"></div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Initialize the Modal Editor
+    this.state.popupCm = new window.CM6.EditorView({
+        state: window.CM6.EditorState.create({
+            doc: content,
+            extensions: [
+                window.CM6.basicSetup,
+                window.CM6.oneDark,
+                window.CM6.EditorView.lineWrapping,
+                this.state.languageConf.of(window.CM6.javascript())
+            ]
+        }),
+        parent: document.getElementById('popup-editor-target')
+    });
+    
+    // Crucial: Force the editor to calculate its scroll height
+    setTimeout(() => this.state.popupCm.requestMeasure(), 50);
+};
+
+Nexus.closePopupEditor = function() {
+    if (this.state.popupCm) {
+        const newCode = this.state.popupCm.state.doc.toString();
+        this.state.vfs[this.state.active] = newCode;
+        this.openFile(this.state.active); // Sync back to standard view
+    }
+    document.getElementById('nexus-editor-modal').remove();
+    this.state.popupCm = null;
+};
     async boot() {
         localforage.config({ name: 'Nexus_Prime_V6' });
         this.state.vfs = await localforage.getItem('vfs') || {
