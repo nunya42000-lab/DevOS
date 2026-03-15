@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
+<html lang="en"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DevOS Nexus Prime | Omni-Edition</title>
@@ -239,7 +238,7 @@
             overflow-y: auto;
         }
     </style>
-</head>
+<script src="https://esm.sh/acorn"></script></head>
 <body>
 
     <div id="nexus-app-root">
@@ -252,11 +251,20 @@
             <div class="sidebar-scroll">
                 <div class="acc-item">
                     <div class="acc-head" onclick="Nexus.toggleAcc(this)">📄 Explorer <span>▼</span></div>
-                    <div class="acc-body active" id="explorer"></div>
-                </div>
+                    <div class="acc-body active" id="explorer"><div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer;"><span style="flex: 1 1 0%; color: var(--text);">SentinelFixer.js</span><button style="background: none; border: none; color: var(--danger); font-size: 12px; padding: 5px;">🗑️</button></div><div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer;"><span style="flex: 1 1 0%; color: var(--text);">NexusContext.js</span><button style="background: none; border: none; color: var(--danger); font-size: 12px; padding: 5px;">🗑️</button></div><div style="padding: 10px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer;"><span style="flex: 1 1 0%; color: var(--text);">SentinelDashboard.js</span><button style="background: none; border: none; color: var(--danger); font-size: 12px; padding: 5px;">🗑️</button></div></div>
+                <div id="ops-container" style="padding: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
+            <input type="file" id="import-input" multiple="" style="display:none;" onchange="Nexus.importFiles(event)">
+            <button class="tool-btn btn-blue" onclick="document.getElementById('import-input').click()">📂 Import Files</button>
+            <button class="tool-btn btn-green" onclick="Nexus.exportProject()">📦 Export ZIP</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.syncToLocalFolder()">📁 Sync Folder</button>
+        </div></div>
                 <div class="acc-item">
                     <div class="acc-head" onclick="Nexus.toggleAcc(this)">🗂️ Branches <span>▼</span></div>
-                    <div class="acc-body" id="branch-list"></div>
+                    <div class="acc-body" id="branch-list">
+                <div onclick="NexusBranches.switchBranch('main')" style="padding:8px; cursor:pointer; border-bottom:1px solid #333; color:var(--success)">
+                    ● main
+                </div>
+            </div>
                 </div>
                 <div class="acc-item">
                     <div class="acc-head" onclick="Nexus.toggleAcc(this)">⏳ History <span>▼</span></div>
@@ -274,7 +282,7 @@
                 <div class="toolbar-track">
                     <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Menu</button>
                     <button class="tool-btn btn-blue" onclick="NexusSmartMerger.openModal()">⚡ Merge</button>
-                    <button class="tool-btn btn-accent" onclick="Nexus.toggleVisual()">👁️ Visual</button>
+                    <button id="btn-jump" class="tool-btn btn-blue">🎯 Jump</button><button class="tool-btn btn-accent" onclick="Nexus.toggleVisual()">👁️ Visual</button>
                     <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
                     <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Search</button>
                     <button class="tool-btn btn-gold" onclick="NexusVault.openModal()">🗄️ Vault</button>
@@ -291,12 +299,7 @@
             </div>
 
             <div id="editor-wrapper">
-                <div id="quick-nav-bar">
-                    <button onclick="ScrollEngine.jump('TOP')">⇪</button>
-                    <button onclick="ScrollEngine.jump(-15)">↑</button>
-                    <button onclick="ScrollEngine.jump(15)">↓</button>
-                    <button onclick="ScrollEngine.jump('BOTTOM')">⇩</button>
-                </div>
+                
             </div>
 
             <button class="fab fab-left" onclick="Nexus.toggleTerminalPopup()">📜</button>
@@ -304,12 +307,12 @@
             <button class="fab fab-right" onclick="Nexus.toggleKb()">⌨️</button>
         </main>
 
-        <div id="terminal-zone">
+        <div id="terminal-zone" style="display: flex;">
             <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:10px; color:var(--gold)">
-                <span>TERMINAL & LOGS</span>
+                <span>TERMINAL &amp; LOGS</span>
                 <span onclick="Nexus.toggleTerminalPopup()" style="cursor:pointer">CLOSE</span>
             </div>
-            <div id="term-out"></div>
+            <div id="term-out"><div style="color: var(--accent);">&gt; Omni-Engine Restored.</div><div style="color: rgb(34, 197, 94);">&gt; Buttons Repaired.</div><div style="color: var(--success);">&gt; undefined</div><div style="color: rgb(34, 197, 94);">&gt; Buttons Repaired.</div><div style="color: var(--success);">&gt; undefined</div><div style="color: var(--warn);">&gt; Navigation arrows removed.</div><div style="color: var(--success);">&gt; Clipboard, Nav, and Vault systems synchronized.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Intel Engine (Beautify/Linter) synchronized.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Import/Export, Search, and Preview systems restored.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Loading Acorn AST Parser...</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Sentinel Super-Fixer Engine deployed and wired to Intel.</div><div style="color: var(--success);">&gt; Sentinel files registered in VFS.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Sentinel Controller Online.</div><div style="color: var(--gold);">&gt; Initiating Master Suite Integration...</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Master Suite Integrated: Sentinel Dashboard &amp; Context Engine Online.</div><div style="color: var(--gold);">&gt; Restoring File Connectivity &amp; Compare Engine...</div><div style="color: var(--success);">&gt; Explorer clicking fixed. Compare engine online. Jump logic active.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Building Intelligence Hub...</div><div style="color: var(--success);">&gt; Intelligence Hub populated and synchronized.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--danger);">&gt; Unexpected end of input</div><div style="color: var(--gold);">&gt; Ghost Backup Button active at top-left.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--accent);">&gt; Generating project ZIP...</div><div style="color: var(--success);">&gt; Download triggered. Self-destructing button...</div><div style="color: var(--accent);">&gt; Master Persistence button active.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Hard-patching Sentinel Suite to VFS...</div><div style="color: var(--success);">&gt; VFS Persisted to IndexedDB. Refresh is now safe.</div><div style="color: var(--success);">&gt; ZIP Exported.</div><div style="color: var(--gold);">&gt; Master Backup complete. Tool self-destructed.</div><div style="color: var(--accent);">&gt; Sync Tool ready at top-left.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Capturing running logic and writing to VFS...</div><div style="color: var(--success);">&gt; App state synchronized to Explorer. Files are now editable and saveable.</div><div style="color: var(--warn);">&gt; Sync Cancelled.</div><div style="color: var(--gold);">&gt; Capturing live patched environment...</div></div>
             <div class="term-input">
                 <span>$</span>
                 <input type="text" id="term-in" placeholder="Enter command...">
@@ -321,10 +324,10 @@
             <div id="kb-grid" style="display:grid; grid-template-columns:repeat(10,1fr); gap:5px; padding:10px;"></div>
         </div>
 
-        <div id="modal-overlay">
+        <div id="modal-overlay" style="display: flex;">
             <div class="modal-box">
-                <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;"></h3>
-                <div id="modal-body" style="margin-top:15px; color:var(--text)"></div>
+                <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;">⚡ Smart Merger</h3>
+                <div id="modal-body" style="margin-top:15px; color:var(--text)"><div style="display:flex;flex-direction:column;gap:12px;">                 <textarea id="merger-input" placeholder="Paste patch here..." style="width:100%;height:180px;background:#000;color:#22c55e;font-family:monospace;padding:10px;border:1px solid #2d333f;"></textarea>                 <div style="display:flex;gap:10px;">                     <button class="tool-btn btn-accent" style="flex:1;height:40px;" onclick="NexusSmartMerger.executeMerge()">🤖 Run Patch</button>                     <button class="tool-btn btn-gold" style="flex:1;" onclick="NexusSmartMerger.manualInsert()">🎯 Insert</button>                 </div></div></div>
                 <button class="tool-btn btn-red" style="width:100%; margin-top:20px; padding:12px;" onclick="Nexus.closeModal()">Dismiss Window</button>
             </div>
         </div>
@@ -336,5 +339,17 @@
     <script src="./sync.js"></script>
     <script src="./injector.js"></script>
 
-</body>
-</html>
+
+
+
+            <div id="intel-modal-backdrop" style="display: none; position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 9000;"></div>
+            <div id="intel-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 75%; background: rgb(26, 29, 35); border: 1px solid rgb(51, 51, 51); border-radius: 12px; z-index: 9001; flex-direction: column; color: rgb(238, 238, 238);">
+                <div style="padding:15px; background:#252a33; border-bottom:1px solid #333; display:flex; justify-content:space-between; align-items:center; border-radius:12px 12px 0 0;">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <span style="color:#3b82f6; font-weight:bold;">⚡ DEVOS INTEL</span>
+                        <span id="intel-count-pill" style="background:#333; padding:2px 8px; border-radius:10px; font-size:11px;">0 Issues</span>
+                    </div>
+                    <button onclick="window.Nexus.toggleIntel(false)" style="background:none; border:none; color:#888; font-size:24px; cursor:pointer;">×</button>
+                </div>
+                <div id="intel-content" style="flex:1; overflow-y:auto; padding:15px;"></div>
+            </div></body></html>
