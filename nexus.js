@@ -1,7 +1,7 @@
 /* =============================================================================
    FILE: nexus.js (DevOS Nexus Prime Ultimate)
-   CORE VERSION: 6.0.0
-   TOTAL SCALE: ~800 Lines
+   CORE VERSION: 6.0.1
+   TOTAL SCALE: Complete Unified Patch
    ============================================================================= */
 
 /**
@@ -14,7 +14,7 @@
 // --- 1. THE PROGRAMMATIC SCROLL ENGINE ---
 /**
  * Bypasses browser touch-engine limitations by interacting directly with
- * the CodeMirror 6 ScrollDOM. Ensures precision navigation even on high-scale.
+ * the CodeMirror 6 ScrollDOM. Ensures precision navigation even on high-scale files.
  */
 const ScrollEngine = {
     jump(lines) {
@@ -34,15 +34,81 @@ const ScrollEngine = {
             Nexus.log("Scrolled to Top", "var(--accent)");
         } else if (lines === 'BOTTOM') {
             scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
-            Nexus.log("Scrolled to End", "var(--accent)");
+            Nexus.log("Scrolled to Bottom", "var(--accent)");
         } else {
-            scroller.scrollBy({ top: lines * lineHeight, behavior: 'smooth' });
+            const currentScroll = scroller.scrollTop;
+            scroller.scrollTo({ 
+                top: currentScroll + (lines * lineHeight), 
+                behavior: 'auto' 
+            });
         }
 
         // Hardware Feedback
         if (Nexus.state.config.haptics && window.navigator.vibrate) {
             window.navigator.vibrate(20);
         }
+    },
+
+    initScrollPillar() {
+        const wrapper = document.getElementById('editor-wrapper') || document.body;
+        // Prevent duplicate injection
+        if (document.querySelector('.scroll-pillar')) return;
+
+        const pillar = document.createElement('div');
+        pillar.className = 'scroll-pillar';
+
+        const upBtn = document.createElement('div');
+        upBtn.className = 'scroll-btn';
+        upBtn.innerText = '▲';
+        upBtn.onclick = () => this.jump(-10);
+
+        const handle = document.createElement('div');
+        handle.className = 'scroll-handle';
+        
+        const downBtn = document.createElement('div');
+        downBtn.className = 'scroll-btn';
+        downBtn.innerText = '▼';
+        downBtn.onclick = () => this.jump(10);
+
+        pillar.appendChild(upBtn);
+        pillar.appendChild(handle);
+        pillar.appendChild(downBtn);
+        wrapper.appendChild(pillar);
+
+        this.setupHandleLogic(handle);
+    },
+
+    setupHandleLogic(handle) {
+        let isDragging = false;
+        let startY, startScroll;
+
+        const onMove = (e) => {
+            if (!isDragging) return;
+            const view = Nexus.state.cm;
+            if (!view) return;
+
+            const scroller = view.scrollDOM;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const delta = clientY - startY;
+            
+            // Calculate movement scale relative to total content height
+            const scrollRatio = scroller.scrollHeight / window.innerHeight;
+            scroller.scrollTop = startScroll + (delta * scrollRatio);
+        };
+
+        handle.addEventListener('touchstart', (e) => {
+            isDragging = true;
+            startY = e.touches[0].clientY;
+            startScroll = Nexus.state.cm.scrollDOM.scrollTop;
+            handle.style.background = 'var(--accent)';
+            if (navigator.vibrate) navigator.vibrate(10);
+        });
+
+        window.addEventListener('touchmove', onMove, { passive: false });
+        window.addEventListener('touchend', () => {
+            isDragging = false;
+            handle.style.background = 'var(--gold)';
+        });
     }
 };
 
@@ -202,10 +268,12 @@ const NexusSync = {
 
 // --- 3. THE MAIN NEXUS ENGINE ---
 
-const Nexus = {
+window.Nexus = {
     state: {
         vfs: {},
         active: 'index.html',
+        currentFile: 'index.html',
+        docContent: "",
         tabs: [],
         cm: null,
         popupCm: null,
@@ -218,7 +286,8 @@ const Nexus = {
             termHeight: 180,
             gesturesEnabled: true,
             kbEnabled: true,
-            kb: ['{', '}', '(', ')', ';', '=>', '&&', '||', '!', '=', '$', '_', '.', ',', '+', '-', '*', '/', '<', '>']
+            theme: 'dark',
+            kb: ['{', '}', '(', ')', ';', '=>', 'import', 'const', 'let', 'async', 'await', '?', ':', '`']
         }
     },
 
@@ -227,83 +296,206 @@ const Nexus = {
      * Initializes storage, UI properties, and CodeMirror environment.
      */
     async boot() {
-        Nexus.log("System Booting...", "var(--gold)");
-        localforage.config({ name: 'Nexus_Prime_V6' });
-
-        // Load Virtual File System
-        this.state.vfs = await localforage.getItem('vfs') || {
-            'index.html': '<!DOCTYPE html>\n<html>\n<head>\n<title>DevOS App</title>\n</head>\n<body>\n  <h1>Hello Nexus</h1>\n</body>\n</html>',
-            'main.js': '// Logic goes here\nconsole.log("Nexus Prime Online");',
-            'styles.css': 'body { background: #0d1117; color: #c9d1d9; font-family: sans-serif; }'
-        };
-
-        // Load Configuration
-        const savedConfig = await localforage.getItem('config');
-        if (savedConfig) this.state.config = { ...this.state.config, ...savedConfig };
-
-        // Load Branch Data
-        this.state.branchesData = await localforage.getItem('nexus_branches') || { 'main': { ...this.state.vfs } };
-        this.state.currentBranch = await localforage.getItem('nexus_active_branch') || 'main';
-
-        await NexusHistory.init();
-        this.applyUIProperties();
+        this.log("Initializing Nexus Prime Engine...", "var(--gold)");
         
-        // --- 1. INITIALIZE PILLAR ---
-        this.initScrollPillar();
+        try {
+            // Setup localforage
+            await localforage.config({
+                name: 'NexusVFS',
+                storeName: 'files'
+            });
 
-        // --- 2. INITIALIZE EDITOR ---
-        if (!window.CM6) {
-            await new Promise(r => window.addEventListener('cm6-ready', r));
+            // Load Virtual File System
+            this.state.vfs = await localforage.getItem('vfs') || {
+                'index.html': '<!DOCTYPE html>\n<html>\n<head>\n<title>DevOS App</title>\n</head>\n<body>\n  <h1>Hello Nexus</h1>\n</body>\n</html>',
+                'main.js': '// Logic goes here\nconsole.log("Nexus Prime Online");',
+                'styles.css': 'body { background: #0d1117; color: #c9d1d9; font-family: sans-serif; }'
+            };
+
+            // Load Configuration
+            const savedConfig = await localforage.getItem('config');
+            if (savedConfig) this.state.config = { ...this.state.config, ...savedConfig };
+
+            // Load Branch Data
+            this.state.branchesData = await localforage.getItem('nexus_branches') || { 'main': { ...this.state.vfs } };
+            this.state.currentBranch = await localforage.getItem('nexus_active_branch') || 'main';
+
+            await NexusHistory.init();
+            this.applyUIProperties();
+            
+            // --- 1. INITIALIZE PILLAR ---
+            ScrollEngine.initScrollPillar();
+
+            // --- 2. INITIALIZE EDITOR ---
+            if (!window.CM6) {
+                // In a true environment we'd await CM6, but we'll proceed if it's missing to avoid hanging
+                try { await new Promise((r, reject) => {
+                    const timeout = setTimeout(reject, 2000);
+                    window.addEventListener('cm6-ready', () => { clearTimeout(timeout); r(); });
+                }); } catch(e) {}
+            }
+
+            await this.initEditor(this.state.vfs['index.html'] || '');
+            
+            this.initResizer();
+            this.initGestures();
+            this.initImporter();
+            this.initTerm();
+
+            // Initialize Hardware Sensors
+            if (window.DeviceMotionEvent) Hardware.initShakeToUndo();
+
+            // Load Initial Data
+            await this.loadFile(this.state.currentFile);
+
+            // --- 3. UI RENDER & LISTENERS ---
+            this.bindEvents();
+            this.renderAll();
+            this.renderKb();
+            this.openFile('index.html');
+            
+            this.log("System Status: Online.", "var(--success)");
+            
+        } catch (err) {
+            this.log(`Boot Failure: ${err.message}`, "var(--danger)");
+            console.error("Nexus Boot Error:", err);
         }
-
-        this.initEditor(this.state.vfs['index.html'] || '');
-        this.initResizer();
-        this.initGestures();
-        this.initImporter();
-        this.initTerm();
-
-        // --- 3. UI RENDER ---
-        this.renderAll();
-        this.openFile('index.html');
-        
-        Nexus.log("Engine Online. All modules initialized.", "var(--success)");
     },
 
-    initEditor(initialContent) {
-        const editorArea = document.querySelector('.editor-area');
+    async initEditor(initialContent) {
+        const editorArea = document.querySelector('.editor-area') || document.getElementById('editor-wrapper');
+        if (!editorArea) throw new Error("Editor target not found");
         editorArea.innerHTML = '';
 
-        this.state.languageConf = new window.CM6.Compartment();
+        if (window.CM6) {
+            this.state.languageConf = new window.CM6.Compartment();
 
-        // Core Update Listener for Auto-Save
-        const updateListener = window.CM6.EditorView.updateListener.of((update) => {
-            if (update.docChanged && !this.state.popupCm) {
-                const code = update.state.doc.toString();
-                this.state.vfs[this.state.active] = code;
-                NexusHistory.takeSnapshot(this.state.active, code);
+            // Core Update Listener for Auto-Save
+            const updateListener = window.CM6.EditorView.updateListener.of((update) => {
+                if (update.docChanged && !this.state.popupCm) {
+                    const code = update.state.doc.toString();
+                    this.state.docContent = code;
+                    this.state.vfs[this.state.active] = code;
+                    NexusHistory.takeSnapshot(this.state.active, code);
+                }
+            });
+
+            this.state.cm = new window.CM6.EditorView({
+                state: window.CM6.EditorState.create({
+                    doc: initialContent,
+                    extensions: [
+                        window.CM6.basicSetup,
+                        window.CM6.oneDark,
+                        this.state.languageConf.of(window.CM6.html()),
+                        updateListener,
+                        window.CM6.EditorView.lineWrapping
+                    ]
+                }),
+                parent: editorArea
+            });
+            
+            // Reclaim focus method wrapper
+            this.state.cm.focus = () => {
+                const el = editorArea.querySelector('.cm-content') || editorArea;
+                el.focus();
+                this.log("Focus Reclaimed", "var(--accent)");
+            };
+        } else {
+            // Fallback mock if CM6 is not present during boot
+            this.state.cm = {
+                scrollDOM: editorArea,
+                contentDOM: editorArea,
+                state: {
+                    doc: { toString: () => this.state.docContent }
+                },
+                dispatch: (tr) => { 
+                    if (tr.changes) this.state.docContent = tr.state.doc.toString();
+                },
+                focus: () => {
+                    const el = editorArea.querySelector('.cm-content') || editorArea;
+                    el.focus();
+                    this.log("Focus Reclaimed", "var(--accent)");
+                }
+            };
+        }
+
+        this.log("Editor Engine Mounted.", "var(--accent)");
+    },
+
+    bindEvents() {
+        // Toolbar Button Handler
+        document.querySelectorAll('.tool-btn').forEach(btn => {
+            btn.onclick = (e) => {
+                const action = e.target.innerText.trim();
+                this.handleAction(action);
+            };
+        });
+
+        // Global Keyboard Toggle Logic
+        window.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                this.saveFile();
             }
         });
+    },
 
-        this.state.cm = new window.CM6.EditorView({
-            state: window.CM6.EditorState.create({
-                doc: initialContent,
-                extensions: [
-                    window.CM6.basicSetup,
-                    window.CM6.oneDark,
-                    this.state.languageConf.of(window.CM6.html()),
-                    updateListener,
-                    window.CM6.EditorView.lineWrapping
-                ]
-            }),
-            parent: editorArea
-        });
+    handleAction(action) {
+        switch(action) {
+            case 'Editor': this.state.cm.focus(); break;
+            case 'Save': this.saveFile(); break;
+            case 'Format': this.format(); break;
+            case 'Clear': this.clearTerminal(); break;
+            case 'TOP': ScrollEngine.jump('TOP'); break;
+            case 'BOTTOM': ScrollEngine.jump('BOTTOM'); break;
+            default: this.log(`Action Unknown: ${action}`, "var(--warn)");
+        }
+    },
+
+    async loadFile(name) {
+        this.state.currentFile = name;
+        const content = await localforage.getItem(name) || this.state.vfs[name] || "// DevOS Nexus Prime\n// Start coding...";
+        this.state.docContent = content;
+        this.updateEditor(content);
+        this.log(`Loaded: ${name}`, "var(--accent)");
+    },
+
+    async saveFile() {
+        const content = this.state.cm.state.doc.toString();
+        await localforage.setItem(this.state.currentFile, content);
+        this.state.vfs[this.state.currentFile] = content;
+        this.save(); // Sync to global localforage
+        this.log(`Saved: ${this.state.currentFile}`, "var(--success)");
+        if (navigator.vibrate) navigator.vibrate([30, 10, 30]);
+    },
+
+    format() {
+        try {
+            const raw = this.state.cm.state.doc.toString();
+            // Using js-beautify (Ensure library is included in index.html)
+            if (typeof js_beautify !== 'undefined') {
+                const clean = js_beautify(raw, { indent_size: 4 });
+                this.updateEditor(clean);
+                this.log("Code Formatted", "var(--success)");
+            } else {
+                this.formatCode(); // Fallback to original formatter logic
+            }
+        } catch (e) {
+            this.log("Formatting Error", "var(--danger)");
+        }
+    },
+
+    updateEditor(content) {
+        this.state.docContent = content;
+        if (this.state.cm && this.state.cm.dispatch && window.CM6) {
+            this.state.cm.dispatch({
+                changes: { from: 0, to: this.state.cm.state.doc.length, insert: String(content) }
+            });
+        }
+        console.log("View Synced.");
     },
 
     // --- MAXIMIZE EDITOR (MODAL SYSTEM) ---
-    /**
-     * Spawns a dedicated high-priority modal with a secondary CM6 instance.
-     * This bypasses the main layout constraints to allow full-screen focus.
-     */
     maximizeEditor() {
         const filename = this.state.active;
         const content = this.state.vfs[filename] || '';
@@ -314,7 +506,7 @@ const Nexus = {
                     <div class="editor-popup-header">
                         <span style="color:var(--accent); font-weight:bold; font-size:12px;">EDITOR MAXIMIZED: ${filename}</span>
                         <div style="display:flex; gap:8px;">
-                            <button class="tool-btn" onclick="Nexus.formatCode()">FORMAT</button>
+                            <button class="tool-btn" onclick="Nexus.format()">FORMAT</button>
                             <button class="tool-btn btn-gold" onclick="Nexus.closePopupEditor()">SAVE & CLOSE [X]</button>
                         </div>
                     </div>
@@ -326,80 +518,48 @@ const Nexus = {
         document.body.insertAdjacentHTML('beforeend', modalHTML);
 
         // Initialize the Popup Editor Instance
-        this.state.popupCm = new window.CM6.EditorView({
-            state: window.CM6.EditorState.create({
-                doc: content,
-                extensions: [
-                    window.CM6.basicSetup,
-                    window.CM6.oneDark,
-                    window.CM6.EditorView.lineWrapping,
-                    this.state.languageConf.of(window.CM6.javascript())
-                ]
-            }),
-            parent: document.getElementById('popup-editor-target')
-        });
+        if (window.CM6) {
+            this.state.popupCm = new window.CM6.EditorView({
+                state: window.CM6.EditorState.create({
+                    doc: content,
+                    extensions: [
+                        window.CM6.basicSetup,
+                        window.CM6.oneDark,
+                        window.CM6.EditorView.lineWrapping,
+                        this.state.languageConf.of(window.CM6.javascript())
+                    ]
+                }),
+                parent: document.getElementById('popup-editor-target')
+            });
 
-        // Set Language based on filename
-        const ext = filename.split('.').pop().toLowerCase();
-        let langExt = window.CM6.javascript();
-        if (ext === 'html') langExt = window.CM6.html();
-        else if (ext === 'css') langExt = window.CM6.css();
-        
-        this.state.popupCm.dispatch({
-            effects: this.state.languageConf.reconfigure(langExt)
-        });
+            // Set Language based on filename
+            const ext = filename.split('.').pop().toLowerCase();
+            let langExt = window.CM6.javascript();
+            if (ext === 'html') langExt = window.CM6.html();
+            else if (ext === 'css') langExt = window.CM6.css();
+            
+            this.state.popupCm.dispatch({
+                effects: this.state.languageConf.reconfigure(langExt)
+            });
 
-        // Force measurement to ensure internal scrolling is calculated
-        setTimeout(() => {
-            if (this.state.popupCm) this.state.popupCm.requestMeasure();
-        }, 100);
+            // Force measurement to ensure internal scrolling is calculated
+            setTimeout(() => {
+                if (this.state.popupCm) this.state.popupCm.requestMeasure();
+            }, 100);
+        }
     },
 
     closePopupEditor() {
         if (this.state.popupCm) {
             const newCode = this.state.popupCm.state.doc.toString();
             this.state.vfs[this.state.active] = newCode;
-            this.save();
+            this.saveFile();
             this.openFile(this.state.active);
         }
         const modal = document.getElementById('nexus-editor-modal');
         if (modal) modal.remove();
         this.state.popupCm = null;
-        Nexus.log("Popup Session Closed. Sync complete.", "var(--accent)");
-    },
-
-    // --- PROGRAMMATIC SCROLL PILLAR ---
-    /**
-     * Injects the Scroll Pillar UI. This bar allows programmatic scrolling
-     * which is much more reliable than native touch for virtual lists.
-     */
-    initScrollPillar() {
-        const existing = document.querySelector('.scroll-pillar');
-        if (existing) existing.remove();
-
-        const pillar = document.createElement('div');
-        pillar.className = 'scroll-pillar';
-
-        const buttons = [
-            { label: 'TOP', val: 'TOP' },
-            { label: '▲ 100', val: -100 },
-            { label: '▲ 25', val: -25 },
-            { label: '▲ 5', val: -5 },
-            { label: '▼ 5', val: 5 },
-            { label: '▼ 25', val: 25 },
-            { label: '▼ 100', val: 100 },
-            { label: 'END', val: 'BOTTOM' }
-        ];
-
-        buttons.forEach(cfg => {
-            const btn = document.createElement('button');
-            btn.className = 'scroll-btn';
-            btn.innerText = cfg.label;
-            btn.onclick = () => ScrollEngine.jump(cfg.val);
-            pillar.appendChild(btn);
-        });
-
-        document.body.appendChild(pillar);
+        this.log("Popup Session Closed. Sync complete.", "var(--accent)");
     },
 
     // --- CORE IO & VFS ---
@@ -411,11 +571,13 @@ const Nexus = {
 
     openFile(filename) {
         this.state.active = filename;
+        this.state.currentFile = filename;
         if (!this.state.tabs.includes(filename)) this.state.tabs.push(filename);
 
         const content = this.state.vfs[filename] || '';
+        this.state.docContent = content;
 
-        if (this.state.cm) {
+        if (this.state.cm && window.CM6) {
             const ext = filename.split('.').pop().toLowerCase();
             let langExt = window.CM6.javascript();
             if (ext === 'html') langExt = window.CM6.html();
@@ -436,27 +598,34 @@ const Nexus = {
     },
 
     type(val, fromSync = false) {
-        // CONTEXT-AWARE: Typing always targets the visible editor
-        const activeView = this.state.popupCm || this.state.cm;
-        if (!activeView) return;
-
-        const cursor = activeView.state.selection.main.head;
+        const view = this.state.popupCm || this.state.cm;
+        if (!view) return;
 
         if (val === 'BACKSPACE') {
-            if (cursor > 0) {
-                activeView.dispatch({
-                    changes: { from: cursor - 1, to: cursor, insert: "" }
-                });
+            this.log("Delete Key", "var(--text)");
+            if (window.CM6) {
+                const cursor = view.state.selection.main.head;
+                if (cursor > 0) {
+                    view.dispatch({
+                        changes: { from: cursor - 1, to: cursor, insert: "" }
+                    });
+                }
             }
         } else {
-            activeView.dispatch({
-                changes: { from: cursor, insert: val },
-                selection: { anchor: cursor + val.length }
-            });
+            if (window.CM6) {
+                const cursor = view.state.selection.main.head;
+                view.dispatch({
+                    changes: { from: cursor, insert: val },
+                    selection: { anchor: cursor + val.length }
+                });
+            }
+            // Send keystroke to sync logic if active
+            if (!fromSync && window.NexusSync && window.NexusSync.conn) {
+                window.NexusSync.sendKeystroke(val);
+            }
         }
 
         if (this.state.config.haptics && window.navigator.vibrate) window.navigator.vibrate(40);
-        if (!fromSync && NexusSync.conn) NexusSync.sendKeystroke(val);
     },
 
     // --- UI MODULES & HELPERS ---
@@ -501,7 +670,7 @@ const Nexus = {
             this.applyUIProperties();
             
             // Force CodeMirror to measure its new box
-            if (this.state.cm) this.state.cm.requestMeasure();
+            if (this.state.cm && window.CM6) this.state.cm.requestMeasure();
         };
 
         const onUp = () => {
@@ -625,17 +794,25 @@ const Nexus = {
         };
     },
 
-    log(msg, color = "var(--text)") {
-        const out = document.getElementById('term-out');
-        if (!out) return;
+    log(msg, color = 'white') {
+        const term = document.getElementById('terminal-zone') || document.getElementById('term-out');
+        if (!term) return;
 
-        const entry = document.createElement('div');
-        entry.style.color = color;
-        entry.style.marginBottom = "4px";
-        entry.innerText = msg;
+        const line = document.createElement('div');
+        line.style.color = color;
+        line.style.fontSize = '12px';
+        line.style.fontFamily = 'monospace';
+        line.style.paddingLeft = '5px';
+        line.style.marginBottom = '2px';
+        line.innerText = `[${new Date().toLocaleTimeString()}] > ${msg}`;
         
-        out.appendChild(entry);
-        out.scrollTop = out.scrollHeight;
+        term.appendChild(line);
+        term.scrollTop = term.scrollHeight;
+    },
+
+    clearTerminal() {
+        const term = document.getElementById('terminal-zone') || document.getElementById('term-out');
+        if (term) term.innerHTML = '';
     },
 
     processCommand(cmd) {
@@ -650,9 +827,7 @@ const Nexus = {
                 this.log("Evaluation Error", "var(--danger)");
             }
         } 
-        else if (low === 'clear') {
-            document.getElementById('term-out').innerHTML = "";
-        }
+        else if (low === 'clear') this.clearTerminal();
         else if (low === 'nuke') System.nuke();
         else if (low === 'pwa') System.generatePWA();
         else if (low === 'build') Vault.compile();
@@ -723,15 +898,15 @@ const Nexus = {
         if (!grid) return;
 
         grid.innerHTML = "";
-        this.state.config.kb.forEach(k => {
+        this.state.config.kb.forEach(key => {
             const btn = document.createElement('button');
             btn.className = "kb-key";
-            btn.innerText = k;
-            btn.onclick = () => this.type(k);
+            btn.innerText = key;
+            btn.onclick = () => this.type(key);
             grid.appendChild(btn);
         });
         
-        // Add System Logic Keys
+        // Add System Logic Keys to the patched kb map
         const systemKeys = [
             { l: 'SPACE', v: ' ' },
             { l: 'ENTER', v: '\n' },
@@ -751,7 +926,7 @@ const Nexus = {
 
     formatCode() {
         const view = this.state.popupCm || this.state.cm;
-        if (!view) return;
+        if (!view || !window.CM6) return;
 
         const code = view.state.doc.toString();
         const ext = this.state.active.split('.').pop();
@@ -789,26 +964,29 @@ const Nexus = {
 const Hardware = {
     initShakeToUndo() {
         let lastX, lastY, lastZ;
+        const threshold = 25; 
+
         window.addEventListener('devicemotion', (e) => {
-            let acc = e.accelerationIncludingGravity;
-            if (!acc || !acc.x) return;
-            
-            let delta = Math.abs(acc.x + acc.y + acc.z - lastX - lastY - lastZ);
-            if (delta > 20) { // Shake sensitivity threshold
-                const view = Nexus.state.popupCm || Nexus.state.cm;
-                if (window.CM6 && view) {
-                    Nexus.log("Shake Detected: Undoing...", "var(--accent)");
-                    window.CM6.undo({ state: view.state, dispatch: view.dispatch });
+            const acc = e.accelerationIncludingGravity;
+            if (!acc || acc.x === null) return;
+
+            if (lastX !== undefined) {
+                let delta = Math.abs(acc.x + acc.y + acc.z - lastX - lastY - lastZ);
+                if (delta > threshold) {
+                    Nexus.log("Shake Detected: Processing Undo...", "var(--gold)");
+                    if (navigator.vibrate) navigator.vibrate(50);
+                    
+                    // Actual CM6 undo hook
+                    const view = Nexus.state.popupCm || Nexus.state.cm;
+                    if (window.CM6 && view) {
+                        window.CM6.undo({ state: view.state, dispatch: view.dispatch });
+                    }
                 }
-                if (navigator.vibrate) navigator.vibrate(40);
             }
             lastX = acc.x; lastY = acc.y; lastZ = acc.z;
         }, true);
     }
 };
 
-// Final System Initialization
-if (window.DeviceMotionEvent) Hardware.initShakeToUndo();
-
-// Boot the Nexus Engine
-Nexus.boot();
+// --- 5. BOOTSTRAP ---
+window.onload = () => Nexus.boot();
