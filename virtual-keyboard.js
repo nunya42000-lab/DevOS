@@ -2,7 +2,7 @@
  * virtual-keyboard.js - Context-Aware Input Ribbon
  */
 
-const VirtualKeyboard = {
+window.VirtualKeyboard = {
     layouts: {
         js: ['{', '}', '(', ')', ';', '=>', 'import', 'const', 'let', 'async', 'await', '?', ':', '`'],
         html: ['<', '>', '/', '=', '"', '!', 'div', 'span', 'class', 'id', 'script', 'br']
@@ -10,7 +10,7 @@ const VirtualKeyboard = {
     alpha: "qwertyuiopasdfghjklzxcvbnm".split(""),
 
     render(context = 'js') {
-        const kb = document.getElementById('kb-grid');
+        const kb = document.getElementById('kb-grid'); 
         if (!kb) return;
         kb.innerHTML = '';
 
@@ -18,6 +18,12 @@ const VirtualKeyboard = {
         keys.forEach(key => {
             const btn = document.createElement('button');
             btn.innerText = key;
+            btn.style.background = "var(--surface)";
+            btn.style.color = "var(--text)";
+            btn.style.border = "1px solid var(--border)";
+            btn.style.borderRadius = "4px";
+            btn.style.padding = "10px 5px";
+            btn.style.cursor = "pointer";
             btn.onclick = () => this.type(key);
             kb.appendChild(btn);
         });
@@ -28,16 +34,31 @@ const VirtualKeyboard = {
     },
 
     type(val) {
-        // Automatically targets the active editor via Nexus.type logic
-        Nexus.type(val);
+        if (window.Nexus && window.Nexus.type) {
+            window.Nexus.type(val);
+        }
     },
 
     addSystemKey(label, val, className) {
+        const kb = document.getElementById('kb-grid');
+        if (!kb) return;
+        
         const btn = document.createElement('button');
         btn.innerText = label;
         btn.className = className;
+        btn.style.background = "var(--surface)";
+        btn.style.color = "var(--text)";
+        btn.style.border = "1px solid var(--border)";
+        btn.style.borderRadius = "4px";
+        btn.style.padding = "10px 5px";
+        btn.style.fontWeight = "bold";
+        btn.style.cursor = "pointer";
+        
+        if (label === 'Space') btn.style.gridColumn = "span 2";
+        if (label === 'Enter') btn.style.color = "var(--accent)";
+        if (label === 'DEL') btn.style.color = "var(--danger)";
+        
         btn.onclick = () => this.type(val);
-        const kb = document.getElementById('kb-grid');
-        if (kb) kb.appendChild(btn);
+        kb.appendChild(btn);
     }
 };
