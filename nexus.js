@@ -28,6 +28,53 @@ const System = {
         Nexus.log("PWA Manifest & Service Worker generated.", "var(--success)");
     }
 };
+const ScrollEngine = {
+    jump(lines) {
+        const view = Nexus.state.popupCm || Nexus.state.cm;
+        if (!view) return;
+
+        const scroller = view.scrollDOM;
+        // Calculate approx line height from the editor's computed style
+        const lineHeight = parseFloat(window.getComputedStyle(view.contentDOM).lineHeight) || 18;
+        
+        if (lines === 'TOP') {
+            scroller.scrollTo({ top: 0, behavior: 'smooth' });
+        } else if (lines === 'BOTTOM') {
+            scroller.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' });
+        } else {
+            scroller.scrollBy({ top: lines * lineHeight, behavior: 'smooth' });
+        }
+
+        if (Nexus.state.config.haptics) window.navigator.vibrate(30);
+    }
+};
+
+// Add this function to your Nexus object or call it on boot
+Nexus.initScrollPillar = function() {
+    const pillar = document.createElement('div');
+    pillar.className = 'scroll-pillar';
+    
+    const config = [
+        { label: 'TOP', val: 'TOP' },
+        { label: '▲ 100', val: -100 },
+        { label: '▲ 25', val: -25 },
+        { label: '▲ 5', val: -5 },
+        { label: '▼ 5', val: 5 },
+        { label: '▼ 25', val: 25 },
+        { label: '▼ 100', val: 100 },
+        { label: 'END', val: 'BOTTOM' }
+    ];
+
+    config.forEach(item => {
+        const btn = document.createElement('button');
+        btn.className = 'scroll-btn';
+        btn.innerText = item.label;
+        btn.onclick = () => ScrollEngine.jump(item.val);
+        pillar.appendChild(btn);
+    });
+
+    document.body.appendChild(pillar);
+};
 
 const Vault = {
     compile() {
@@ -118,7 +165,7 @@ const Nexus = {
 
         await NexusHistory.init();
         this.applyUIProperties();
-
+this.initScrollPillar();
         if (!window.CM6) {
             await new Promise(r => window.addEventListener('cm6-ready', r));
         }
