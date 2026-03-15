@@ -3,29 +3,251 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DevOS Nexus Prime</title>
-    <link rel="stylesheet" href="./styles.css">
+    <title>DevOS Nexus Prime | Omni-Edition</title>
+    <link rel="manifest" href="./manifest.json">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.8.0/math.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
 
     <script type="module">
         import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
         import { EditorView } from "https://esm.sh/@codemirror/view";
+        import { EditorState, Compartment } from "https://esm.sh/@codemirror/state";
         import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
+        import { html } from "https://esm.sh/@codemirror/lang-html";
+        import { css } from "https://esm.sh/@codemirror/lang-css";
         import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
-        window.CM6 = { basicSetup, EditorView, javascript, oneDark };
+
+        window.CM6 = { basicSetup, EditorView, EditorState, Compartment, javascript, html, css, oneDark };
         window.dispatchEvent(new Event('cm6-ready'));
     </script>
+
+    <style>
+        :root {
+            --bg: #080a0f;
+            --panel: #11141b;
+            --surface: #1c212b;
+            --accent: #3b82f6;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warn: #f59e0b;
+            --text: #e2e8f0;
+            --border: #2d333f;
+            --gold: #d29922;
+            --term-height: 200px;
+        }
+
+        body, html {
+            margin: 0; padding: 0;
+            height: 100%; width: 100%;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #nexus-app-root {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            width: 100vw;
+            position: relative;
+        }
+
+        /* --- Sidebar & Accordions --- */
+        .sidebar {
+            position: fixed;
+            left: -280px;
+            top: 0;
+            width: 280px;
+            height: 100%;
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            z-index: 5000;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar.active { transform: translateX(280px); }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .sidebar-scroll { flex: 1; overflow-y: auto; }
+
+        .acc-item { border-bottom: 1px solid var(--border); }
+        .acc-head {
+            padding: 15px 20px;
+            background: var(--panel);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--gold);
+        }
+        .acc-body { display: none; padding: 10px; background: #000; }
+        .acc-body.active { display: block; }
+
+        /* --- Main Workspace --- */
+        .workspace { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+        /* --- Infinite Scroll Ribbon --- */
+        .toolbar-viewport {
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+        .toolbar-viewport::-webkit-scrollbar { display: none; }
+        
+        .toolbar-track {
+            display: flex;
+            padding: 10px;
+            gap: 10px;
+            white-space: nowrap;
+        }
+
+        .tool-btn {
+            padding: 8px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tool-btn:active { transform: scale(0.95); background: var(--border); }
+        .btn-blue { border-color: var(--accent); color: var(--accent); }
+        .btn-green { border-color: var(--success); color: var(--success); }
+        .btn-gold { border-color: var(--gold); color: var(--gold); }
+        .btn-red { border-color: var(--danger); color: var(--danger); }
+        .btn-accent { background: var(--accent); color: white; border: none; }
+
+        /* --- Editor Area --- */
+        #editor-wrapper { flex: 1; position: relative; background: #000; }
+        
+        #quick-nav-bar {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 100;
+        }
+        #quick-nav-bar button {
+            width: 44px; height: 44px; border-radius: 50%;
+            background: rgba(28, 33, 43, 0.8);
+            border: 1px solid var(--border);
+            color: var(--gold);
+            font-size: 18px;
+            backdrop-filter: blur(5px);
+        }
+
+        /* --- FABs --- */
+        .fab {
+            position: fixed;
+            width: 50px; height: 50px;
+            border-radius: 50%;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 4000;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+        .fab-left { bottom: 20px; left: 20px; }
+        .fab-mid { bottom: 20px; left: 85px; }
+        .fab-right { bottom: 20px; right: 20px; }
+
+        /* --- Term & Modals --- */
+        #terminal-zone {
+            position: fixed;
+            bottom: 80px; left: 20px;
+            width: calc(100% - 40px);
+            max-width: 450px;
+            height: var(--term-height);
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            display: none;
+            flex-direction: column;
+            padding: 15px;
+            z-index: 4500;
+        }
+        #term-out { flex: 1; overflow-y: auto; font-family: monospace; font-size: 12px; color: #aaa; }
+        .term-input { display: flex; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+        #term-in { background: transparent; border: none; color: var(--success); flex: 1; outline: none; font-family: monospace; }
+
+        #visual-preview {
+            position: absolute;
+            inset: 0;
+            background: #fff;
+            z-index: 1000;
+            display: none;
+            flex-direction: column;
+        }
+        #preview-kill-btn {
+            position: absolute;
+            top: 20px; right: 20px;
+            padding: 10px 20px;
+            background: var(--danger);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 6000;
+            backdrop-filter: blur(4px);
+        }
+        .modal-box {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            border-radius: 12px;
+            padding: 25px;
+            overflow-y: auto;
+        }
+    </style>
 </head>
 <body>
+
     <div id="nexus-app-root">
+        
         <aside id="sidebar" class="sidebar">
             <div class="sidebar-header">
-                <h2>Nexus Prime</h2>
-                <button onclick="Nexus.toggleSidebar(false)">✕</button>
+                <h2 style="margin:0; font-size:18px; color:var(--gold)">Nexus Prime</h2>
+                <button onclick="Nexus.toggleSidebar(false)" style="background:none; border:none; color:white; font-size:24px;">×</button>
             </div>
             <div class="sidebar-scroll">
                 <div class="acc-item">
@@ -33,66 +255,86 @@
                     <div class="acc-body active" id="explorer"></div>
                 </div>
                 <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">🗂️ Branches <span>▼</span></div>
+                    <div class="acc-body" id="branch-list"></div>
+                </div>
+                <div class="acc-item">
                     <div class="acc-head" onclick="Nexus.toggleAcc(this)">⏳ History <span>▼</span></div>
                     <div class="acc-body" id="history-list"></div>
                 </div>
             </div>
-            <div class="sidebar-footer">
-                <button onclick="Nexus.openHelp()">📖 Help</button>
-                <button onclick="Nexus.openSettings()">⚙ Settings</button>
+            <div style="padding: 15px; display:flex; gap:10px; border-top: 1px solid var(--border);">
+                <button class="tool-btn btn-gold" style="flex:1" onclick="Nexus.openHelp()">Help</button>
+                <button class="tool-btn btn-gold" style="flex:1" onclick="Nexus.openSettings()">Settings</button>
             </div>
         </aside>
 
         <main class="workspace">
             <div class="toolbar-viewport">
-                <div class="toolbar-track" id="main-ribbon">
+                <div class="toolbar-track">
                     <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Menu</button>
                     <button class="tool-btn btn-blue" onclick="NexusSmartMerger.openModal()">⚡ Merge</button>
                     <button class="tool-btn btn-accent" onclick="Nexus.toggleVisual()">👁️ Visual</button>
                     <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
-                    <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Find</button>
+                    <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Search</button>
                     <button class="tool-btn btn-gold" onclick="NexusVault.openModal()">🗄️ Vault</button>
                     <button class="tool-btn btn-green" onclick="Nexus.openIntel()">🧠 Intel</button>
                     <button class="tool-btn btn-green" onclick="Nexus.syncToLocalFolder()">📁 Sync</button>
                     <button class="tool-btn btn-red" onclick="Nexus.clearFiles()">🗑️ Clear</button>
-                    <button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
+                    <button class="tool-btn btn-red" style="background:darkred; color:white;" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
                 </div>
             </div>
 
-            <div id="visual-preview" style="display: none;">
-                <button id="preview-kill-btn" onclick="Nexus.killPreview()">🚨 KILL</button>
-                <iframe id="preview-frame"></iframe>
+            <div id="visual-preview">
+                <button id="preview-kill-btn" onclick="Nexus.killPreview()">🚨 KILL PROCESS</button>
+                <iframe id="preview-frame" style="width:100%; height:100%; border:none;"></iframe>
             </div>
 
-            <div id="editor-wrapper"></div>
+            <div id="editor-wrapper">
+                <div id="quick-nav-bar">
+                    <button onclick="ScrollEngine.jump('TOP')">⇪</button>
+                    <button onclick="ScrollEngine.jump(-15)">↑</button>
+                    <button onclick="ScrollEngine.jump(15)">↓</button>
+                    <button onclick="ScrollEngine.jump('BOTTOM')">⇩</button>
+                </div>
+            </div>
 
             <button class="fab fab-left" onclick="Nexus.toggleTerminalPopup()">📜</button>
             <button class="fab fab-mid" onclick="Nexus.copyLog()">📋</button>
             <button class="fab fab-right" onclick="Nexus.toggleKb()">⌨️</button>
         </main>
 
-        <div id="terminal-zone" style="display:none;">
+        <div id="terminal-zone">
+            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:10px; color:var(--gold)">
+                <span>TERMINAL & LOGS</span>
+                <span onclick="Nexus.toggleTerminalPopup()" style="cursor:pointer">CLOSE</span>
+            </div>
             <div id="term-out"></div>
             <div class="term-input">
                 <span>$</span>
-                <input type="text" id="term-in">
+                <input type="text" id="term-in" placeholder="Enter command...">
             </div>
         </div>
 
-        <div id="kb-drawer" style="display:none;">
-            <div class="kb-header" onclick="Nexus.toggleKb()">CLOSE</div>
-            <div id="kb-grid"></div>
+        <div id="kb-drawer" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:var(--panel); border-top:2px solid var(--gold); z-index:5500;">
+            <div style="text-align:center; padding:10px; cursor:pointer; background:var(--surface); color:var(--gold); font-weight:bold;" onclick="Nexus.toggleKb()">CLOSE KEYBOARD</div>
+            <div id="kb-grid" style="display:grid; grid-template-columns:repeat(10,1fr); gap:5px; padding:10px;"></div>
         </div>
 
-        <div id="modal-overlay" style="display:none;">
+        <div id="modal-overlay">
             <div class="modal-box">
-                <h3 id="modal-title"></h3>
-                <div id="modal-body"></div>
-                <button class="tool-btn btn-red" onclick="Nexus.closeModal()">Close</button>
+                <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;"></h3>
+                <div id="modal-body" style="margin-top:15px; color:var(--text)"></div>
+                <button class="tool-btn btn-red" style="width:100%; margin-top:20px; padding:12px;" onclick="Nexus.closeModal()">Dismiss Window</button>
             </div>
         </div>
+
     </div>
+
     <script src="./nexus.js"></script>
     <script src="./virtual-keyboard.js"></script>
+    <script src="./sync.js"></script>
+    <script src="./injector.js"></script>
+
 </body>
 </html>
