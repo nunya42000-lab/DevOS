@@ -1,11 +1,10 @@
-const CACHE_NAME = 'nexus-cache-v7';
+const CACHE_NAME = 'nexus-cache-v8';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './styles.css',
   './nexus.js',
-  './sync.js',
   './injector.js',
   './virtual-keyboard.js',
   './icon-192.png',
@@ -18,10 +17,10 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (e) => {
+  self.skipWaiting(); // Force the waiting service worker to become the active service worker
   e.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
   );
 });
 
@@ -31,19 +30,31 @@ self.addEventListener('activate', (e) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
+            return caches.delete(cacheName); // Clear out old caches
           }
         })
       );
-    })
+    }).then(() => self.clients.claim()) // Take control of all clients immediately
   );
-  return self.clients.claim();
 });
 
+// Network-First Strategy for active development
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((response) => {
-      return response || fetch(e.request);
-    })
+    fetch(e.request)
+      .then((networkResponse) => {
+        // If network fetch succeeds, cache the new response and return it
+        if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const responseToCache = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(e.request, responseToCache);
+            });
+        }
+        return networkResponse;
+      })
+      .catch(() => {
+        // If network fails (offline), fallback to the cache
+        return caches.match(e.request);
+      })
   );
 });
