@@ -23,7 +23,7 @@ body, html {
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     overflow: hidden; 
-    touch-action: none;
+    touch-action: none; /* Prevents pull-to-refresh on mobile */
 }
 
 #nexus-app-root {
@@ -35,7 +35,14 @@ body, html {
     position: relative;
 }
 
-/* 2. Editor Container & Layout */
+/* --- Layout Elements --- */
+.workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
 #editor-wrapper {
     flex: 1;
     position: relative;
@@ -45,62 +52,70 @@ body, html {
     background: #000;
 }
 
-.cm-editor {
-    height: 100%;
-    font-size: 14px;
-}
+/* CodeMirror Overrides */
+.cm-editor { height: 100%; }
+.cm-scroller { overflow: auto; }
 
-/* 3. Programmatic Scroll Pillar */
-.scroll-pillar {
+/* --- Quick Navigation Bar (The New Scrolling System) --- */
+#quick-nav-bar {
     position: absolute;
-    right: 2px;
-    top: 50px;
-    bottom: 50px;
-    width: 35px;
-    background: rgba(255, 255, 255, 0.03);
-    border-radius: 20px;
-    z-index: 1000;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%) translateX(0);
     display: flex;
     flex-direction: column;
-    align-items: center;
+    gap: 12px;
+    background: rgba(33, 38, 45, 0.85);
+    padding: 10px;
+    border-radius: 8px;
     border: 1px solid var(--border);
+    z-index: 100;
+    backdrop-filter: blur(4px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 1;
 }
 
-.scroll-handle {
-    width: 28px;
-    height: 60px;
-    background: var(--gold);
-    border-radius: 15px;
-    margin: 5px 0;
-    box-shadow: 0 0 10px rgba(210, 153, 34, 0.4);
-    cursor: pointer;
-    touch-action: none;
+#quick-nav-bar.hidden {
+    opacity: 0;
+    transform: translateY(-50%) translateX(150%);
+    pointer-events: none;
 }
 
-.scroll-btn {
-    width: 35px;
-    height: 35px;
-    background: var(--surface);
-    border: 1px solid var(--border);
+#quick-nav-bar button {
+    background: var(--panel);
     color: var(--gold);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    width: 40px;
+    height: 40px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: bold;
-    border-radius: 50%;
-    margin: 5px 0;
+    transition: all 0.2s ease;
 }
 
-/* 4. Toolbar & Buttons */
-.toolbar {
-    height: 50px;
+#quick-nav-bar button:active {
+    background: var(--gold);
+    color: #000;
+    transform: scale(0.95);
+}
+
+/* --- Toolbar & Buttons --- */
+.toolbar-viewport {
     background: var(--panel);
     border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+}
+
+.toolbar-track {
+    height: 50px;
     display: flex;
     align-items: center;
     padding: 0 10px;
     gap: 10px;
-    overflow-x: auto;
     white-space: nowrap;
 }
 
@@ -112,6 +127,7 @@ body, html {
     border-radius: 6px;
     font-size: 12px;
     font-weight: 600;
+    cursor: pointer;
 }
 
 .btn-active {
@@ -120,7 +136,14 @@ body, html {
     box-shadow: 0 0 5px rgba(210, 153, 34, 0.2);
 }
 
-/* 5. Terminal & Keyboard */
+/* Button Colors */
+.btn-gold { color: var(--gold); border-color: var(--gold); }
+.btn-blue { color: var(--accent); border-color: var(--accent); }
+.btn-green { color: var(--success); border-color: var(--success); }
+.btn-red { color: var(--danger); border-color: var(--danger); }
+.btn-gray { color: var(--text); }
+
+/* --- Terminal Zone --- */
 #terminal-zone {
     height: var(--term-height);
     background: #000;
@@ -128,31 +151,136 @@ body, html {
     font-family: monospace;
     padding: 10px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
 }
 
+#term-out { flex: 1; overflow-y: auto; margin-bottom: 5px; }
+
+.term-input {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+#term-in {
+    background: transparent;
+    border: none;
+    color: var(--text);
+    font-family: monospace;
+    flex: 1;
+    outline: none;
+}
+
+/* --- Virtual Keyboard Drawer --- */
 #kb-drawer {
     position: fixed;
-    bottom: -300px;
-    left: 0; width: 100%;
+    bottom: 0;
+    left: 0;
+    width: 100%;
     background: var(--panel);
-    z-index: 1100;
-    transition: bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    padding-bottom: env(safe-area-inset-bottom);
+    border-top: 2px solid var(--gold);
+    z-index: 1000;
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    flex-direction: column;
 }
 
-#kb-drawer.active { bottom: 0; }
-
-#kb-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 6px; padding: 10px;
+/* Active class slides it up */
+#kb-drawer.active {
+    transform: translateY(0);
 }
 
-#kb-grid button {
-    height: 50px;
+.kb-header {
     background: var(--surface);
-    border: 1px solid var(--border);
-    color: white;
-    border-radius: 8px;
-    font-size: 16px;
+    color: var(--gold);
+    text-align: center;
+    padding: 8px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
 }
+
+.kb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+    gap: 5px;
+    padding: 10px;
+    max-height: 30vh;
+    overflow-y: auto;
+}
+
+.kb-grid button {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 5px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.kb-grid button:active {
+    background: var(--gold);
+    color: #000;
+}
+
+/* --- Sidebar --- */
+.sidebar {
+    position: fixed;
+    left: -260px;
+    top: 0;
+    width: 260px;
+    height: 100%;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    z-index: 2000;
+    transition: left 0.3s ease;
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar.active { left: 0; }
+
+.sidebar-header {
+    padding: 15px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--gold);
+}
+
+.sidebar-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+/* --- Modals --- */
+.overlay {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 3000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(3px);
+}
+
+.overlay.active { display: flex; }
+
+.modal-box {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+#modal-title { margin-top: 0; color: var(--gold); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
