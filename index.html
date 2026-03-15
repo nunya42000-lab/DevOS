@@ -86,17 +86,26 @@
                 <div class="toolbar-track">
                     <button class="tool-btn btn-gray" onclick="Nexus.toggleSidebar()">☰ Menu</button>
                     <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
+                    <button class="tool-btn btn-gray" onclick="Nexus.cutText()">✂️ Cut</button>
+                    <button class="tool-btn btn-gray" onclick="Nexus.copyText()">📋 Copy</button>
                     <button class="tool-btn btn-green" onclick="Nexus.formatCode()">✨ Beautify</button>
+                    <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Find/Replace</button>
+                    <button class="tool-btn btn-gold" onclick="Nexus.compareFiles()">⚖️ Compare</button>
+                    <button class="tool-btn btn-accent" onclick="Nexus.toggleVisual()">👁️ Visual</button>
                     <button class="tool-btn btn-red" onclick="Nexus.runLinters()">🐛 Linter</button>
                     <button class="tool-btn btn-gold" onclick="NexusVault.openModal()">🗄️ Vault</button>
-                    <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Find/Replace</button>
                     <button class="tool-btn btn-green" onclick="Nexus.runIntel()">🧠 Intel</button>
                     <button class="tool-btn btn-gray" onclick="Nexus.toggleKb()">⌨️ Keyboard</button>
                     <button class="tool-btn btn-red" onclick="NexusMic.toggle()">🎤 Mic</button>
+                    <button class="tool-btn" style="background: var(--danger); color: white; border-color: darkred;" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
                 </div>
             </div>
 
             <div class="tab-bar" id="tab-bar"></div>
+
+            <div id="visual-preview" style="display: none; flex: 1; background: #fff;">
+                <iframe id="preview-frame" style="width: 100%; height: 100%; border: none;"></iframe>
+            </div>
 
             <div id="editor-wrapper" class="editor-area">
                 <div id="quick-nav-bar">
