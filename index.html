@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>DevOS Nexus Prime</title>
+    <link rel="stylesheet" href="./styles.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+
+    <script type="module">
+        import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
+        import { EditorView } from "https://esm.sh/@codemirror/view";
+        import { javascript } from "https://esm.sh/@codemirror/lang-javascript";
+        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark";
+        window.CM6 = { basicSetup, EditorView, javascript, oneDark };
+        window.dispatchEvent(new Event('cm6-ready'));
+    </script>
+</head>
+<body>
+    <div id="nexus-app-root">
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2>Nexus Prime</h2>
+                <button onclick="Nexus.toggleSidebar(false)">✕</button>
+            </div>
+            <div class="sidebar-scroll">
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">📄 Explorer <span>▼</span></div>
+                    <div class="acc-body active" id="explorer"></div>
+                </div>
+                <div class="acc-item">
+                    <div class="acc-head" onclick="Nexus.toggleAcc(this)">⏳ History <span>▼</span></div>
+                    <div class="acc-body" id="history-list"></div>
+                </div>
+            </div>
+            <div class="sidebar-footer">
+                <button onclick="Nexus.openHelp()">📖 Help</button>
+                <button onclick="Nexus.openSettings()">⚙ Settings</button>
+            </div>
+        </aside>
+
+        <main class="workspace">
+            <div class="toolbar-viewport">
+                <div class="toolbar-track" id="main-ribbon">
+                    <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Menu</button>
+                    <button class="tool-btn btn-blue" onclick="NexusSmartMerger.openModal()">⚡ Merge</button>
+                    <button class="tool-btn btn-accent" onclick="Nexus.toggleVisual()">👁️ Visual</button>
+                    <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
+                    <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Find</button>
+                    <button class="tool-btn btn-gold" onclick="NexusVault.openModal()">🗄️ Vault</button>
+                    <button class="tool-btn btn-green" onclick="Nexus.openIntel()">🧠 Intel</button>
+                    <button class="tool-btn btn-green" onclick="Nexus.syncToLocalFolder()">📁 Sync</button>
+                    <button class="tool-btn btn-red" onclick="Nexus.clearFiles()">🗑️ Clear</button>
+                    <button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
+                </div>
+            </div>
+
+            <div id="visual-preview" style="display: none;">
+                <button id="preview-kill-btn" onclick="Nexus.killPreview()">🚨 KILL</button>
+                <iframe id="preview-frame"></iframe>
+            </div>
+
+            <div id="editor-wrapper"></div>
+
+            <button class="fab fab-left" onclick="Nexus.toggleTerminalPopup()">📜</button>
+            <button class="fab fab-mid" onclick="Nexus.copyLog()">📋</button>
+            <button class="fab fab-right" onclick="Nexus.toggleKb()">⌨️</button>
+        </main>
+
+        <div id="terminal-zone" style="display:none;">
+            <div id="term-out"></div>
+            <div class="term-input">
+                <span>$</span>
+                <input type="text" id="term-in">
+            </div>
+        </div>
+
+        <div id="kb-drawer" style="display:none;">
+            <div class="kb-header" onclick="Nexus.toggleKb()">CLOSE</div>
+            <div id="kb-grid"></div>
+        </div>
+
+        <div id="modal-overlay" style="display:none;">
+            <div class="modal-box">
+                <h3 id="modal-title"></h3>
+                <div id="modal-body"></div>
+                <button class="tool-btn btn-red" onclick="Nexus.closeModal()">Close</button>
+            </div>
+        </div>
+    </div>
+    <script src="./nexus.js"></script>
+    <script src="./virtual-keyboard.js"></script>
+</body>
+</html>
