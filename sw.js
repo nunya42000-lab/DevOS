@@ -1,13 +1,17 @@
-const CACHE_NAME = 'nexus-cache-v8';
+ const CACHE_NAME = 'nexus-cache-v8';
 const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './styles.css',
   './nexus.js',
+  './DevOSSentinel.js',    // ADD THIS
+  './SentinelFixer.js',    // ADD THIS
+  './NexusContext.js',     // ADD THIS
+  './sentinel.worker.js',  // ADD THIS
   './sync.js',
   './injector.js',
-  './virtual-keyboard.js',
+  './virtual-keyboard.js'
   './icon-192.png',
   './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
