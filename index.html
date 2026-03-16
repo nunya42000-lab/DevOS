@@ -306,6 +306,20 @@
             <button class="fab fab-mid" onclick="Nexus.copyLog()">📋</button>
             <button class="fab fab-right" onclick="Nexus.toggleKb()">⌨️</button>
         </main>
+<div id="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
+    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
+        <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface);">
+            <h3 id="modal-title" style="margin: 0; color: var(--gold); font-size: 14px;">⚡ SYSTEM</h3>
+            <button onclick="Nexus.closeModal()" style="background: none; border: none; color: var(--text); cursor: pointer; font-size: 20px;">&times;</button>
+        </div>
+        <div id="modal-body" style="padding: 20px; overflow-y: auto;"></div>
+    </div>
+</div>
+
+<div id="intel-modal-backdrop" style="display: none; position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 9000;"></div>
+
+<div id="intel-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 75%; background: rgb(26, 29, 35); border: 1px solid rgb(51, 51, 51); border-radius: 12px; z-index: 9001; flex-direction: column;">
+    </div>
 
         <div id="terminal-zone" style="display: flex;">
             <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:10px; color:var(--gold)">
@@ -331,43 +345,13 @@
                 <button class="tool-btn btn-red" style="width:100%; margin-top:20px; padding:12px;" onclick="Nexus.closeModal()">Dismiss Window</button>
             </div>
         </div>
-
-    </div>
+   </div>
 
     <script src="./nexus.js"></script>
     <script src="./virtual-keyboard.js"></script>
     <script src="./sync.js"></script>
     <script src="./injector.js"></script>
 
-
-
-<div id="modal-overlay" class="overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
-    <div class="modal-box" style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 600px; padding: 0; overflow: hidden;">
-        <div style="padding: 15px; background: var(--surface); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h3 id="modal-title" style="margin: 0; color: var(--gold); font-size: 14px;">⚡ System</h3>
-            <button onclick="Nexus.closeModal()" style="background: none; border: none; color: var(--text); cursor: pointer; font-size: 18px;">&times;</button>
-        </div>
-        <div id="modal-body" style="padding: 20px;"></div>
-    </div>
-</div>
-
-<div id="intel-modal-backdrop" style="display: none; position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 9000;"></div>
-<div id="intel-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 75%; background: rgb(26, 29, 35); border: 1px solid rgb(51, 51, 51); border-radius: 12px; z-index: 9001; flex-direction: column; color: rgb(238, 238, 238);">
-    </div>
-<div id="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
-    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow: auto;">
-        <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface);">
-            <h3 id="modal-title" style="margin: 0; color: var(--gold); font-size: 14px;">⚡ SYSTEM</h3>
-            <button onclick="Nexus.closeModal()" style="background: none; border: none; color: var(--text); cursor: pointer; font-size: 20px;">&times;</button>
-        </div>
-        <div id="modal-body" style="padding: 20px;"></div>
-    </div>
-</div>
-
-<div id="intel-modal-backdrop" style="display: none; position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 9000;"></div>
-<div id="intel-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 75%; background: rgb(26, 29, 35); border: 1px solid rgb(51, 51, 51); border-radius: 12px; z-index: 9001; flex-direction: column; display: none;">
-</div>
-    
 <script>
     window.onload = () => {
         if (window.Nexus) Nexus.boot();
