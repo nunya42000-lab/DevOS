@@ -1,27 +1,93 @@
 /* =============================================================================
    FILE: nexus.js (Omni-Edition - Full Integration)
    ============================================================================= */
+/* nexus.js: Thorough Integration Patch */
 
 window.Nexus = {
     state: { vfs: {}, activeFile: "main.js", cm: null, history: [] },
-/* --- PERMANENT CORE ENGINE UPDATE --- */
-boot() {
-    this.log("DevOS Nexus Prime: Omni-Engine Online.", "var(--accent)");
-    this.initGestures();
-    
-    // Auto-Repair & Verification
-    this.verifyIntelligence();
 
-    window.addEventListener('cm6-ready', () => {
-        this.initEditor();
-        this.renderExplorer();
-        this.syncUI(); // Hard-wire buttons immediately
-    });
+    boot() {
+        this.log("DevOS Nexus Prime: Omni-Engine Online.", "var(--accent)");
+        this.initGestures();
+        
+        // Verifies VFS state without opening UI modals
+        this.verifyIntelligence();
 
-    document.getElementById('term-in').onkeydown = (e) => {
-        if (e.key === 'Enter') { this.executeCommand(e.target.value); e.target.value = ''; }
-    };
-},
+        window.addEventListener('cm6-ready', () => {
+            this.initEditor();
+            this.renderExplorer();
+            this.syncUI(); 
+        });
+
+        // Initialize Terminal Input logic
+        const termIn = document.getElementById('term-in');
+        if (termIn) {
+            termIn.onkeydown = (e) => {
+                if (e.key === 'Enter') { 
+                    this.executeCommand(e.target.value); 
+                    e.target.value = ''; 
+                }
+            };
+        }
+    },
+
+    // Bridge for virtual-keyboard.js to interact with CodeMirror
+    type(char) {
+        if (!this.state.cm) return;
+        const state = this.state.cm.state;
+        const selection = state.selection.main;
+        
+        if (char === 'BACKSPACE') {
+            this.state.cm.dispatch({
+                changes: { from: selection.from > 0 ? selection.from - 1 : 0, to: selection.to, insert: '' }
+            });
+        } else {
+            this.state.cm.dispatch({
+                changes: { from: selection.from, to: selection.to, insert: char },
+                selection: { anchor: selection.from + char.length, head: selection.from + char.length }
+            });
+        }
+        this.state.cm.focus();
+    },
+
+    // UI Toggle Fixes (Aligns with .active classes in styles.css)
+    toggleKb() { 
+        const k = document.getElementById('kb-drawer'); 
+        if (k) k.classList.toggle('active'); 
+    },
+
+    toggleTerminalPopup() { 
+        const t = document.getElementById('terminal-zone'); 
+        if (t) {
+            const isHidden = t.style.display === 'none' || t.style.display === '';
+            t.style.display = isHidden ? 'flex' : 'none'; 
+        }
+    },
+
+    toggleSidebar(force) {
+        const s = document.getElementById('sidebar');
+        if (s) s.classList.toggle('active', force);
+    },
+
+    // Modal Controller
+    showModal(title, html) {
+        const overlay = document.getElementById('modal-overlay');
+        const titleEl = document.getElementById('modal-title');
+        const bodyEl = document.getElementById('modal-body');
+        
+        if (overlay && titleEl && bodyEl) {
+            titleEl.innerText = title;
+            bodyEl.innerHTML = html;
+            overlay.style.display = 'flex';
+        }
+    },
+
+    closeModal() { 
+        const overlay = document.getElementById('modal-overlay');
+        if (overlay) overlay.style.display = 'none'; 
+    }
+};
+
 
 // NEW: Ensures system files always exist in VFS
 async verifyIntelligence() {
