@@ -1,26 +1,24 @@
 
-/* =============================================================================
-   FILE: nexus.js (Omni-Edition - Full Integration)
-   ============================================================================= */
-/* nexus.js: Thorough Integration Patch */
+/* nexus.js: Safe-Guard Patch */
 
 window.Nexus = {
     state: { vfs: {}, activeFile: "main.js", cm: null, history: [] },
 
     boot() {
         this.log("DevOS Nexus Prime: Omni-Engine Online.", "var(--accent)");
-        this.initGestures();
         
-        // Verifies VFS state without opening UI modals
+        // 1. Initialize logic safely
+        this.initGestures();
         this.verifyIntelligence();
 
+        // 2. Wait for CodeMirror and DOM to be fully ready
         window.addEventListener('cm6-ready', () => {
             this.initEditor();
             this.renderExplorer();
             this.syncUI(); 
         });
 
-        // Initialize Terminal Input logic
+        // 3. SAFE check for terminal input
         const termIn = document.getElementById('term-in');
         if (termIn) {
             termIn.onkeydown = (e) => {
@@ -32,8 +30,8 @@ window.Nexus = {
         }
     },
 
-    // Bridge for virtual-keyboard.js to interact with CodeMirror
-      type(char) {
+    // Bridge for keyboard to type into editor
+    type(char) {
         if (!this.state.cm) return;
         const state = this.state.cm.state;
         const selection = state.selection.main;
@@ -51,7 +49,7 @@ window.Nexus = {
         this.state.cm.focus();
     },
 
-    // FIXED: Uses classes to match your CSS transitions
+    // SAFE UI TOGGLES (Prevents the "Cannot set property of null" error)
     toggleKb() { 
         const k = document.getElementById('kb-drawer'); 
         if (k) k.classList.toggle('active'); 
@@ -60,19 +58,22 @@ window.Nexus = {
     toggleTerminalPopup() { 
         const t = document.getElementById('terminal-zone'); 
         if (t) {
-            // Check if it's currently hidden or has no inline style
             const isHidden = t.style.display === 'none' || t.style.display === '';
             t.style.display = isHidden ? 'flex' : 'none'; 
         }
     },
 
-    // MODAL LOGIC: Prevents the "Undefined" errors
     showModal(title, html) {
         const overlay = document.getElementById('modal-overlay');
-        if (overlay) {
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-body').innerHTML = html;
+        const titleEl = document.getElementById('modal-title');
+        const bodyEl = document.getElementById('modal-body');
+        
+        if (overlay && titleEl && bodyEl) {
+            titleEl.innerText = title;
+            bodyEl.innerHTML = html;
             overlay.style.display = 'flex';
+        } else {
+            console.warn("Modal elements missing from HTML. Ignoring showModal call.");
         }
     },
 
