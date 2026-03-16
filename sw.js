@@ -11,7 +11,7 @@ const ASSETS = [
   './sentinel.worker.js',  // ADD THIS
   './sync.js',
   './injector.js',
-  './virtual-keyboard.js'
+  './virtual-keyboard.js',3
   './icon-192.png',
   './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
