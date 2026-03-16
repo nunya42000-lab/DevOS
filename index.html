@@ -338,14 +338,24 @@
             <div id="kb-grid" style="display:grid; grid-template-columns:repeat(10,1fr); gap:5px; padding:10px;"></div>
         </div>
 
-        <div id="modal-overlay" style="display: flex;">
-            <div class="modal-box">
-                <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;">⚡ Smart Merger</h3>
-                <div id="modal-body" style="margin-top:15px; color:var(--text)"><div style="display:flex;flex-direction:column;gap:12px;">                 <textarea id="merger-input" placeholder="Paste patch here..." style="width:100%;height:180px;background:#000;color:#22c55e;font-family:monospace;padding:10px;border:1px solid #2d333f;"></textarea>                 <div style="display:flex;gap:10px;">                     <button class="tool-btn btn-accent" style="flex:1;height:40px;" onclick="NexusSmartMerger.executeMerge()">🤖 Run Patch</button>                     <button class="tool-btn btn-gold" style="flex:1;" onclick="NexusSmartMerger.manualInsert()">🎯 Insert</button>                 </div></div></div>
-                <button class="tool-btn btn-red" style="width:100%; margin-top:20px; padding:12px;" onclick="Nexus.closeModal()">Dismiss Window</button>
+        <div id="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
+    <div class="modal-box" style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 600px; padding: 20px;">
+        <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;">⚡ Smart Merger</h3>
+        
+        <div id="modal-body" style="margin-top:15px; color:var(--text)">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <textarea id="merger-input" placeholder="Paste patch here..." style="width:100%; height:180px; background:#000; color:#22c55e; font-family:monospace; padding:10px; border:1px solid #2d333f; border-radius:4px;"></textarea>
+                
+                <div style="display:flex; gap:10px;">
+                    <button class="tool-btn btn-accent" style="flex:1; height:40px; cursor:pointer;" onclick="Nexus.executeMerge()">🤖 Run Patch</button>
+                    <button class="tool-btn btn-gold" style="flex:1; cursor:pointer;" onclick="Nexus.manualInsert()">🎯 Insert</button>
+                </div>
             </div>
         </div>
-   </div>
+
+        <button class="tool-btn btn-red" style="width:100%; margin-top:20px; padding:12px; cursor:pointer;" onclick="Nexus.closeModal()">Dismiss Window</button>
+    </div>
+</div>
 
     <script src="./nexus.js"></script>
     <script src="./virtual-keyboard.js"></script>
