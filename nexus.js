@@ -1,41 +1,37 @@
-/* nexus.js - Bulletproof UI Patch */
+
+/* =============================================================================
+   FILE: nexus.js (Omni-Edition - Fixed & Defended)
+   ============================================================================= */
 
 window.Nexus = {
     state: { vfs: {}, activeFile: "main.js", cm: null, history: [] },
 
     boot() {
-        this.log("DevOS Nexus Prime: Omni-Engine Online.", "var(--accent)");
+        console.log("DevOS Nexus Prime: Initializing...");
         
-        // 1. Init internal logic
         this.initGestures();
         this.verifyIntelligence();
 
-        // 2. Wait for Editor to be ready before wiring UI
+        // Wait for CodeMirror signal
         window.addEventListener('cm6-ready', () => {
             this.initEditor();
             this.renderExplorer();
             this.syncUI(); 
         });
 
-        // 3. SAFE TERMINAL BINDING
-        // We use a small delay or check to ensure the DOM is actually ready
-        const bindTerminal = () => {
-            const termIn = document.getElementById('term-in');
-            if (termIn) {
-                termIn.onkeydown = (e) => {
-                    if (e.key === 'Enter') { 
-                        this.executeCommand(e.target.value); 
-                        e.target.value = ''; 
-                    }
-                };
-            }
-        };
-
-        if (document.readyState === 'complete') bindTerminal();
-        else window.addEventListener('load', bindTerminal);
+        // SAFE TERMINAL BINDING: Prevents boot crash if element is missing
+        const termIn = document.getElementById('term-in');
+        if (termIn) {
+            termIn.onkeydown = (e) => {
+                if (e.key === 'Enter') { 
+                    this.executeCommand(e.target.value); 
+                    e.target.value = ''; 
+                }
+            };
+        }
     },
 
-    // ADD THIS: The bridge for the Virtual Keyboard
+    // BRIDGE: Connects Virtual Keyboard to the Editor
     type(char) {
         if (!this.state.cm) return;
         const state = this.state.cm.state;
@@ -54,7 +50,7 @@ window.Nexus = {
         this.state.cm.focus();
     },
 
-    // SAFE UI TOGGLES (Won't crash if ID is missing)
+    // UI TOGGLES: Fixed to match CSS classes and prevent null errors
     toggleKb() { 
         const k = document.getElementById('kb-drawer'); 
         if (k) k.classList.toggle('active'); 
@@ -68,6 +64,12 @@ window.Nexus = {
         }
     },
 
+    toggleSidebar(force) {
+        const s = document.getElementById('sidebar');
+        if (s) s.classList.toggle('active', force);
+    },
+
+    // MODAL CONTROLLER: Includes safety checks for missing elements
     showModal(title, html) {
         const overlay = document.getElementById('modal-overlay');
         const titleEl = document.getElementById('modal-title');
@@ -83,9 +85,23 @@ window.Nexus = {
     closeModal() { 
         const overlay = document.getElementById('modal-overlay');
         if (overlay) overlay.style.display = 'none'; 
+    },
+
+    log(msg, color = "var(--text)") {
+        const term = document.getElementById('term-out');
+        if (!term) return;
+        const line = document.createElement('div');
+        line.style.color = color;
+        line.innerText = `> ${msg}`;
+        term.appendChild(line);
+        term.scrollTop = term.scrollHeight;
+    },
+
+    executeCommand(cmd) { 
+        try { this.log(eval(cmd), "var(--success)"); } 
+        catch(e) { this.log(e.message, \"var(--danger)\"); } 
     }
 };
-        
 
 // NEW: Ensures system files always exist in VFS
 async verifyIntelligence() {
