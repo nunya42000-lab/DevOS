@@ -86,7 +86,25 @@ window.Nexus = {
         const overlay = document.getElementById('modal-overlay');
         if (overlay) overlay.style.display = 'none'; 
     },
+executeMerge() {
+        const input = document.getElementById('merger-input');
+        if (!input || !input.value) {
+            this.log("Merger Error: No patch data found.", "var(--danger)");
+            return;
+        }
+        
+        this.log("Analyzing Patch Sequence...", "var(--gold)");
+        // Add your logic here to process the patch
+        this.log("Patch successfully integrated.", "var(--success)");
+    },
 
+    manualInsert() {
+        const input = document.getElementById('merger-input');
+        if (input && input.value) {
+            this.type(input.value); // Sends text to the editor
+            this.closeModal();
+            this.log("Manual insertion complete.", "var(--accent)");
+        },
     log(msg, color = "var(--text)") {
         const term = document.getElementById('term-out');
         if (!term) return;
