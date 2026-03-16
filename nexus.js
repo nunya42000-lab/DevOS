@@ -1,3 +1,4 @@
+
 /* =============================================================================
    FILE: nexus.js (Omni-Edition - Full Integration)
    ============================================================================= */
@@ -32,7 +33,7 @@ window.Nexus = {
     },
 
     // Bridge for virtual-keyboard.js to interact with CodeMirror
-    type(char) {
+      type(char) {
         if (!this.state.cm) return;
         const state = this.state.cm.state;
         const selection = state.selection.main;
@@ -50,7 +51,7 @@ window.Nexus = {
         this.state.cm.focus();
     },
 
-    // UI Toggle Fixes (Aligns with .active classes in styles.css)
+    // FIXED: Uses classes to match your CSS transitions
     toggleKb() { 
         const k = document.getElementById('kb-drawer'); 
         if (k) k.classList.toggle('active'); 
@@ -59,25 +60,18 @@ window.Nexus = {
     toggleTerminalPopup() { 
         const t = document.getElementById('terminal-zone'); 
         if (t) {
+            // Check if it's currently hidden or has no inline style
             const isHidden = t.style.display === 'none' || t.style.display === '';
             t.style.display = isHidden ? 'flex' : 'none'; 
         }
     },
 
-    toggleSidebar(force) {
-        const s = document.getElementById('sidebar');
-        if (s) s.classList.toggle('active', force);
-    },
-
-    // Modal Controller
+    // MODAL LOGIC: Prevents the "Undefined" errors
     showModal(title, html) {
         const overlay = document.getElementById('modal-overlay');
-        const titleEl = document.getElementById('modal-title');
-        const bodyEl = document.getElementById('modal-body');
-        
-        if (overlay && titleEl && bodyEl) {
-            titleEl.innerText = title;
-            bodyEl.innerHTML = html;
+        if (overlay) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-body').innerHTML = html;
             overlay.style.display = 'flex';
         }
     },
@@ -87,7 +81,7 @@ window.Nexus = {
         if (overlay) overlay.style.display = 'none'; 
     }
 };
-
+           
 
 // NEW: Ensures system files always exist in VFS
 async verifyIntelligence() {
