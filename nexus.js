@@ -1,5 +1,4 @@
-
-/* nexus.js: Safe-Guard Patch */
+/* nexus.js - Bulletproof UI Patch */
 
 window.Nexus = {
     state: { vfs: {}, activeFile: "main.js", cm: null, history: [] },
@@ -7,30 +6,36 @@ window.Nexus = {
     boot() {
         this.log("DevOS Nexus Prime: Omni-Engine Online.", "var(--accent)");
         
-        // 1. Initialize logic safely
+        // 1. Init internal logic
         this.initGestures();
         this.verifyIntelligence();
 
-        // 2. Wait for CodeMirror and DOM to be fully ready
+        // 2. Wait for Editor to be ready before wiring UI
         window.addEventListener('cm6-ready', () => {
             this.initEditor();
             this.renderExplorer();
             this.syncUI(); 
         });
 
-        // 3. SAFE check for terminal input
-        const termIn = document.getElementById('term-in');
-        if (termIn) {
-            termIn.onkeydown = (e) => {
-                if (e.key === 'Enter') { 
-                    this.executeCommand(e.target.value); 
-                    e.target.value = ''; 
-                }
-            };
-        }
+        // 3. SAFE TERMINAL BINDING
+        // We use a small delay or check to ensure the DOM is actually ready
+        const bindTerminal = () => {
+            const termIn = document.getElementById('term-in');
+            if (termIn) {
+                termIn.onkeydown = (e) => {
+                    if (e.key === 'Enter') { 
+                        this.executeCommand(e.target.value); 
+                        e.target.value = ''; 
+                    }
+                };
+            }
+        };
+
+        if (document.readyState === 'complete') bindTerminal();
+        else window.addEventListener('load', bindTerminal);
     },
 
-    // Bridge for keyboard to type into editor
+    // ADD THIS: The bridge for the Virtual Keyboard
     type(char) {
         if (!this.state.cm) return;
         const state = this.state.cm.state;
@@ -49,7 +54,7 @@ window.Nexus = {
         this.state.cm.focus();
     },
 
-    // SAFE UI TOGGLES (Prevents the "Cannot set property of null" error)
+    // SAFE UI TOGGLES (Won't crash if ID is missing)
     toggleKb() { 
         const k = document.getElementById('kb-drawer'); 
         if (k) k.classList.toggle('active'); 
@@ -72,8 +77,6 @@ window.Nexus = {
             titleEl.innerText = title;
             bodyEl.innerHTML = html;
             overlay.style.display = 'flex';
-        } else {
-            console.warn("Modal elements missing from HTML. Ignoring showModal call.");
         }
     },
 
@@ -82,7 +85,7 @@ window.Nexus = {
         if (overlay) overlay.style.display = 'none'; 
     }
 };
-           
+        
 
 // NEW: Ensures system files always exist in VFS
 async verifyIntelligence() {
