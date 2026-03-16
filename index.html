@@ -276,7 +276,22 @@
                 <button class="tool-btn btn-gold" style="flex:1" onclick="Nexus.openSettings()">Settings</button>
             </div>
         </aside>
-
+<div id="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
+    <div class="modal-box" style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 600px; padding: 20px;">
+        <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;">⚡ Smart Merger</h3>
+        <div id="modal-body" style="margin-top:15px; color:var(--text)">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <textarea id="merger-input" placeholder="Paste patch here..." style="width:100%;height:180px;background:#000;color:#22c55e;font-family:monospace;padding:10px;border:1px solid #2d333f;"></textarea>
+                <div style="display:flex;gap:10px;">
+                    <button class="tool-btn btn-accent" style="flex:1;height:40px;" onclick="Nexus.executeMerge()">🤖 Run Patch</button>
+                    <button class="tool-btn btn-gold" style="flex:1;" onclick="Nexus.manualInsert()">🎯 Insert</button>
+                </div>
+            </div>
+        </div>
+        <button class="tool-btn btn-red" style="width:100%; margin-top:20px; padding:12px;" onclick="Nexus.closeModal()">Dismiss Window</button>
+    </div>
+</div>
+        
         <main class="workspace">
             <div class="toolbar-viewport">
                 <div class="toolbar-track">
@@ -306,56 +321,6 @@
             <button class="fab fab-mid" onclick="Nexus.copyLog()">📋</button>
             <button class="fab fab-right" onclick="Nexus.toggleKb()">⌨️</button>
         </main>
-<div id="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
-    <div style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 600px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column;">
-        <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--surface);">
-            <h3 id="modal-title" style="margin: 0; color: var(--gold); font-size: 14px;">⚡ SYSTEM</h3>
-            <button onclick="Nexus.closeModal()" style="background: none; border: none; color: var(--text); cursor: pointer; font-size: 20px;">&times;</button>
-        </div>
-        <div id="modal-body" style="padding: 20px; overflow-y: auto;"></div>
-    </div>
-</div>
-
-<div id="intel-modal-backdrop" style="display: none; position: fixed; inset: 0px; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(4px); z-index: 9000;"></div>
-
-<div id="intel-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: 75%; background: rgb(26, 29, 35); border: 1px solid rgb(51, 51, 51); border-radius: 12px; z-index: 9001; flex-direction: column;">
-    </div>
-
-        <div id="terminal-zone" style="display: flex;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:10px; font-size:10px; color:var(--gold)">
-                <span>TERMINAL &amp; LOGS</span>
-                <span onclick="Nexus.toggleTerminalPopup()" style="cursor:pointer">CLOSE</span>
-            </div>
-            <div id="term-out"><div style="color: var(--accent);">&gt; Omni-Engine Restored.</div><div style="color: rgb(34, 197, 94);">&gt; Buttons Repaired.</div><div style="color: var(--success);">&gt; undefined</div><div style="color: rgb(34, 197, 94);">&gt; Buttons Repaired.</div><div style="color: var(--success);">&gt; undefined</div><div style="color: var(--warn);">&gt; Navigation arrows removed.</div><div style="color: var(--success);">&gt; Clipboard, Nav, and Vault systems synchronized.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Intel Engine (Beautify/Linter) synchronized.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Import/Export, Search, and Preview systems restored.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Loading Acorn AST Parser...</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Sentinel Super-Fixer Engine deployed and wired to Intel.</div><div style="color: var(--success);">&gt; Sentinel files registered in VFS.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Sentinel Controller Online.</div><div style="color: var(--gold);">&gt; Initiating Master Suite Integration...</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--success);">&gt; Master Suite Integrated: Sentinel Dashboard &amp; Context Engine Online.</div><div style="color: var(--gold);">&gt; Restoring File Connectivity &amp; Compare Engine...</div><div style="color: var(--success);">&gt; Explorer clicking fixed. Compare engine online. Jump logic active.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Building Intelligence Hub...</div><div style="color: var(--success);">&gt; Intelligence Hub populated and synchronized.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--danger);">&gt; Unexpected end of input</div><div style="color: var(--gold);">&gt; Ghost Backup Button active at top-left.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--accent);">&gt; Generating project ZIP...</div><div style="color: var(--success);">&gt; Download triggered. Self-destructing button...</div><div style="color: var(--accent);">&gt; Master Persistence button active.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Hard-patching Sentinel Suite to VFS...</div><div style="color: var(--success);">&gt; VFS Persisted to IndexedDB. Refresh is now safe.</div><div style="color: var(--success);">&gt; ZIP Exported.</div><div style="color: var(--gold);">&gt; Master Backup complete. Tool self-destructed.</div><div style="color: var(--accent);">&gt; Sync Tool ready at top-left.</div><div style="color: rgb(34, 197, 94);">&gt; Patch applied.</div><div style="color: var(--gold);">&gt; Capturing running logic and writing to VFS...</div><div style="color: var(--success);">&gt; App state synchronized to Explorer. Files are now editable and saveable.</div><div style="color: var(--warn);">&gt; Sync Cancelled.</div><div style="color: var(--gold);">&gt; Capturing live patched environment...</div></div>
-            <div class="term-input">
-                <span>$</span>
-                <input type="text" id="term-in" placeholder="Enter command...">
-            </div>
-        </div>
-
-        <div id="kb-drawer" style="display:none; position:fixed; bottom:0; left:0; width:100%; background:var(--panel); border-top:2px solid var(--gold); z-index:5500;">
-            <div style="text-align:center; padding:10px; cursor:pointer; background:var(--surface); color:var(--gold); font-weight:bold;" onclick="Nexus.toggleKb()">CLOSE KEYBOARD</div>
-            <div id="kb-grid" style="display:grid; grid-template-columns:repeat(10,1fr); gap:5px; padding:10px;"></div>
-        </div>
-
-        <div id="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; align-items: center; justify-content: center;">
-    <div class="modal-box" style="background: var(--panel); border: 1px solid var(--border); border-radius: 8px; width: 90%; max-width: 600px; padding: 20px;">
-        <h3 id="modal-title" style="margin-top:0; color:var(--gold); border-bottom:1px solid var(--border); padding-bottom:10px;">⚡ Smart Merger</h3>
-        
-        <div id="modal-body" style="margin-top:15px; color:var(--text)">
-            <div style="display:flex;flex-direction:column;gap:12px;">
-                <textarea id="merger-input" placeholder="Paste patch here..." style="width:100%; height:180px; background:#000; color:#22c55e; font-family:monospace; padding:10px; border:1px solid #2d333f; border-radius:4px;"></textarea>
-                
-                <div style="display:flex; gap:10px;">
-                    <button class="tool-btn btn-accent" style="flex:1; height:40px; cursor:pointer;" onclick="Nexus.executeMerge()">🤖 Run Patch</button>
-                    <button class="tool-btn btn-gold" style="flex:1; cursor:pointer;" onclick="Nexus.manualInsert()">🎯 Insert</button>
-                </div>
-            </div>
-        </div>
-
-        <button class="tool-btn btn-red" style="width:100%; margin-top:20px; padding:12px; cursor:pointer;" onclick="Nexus.closeModal()">Dismiss Window</button>
-    </div>
-</div>
 
     <script src="./nexus.js"></script>
     <script src="./virtual-keyboard.js"></script>
