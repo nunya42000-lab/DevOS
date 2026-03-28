@@ -2,42 +2,28 @@
  * virtual-keyboard.js - Context-Aware Input Ribbon
  */
 
-window.VirtualKeyboard = {
-    layouts: {
-        js: ['{', '}', '(', ')', ';', '=>', 'import', 'const', 'let', 'async', 'await', '?', ':', '`'],
-        html: ['<', '>', '/', '=', '"', '!', 'div', 'span', 'class', 'id', 'script', 'br']
-    },
-    alpha: "qwertyuiopasdfghjklzxcvbnm".split(""),
-
-    render(context = 'js') {
-        const kb = document.getElementById('kb-grid'); 
-        if (!kb) return;
-        kb.innerHTML = '';
-
-        const keys = [...(this.layouts[context] || this.layouts.js), ...this.alpha];
+ window.VirtualKeyboard = {
+    render(layout) {
+        const kb = document.createElement('div');
+        kb.id = "kb-drawer";
+        kb.style = "position:fixed; bottom:0; width:100%; background:var(--panel); border-top:1px solid var(--border); padding:10px; z-index:9999; display:grid; grid-template-columns: repeat(10, 1fr); gap:5px; transform:translateY(100%); transition:0.3s;";
+        
+        const keys = "QWERTYUIOPASDFGHJKLZXCVBNM".split('');
         keys.forEach(key => {
             const btn = document.createElement('button');
             btn.innerText = key;
-            btn.style.background = "var(--surface)";
-            btn.style.color = "var(--text)";
-            btn.style.border = "1px solid var(--border)";
-            btn.style.borderRadius = "4px";
-            btn.style.padding = "10px 5px";
-            btn.style.cursor = "pointer";
+            btn.style = "background:var(--surface); color:var(--text); border:1px solid var(--border); padding:10px 5px; cursor:pointer;";
             btn.onclick = () => this.type(key);
             kb.appendChild(btn);
         });
-
-        this.addSystemKey('Space', ' ', 'wide-key');
-        this.addSystemKey('Enter', '\n', 'action-key');
-        this.addSystemKey('DEL', 'BACKSPACE', 'delete-key');
+        
+        document.body.appendChild(kb);
     },
-
     type(val) {
-        if (window.Nexus && window.Nexus.type) {
-            window.Nexus.type(val);
-        }
-    },
+        if (window.Nexus) window.Nexus.type(val);
+    }
+};
+
 
     addSystemKey(label, val, className) {
         const kb = document.getElementById('kb-grid');
