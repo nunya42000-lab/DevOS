@@ -3,80 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DevOS Nexus Prime | All-In-One Edition</title>
+    <title>DevOS Nexus Prime | Omni-Edition</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
 
     <script type="module">
         import { EditorView, basicSetup } from "https://esm.sh/codemirror@6.0.1";
         import { javascript } from "https://esm.sh/@codemirror/lang-javascript@6.2.1";
         import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark@6.1.2";
-
-        // This builds the object that Nexus.initEditor() is looking for
-        window.CM6 = {
-            EditorView,
-            basicSetup,
-            javascript,
-            oneDark
-        };
-
-        // Notify the system that CM6 is ready to avoid the 100ms race condition
+        window.CM6 = { EditorView, basicSetup, javascript, oneDark };
         window.dispatchEvent(new CustomEvent('cm6-ready'));
     </script>
     
     <style>
         :root {
-            --bg: #0d1117;
-            --panel: #161b22;
-            --surface: #21262d;
-            --border: #30363d;
-            --text: #c9d1d9;
-            --accent: #58a6ff;
-            --success: #238636;
-            --gold: #d29922;
-            --danger: #da3633;
+            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+            --border: #30363d; --text: #c9d1d9; --accent: #58a6ff;
+            --success: #238636; --gold: #d29922; --danger: #da3633; --purple: #bb86fc;
         }
 
         body, html {
-            margin: 0; padding: 0;
-            width: 100%; height: 100%;
-            background: var(--bg);
-            color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            overflow: hidden;
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            background: var(--bg); color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            overflow: hidden; touch-action: none;
         }
 
         #nexus-app-root { display: flex; flex-direction: column; height: 100vh; }
 
-        /* Sidebar */
+        /* Sidebar & Edge Swipe Area */
         #sidebar {
             position: fixed; left: -280px; top: 0; width: 280px; height: 100%;
             background: var(--panel); border-right: 1px solid var(--border);
-            transition: left 0.3s ease; z-index: 8000;
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 8000;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5); display: flex; flex-direction: column;
         }
         #sidebar.active { left: 0; }
 
-        /* Toolbar / Ribbon */
         .toolbar-viewport { background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; white-space: nowrap; }
         .toolbar-track { padding: 8px; display: flex; gap: 8px; }
 
         .tool-btn {
             background: var(--surface); color: var(--text); border: 1px solid var(--border);
-            padding: 8px 16px; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer;
+            padding: 8px 14px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
         }
         .btn-blue { border-color: var(--accent); color: var(--accent); }
         .btn-green { border-color: var(--success); color: var(--success); }
         .btn-gold { border-color: var(--gold); color: var(--gold); }
         .btn-red { border-color: var(--danger); color: var(--danger); }
-        .btn-accent { border-color: #bb86fc; color: #bb86fc; }
+        .btn-accent { border-color: var(--purple); color: var(--purple); }
 
         #editor-wrapper { flex: 1; background: #000; position: relative; }
-        
-        /* Ensure CM6 fills the container */
         .cm-editor { height: 100%; }
 
-        /* CMD Panel */
+        /* HUD & Overlays */
+        #intel-hud {
+            position: absolute; top: 10px; right: 10px; z-index: 100;
+            font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4);
+            text-align: right; pointer-events: none;
+        }
+
+        /* CMD & Vault Panels */
         #cmd-panel {
             position: fixed; bottom: -350px; left: 0; width: 100%; height: 350px;
             background: var(--panel); border-top: 2px solid var(--accent);
@@ -90,30 +79,40 @@
             padding: 12px; font-family: monospace; font-size: 14px; resize: none; outline: none;
         }
 
-        /* Terminal Pop-up */
-        #terminal-zone {
-            position: absolute; bottom: 20px; right: 20px; width: 320px; height: 220px;
-            background: rgba(0,0,0,0.9); border: 1px solid var(--border);
-            display: none; flex-direction: column; z-index: 5000; border-radius: 8px;
-        }
-        #term-out { flex: 1; overflow-y: auto; padding: 10px; font-size: 12px; font-family: monospace; }
+        /* Explorer Empty State */
+        .empty-explorer { padding: 40px 20px; text-align: center; color: #8b949e; font-size: 12px; line-height: 1.6; }
 
         /* Modals */
         #modal-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 9999;
+            background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999;
         }
-        .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 500px; padding: 20px; border-radius: 8px; }
+        .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 550px; padding: 20px; border-radius: 8px; }
+        
+        #terminal-zone {
+            position: absolute; bottom: 20px; right: 20px; width: 320px; height: 180px;
+            background: rgba(0,0,0,0.9); border: 1px solid var(--border);
+            display: none; flex-direction: column; z-index: 5000; border-radius: 8px;
+        }
+        #term-out { flex: 1; overflow-y: auto; padding: 10px; font-size: 11px; font-family: monospace; }
     </style>
 </head>
 <body>
 
 <div id="nexus-app-root">
     <aside id="sidebar">
-        <div style="padding: 20px;">
-            <h3 style="color: var(--accent); margin-top: 0;">Project Explorer</h3>
-            <div id="explorer"></div>
-            <button class="tool-btn btn-blue" style="width: 100%; margin-top: 15px;" onclick="Nexus.repopulateExplorer()">♻️ Restore Defaults</button>
+        <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+            <select id="branch-selector" class="tool-btn btn-accent" onchange="Nexus.switchBranch(this.value)">
+                <option value="main">branch: main</option>
+            </select>
+            <button class="tool-btn" onclick="Nexus.createBranch()">+</button>
+        </div>
+        
+        <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
+
+        <div style="padding: 15px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border);">
+            <button class="tool-btn btn-blue" onclick="Nexus.triggerImport()">📂 Import Files</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.openSettings()">⚙️ Settings</button>
         </div>
     </aside>
 
@@ -122,223 +121,271 @@
             <div class="toolbar-track">
                 <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Menu</button>
                 <button class="tool-btn btn-accent" onclick="Nexus.toggleCMD()">⚡ CMD</button>
-                <button class="tool-btn btn-blue" onclick="Nexus.openMerger()">⚡ Merge</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ Format</button>
                 <button class="tool-btn btn-gold" onclick="Nexus.openVault()">🗄️ Vault</button>
                 <button class="tool-btn btn-green" onclick="Nexus.openIntel()">🧠 Intel</button>
                 <button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
             </div>
         </div>
 
-        <div id="editor-wrapper"></div>
+        <div id="editor-wrapper">
+            <div id="intel-hud">OS: NEXUS_PRIME_v4<br>VFS: STANDBY</div>
+        </div>
 
         <div id="cmd-panel">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <span style="color: var(--accent); font-weight: bold;">NEXUS COMMAND INJECTOR</span>
+                <span style="color: var(--accent); font-weight: bold; font-size: 12px;">NEXUS COMMAND INJECTOR</span>
                 <div style="display: flex; gap: 8px;">
-                    <button class="tool-btn btn-green" onclick="Nexus.runCMD()">RUN SCRIPT</button>
+                    <button class="tool-btn btn-green" onclick="Nexus.runCMD()">EXECUTE</button>
                     <button class="tool-btn" onclick="Nexus.toggleCMD()">CLOSE</button>
                 </div>
             </div>
-            <textarea id="cmd-input" placeholder="// Input JavaScript to manipulate the system..."></textarea>
+            <textarea id="cmd-input" placeholder="// JavaScript Injection..."></textarea>
         </div>
 
         <div id="terminal-zone">
             <div id="term-out"></div>
-            <input type="text" id="term-in" placeholder="Command..." style="background:#000; border:none; border-top:1px solid var(--border); color:#fff; padding:8px;">
+            <input type="text" id="term-in" placeholder="Command..." style="background:#000; border:none; border-top:1px solid var(--border); color:#fff; padding:8px; outline:none;">
         </div>
     </main>
 </div>
 
+<input type="file" id="nexus-file-import" multiple style="display: none;" onchange="Nexus.handleImport(event)">
+
 <div id="modal-overlay" onclick="if(event.target === this) Nexus.closeModal()">
     <div class="modal-content">
-        <h2 id="modal-title" style="margin-top:0; font-size: 18px;"></h2>
+        <h2 id="modal-title" style="margin-top:0; font-size: 16px; color: var(--accent);"></h2>
         <div id="modal-body"></div>
     </div>
 </div>
 
 <script>
 window.Nexus = {
-    state: { vfs: {}, activeFile: "main.js", cm: null },
+    state: { 
+        branches: { main: {} },
+        activeBranch: "main",
+        activeFile: null, 
+        cm: null,
+        vaultLocked: true,
+        vaultData: {}
+    },
 
     boot() {
-        console.log("Nexus Prime: Systems Online.");
+        console.log("Nexus Prime: Kernel Init...");
         this.initGestures();
-        this.verifyIntelligence();
-
-        // Listen for CM6 being ready before initializing editor
         window.addEventListener('cm6-ready', () => {
             this.initEditor();
             this.renderExplorer();
-            this.log("Editor Components Loaded.", "var(--success)");
+            this.log("System Ready. Swipe left edge to begin.", "var(--accent)");
         });
+    },
 
-        // Fallback for slower connections
-        setTimeout(() => {
-            if (!this.state.cm && window.CM6) {
-                this.initEditor();
-                this.renderExplorer();
-            }
-        }, 2000);
-
-        const termIn = document.getElementById('term-in');
-        if (termIn) {
-            termIn.onkeydown = (e) => {
-                if (e.key === 'Enter') { 
-                    this.executeCommand(e.target.value);
-                    e.target.value = ''; 
-                }
-            };
+    // --- Branching Logic ---
+    createBranch() {
+        const name = prompt("Enter new branch name:");
+        if (name && !this.state.branches[name]) {
+            this.state.branches[name] = JSON.parse(JSON.stringify(this.state.branches[this.state.activeBranch]));
+            this.updateBranchUI();
+            this.switchBranch(name);
         }
     },
 
-    repopulateExplorer() {
-        const templates = {
-            "index.html": "<!DOCTYPE html>\n<html>\n<body>\n  <h1>Nexus Page</h1>\n</body>\n</html>",
-            "style.css": "body { background: #000; color: #fff; }",
-            "main.js": "console.log('Nexus System Active');",
-            "config.json": "{\n  \"version\": \"1.0.0\"\n}"
-        };
-        Object.entries(templates).forEach(([name, content]) => {
-            if (!this.state.vfs[name]) this.state.vfs[name] = content;
-        });
+    switchBranch(name) {
+        this.state.activeBranch = name;
+        this.state.activeFile = null;
         this.renderExplorer();
-        this.log("Explorer repopulated.", "var(--success)");
+        this.log(`Switched to branch: ${name}`, "var(--purple)");
+        document.getElementById('branch-selector').value = name;
     },
 
+    updateBranchUI() {
+        const sel = document.getElementById('branch-selector');
+        sel.innerHTML = Object.keys(this.state.branches).map(b => `<option value="${b}">branch: ${b}</option>`).join('');
+    },
+
+    // --- Intel Module (Dependency & Syntax Tracking) ---
+    openIntel() {
+        if (!this.state.activeFile) return this.log("Intel: Select a file first.", "var(--danger)");
+        const code = this.state.cm.state.doc.toString();
+        const report = this.runAnalysis(code);
+
+        const html = `
+            <div style="font-family:monospace; font-size:12px;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:15px;">
+                    <div style="background:#000; padding:10px; border:1px solid var(--border);">
+                        <div style="color:var(--accent)">HEALTH</div><div style="font-size:18px">${report.health}%</div>
+                    </div>
+                    <div style="background:#000; padding:10px; border:1px solid var(--border);">
+                        <div style="color:var(--gold)">DEPENDENCIES</div><div style="font-size:18px">${report.deps.length}</div>
+                    </div>
+                </div>
+                <div style="color:var(--success); margin-bottom:5px;">▶ Dependencies Detected:</div>
+                <div style="background:#000; padding:10px; border:1px solid var(--border); max-height:100px; overflow-y:auto; color:var(--accent)">
+                    ${report.deps.length ? report.deps.join('<br>') : 'None found.'}
+                </div>
+                <div style="color:var(--gold); margin-top:10px; margin-bottom:5px;">▶ Syntax & Logic Findings:</div>
+                <ul style="padding-left:20px; color:#8b949e;">
+                    ${report.findings.map(f => `<li>${f}</li>`).join('')}
+                </ul>
+            </div>`;
+        this.showModal(`🧠 Intel: ${this.state.activeFile}`, html);
+    },
+
+    runAnalysis(code) {
+        const deps = [...code.matchAll(/(?:import|require|from|src|href)\s*['"]([^'"]+)['"]/g)].map(m => m[1]);
+        const findings = [];
+        let health = 100;
+
+        if (code.includes('eval(')) { findings.push("Critical: eval() usage."); health -= 40; }
+        if (code.includes('innerHTML')) { findings.push("Security: innerHTML usage."); health -= 10; }
+        if (code.split('\n').length > 500) findings.push("Structure: File is oversized.");
+        
+        return { deps, findings, health: Math.max(0, health) };
+    },
+
+    // --- Vault Logic ---
+    openVault() {
+        if (this.state.vaultLocked) {
+            const pin = prompt("Enter Vault PIN:");
+            if (pin === "1234") { // Default PIN
+                this.state.vaultLocked = false;
+                this.log("Vault Decrypted.", "var(--gold)");
+                this.openVault();
+            } else {
+                this.log("Vault Access Denied.", "var(--danger)");
+            }
+            return;
+        }
+        
+        const html = `
+            <div style="color:var(--gold); font-size:12px;">
+                <p>Secure storage active. Data is isolated from VFS Branches.</p>
+                <div id="vault-items">No secure items found.</div>
+                <button class="tool-btn btn-red" style="margin-top:20px; width:100%" onclick="Nexus.state.vaultLocked=true; Nexus.closeModal(); Nexus.log('Vault Locked.')">🔒 Lock Vault</button>
+            </div>`;
+        this.showModal("🗄️ Nexus Vault", html);
+    },
+
+    // --- Code Formatting ---
+    beautifyCode() {
+        if (!this.state.cm) return;
+        const code = this.state.cm.state.doc.toString();
+        const formatted = js_beautify(code, { indent_size: 2, space_in_empty_paren: true });
+        this.state.cm.dispatch({
+            changes: { from: 0, to: this.state.cm.state.doc.length, insert: formatted }
+        });
+        this.log("Code Beautified.", "var(--success)");
+    },
+
+    // --- Gesture Engine ---
+    initGestures() {
+        let startX, startY;
+        document.addEventListener('touchstart', e => {
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+        }, {passive: true});
+
+        document.addEventListener('touchend', e => {
+            const diffX = e.changedTouches[0].clientX - startX;
+            if (startX < 35 && diffX > 80) this.toggleSidebar(true);
+            if (diffX < -80) this.toggleSidebar(false);
+        });
+    },
+
+    // --- VFS Management ---
     renderExplorer() {
         const exp = document.getElementById('explorer');
-        if (!exp) return;
-        exp.innerHTML = Object.keys(this.state.vfs).map(name => `
-            <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="Nexus.loadFile('${name}')">
-                <span style="color:${this.state.activeFile === name ? 'var(--success)' : 'var(--text)'}">${name}</span>
+        const vfs = this.state.branches[this.state.activeBranch];
+        const keys = Object.keys(vfs);
+        
+        if (keys.length === 0) {
+            exp.innerHTML = `<div class="empty-explorer">PROJECT EMPTY<br>Swipe left edge to import scripts.</div>`;
+            return;
+        }
+
+        exp.innerHTML = keys.map(name => `
+            <div style="padding:12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="Nexus.loadFile('${name}')">
+                <span style="color:${this.state.activeFile === name ? 'var(--success)' : 'var(--text)'}; font-size:12px;">${name}</span>
                 <button onclick="event.stopPropagation(); Nexus.deleteFile('${name}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>
             </div>
         `).join('');
     },
 
+    triggerImport() { document.getElementById('nexus-file-import').click(); },
+
+    handleImport(event) {
+        const files = event.target.files;
+        const vfs = this.state.branches[this.state.activeBranch];
+        for (let file of files) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                vfs[file.name] = e.target.result;
+                this.renderExplorer();
+            };
+            reader.readAsText(file);
+        }
+    },
+
     loadFile(filename) {
-        if (!this.state.vfs[filename]) return;
+        const vfs = this.state.branches[this.state.activeBranch];
         this.state.activeFile = filename;
         if (this.state.cm) {
             this.state.cm.dispatch({
-                changes: { from: 0, to: this.state.cm.state.doc.length, insert: this.state.vfs[filename] }
+                changes: { from: 0, to: this.state.cm.state.doc.length, insert: vfs[filename] }
             });
         }
+        document.getElementById('intel-hud').innerHTML = `OS: NEXUS_PRIME_v4<br>FILE: ${filename.toUpperCase()}`;
         this.renderExplorer();
-        this.log(`Loaded: ${filename}`, "var(--accent)");
     },
 
-    deleteFile(filename) {
-        if (filename === "main.js") return this.log("Cannot delete main.js.", "var(--danger)");
-        if (confirm(`Delete ${filename}?`)) {
-            delete this.state.vfs[filename];
-            if (this.state.activeFile === filename) this.loadFile("main.js");
+    deleteFile(name) {
+        if (confirm(`Nuke ${name}?`)) {
+            delete this.state.branches[this.state.activeBranch][name];
+            if (this.state.activeFile === name) this.state.activeFile = null;
             this.renderExplorer();
         }
     },
 
-    toggleCMD() {
-        const panel = document.getElementById('cmd-panel');
-        if (panel) panel.classList.toggle('active');
+    // --- Logic & UI Core ---
+    initEditor() {
+        const parent = document.getElementById('editor-wrapper');
+        if (!window.CM6) return;
+        this.state.cm = new window.CM6.EditorView({
+            doc: "// DevOS Nexus Prime Ready\n// Swipe Edge to Import\n",
+            extensions: [window.CM6.basicSetup, window.CM6.oneDark, window.CM6.javascript()],
+            parent: parent
+        });
     },
 
     runCMD() {
         const code = document.getElementById('cmd-input').value;
-        if (!code) return;
         try {
-            const result = new Function(code).bind(this)();
-            this.log(`Result: ${result || 'Success'}`, "var(--success)");
-        } catch (e) {
-            this.log(`Script Error: ${e.message}`, "var(--danger)");
-        }
+            const out = new Function(code).bind(this)();
+            this.log(out || "Executed.", "var(--success)");
+        } catch(e) { this.log(e.message, "var(--danger)"); }
     },
 
     log(msg, color = "var(--text)") {
         const term = document.getElementById('term-out');
         if (!term) return;
         const line = document.createElement('div');
-        line.style.color = color;
-        line.innerText = `> ${msg}`;
-        term.appendChild(line);
-        term.scrollTop = term.scrollHeight;
+        line.style.color = color; line.innerText = `> ${msg}`;
+        term.appendChild(line); term.scrollTop = term.scrollHeight;
     },
 
-    showModal(title, html) {
-        const overlay = document.getElementById('modal-overlay');
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-body').innerHTML = html;
-        overlay.style.display = 'flex';
+    toggleCMD() { document.getElementById('cmd-panel').classList.toggle('active'); },
+    toggleSidebar(f) { document.getElementById('sidebar').classList.toggle('active', f); },
+    showModal(t, h) { 
+        document.getElementById('modal-title').innerText = t;
+        document.getElementById('modal-body').innerHTML = h;
+        document.getElementById('modal-overlay').style.display = 'flex';
     },
-
     closeModal() { document.getElementById('modal-overlay').style.display = 'none'; },
-
-    toggleSidebar(force) {
-        const s = document.getElementById('sidebar');
-        if (s) s.classList.toggle('active', force);
-    },
-
-    openMerger() {
-        const html = `
-            <textarea id="merger-input" style="width:100%; height:180px; background:#000; color:#22c55e; font-family:monospace; padding:10px; border:1px solid var(--border);"></textarea>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <button class="tool-btn btn-blue" style="flex:1" onclick="Nexus.applyMerge('replace')">Replace All</button>
-                <button class="tool-btn btn-accent" style="flex:1" onclick="Nexus.applyMerge('cursor')">Insert</button>
-            </div>`;
-        this.showModal("⚡ Code Merger", html);
-    },
-
-    applyMerge(mode) {
-        const code = document.getElementById('merger-input').value;
-        if (!code || !this.state.cm) return;
-        if (mode === 'replace') {
-            this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: code } });
-        } else {
-            const pos = this.state.cm.state.selection.main.from;
-            this.state.cm.dispatch({ changes: { from: pos, insert: code } });
-        }
-        this.closeModal();
-    },
-
-    initEditor() {
-        const parent = document.getElementById('editor-wrapper');
-        if (!parent || !window.CM6) return;
-        
-        this.state.cm = new window.CM6.EditorView({
-            doc: this.state.vfs[this.state.activeFile] || "// Nexus Codebase\n",
-            extensions: [
-                window.CM6.basicSetup, 
-                window.CM6.oneDark, 
-                window.CM6.javascript()
-            ],
-            parent: parent
-        });
-    },
-
-    executeCommand(cmd) {
-        try { this.log(eval(cmd), "var(--success)"); } catch(e) { this.log(e.message, "var(--danger)"); }
-    },
-
-    verifyIntelligence() {
-        if (!this.state.vfs["main.js"]) this.state.vfs["main.js"] = "// Nexus Active";
-    },
-
-    initGestures() {
-        let startX;
-        document.addEventListener('touchstart', e => startX = e.touches[0].clientX);
-        document.addEventListener('touchend', e => {
-            const diff = e.changedTouches[0].clientX - startX;
-            if (startX < 50 && diff > 100) this.toggleSidebar(true);
-            if (diff < -100) this.toggleSidebar(false);
-        });
-    },
-
-    openVault() { this.log("Vault module inactive.", "var(--gold)"); },
-    openIntel() { this.log("Intel engine online.", "var(--gold)"); },
-    nukeSystem() { if(confirm("Clear system?")) { this.state.vfs = {}; location.reload(); } }
+    openSettings() { this.showModal("⚙️ System Settings", `<p>VFS Integrity: 100%</p><button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">Wipe Cache</button>`); },
+    nukeSystem() { if(confirm("Nuke System?")) location.reload(); }
 };
 
 document.addEventListener('DOMContentLoaded', () => Nexus.boot());
 </script>
-
 </body>
 </html>
