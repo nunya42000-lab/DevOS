@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DevOS Nexus Prime | Omni-Edition</title>
+    <title>DevOS Nexus Prime | All-In-One Edition</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
@@ -93,6 +93,7 @@
         <div style="padding: 20px;">
             <h3 style="color: var(--accent); margin-top: 0;">Project Explorer</h3>
             <div id="explorer"></div>
+            <button class="tool-btn btn-blue" style="width: 100%; margin-top: 15px;" onclick="Nexus.repopulateExplorer()">♻️ Restore Defaults</button>
         </div>
     </aside>
 
@@ -102,7 +103,6 @@
                 <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Menu</button>
                 <button class="tool-btn btn-accent" onclick="Nexus.toggleCMD()">⚡ CMD</button>
                 <button class="tool-btn btn-blue" onclick="Nexus.openMerger()">⚡ Merge</button>
-                <button class="tool-btn btn-blue" onclick="Nexus.compareFiles()">⚖️ Compare</button>
                 <button class="tool-btn btn-gold" onclick="Nexus.openVault()">🗄️ Vault</button>
                 <button class="tool-btn btn-green" onclick="Nexus.openIntel()">🧠 Intel</button>
                 <button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
@@ -136,11 +136,206 @@
     </div>
 </div>
 
-<script src="./nexus.js"></script>
 <script>
-    document.addEventListener('DOMContentLoaded', () => {
-        if (window.Nexus) Nexus.boot();
-    });
+/* =============================================================================
+   CONSOLIDATED NEXUS LOGIC
+   ============================================================================= */
+
+window.Nexus = {
+    state: { 
+        vfs: {}, 
+        activeFile: "main.js", 
+        cm: null 
+    },
+
+    boot() {
+        console.log("Nexus Prime: Systems Online.");
+        this.initGestures();
+        this.verifyIntelligence();
+
+        // Initialize UI components
+        setTimeout(() => {
+            this.initEditor();
+            this.renderExplorer();
+            this.log("DevOS Nexus Prime Initialized.", "var(--success)");
+        }, 100);
+
+        const termIn = document.getElementById('term-in');
+        if (termIn) {
+            termIn.onkeydown = (e) => {
+                if (e.key === 'Enter') { 
+                    this.executeCommand(e.target.value);
+                    e.target.value = ''; 
+                }
+            };
+        }
+    },
+
+    // --- Explorer Logic ---
+    repopulateExplorer() {
+        const templates = {
+            "index.html": "<!DOCTYPE html>\n<html>\n<body>\n  <h1>Nexus Page</h1>\n</body>\n</html>",
+            "style.css": "body { background: #000; color: #fff; }",
+            "main.js": "console.log('Nexus System Active');",
+            "config.json": "{\n  \"version\": \"1.0.0\"\n}"
+        };
+
+        Object.entries(templates).forEach(([name, content]) => {
+            if (!this.state.vfs[name]) this.state.vfs[name] = content;
+        });
+
+        this.renderExplorer();
+        this.log("Explorer repopulated with default system files.", "var(--success)");
+    },
+
+    renderExplorer() {
+        const exp = document.getElementById('explorer');
+        if (!exp) return;
+        exp.innerHTML = Object.keys(this.state.vfs).map(name => `
+            <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="Nexus.loadFile('${name}')">
+                <span style="color:${this.state.activeFile === name ? 'var(--success)' : 'var(--text)'}">${name}</span>
+                <button onclick="event.stopPropagation(); Nexus.deleteFile('${name}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>
+            </div>
+        `).join('');
+    },
+
+    loadFile(filename) {
+        if (!this.state.vfs[filename]) return;
+        this.state.activeFile = filename;
+        if (this.state.cm) {
+            this.state.cm.dispatch({
+                changes: { from: 0, to: this.state.cm.state.doc.length, insert: this.state.vfs[filename] }
+            });
+        }
+        this.renderExplorer();
+        this.log(`Switched to: ${filename}`, "var(--accent)");
+    },
+
+    deleteFile(filename) {
+        if (filename === "main.js") return this.log("System protected: main.js cannot be deleted.", "var(--danger)");
+        if (confirm(`Delete ${filename}?`)) {
+            delete this.state.vfs[filename];
+            if (this.state.activeFile === filename) this.loadFile("main.js");
+            this.renderExplorer();
+        }
+    },
+
+    // --- CMD & Script Injection ---
+    toggleCMD() {
+        const panel = document.getElementById('cmd-panel');
+        if (panel) panel.classList.toggle('active');
+    },
+
+    runCMD() {
+        const code = document.getElementById('cmd-input').value;
+        if (!code) return;
+        try {
+            const result = new Function(code).bind(this)();
+            this.log(`Result: ${result || 'Success'}`, "var(--success)");
+        } catch (e) {
+            this.log(`Script Error: ${e.message}`, "var(--danger)");
+        }
+    },
+
+    // --- UI Helpers ---
+    log(msg, color = "var(--text)") {
+        const term = document.getElementById('term-out');
+        if (!term) return;
+        const line = document.createElement('div');
+        line.style.color = color;
+        line.innerText = `> ${msg}`;
+        term.appendChild(line);
+        term.scrollTop = term.scrollHeight;
+    },
+
+    showModal(title, html) {
+        const overlay = document.getElementById('modal-overlay');
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-body').innerHTML = html;
+        overlay.style.display = 'flex';
+    },
+
+    closeModal() {
+        document.getElementById('modal-overlay').style.display = 'none';
+    },
+
+    toggleSidebar(force) {
+        const s = document.getElementById('sidebar');
+        if (s) s.classList.toggle('active', force);
+    },
+
+    // --- Merger ---
+    openMerger() {
+        const html = `
+            <textarea id="merger-input" style="width:100%; height:180px; background:#000; color:#22c55e; font-family:monospace; padding:10px; border:1px solid var(--border);"></textarea>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <button class="tool-btn btn-blue" style="flex:1" onclick="Nexus.applyMerge('replace')">Replace All</button>
+                <button class="tool-btn btn-accent" style="flex:1" onclick="Nexus.applyMerge('cursor')">Insert At Cursor</button>
+            </div>`;
+        this.showModal("⚡ Code Merger", html);
+    },
+
+    applyMerge(mode) {
+        const code = document.getElementById('merger-input').value;
+        if (!code || !this.state.cm) return;
+        if (mode === 'replace') {
+            this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: code } });
+        } else {
+            const pos = this.state.cm.state.selection.main.from;
+            this.state.cm.dispatch({ changes: { from: pos, insert: code } });
+        }
+        this.closeModal();
+        this.log("Merge Successful.", "var(--success)");
+    },
+
+    // --- System Internals ---
+    initEditor() {
+        const parent = document.getElementById('editor-wrapper');
+        if (!parent) return;
+        if (window.CM6) {
+            this.state.cm = new window.CM6.EditorView({
+                doc: this.state.vfs[this.state.activeFile] || "// Nexus Codebase\n",
+                extensions: [window.CM6.basicSetup, window.CM6.oneDark, window.CM6.javascript()],
+                parent: parent
+            });
+        } else {
+            parent.innerHTML = `<div style="color:var(--accent); padding:20px; font-family:monospace;">Waiting for CodeMirror 6...<br><br>// Current File: ${this.state.activeFile}</div>`;
+        }
+    },
+
+    executeCommand(cmd) {
+        try {
+            const out = eval(cmd);
+            this.log(out, "var(--success)");
+        } catch(e) {
+            this.log(e.message, "var(--danger)");
+        }
+    },
+
+    verifyIntelligence() {
+        if (!this.state.vfs["main.js"]) {
+            this.state.vfs["main.js"] = "// Nexus Main Script\nconsole.log('Nexus Boot Sequence Completed');";
+        }
+    },
+
+    initGestures() {
+        let startX;
+        document.addEventListener('touchstart', e => startX = e.touches[0].clientX);
+        document.addEventListener('touchend', e => {
+            const diff = e.changedTouches[0].clientX - startX;
+            if (startX < 50 && diff > 100) this.toggleSidebar(true);
+            if (diff < -100) this.toggleSidebar(false);
+        });
+    },
+
+    // Stubs for functionality buttons
+    openVault() { this.log("Vault logic pending activation.", "var(--gold)"); },
+    openIntel() { this.log("Intel analysis engine online.", "var(--gold)"); },
+    nukeSystem() { if(confirm("Clear all VFS memory?")) { this.state.vfs = {}; location.reload(); } }
+};
+
+// Initialize app on load
+document.addEventListener('DOMContentLoaded', () => Nexus.boot());
 </script>
 
 </body>
