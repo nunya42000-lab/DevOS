@@ -293,35 +293,21 @@
 </div>
         
         <main class="workspace">
-            <div class="toolbar-viewport">
-                <div class="toolbar-track">
-                    <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Menu</button>
-                    <button class="tool-btn btn-blue" onclick="NexusSmartMerger.openModal()">⚡ Merge</button>
-                    <button id="btn-jump" class="tool-btn btn-blue">🎯 Jump</button><button class="tool-btn btn-accent" onclick="Nexus.toggleVisual()">👁️ Visual</button>
-                    <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
-                    <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Search</button>
-                    <button class="tool-btn btn-gold" onclick="NexusVault.openModal()">🗄️ Vault</button>
-                    <button class="tool-btn btn-green" onclick="Nexus.openIntel()">🧠 Intel</button>
-                    <button class="tool-btn btn-green" onclick="Nexus.syncToLocalFolder()">📁 Sync</button>
-                    <button class="tool-btn btn-red" onclick="Nexus.clearFiles()">🗑️ Clear</button>
-                    <button class="tool-btn btn-red" style="background:darkred; color:white;" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
-                </div>
+        <main class="workspace">
+    <div class="toolbar-viewport">
+        <div class="toolbar-track">
+            <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Menu</button>
+            <button class="tool-btn btn-blue" onclick="Nexus.openMerger()">⚡ Merge</button>
+            <button id="btn-jump" class="tool-btn btn-blue">🎯 Jump</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.toggleVisual()">👁️ Visual</button>
+            <button class="tool-btn btn-blue" onclick="Nexus.newFile()">+ New File</button>
+            <button class="tool-btn btn-blue" onclick="Nexus.openFindReplace()">🔍 Search</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.openVault()">🗄️ Vault</button>
+            <button class="tool-btn btn-green" onclick="Nexus.openIntel()">🧠 Intel</button>
             </div>
-
-            <div id="visual-preview">
-                <button id="preview-kill-btn" onclick="Nexus.killPreview()">🚨 KILL PROCESS</button>
-                <iframe id="preview-frame" style="width:100%; height:100%; border:none;"></iframe>
-            </div>
-
-            <div id="editor-wrapper">
-                
-            </div>
-
-            <button class="fab fab-left" onclick="Nexus.toggleTerminalPopup()">📜</button>
-            <button class="fab fab-mid" onclick="Nexus.copyLog()">📋</button>
-            <button class="fab fab-right" onclick="Nexus.toggleKb()">⌨️</button>
+    </div>
         </main>
-
+            
     <script src="./nexus.js"></script>
     <script src="./virtual-keyboard.js"></script>
     <script src="./sync.js"></script>
