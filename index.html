@@ -4,32 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DevOS Nexus Prime | Omni-Edition</title>
-    
     <link rel="manifest" href="./manifest.json">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/terser/dist/bundle.min.js"></script>
-    
     <script src="https://unpkg.com/@rollup/browser@3.29.4/dist/rollup.browser.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/merge/merge.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/merge/merge.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
-
     <script type="module">
         import { EditorView, basicSetup } from "https://esm.sh/codemirror@6.0.1";
         import { javascript } from "https://esm.sh/@codemirror/lang-javascript@6.2.1";
@@ -43,217 +27,184 @@
             --bg: #0d1117; --panel: #161b22; --surface: #21262d;
             --border: #30363d; --text: #c9d1d9; --accent: #58a6ff;
             --success: #238636; --gold: #d29922; --danger: #da3633; --purple: #bb86fc;
-            --muted: #8b949e;
         }
 
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             background: var(--bg); color: var(--text);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden; touch-action: none; display: flex; flex-direction: column;
+            overflow: hidden; touch-action: none;
         }
 
-        header { background: var(--panel); padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; flex-shrink: 0; }
-        .header-left { display: flex; align-items: center; gap: 10px; }
-        .menu-btn { background: transparent; border: 1px solid var(--border); color: var(--text); font-size: 18px; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
+        #nexus-app-root { display: flex; flex-direction: column; height: 100vh; }
+
+        /* --- OMNI RIBBON (Per 378.png) --- */
+        .omni-ribbon { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
+        .ribbon-toolbar { padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+        .ribbon-tabs { display: flex; gap: 4px; padding: 0 10px 10px 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .ribbon-tabs::-webkit-scrollbar { display: none; }
         
-        .tabs-ribbon { display: flex; gap: 8px; overflow-x: auto; white-space: nowrap; padding: 10px 15px; background: var(--panel); border-bottom: 1px solid var(--border); scrollbar-width: none; flex-shrink: 0; }
-        .tabs-ribbon::-webkit-scrollbar { display: none; }
-        
-        .tool-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; white-space: nowrap; }
+        .tool-btn {
+            background: var(--surface); color: var(--text); border: 1px solid var(--border);
+            padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+        }
         .tool-btn:active { opacity: 0.8; }
         
-        .tab-btn { padding: 8px 12px; background: #000; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; color: var(--muted); }
+        .tab-btn { background: #000; color: #8b949e; border-color: var(--border); }
         .tab-btn.active-tab { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-        .btn-primary { background: var(--accent); color: white; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
-        .btn-danger { background: var(--danger); color: white; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
-        .btn-warn { background: var(--gold); color: #000; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
-        .btn-success { background: var(--success); color: white; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
-        .btn-outline { background: #21262d; color: var(--text); border: 1px solid var(--border); padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-blue { border-color: var(--accent); color: var(--accent); }
+        .btn-green { border-color: var(--success); color: var(--success); }
+        .btn-gold { border-color: var(--gold); color: var(--gold); }
+        .btn-red { border-color: var(--danger); color: var(--danger); }
+        .btn-purple { border-color: var(--purple); color: var(--purple); }
 
-        .btn-blue-outline { border-color: var(--accent); color: var(--accent); background: transparent; }
-        .btn-green-outline { border-color: var(--success); color: var(--success); background: transparent; }
-        .btn-purple-outline { border-color: var(--purple); color: var(--purple); background: transparent; }
-        .btn-red-outline { border-color: var(--danger); color: var(--danger); background: transparent; }
-
-        .workspace { display: flex; flex: 1; overflow: hidden; position: relative; width: 100%; }
-        .view-panel { display: none; flex-direction: column; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--bg); }
+        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
+        .view-panel { flex: 1; display: none; flex-direction: column; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); overflow-y: auto; }
         .view-panel.active { display: flex; }
 
-        #sidebar { position: absolute; left: -280px; top: 0; width: 280px; height: 100%; background: var(--panel); border-right: 1px solid var(--border); transition: left 0.3s; z-index: 8000; box-shadow: 10px 0 30px rgba(0,0,0,0.5); display: flex; flex-direction: column; }
+        /* Sidebar (Per 380.png) */
+        #sidebar {
+            position: absolute; left: -280px; top: 0; width: 280px; height: 100%;
+            background: var(--panel); border-right: 1px solid var(--border);
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 8000;
+            box-shadow: 10px 0 30px rgba(0,0,0,0.5); display: flex; flex-direction: column;
+        }
         #sidebar.active { left: 0; }
         .side-sec { padding: 10px; border-bottom: 1px solid var(--border); }
 
-        #editor-wrapper { flex: 1; position: relative; overflow: hidden; background: #000; }
-        .cm-editor { height: 100%; width: 100%; outline: none !important; }
-        
-        #mobile-soft-keys { display: flex; overflow-x: auto; padding: 6px; background: var(--panel); gap: 6px; border-top: 1px solid var(--border); flex-shrink: 0; scrollbar-width: none; scroll-behavior: smooth; }
-        #mobile-soft-keys::-webkit-scrollbar { display: none; }
-        .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; flex-shrink: 0; cursor: pointer; min-width: 45px; text-align: center; }
+        /* Editor Area (Per 381.png) */
+        #editor-wrapper { flex: 1; background: #000; position: relative; overflow: hidden; }
+        .cm-editor { height: 100%; }
+        #mobile-soft-keys { display: flex; overflow-x: auto; padding: 6px; background: var(--panel); gap: 6px; border-top: 1px solid var(--border); }
+        .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; }
 
-        .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); }
+        /* Preview Area (Per 382.png) */
+        #live-preview-frame { width: 100%; flex: 1; border: none; background: #fff; transition: width 0.3s; }
+        #ghost-console { height: 150px; background: rgba(0,0,0,0.9); border-top: 2px solid var(--accent); color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; }
+        .preview-controls { padding: 8px; background: var(--panel); display: flex; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--border); }
+
+        /* Visual Cards (Per 379.png) */
+        .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); cursor: pointer; }
+
+        /* Modals */
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; }
-        .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 550px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 8px; }
+        .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 550px; padding: 20px; border-radius: 8px; }
         
         #search-results-tree { max-height: 150px; overflow-y: auto; margin-top: 10px; font-size: 12px; }
-        .search-hit { padding: 8px 5px; cursor: pointer; border-bottom: 1px solid var(--border); }
-        .search-hit:hover { background: var(--surface); }
-
-        .CodeMirror-merge, .CodeMirror-merge .CodeMirror { height: 100%; border: none; }
+        .search-hit { padding: 5px; cursor: pointer; border-bottom: 1px solid #222; }
     </style>
 </head>
 <body>
 
-<header>
-    <div class="header-left">
-        <button class="menu-btn" onclick="Nexus.toggleSidebar(true)">☰</button>
-        <div style="font-weight: bold; font-size: 16px;">DevOS <span id="active-file-display" style="color:var(--accent); font-size:12px; margin-left:8px;">No File Selected</span></div>
-    </div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="tool-btn btn-blue-outline" onclick="Nexus.toggleCMD()">⚡ CMD</button>
-        <button class="tool-btn btn-blue-outline" onclick="Nexus.beautifyCode()">✨ FMT</button>
-        <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
-        <button class="tool-btn" onclick="document.getElementById('zip-upload-input').click()">📁 LOAD</button>
-        
-        <button class="tool-btn btn-purple-outline" onclick="Nexus.openAdvancedMerger()">📦 MERGE</button>
-        <button class="tool-btn btn-green-outline" onclick="Nexus.saveVFS()">💾 SAVE</button>
-        <button class="tool-btn btn-warn" onclick="Nexus.buildForProduction()">🚀 BUILD</button>
-    </div>
-</header>
-
-<div class="tabs-ribbon">
-    <button class="tab-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">1. Code</button>
-    <button class="tab-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">2. Sandbox</button>
-    <button class="tab-btn" id="tab-btn-diagnostic" onclick="Nexus.switchTab('diagnostic')">3. Inspector</button>
-    <button class="tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">4. Visual Labs</button>
-    <button class="tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">5. Intel</button>
-    <button class="tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">6. Time & Diff</button>
-</div>
-
-<div class="workspace">
-    <aside id="sidebar">
-        <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <span style="font-weight: bold; color: var(--accent);">EXPLORER</span>
-            <button class="tool-btn" onclick="Nexus.toggleSidebar(false)">✕</button>
-        </div>
-        <div class="side-sec">
-            <input type="text" id="global-search-input" placeholder="Search code..." style="width:100%; padding:10px; background:#000; border:1px solid var(--border); border-radius:4px; color:white; box-sizing:border-box;">
-            <div id="search-results-tree"></div>
-        </div>
-        <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
-        
-        <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
-            <button class="tool-btn btn-purple-outline" onclick="Nexus.initSync()">📡 Start Peer Sync</button>
-            <button class="tool-btn btn-blue-outline" onclick="Nexus.connectSync()">🔗 Connect to Peer</button>
-            <button class="tool-btn btn-green-outline" onclick="Nexus.generateComponent()">🧩 New Component</button>
-            <button class="tool-btn btn-red-outline" onclick="Nexus.clearWorkspace()">🗑️ Wipe Workspace</button>
-        </div>
-    </aside>
-
-    <div id="editor-view" class="view-panel active">
-        <div id="editor-wrapper"></div>
-        <div id="mobile-soft-keys"></div>
-    </div>
-
-    <div id="preview-view" class="view-panel" style="padding: 0; background: transparent; border: none;">
-        <div style="padding: 10px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <strong style="color: var(--success)">Sandbox Environment</strong>
+<div id="nexus-app-root">
+    
+    <header class="omni-ribbon">
+        <div class="ribbon-toolbar">
             <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰</button>
+                <span style="font-weight: bold; color: var(--accent); font-size: 14px;">DEVOS NEXUS</span>
+            </div>
+            
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ FMT</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.exportForAI()">🤖 AI TXT</button>
+                <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
+                <button class="tool-btn btn-gold" onclick="document.getElementById('zip-upload-input').click()">📁 LOAD</button>
+                <button class="tool-btn btn-green" onclick="Nexus.saveVFS()">💾 SAVE</button>
+                <button class="tool-btn btn-purple" onclick="Nexus.openAdvancedMerger()">⚡ MERGE</button>
+                <button class="tool-btn btn-green" onclick="Nexus.downloadProjectZip()">📦 ZIP</button>
+                <button class="tool-btn btn-red" onclick="Nexus.clearWorkspace()">🗑️ WIPE</button>
+            </div>
+        </div>
+
+        <nav class="ribbon-tabs">
+            <button class="tool-btn tab-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">1. Code</button>
+            <button class="tool-btn tab-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">2. Sandbox</button>
+            <button class="tool-btn tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">3. Visual Labs</button>
+            <button class="tool-btn tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">4. Intel</button>
+            <button class="tool-btn tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">5. Time</button>
+        </nav>
+    </header>
+
+    <div class="main-container">
+        
+        <aside id="sidebar">
+            <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold; color: var(--accent);">EXPLORER</span>
+                <button class="tool-btn" onclick="Nexus.toggleSidebar(false)">✕</button>
+            </div>
+            <div class="side-sec">
+                <input type="text" id="global-search-input" placeholder="Search code..." style="width:100%; padding:8px; background:#000; border:1px solid var(--border); border-radius:4px; color:white; box-sizing:border-box;">
+                <div id="search-results-tree"></div>
+            </div>
+            <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
+            <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
+                <button class="tool-btn btn-blue" onclick="Nexus.exportForAI()">🤖 Export AI Context</button>
+                <button class="tool-btn btn-red" onclick="Nexus.clearWorkspace()">🗑️ Wipe Workspace</button>
+            </div>
+        </aside>
+
+        <div id="editor-view" class="view-panel active">
+            <div id="editor-wrapper"></div>
+            <div id="mobile-soft-keys"></div>
+        </div>
+
+        <div id="preview-view" class="view-panel">
+            <div class="preview-controls">
+                <button class="tool-btn btn-green" onclick="Nexus.refreshLivePreview()">▶ REBUILD & RUN</button>
                 <select class="tool-btn" id="preview-size" onchange="Nexus.resizePreview(this.value)">
                     <option value="100%">Full Screen</option>
                     <option value="375px">iPhone SE</option>
                     <option value="414px">iPhone Pro</option>
                 </select>
-                <button class="btn-danger" style="padding: 6px 12px;" onclick="Nexus.stopSandbox()">⏹ STOP</button>
-                <button class="btn-success" style="padding: 6px 12px;" onclick="Nexus.refreshLivePreview()">▶ REBUILD & RUN</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ CMD INJECT</button>
+                <span id="fps-counter" style="font-size:10px; color:var(--success); font-weight:bold; margin-left:auto;">0 FPS</span>
+            </div>
+            <div style="flex:1; background:#000; display:flex; justify-content:center; overflow:hidden;">
+                <iframe id="live-preview-frame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+            </div>
+            <div id="ghost-console"></div>
+        </div>
+
+        <div id="visual-view" class="view-panel" style="padding:20px;">
+            <h2 style="margin-top:0; color:var(--accent);">Visual Creative Labs</h2>
+            <div class="tool-card" onclick="Nexus.log('State Machine Builder Online.', 'var(--success)')">
+                <h3>⚙️ State Machine</h3>
+                <p style="font-size:12px; color:#888;">Generate logic blocks for IDLE, WIN, LOSE, and Upside Down states.</p>
+            </div>
+            <div class="tool-card" onclick="Nexus.log('Audio Synth Online.', 'var(--success)')">
+                <h3>🎵 Audio Synth</h3>
+                <p style="font-size:12px; color:#888;">Design retro sound effects with code.</p>
+            </div>
+            <div class="tool-card" onclick="Nexus.log('Sprite Slicer Online.', 'var(--success)')">
+                <h3>🖼️ Sprite Slicer</h3>
+                <p style="font-size:12px; color:#888;">Map CSS positions for sprite sheets.</p>
             </div>
         </div>
-        <div style="flex:1; background:#000; display:flex; justify-content:center; overflow:hidden;">
-            <iframe id="live-preview-frame" sandbox="allow-scripts allow-modals allow-same-origin" style="width:100%; height:100%; border:none; background:#fff; transition: width 0.3s;"></iframe>
-        </div>
-        <div id="ghost-console" style="height: 150px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; border-top: 2px solid #333; flex-shrink:0;">Console ready. Hit Rebuild & Run to launch.<br></div>
-    </div>
 
-    <div id="diagnostic-view" class="view-panel" style="padding: 15px; overflow-y:auto;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h3 style="margin:0; color:var(--danger)">Diagnostics Hub</h3>
-            <div style="display: flex; gap: 6px;">
-                <button class="btn-outline" onclick="Nexus.copyDiagnostics()">📋 Copy</button>
-                <button class="btn-success" onclick="Nexus.autoFixCurrentFile()">🔧 FIX</button>
-            </div>
+        <div id="intel-view" class="view-panel" style="padding:20px;">
+            <h2 style="margin-top:0; color:var(--gold);">System Intelligence</h2>
+            <div id="project-stats-container"></div>
         </div>
-        <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
-            <button class="btn-danger" style="flex: 1; min-width: 30%;" onclick="Nexus.runLinter()">1. LINT FILE</button>
-            <button class="btn-warn" style="flex: 1; min-width: 30%;" onclick="Nexus.runDependencyCheck()">2. SCAN IMPORTS</button>
-            <button class="btn-primary" style="flex: 1; min-width: 30%;" onclick="Nexus.beautifyCode()">3. FORMAT FILE</button>
-        </div>
-        <div id="diagnostic-results" style="height: 150px; background:#000; border:1px solid var(--border); border-radius:6px; overflow-y:auto; padding:12px; font-family:monospace; font-size:12px; white-space: pre-wrap;"></div>
 
-        <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:15px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin:0; color:var(--gold)">Data Storage (Live)</h3>
-                <div style="display:flex; gap:6px;">
-                    <button class="btn-success" style="padding:4px 8px;" onclick="Nexus.openDataSeeder()">🌱 Seed</button>
-                    <button class="btn-outline" style="padding:4px 8px;" onclick="Nexus.exportStorageToJSON()">💾 Export</button>
-                    <button class="btn-danger" style="padding:4px 8px;" onclick="Nexus.clearLiveStorage()">🗑️ Wipe</button>
+        <div id="time-view" class="view-panel" style="padding:20px;">
+            <h2 style="margin-top:0; color:var(--purple);">Time Machine</h2>
+            <div id="history-list"></div>
+        </div>
+
+        <div id="cmd-panel" style="position:absolute; bottom:-400px; left:0; width:100%; height:400px; background:var(--panel); border-top:2px solid var(--accent); z-index:7500; transition:bottom 0.3s; display:flex; flex-direction:column; padding:12px; box-sizing:border-box;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <span style="color:var(--accent); font-weight:bold;">NEXUS INJECTOR</span>
+                <div style="display:flex; gap:8px;">
+                    <button class="tool-btn btn-green" onclick="Nexus.runCMD()">EXECUTE</button>
+                    <button class="tool-btn" onclick="Nexus.toggleCMD()">CLOSE</button>
                 </div>
             </div>
-            <div id="storage-inspector-ui" style="max-height: 250px; overflow-y: auto;"></div>
-        </div>
-    </div>
-
-    <div id="visual-view" class="view-panel" style="padding:20px; overflow-y:auto;">
-        <h2 style="margin-top:0; color:var(--accent);">Visual Creative Labs</h2>
-        
-        <div class="tool-card">
-            <h3 style="margin-top:0; color:var(--success);">⚙️ State Machine</h3>
-            <p style="font-size:12px; color:#888;">Generate logic blocks for IDLE, WIN, LOSE, and Upside Down states.</p>
-            <button class="btn-outline" style="width:100%;" onclick="Nexus.generateStateMachine()">Build State Skeleton</button>
+            <textarea id="cmd-input" placeholder="// Paste script to edit VFS..." style="flex:1; background:#000; color:#22c55e; border:1px solid var(--border); padding:12px; font-family:monospace; font-size:14px; outline:none;"></textarea>
         </div>
 
-        <div class="tool-card">
-            <h3 style="margin-top:0; color:var(--gold);">🖼️ Sprite Slicer</h3>
-            <p style="font-size:12px; color:#888;">Upload an image, map sizes, and generate CSS grids automatically.</p>
-            <input type="file" id="sprite-upload" accept="image/*" style="margin-bottom:10px; color:white; width: 100%;" onchange="Nexus.handleSpriteUpload(event)">
-            <div style="display:flex; gap:10px; margin-bottom:10px;">
-                <input type="number" id="sprite-w" placeholder="Width (e.g. 32)" class="tool-btn" style="flex:1;">
-                <input type="number" id="sprite-h" placeholder="Height (e.g. 32)" class="tool-btn" style="flex:1;">
-            </div>
-            <canvas id="sprite-canvas-tool" style="max-width:100%; border:1px dashed var(--border); margin-bottom:10px; background:#000;"></canvas>
-            <button class="btn-primary" style="width:100%;" onclick="Nexus.generateSpriteCSS()">Generate Sprite CSS</button>
-        </div>
     </div>
-
-    <div id="intel-view" class="view-panel" style="padding:20px;">
-        <h2 style="margin-top:0; color:var(--gold);">System Intelligence</h2>
-        <div id="project-stats-container"></div>
-    </div>
-
-    <div id="time-view" class="view-panel" style="padding:20px; display:flex; flex-direction:column;">
-        <h2 style="margin-top:0; color:var(--purple);">Time Machine & Diff Viewer</h2>
-        <div id="history-list"></div>
-        <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:15px; flex:1; display:flex; flex-direction:column;">
-            <div style="display: flex; gap: 10px; margin-bottom:10px;">
-                <select id="diff-file-a" class="tool-btn" style="flex:1;"></select>
-                <select id="diff-file-b" class="tool-btn" style="flex:1;"></select>
-                <button class="btn-primary" onclick="Nexus.executeDiff()">Compare</button>
-            </div>
-            <div id="diff-container" style="flex:1; border:1px solid var(--border); background:#000; min-height:300px;"></div>
-        </div>
-    </div>
-
-    <div id="cmd-panel" style="position:absolute; bottom:-400px; left:0; width:100%; height:400px; background:var(--panel); border-top:2px solid var(--accent); z-index:7500; transition:bottom 0.3s; display:flex; flex-direction:column; padding:12px; box-sizing:border-box;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <span style="color:var(--accent); font-weight:bold;">NEXUS INJECTOR</span>
-            <div style="display:flex; gap:8px;">
-                <button class="btn-success" onclick="Nexus.runCMD()">EXECUTE</button>
-                <button class="btn-outline" onclick="Nexus.toggleCMD()">CLOSE</button>
-            </div>
-        </div>
-        <textarea id="cmd-input" placeholder="// Paste script to edit VFS..." style="flex:1; background:#000; color:#22c55e; border:1px solid var(--border); padding:12px; font-family:monospace; font-size:14px; outline:none;"></textarea>
-    </div>
-
 </div>
 
 <div id="modal-overlay" onclick="if(event.target === this) Nexus.closeModal()">
