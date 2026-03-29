@@ -7,7 +7,8 @@ window.Nexus = {
         vfs: {}, 
         activeFile: "main.js", 
         cm: null,
-        autoSaveTimer: null
+        autoSaveTimer: null,
+        diffEditorInstance: null
     },
 
     async boot() {
@@ -22,32 +23,30 @@ window.Nexus = {
             this.initMobileSoftKeys();
             this.initSearch();
             
-            // Ensure UI shows the loaded file
             if (this.state.vfs[this.state.activeFile]) {
                 document.getElementById('active-file-display').innerText = this.state.activeFile;
             }
-            
             this.log("DevOS Nexus Prime Initialized.", "var(--success)");
         });
     },
 
     // --- Layout & View Switching ---
     switchTab(tabId) {
-        // Update Buttons
         document.querySelectorAll('.tabs-ribbon .tab-btn').forEach(b => b.classList.remove('active-tab'));
         const btn = document.getElementById(`tab-btn-${tabId}`);
         if (btn) btn.classList.add('active-tab');
 
-        // Update Panels
         document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
         const panel = document.getElementById(`${tabId}-view`);
         if (panel) panel.classList.add('active');
 
-        // Fire specific refresh logic
+        // Context-Aware Hooks for the new features
         if (tabId === 'intel') this.updateProjectStats();
+        if (tabId === 'diagnostic') this.refreshStorageInspector();
+        if (tabId === 'time') this.initDiffViewer();
     },
 
-    // --- Search & Jump (CM6 Integration) ---
+    // --- Search & Jump ---
     initSearch() {
         const input = document.getElementById('global-search-input');
         if (!input) return;
@@ -69,15 +68,11 @@ window.Nexus = {
                             this.loadFile(file);
                             this.switchTab('editor');
                             this.toggleSidebar(false);
-                            // Jump to line in CM6
                             setTimeout(() => {
                                 if (!this.state.cm) return;
                                 try {
                                     const targetLine = this.state.cm.state.doc.line(i + 1);
-                                    this.state.cm.dispatch({ 
-                                        selection: { anchor: targetLine.from }, 
-                                        scrollIntoView: true 
-                                    });
+                                    this.state.cm.dispatch({ selection: { anchor: targetLine.from }, scrollIntoView: true });
                                     this.state.cm.focus();
                                 } catch(e) {}
                             }, 100);
@@ -96,15 +91,11 @@ window.Nexus = {
         if (!frame || !ghost) return;
 
         ghost.innerHTML = ''; 
-        
         const html = this.state.vfs['index.html'] || '<div style="color:black; padding:20px;">No index.html found.</div>';
         
         let jsToLoad = "";
-        if (this.state.vfs['main.js']) {
-            jsToLoad = this.state.vfs['main.js'];
-        } else if (this.state.activeFile && this.state.activeFile.endsWith('.js')) {
-            jsToLoad = this.state.vfs[this.state.activeFile];
-        }
+        if (this.state.vfs['main.js']) jsToLoad = this.state.vfs['main.js'];
+        else if (this.state.activeFile && this.state.activeFile.endsWith('.js')) jsToLoad = this.state.vfs[this.state.activeFile];
         
         const injection = `<script>
             (function(){
@@ -116,7 +107,6 @@ window.Nexus = {
                     div.style.borderBottom = '1px solid #333';
                     div.style.paddingBottom = '4px';
                     div.style.marginBottom = '4px';
-                    
                     const msg = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
                     div.innerText = "[" + type.toUpperCase() + "] " + msg;
                     ghost.appendChild(div);
@@ -125,20 +115,14 @@ window.Nexus = {
                 console.log = function(){ logToGhost('log', arguments); };
                 console.error = function(){ logToGhost('error', arguments); };
                 console.warn = function(){ logToGhost('warn', arguments); };
-                
-                window.onerror = function(msg, url, line) {
-                    console.error("Line " + line + ": " + msg);
-                    return false;
-                };
+                window.onerror = function(msg, url, line) { console.error("Line " + line + ": " + msg); return false; };
             })();
         <\/script>`;
 
         const fullHTML = `
             <!DOCTYPE html>
             <html>
-            <head>
-                <style>body { margin: 0; padding: 0; font-family: sans-serif; }</style>
-            </head>
+            <head><style>body { margin: 0; padding: 0; font-family: sans-serif; }</style></head>
             <body>
                 ${html}
                 ${injection}
@@ -178,7 +162,7 @@ window.Nexus = {
 
         if (ext === 'js') {
             if (typeof JSHINT === 'undefined') {
-                document.getElementById('diagnostic-results').innerHTML = '<div style="color:var(--danger)">JSHint library failed to load. Check network.</div>';
+                document.getElementById('diagnostic-results').innerHTML = '<div style="color:var(--danger)">JSHint library failed to load.</div>';
                 return;
             }
             JSHINT(code, { esversion: 11, browser: true, module: true });
@@ -186,15 +170,13 @@ window.Nexus = {
                 JSHINT.errors.forEach(e => { if (e) html += `<div style="color:var(--danger); margin-bottom:4px;">Line ${e.line}: ${e.reason}</div>`; });
             }
         } else if (ext === 'json') {
-            try { JSON.parse(code); } 
-            catch (e) { html += `<div style="color:var(--danger)">JSON Error: ${e.message}</div>`; }
+            try { JSON.parse(code); } catch (e) { html += `<div style="color:var(--danger)">JSON Error: ${e.message}</div>`; }
         } else if (ext === 'html') {
             const parser = new DOMParser();
             const doc = parser.parseFromString(code, "text/html");
             const errors = doc.getElementsByTagName("parsererror");
             if (errors.length > 0) html += `<div style="color:var(--danger)">HTML Error: ${errors[0].innerText}</div>`;
         }
-
         document.getElementById('diagnostic-results').innerHTML = html || '<div style="color:var(--success)">No syntax errors found. File is clean.</div>';
     },
 
@@ -208,11 +190,10 @@ window.Nexus = {
             while ((match = importRegex.exec(code)) !== null) {
                 let importedPath = match[1] || match[2] || match[3];
                 if (importedPath.startsWith('http') || importedPath.startsWith('//')) continue;
-                
                 importedPath = importedPath.replace(/^(\.\/|\.\.\/)+/, '').replace(/^\//, '');
                 
                 if (!this.state.vfs[importedPath]) {
-                    html += `<div style="color:var(--danger); margin-bottom:4px;">[Missing File] <strong>${fn}</strong> imports missing file: <em>${importedPath}</em></div>`;
+                    html += `<div style="color:var(--danger); margin-bottom:4px;">[Missing] <strong>${fn}</strong> imports: <em>${importedPath}</em></div>`;
                     missingCount++;
                 }
             }
@@ -230,18 +211,154 @@ window.Nexus = {
                 this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: JSON.stringify(looseParse, null, 4) } });
                 document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--success)">Strict JSON format applied.</div>`;
                 this.saveVFS();
-            } catch (e) {
-                document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--danger)">Failed to auto-fix JSON: ${e.message}</div>`;
-            }
+            } catch (e) { document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--danger)">Failed to auto-fix JSON: ${e.message}</div>`; }
         } else {
             this.beautifyCode();
-            document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--accent)">Auto-formatter applied. Check for missing structural closures.</div>`;
+            document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--accent)">Auto-formatter applied.</div>`;
         }
     },
 
     copyDiagnostics() {
         const text = document.getElementById('diagnostic-results').innerText;
         navigator.clipboard.writeText(text).then(() => this.log("Diagnostics copied to clipboard.", "var(--success)"));
+    },
+
+    // --- REINCORPORATED: Data Inspector (data-tools.js) ---
+    refreshStorageInspector() {
+        const container = document.getElementById('storage-inspector-ui');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        const keys = Object.keys(localStorage);
+        const projectKeys = keys.filter(k => !k.startsWith('devos_') && !k.startsWith('settings_') && !k.startsWith('nexus_') && k !== 'vault_snippets');
+        
+        if (projectKeys.length === 0) {
+            container.innerHTML = '<div style="color:var(--muted); font-style:italic; font-size:12px;">No sandbox project data found in LocalStorage.</div>';
+            return;
+        }
+
+        projectKeys.forEach(key => {
+            const val = localStorage.getItem(key);
+            const row = document.createElement('div');
+            row.style.cssText = `display:flex; flex-direction:column; gap:5px; padding:10px; background:var(--bg); border:1px solid var(--border); border-radius:6px; margin-bottom:8px;`;
+            row.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <strong style="color:var(--accent); font-size:13px;">${key}</strong>
+                    <button class="btn-danger" style="padding:2px 6px; font-size:10px;" onclick="Nexus.deleteStorageKey('${key}')">Delete</button>
+                </div>
+                <textarea id="storage-val-${key}" style="width:100%; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:4px; font-size:11px; padding:5px; height:60px; box-sizing:border-box;">${val}</textarea>
+                <button class="btn-primary" style="width:100%; font-size:10px;" onclick="Nexus.updateStorageKey('${key}')">Update Value</button>
+            `;
+            container.appendChild(row);
+        });
+    },
+
+    updateStorageKey(key) {
+        const newVal = document.getElementById(`storage-val-${key}`).value;
+        localStorage.setItem(key, newVal);
+        this.log(`Updated storage key: ${key}`, "var(--success)");
+        this.refreshLivePreview();
+    },
+
+    deleteStorageKey(key) {
+        if (confirm(`Delete key "${key}"?`)) {
+            localStorage.removeItem(key);
+            this.refreshStorageInspector();
+            this.refreshLivePreview();
+            this.log(`Deleted storage key: ${key}`, "var(--warn)");
+        }
+    },
+
+    openDataSeeder() {
+        const seedName = prompt("Enter a name for this data pattern (e.g., 'simon_high_score'):");
+        if (!seedName) return;
+        const seedData = prompt("Enter the JSON or value to store:");
+        if (seedData) {
+            localStorage.setItem(seedName, seedData);
+            this.refreshStorageInspector();
+            this.refreshLivePreview();
+            this.log(`Seeded data for: ${seedName}`, "var(--success)");
+        }
+    },
+
+    clearLiveStorage() {
+        const keys = Object.keys(localStorage);
+        const projectKeys = keys.filter(k => !k.startsWith('devos_') && !k.startsWith('settings_') && !k.startsWith('nexus_') && k !== 'vault_snippets');
+        if (confirm(`Wipe ALL project data (${projectKeys.length} keys)? IDE settings will remain.`)) {
+            projectKeys.forEach(k => localStorage.removeItem(k));
+            this.refreshStorageInspector();
+            this.refreshLivePreview();
+            this.log("Sandbox storage wiped.", "var(--danger)");
+        }
+    },
+
+    exportStorageToJSON() {
+        const data = {};
+        const keys = Object.keys(localStorage).filter(k => !k.startsWith('devos_') && !k.startsWith('settings_') && !k.startsWith('nexus_') && k !== 'vault_snippets');
+        keys.forEach(k => data[k] = localStorage.getItem(k));
+        const blob = new Blob([JSON.stringify(data, null, 4)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'project_data_export.json';
+        a.click();
+    },
+
+    // --- REINCORPORATED: Diff Comparator (diff.js) ---
+    initDiffViewer() {
+        const selectA = document.getElementById('diff-file-a');
+        const selectB = document.getElementById('diff-file-b');
+        if (!selectA || !selectB) return;
+
+        let optionsHTML = '';
+        Object.keys(this.state.vfs).forEach(filename => {
+            optionsHTML += `<option value="${filename}">📄 ${filename} (Live Version)</option>`;
+        });
+        
+        selectA.innerHTML = optionsHTML;
+        selectB.innerHTML = optionsHTML;
+        if (selectA.options.length > 0) selectA.selectedIndex = 0;
+        if (selectB.options.length > 1) selectB.selectedIndex = 1;
+    },
+
+    async executeDiff() {
+        if (!window.CodeMirror || !window.CodeMirror.MergeView) {
+            this.log("CodeMirror 5 MergeView not loaded.", "var(--danger)");
+            return;
+        }
+
+        const fileA = document.getElementById('diff-file-a').value;
+        const fileB = document.getElementById('diff-file-b').value;
+        const container = document.getElementById('diff-container');
+        if (!fileA || !fileB || !container) return;
+
+        const contentA = this.state.vfs[fileA] || '';
+        const contentB = this.state.vfs[fileB] || '';
+
+        container.innerHTML = '';
+        
+        let mode = 'javascript';
+        if (fileA.includes('.html') || fileB.includes('.html')) mode = 'htmlmixed';
+        if (fileA.includes('.css') || fileB.includes('.css')) mode = 'css';
+
+        this.state.diffEditorInstance = window.CodeMirror.MergeView(container, {
+            value: contentB,       // Modified version goes on the Right
+            origLeft: null, 
+            orig: contentA,        // Original version goes on the Left
+            lineNumbers: true,
+            mode: mode,
+            theme: 'dracula',
+            highlightDifferences: true,
+            connect: 'align',
+            collapseIdentical: false,
+            revertButtons: false
+        });
+
+        // Ensure proper sizing within flexbox
+        if (this.state.diffEditorInstance.edit && this.state.diffEditorInstance.right) {
+            this.state.diffEditorInstance.edit.setSize("100%", "100%");
+            this.state.diffEditorInstance.right.orig.setSize("100%", "100%");
+        }
     },
 
     updateProjectStats() {
@@ -275,7 +392,6 @@ window.Nexus = {
                 window.CM6.EditorView.updateListener.of((v) => {
                     if (v.docChanged && this.state.activeFile) {
                         this.state.vfs[this.state.activeFile] = v.state.doc.toString();
-                        
                         clearTimeout(this.state.autoSaveTimer);
                         this.state.autoSaveTimer = setTimeout(() => this.saveVFS(), 1500);
                     }
@@ -322,22 +438,17 @@ window.Nexus = {
         }
     },
 
-    log(msg, color = "var(--text)") {
-        console.log(`[Nexus] ${msg}`);
-    },
-
+    log(msg, color = "var(--text)") { console.log(`[Nexus] ${msg}`); },
     showModal(title, html) {
         const overlay = document.getElementById('modal-overlay');
         document.getElementById('modal-title').innerText = title;
         document.getElementById('modal-body').innerHTML = html;
         overlay.style.display = 'flex';
     },
-
     closeModal() {
         const overlay = document.getElementById('modal-overlay');
         if (overlay) overlay.style.display = 'none';
     },
-
     toggleSidebar(force) {
         const s = document.getElementById('sidebar');
         if (s) s.classList.toggle('active', force);
@@ -396,9 +507,7 @@ window.Nexus = {
                 this.state.vfs = {};
                 this.state.activeFile = null;
                 if (this.state.cm) {
-                    this.state.cm.dispatch({
-                        changes: { from: 0, to: this.state.cm.state.doc.length, insert: "// Workspace wiped.\\n" }
-                    });
+                    this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: "// Workspace wiped.\\n" } });
                 }
                 this.renderExplorer();
                 const display = document.getElementById('active-file-display');
@@ -435,14 +544,88 @@ window.Nexus = {
             else if (ext === 'css') formatted = css_beautify(code, { indent_size: 4 });
             
             if (formatted !== code) {
-                this.state.cm.dispatch({
-                    changes: { from: 0, to: code.length, insert: formatted }
-                });
+                this.state.cm.dispatch({ changes: { from: 0, to: code.length, insert: formatted } });
                 this.saveVFS();
             }
         } catch (err) {
             console.error(`Format Error: ${err.message}`);
         }
+    },
+
+    // --- REINCORPORATED: Component Generator (build-tools.js) ---
+    generateComponent() {
+        const name = prompt("Enter Component Name (e.g. 'BetSelector'):");
+        if (!name) return;
+        const lowerName = name.toLowerCase();
+        
+        this.state.vfs[`${lowerName}.html`] = `<div id="${lowerName}-container">\n    \n</div>`;
+        this.state.vfs[`${lowerName}.js`] = `// ${name} Logic\nfunction init${name}() {\n    console.log('${name} Initialized');\n}`;
+        this.state.vfs[`${lowerName}.css`] = `#${lowerName}-container {\n    padding: 10px;\n}`;
+
+        this.saveVFS();
+        this.renderExplorer();
+        this.loadFile(`${lowerName}.js`);
+        this.switchTab('editor');
+        this.log(`Component ${name} generated.`, "var(--success)");
+    },
+
+    // --- REINCORPORATED: Production Bundler (build-tools.js) ---
+    async minifyJS(code) {
+        if (typeof Terser === 'undefined') {
+            this.log("Terser not loaded. Exporting unminified JS.", "var(--warn)");
+            return code;
+        }
+        try {
+            const result = await Terser.minify(code, {
+                mangle: true,
+                compress: { dead_code: true, drop_console: false, drop_debugger: true }
+            });
+            return result.code;
+        } catch (err) {
+            throw err;
+        }
+    },
+
+    async buildForProduction() {
+        if (!window.JSZip) return alert("JSZip not loaded.");
+        this.log("Starting Production Build...", "var(--gold)");
+        
+        const zip = new JSZip();
+        const buildFolder = zip.folder("production_build");
+
+        const jsFiles = Object.keys(this.state.vfs).filter(f => f.endsWith('.js'));
+        const cssFiles = Object.keys(this.state.vfs).filter(f => f.endsWith('.css'));
+        const otherFiles = Object.keys(this.state.vfs).filter(f => !f.endsWith('.js') && !f.endsWith('.css'));
+
+        for (const file of jsFiles) {
+            try {
+                const minified = await this.minifyJS(this.state.vfs[file]);
+                buildFolder.file(file, minified);
+            } catch (err) {
+                console.error(`Minification failed for ${file}:`, err);
+                buildFolder.file(file, this.state.vfs[file]);
+            }
+        }
+
+        for (const file of cssFiles) {
+            const minifiedCss = this.state.vfs[file].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
+            buildFolder.file(file, minifiedCss);
+        }
+
+        for (const file of otherFiles) {
+            buildFolder.file(file, this.state.vfs[file]);
+        }
+
+        const content = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(content);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `DevOS_Build_${Date.now()}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        
+        this.log("Production Build Downloaded.", "var(--success)");
     },
 
     // --- Rollup & Zip ---
@@ -495,7 +678,6 @@ window.Nexus = {
                 <input type="text" id="merger-output-name" placeholder="Output filename (e.g. bundled.js)" style="padding:10px; background:#000; border:1px solid var(--border); color:var(--success); border-radius:6px; font-family:monospace;">
                 <div style="display:flex; gap:10px; margin-top:10px;">
                     <button class="btn-purple" style="flex:1;" onclick="Nexus.executeMerge()">Merge Selected</button>
-                    <button class="btn-success" style="flex:1;" onclick="Nexus.downloadProjectZip()">Download ZIP</button>
                 </div>
                 <div id="merger-status" style="margin-top:10px; font-weight:bold; font-size:12px; text-align:center;"></div>
             </div>
@@ -557,19 +739,5 @@ window.Nexus = {
             statusEl.innerText = `Merge Error: ${err.message}`; 
             console.error(err);
         }
-    },
-
-    async downloadProjectZip() {
-        if (!window.JSZip) return;
-        try {
-            const zip = new JSZip();
-            Object.keys(this.state.vfs).forEach(filename => zip.file(filename, this.state.vfs[filename]));
-            const blob = await zip.generateAsync({ type: "blob" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = 'DevOS-Project.zip';
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        } catch (err) { alert(err.message); }
     }
 };
