@@ -9,10 +9,11 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
     
     <script src="https://unpkg.com/@rollup/browser@3.29.4/dist/rollup.browser.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -54,7 +55,7 @@
         }
         .tabs-ribbon::-webkit-scrollbar { display: none; }
         
-        /* Buttons & Tabs */
+        /* Ribbon & Generic Buttons */
         .tool-btn {
             background: var(--surface); color: var(--text); border: 1px solid var(--border);
             padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; white-space: nowrap;
@@ -64,10 +65,17 @@
         .tab-btn { padding: 8px 12px; background: #000; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; color: var(--muted); }
         .tab-btn.active-tab { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-        .btn-blue { border-color: var(--accent); color: var(--accent); }
-        .btn-green { background: var(--success); color: #fff; border-color: var(--success); }
-        .btn-purple { background: var(--purple); color: #fff; border-color: var(--purple); }
-        .btn-red { border-color: var(--danger); color: var(--danger); }
+        /* Chunky Old-School Functional Buttons */
+        .btn-primary { background: var(--accent); color: white; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-danger { background: var(--danger); color: white; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-warn { background: var(--gold); color: #000; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-success { background: var(--success); color: white; border: none; padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+        .btn-outline { background: #21262d; color: var(--text); border: 1px solid var(--border); padding: 10px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; text-align: center; }
+
+        .btn-blue-outline { border-color: var(--accent); color: var(--accent); background: transparent; }
+        .btn-green-outline { border-color: var(--success); color: var(--success); background: transparent; }
+        .btn-purple-outline { border-color: var(--purple); color: var(--purple); background: transparent; }
+        .btn-red-outline { border-color: var(--danger); color: var(--danger); background: transparent; }
 
         /* --- WORKSPACE --- */
         .workspace { display: flex; flex: 1; overflow: hidden; position: relative; width: 100%; }
@@ -102,10 +110,6 @@
         .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; flex-shrink: 0; cursor: pointer; }
 
         /* --- PREVIEW & MODULES --- */
-        #live-preview-frame { width: 100%; flex: 1; border: none; background: #fff; }
-        #ghost-console { height: 150px; background: rgba(0,0,0,0.9); border-top: 2px solid var(--accent); color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; flex-shrink: 0; }
-        .preview-controls { padding: 8px; background: var(--panel); display: flex; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-
         .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); cursor: pointer; }
 
         /* Modals */
@@ -125,23 +129,23 @@
         <div style="font-weight: bold; font-size: 16px;">DevOS <span id="active-file-display" style="color:var(--accent); font-size:12px; margin-left:8px;">No File Selected</span></div>
     </div>
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-        <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ CMD</button>
-        <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ FMT</button>
+        <button class="tool-btn btn-blue-outline" onclick="Nexus.toggleCMD()">⚡ CMD</button>
         
         <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
         <button class="tool-btn" onclick="document.getElementById('zip-upload-input').click()">📁 LOAD</button>
         
-        <button class="tool-btn btn-purple" onclick="Nexus.openAdvancedMerger()">📦 MERGE</button>
-        <button class="tool-btn btn-green" onclick="Nexus.saveVFS()">💾 SAVE</button>
+        <button class="tool-btn btn-purple-outline" onclick="Nexus.openAdvancedMerger()">📦 MERGE</button>
+        <button class="tool-btn btn-green-outline" onclick="Nexus.saveVFS()">💾 SAVE</button>
     </div>
 </header>
 
 <div class="tabs-ribbon">
     <button class="tab-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">1. Code</button>
     <button class="tab-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">2. Sandbox</button>
-    <button class="tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">3. Visual Labs</button>
-    <button class="tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">4. Intel</button>
-    <button class="tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">5. Time</button>
+    <button class="tab-btn" id="tab-btn-diagnostic" onclick="Nexus.switchTab('diagnostic')">3. Inspector</button>
+    <button class="tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">4. Visual Labs</button>
+    <button class="tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">5. Intel</button>
+    <button class="tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">6. Time</button>
 </div>
 
 <div class="workspace">
@@ -157,8 +161,8 @@
         </div>
         <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
         <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
-            <button class="tool-btn btn-blue" onclick="Nexus.exportForAI()">🤖 Export AI Context</button>
-            <button class="tool-btn btn-red" onclick="Nexus.clearWorkspace()">🗑️ Wipe Workspace</button>
+            <button class="tool-btn btn-blue-outline" onclick="Nexus.exportForAI()">🤖 Export AI Context</button>
+            <button class="tool-btn btn-red-outline" onclick="Nexus.clearWorkspace()">🗑️ Wipe Workspace</button>
         </div>
     </aside>
 
@@ -167,20 +171,39 @@
         <div id="mobile-soft-keys"></div>
     </div>
 
-    <div id="preview-view" class="view-panel">
-        <div class="preview-controls">
-            <button class="tool-btn btn-green" onclick="Nexus.refreshLivePreview()">▶ REBUILD & RUN</button>
-            <select class="tool-btn" id="preview-size" onchange="Nexus.resizePreview(this.value)">
-                <option value="100%">Full Screen</option>
-                <option value="375px">iPhone SE</option>
-                <option value="414px">iPhone Pro</option>
-            </select>
-            <span id="fps-counter" style="font-size:10px; color:var(--success); font-weight:bold; margin-left:auto;">0 FPS</span>
+    <div id="preview-view" class="view-panel" style="padding: 0; background: transparent; border: none;">
+        <div style="padding: 10px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <strong style="color: var(--success)">Sandbox Environment</strong>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <select class="tool-btn" id="preview-size" onchange="Nexus.resizePreview(this.value)">
+                    <option value="100%">Full Screen</option>
+                    <option value="375px">iPhone SE</option>
+                    <option value="414px">iPhone Pro</option>
+                </select>
+                <button class="btn-danger" style="padding: 6px 12px;" onclick="Nexus.stopSandbox()">⏹ STOP</button>
+                <button class="btn-success" style="padding: 6px 12px;" onclick="Nexus.refreshLivePreview()">▶ REBUILD & RUN</button>
+            </div>
         </div>
         <div style="flex:1; background:#000; display:flex; justify-content:center; overflow:hidden;">
-            <iframe id="live-preview-frame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+            <iframe id="live-preview-frame" sandbox="allow-scripts allow-modals allow-same-origin" style="width:100%; height:100%; border:none; background:#fff; transition: width 0.3s;"></iframe>
         </div>
-        <div id="ghost-console"></div>
+        <div id="ghost-console" style="height: 150px; background: #000; color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; border-top: 2px solid #333; flex-shrink:0;">Console ready. Hit Rebuild & Run to launch.<br></div>
+    </div>
+
+    <div id="diagnostic-view" class="view-panel" style="padding: 15px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin:0; color:var(--danger)">Diagnostics Hub</h3>
+            <div style="display: flex; gap: 6px;">
+                <button class="btn-outline" onclick="Nexus.copyDiagnostics()">📋 Copy</button>
+                <button class="btn-success" onclick="Nexus.autoFixCurrentFile()">🔧 FIX</button>
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap;">
+            <button class="btn-danger" style="flex: 1; min-width: 30%;" onclick="Nexus.runLinter()">1. LINT FILE</button>
+            <button class="btn-warn" style="flex: 1; min-width: 30%;" onclick="Nexus.runDependencyCheck()">2. SCAN IMPORTS</button>
+            <button class="btn-primary" style="flex: 1; min-width: 30%;" onclick="Nexus.beautifyCode()">3. FORMAT FILE</button>
+        </div>
+        <div id="diagnostic-results" style="flex: 1; background:#000; border:1px solid var(--border); border-radius:6px; overflow-y:auto; padding:12px; font-family:monospace; font-size:12px; white-space: pre-wrap;"></div>
     </div>
 
     <div id="visual-view" class="view-panel" style="padding:20px;">
@@ -213,8 +236,8 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <span style="color:var(--accent); font-weight:bold;">NEXUS INJECTOR</span>
             <div style="display:flex; gap:8px;">
-                <button class="tool-btn btn-green" onclick="Nexus.runCMD()">EXECUTE</button>
-                <button class="tool-btn" onclick="Nexus.toggleCMD()">CLOSE</button>
+                <button class="btn-success" onclick="Nexus.runCMD()">EXECUTE</button>
+                <button class="btn-outline" onclick="Nexus.toggleCMD()">CLOSE</button>
             </div>
         </div>
         <textarea id="cmd-input" placeholder="// Paste script to edit VFS..." style="flex:1; background:#000; color:#22c55e; border:1px solid var(--border); padding:12px; font-family:monospace; font-size:14px; outline:none;"></textarea>
