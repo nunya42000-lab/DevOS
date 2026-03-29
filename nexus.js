@@ -183,3 +183,35 @@ window.Nexus = {
     compareFiles() { this.log("Compare module standby.", "var(--accent)"); },
     nukeSystem() { if(confirm("Wipe all local VFS data?")) { this.state.vfs = {}; location.reload(); } }
 };
+Nexus.bundleToSingleFile = function() {
+    this.log("Initiating full system bundle...", "var(--gold)");
+    
+    // 1. Get the base HTML structure
+    let bundledHTML = this.state.vfs['index.html'] || document.documentElement.outerHTML;
+
+    // 2. Inline all CSS from VFS
+    let styles = "";
+    Object.keys(this.state.vfs).filter(f => f.endsWith('.css')).forEach(file => {
+        styles += `\n/* Source: ${file} */\n${this.state.vfs[file]}\n`;
+    });
+    bundledHTML = bundledHTML.replace(/<link.*rel="stylesheet".*>/g, ''); // Remove external links
+    bundledHTML = bundledHTML.replace('</head>', `<style>${styles}</style>\n</head>`);
+
+    // 3. Inline all JS from VFS (excluding the Service Worker)
+    let scripts = "";
+    Object.keys(this.state.vfs).filter(f => f.endsWith('.js') && f !== 'sw.js').forEach(file => {
+        scripts += `\n// Source: ${file}\n${this.state.vfs[file]}\n`;
+    });
+    bundledHTML = bundledHTML.replace(/<script.*src=".*".*><\/script>/g, ''); // Remove external scripts
+    bundledHTML = bundledHTML.replace('</body>', `<script type="module">${scripts}</script>\n</body>`);
+
+    // 4. Trigger Download
+    const blob = new Blob([bundledHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Nexus_Prime_Standalone.html';
+    a.click();
+    
+    this.log("Bundle Complete: Standalone file generated.", "var(--success)");
+};
