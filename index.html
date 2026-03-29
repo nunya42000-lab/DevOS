@@ -9,6 +9,7 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
@@ -87,11 +88,11 @@
         #editor-wrapper { flex: 1; position: relative; overflow: hidden; background: #000; }
         .cm-editor { height: 100%; width: 100%; outline: none !important; }
         
-        #mobile-soft-keys { display: flex; overflow-x: auto; padding: 6px; background: var(--panel); gap: 6px; border-top: 1px solid var(--border); flex-shrink: 0; scrollbar-width: none; }
+        #mobile-soft-keys { display: flex; overflow-x: auto; padding: 6px; background: var(--panel); gap: 6px; border-top: 1px solid var(--border); flex-shrink: 0; scrollbar-width: none; scroll-behavior: smooth; }
         #mobile-soft-keys::-webkit-scrollbar { display: none; }
-        .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; flex-shrink: 0; cursor: pointer; }
+        .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; flex-shrink: 0; cursor: pointer; min-width: 45px; text-align: center; }
 
-        .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); cursor: pointer; }
+        .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); }
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; }
         .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 550px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 8px; }
         
@@ -99,7 +100,6 @@
         .search-hit { padding: 8px 5px; cursor: pointer; border-bottom: 1px solid var(--border); }
         .search-hit:hover { background: var(--surface); }
 
-        /* CodeMirror 5 Diff Viewer Overrides */
         .CodeMirror-merge, .CodeMirror-merge .CodeMirror { height: 100%; border: none; }
     </style>
 </head>
@@ -118,7 +118,6 @@
         
         <button class="tool-btn btn-purple-outline" onclick="Nexus.openAdvancedMerger()">📦 MERGE</button>
         <button class="tool-btn btn-green-outline" onclick="Nexus.saveVFS()">💾 SAVE</button>
-        
         <button class="tool-btn btn-warn" onclick="Nexus.buildForProduction()">🚀 BUILD</button>
     </div>
 </header>
@@ -143,8 +142,10 @@
             <div id="search-results-tree"></div>
         </div>
         <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
+        
         <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
-            <button class="tool-btn btn-blue-outline" onclick="Nexus.exportForAI()">🤖 Export AI Context</button>
+            <button class="tool-btn btn-purple-outline" onclick="Nexus.initSync()">📡 Start Peer Sync</button>
+            <button class="tool-btn btn-blue-outline" onclick="Nexus.connectSync()">🔗 Connect to Peer</button>
             <button class="tool-btn btn-green-outline" onclick="Nexus.generateComponent()">🧩 New Component</button>
             <button class="tool-btn btn-red-outline" onclick="Nexus.clearWorkspace()">🗑️ Wipe Workspace</button>
         </div>
@@ -202,9 +203,26 @@
         </div>
     </div>
 
-    <div id="visual-view" class="view-panel" style="padding:20px;">
+    <div id="visual-view" class="view-panel" style="padding:20px; overflow-y:auto;">
         <h2 style="margin-top:0; color:var(--accent);">Visual Creative Labs</h2>
-        <div class="tool-card"><h3>⚙️ State Machine</h3><p style="font-size:12px; color:#888;">Generate logic blocks for IDLE, WIN, LOSE, and Upside Down states.</p></div>
+        
+        <div class="tool-card">
+            <h3 style="margin-top:0; color:var(--success);">⚙️ State Machine</h3>
+            <p style="font-size:12px; color:#888;">Generate logic blocks for IDLE, WIN, LOSE, and Upside Down states.</p>
+            <button class="btn-outline" style="width:100%;" onclick="Nexus.generateStateMachine()">Build State Skeleton</button>
+        </div>
+
+        <div class="tool-card">
+            <h3 style="margin-top:0; color:var(--gold);">🖼️ Sprite Slicer</h3>
+            <p style="font-size:12px; color:#888;">Upload an image, map sizes, and generate CSS grids automatically.</p>
+            <input type="file" id="sprite-upload" accept="image/*" style="margin-bottom:10px; color:white; width: 100%;" onchange="Nexus.handleSpriteUpload(event)">
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input type="number" id="sprite-w" placeholder="Width (e.g. 32)" class="tool-btn" style="flex:1;">
+                <input type="number" id="sprite-h" placeholder="Height (e.g. 32)" class="tool-btn" style="flex:1;">
+            </div>
+            <canvas id="sprite-canvas-tool" style="max-width:100%; border:1px dashed var(--border); margin-bottom:10px; background:#000;"></canvas>
+            <button class="btn-primary" style="width:100%;" onclick="Nexus.generateSpriteCSS()">Generate Sprite CSS</button>
+        </div>
     </div>
 
     <div id="intel-view" class="view-panel" style="padding:20px;">
@@ -215,7 +233,6 @@
     <div id="time-view" class="view-panel" style="padding:20px; display:flex; flex-direction:column;">
         <h2 style="margin-top:0; color:var(--purple);">Time Machine & Diff Viewer</h2>
         <div id="history-list"></div>
-        
         <div style="margin-top:20px; border-top: 1px solid var(--border); padding-top:15px; flex:1; display:flex; flex-direction:column;">
             <div style="display: flex; gap: 10px; margin-bottom:10px;">
                 <select id="diff-file-a" class="tool-btn" style="flex:1;"></select>
