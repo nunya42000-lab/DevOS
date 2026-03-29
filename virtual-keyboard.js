@@ -48,3 +48,35 @@
         kb.appendChild(btn);
     }
 };
+window.VirtualKeyboard = {
+    render(keys) {
+        const kb = document.getElementById('kb-drawer');
+        kb.innerHTML = '';
+        
+        // Triple the keys to ensure seamless looping
+        const tripleKeys = [...keys, ...keys, ...keys];
+        
+        tripleKeys.forEach((key, index) => {
+            const btn = document.createElement('button');
+            btn.className = 'kb-item tool-btn';
+            btn.innerText = key;
+            btn.onclick = () => window.Nexus.type(key);
+            kb.appendChild(btn);
+        });
+
+        // Loop detection logic
+        kb.onscroll = () => {
+            const itemWidth = 70; // width + margin
+            const totalWidth = keys.length * itemWidth;
+            
+            if (kb.scrollLeft >= totalWidth * 2) {
+                kb.scrollLeft = totalWidth; // Reset to middle
+            } else if (kb.scrollLeft <= 0) {
+                kb.scrollLeft = totalWidth; // Reset to middle
+            }
+        };
+
+        // Initialize at the middle set of keys
+        setTimeout(() => kb.scrollLeft = keys.length * 70, 10);
+    }
+};
