@@ -8,7 +8,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
-
+    <script src="https://unpkg.com/@rollup/browser@4.13.0/dist/rollup.browser.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    
     <script type="module">
         import { EditorView, basicSetup } from "https://esm.sh/codemirror@6.0.1";
         import { javascript } from "https://esm.sh/@codemirror/lang-javascript@6.2.1";
@@ -53,6 +55,7 @@
         .btn-green { border-color: var(--success); color: var(--success); }
         .btn-gold { border-color: var(--gold); color: var(--gold); }
         .btn-red { border-color: var(--danger); color: var(--danger); }
+        .btn-purple { border-color: var(--purple); color: var(--purple); }
 
         #editor-wrapper { flex: 1; background: #000; position: relative; }
         .cm-editor { height: 100%; }
@@ -90,8 +93,10 @@
         </div>
         <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
         <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
-            <button class="tool-btn btn-blue" onclick="Nexus.openMerger()">⚡ Smart Merge</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.saveVFS()">💾 Persist Changes</button>
+            <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
+            <button class="tool-btn btn-gold" onclick="document.getElementById('zip-upload-input').click()">📁 Load ZIP</button>
+            <button class="tool-btn btn-purple" onclick="Nexus.openMerger()">⚡ PWA Merger</button>
+            <button class="tool-btn btn-green" onclick="Nexus.saveVFS()">💾 Persist Changes</button>
         </div>
     </aside>
 
@@ -99,7 +104,7 @@
         <div class="toolbar-viewport">
             <div class="toolbar-track">
                 <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Files</button>
-                <button class="tool-btn btn-accent" onclick="Nexus.toggleCMD()">⚡ CMD</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ CMD</button>
                 <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ Format</button>
                 <button class="tool-btn btn-green" onclick="Nexus.openIntel()">🧠 Intel</button>
                 <button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
@@ -184,42 +189,190 @@ window.Nexus = {
         this.log(`Editing: ${filename}`, "var(--accent)");
     },
 
-    // --- Smart Merger (Multi-File Handling) ---
-    openMerger() {
-        const html = `
-            <div style="font-size:12px; color:var(--text); margin-bottom:10px;">
-                Paste blocks with <b>/* FILE: filename.js */</b> to auto-inject into VFS.
-            </div>
-            <textarea id="merger-input" style="width:100%; height:200px; background:#000; color:#22c55e; font-family:monospace; padding:10px; border:1px solid var(--border);"></textarea>
-            <button class="tool-btn btn-blue" style="width:100%; margin-top:10px;" onclick="Nexus.smartMerge()">Process Multi-Patch</button>`;
-        this.showModal("⚡ Smart Injector", html);
-    },
-
-    smartMerge() {
-        const input = document.getElementById('merger-input').value;
-        if (!input) return;
-
-        // Split code by file markers
-        const blocks = input.split(/\/\*\s*FILE:\s*([\w\.-]+)\s*\*\//);
-        
-        if (blocks.length === 1) {
-            // No markers found, just insert into active file or create new
-            const name = this.state.activeFile || "patch_" + Date.now() + ".js";
-            this.state.vfs[name] = input;
-            this.log(`Patched ${name}`, "var(--success)");
-        } else {
-            // Process named blocks
-            for (let i = 1; i < blocks.length; i += 2) {
-                const filename = blocks[i].trim();
-                const content = blocks[i+1].trim();
-                this.state.vfs[filename] = content;
-                this.log(`Auto-Injected: ${filename}`, "var(--success)");
+    deleteFile(filename) {
+        delete this.state.vfs[filename];
+        if (this.state.activeFile === filename) {
+            this.state.activeFile = null;
+            if (this.state.cm) {
+                this.state.cm.dispatch({
+                    changes: { from: 0, to: this.state.cm.state.doc.length, insert: "// Select a file to start coding.\n" }
+                });
             }
         }
-        
         this.renderExplorer();
-        this.closeModal();
         this.saveVFS();
+        this.log(`Deleted ${filename}`, "var(--danger)");
+    },
+
+    // --- Advanced PWA Merger & Packager ---
+
+    async loadZipToVFS(file) {
+        if (!file) return;
+        if (!window.JSZip) return this.log("[Error] JSZip not loaded. Check connection.", "var(--danger)");
+        
+        this.log("Unpacking ZIP into Nexus VFS...", "var(--gold)");
+        try {
+            const zip = new JSZip();
+            const contents = await zip.loadAsync(file);
+            let loaded = 0;
+            
+            const promises = [];
+            contents.forEach((relativePath, zipEntry) => {
+                if (!zipEntry.dir && !relativePath.includes('__MACOSX')) {
+                    promises.push(
+                        zipEntry.async('string').then(text => {
+                            this.state.vfs[relativePath] = text;
+                            loaded++;
+                        })
+                    );
+                }
+            });
+            
+            await Promise.all(promises);
+            this.renderExplorer();
+            this.log(`Successfully imported ${loaded} files from ZIP.`, "var(--success)");
+            document.getElementById('zip-upload-input').value = ''; // Reset input
+        } catch (err) {
+            this.log(`[ZIP Error] ${err.message}`, "var(--danger)");
+        }
+    },
+
+    openMerger() {
+        const vfsFiles = Object.keys(this.state.vfs).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
+        
+        let fileListHtml = vfsFiles.length > 0 
+            ? vfsFiles.map(f => `
+                <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--border);">
+                    <label style="color:var(--text); font-size:14px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+                        <input type="checkbox" class="merger-checkbox" value="${f}" style="width:18px; height:18px; accent-color:var(--accent);">
+                        ${f}
+                    </label>
+                </div>
+            `).join('')
+            : '<div style="padding:10px; color:var(--danger);">No JS files found in VFS. Load some first!</div>';
+
+        const html = `
+            <div style="display:flex; flex-direction:column; gap:10px; height: 100%;">
+                <p style="color:var(--text); font-size:12px; margin:0;">Select files to merge together. Rollup will resolve dependencies directly from the Nexus VFS.</p>
+                
+                <div style="background:#000; border:1px solid var(--border); border-radius:6px; max-height:220px; overflow-y:auto; margin-bottom:10px;">
+                    ${fileListHtml}
+                </div>
+                
+                <input type="text" id="merger-output-name" placeholder="Output filename (e.g. bundled.js)" style="padding:10px; background:#000; border:1px solid var(--border); color:var(--success); border-radius:6px; font-family:monospace;">
+                
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button class="tool-btn btn-purple" style="flex:1; padding:12px; font-size:14px;" onclick="Nexus.executeMerge()">Merge Selected</button>
+                    <button class="tool-btn btn-green" style="flex:1; padding:12px; font-size:14px;" onclick="Nexus.downloadProjectZip()">Download Project ZIP</button>
+                </div>
+                <div id="merger-status" style="margin-top:10px; font-weight:bold; font-size:12px; text-align:center;"></div>
+            </div>
+        `;
+        
+        this.showModal("📦 PWA Studio Merger", html);
+    },
+
+    async executeMerge() {
+        const checkboxes = document.querySelectorAll('.merger-checkbox:checked');
+        const selectedFiles = Array.from(checkboxes).map(cb => cb.value);
+        let outName = document.getElementById('merger-output-name').value.trim();
+        const statusEl = document.getElementById('merger-status');
+
+        if (selectedFiles.length < 2) {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Error: Select at least 2 files to merge.";
+            return;
+        }
+        if (!outName) outName = 'merged-bundle.js';
+        if (!outName.endsWith('.js')) outName += '.js';
+
+        statusEl.style.color = "var(--accent)";
+        statusEl.innerText = "Analyzing dependencies & merging...";
+
+        try {
+            // Memory Plugin bridging Rollup directly to your Nexus VFS!
+            const memoryPlugin = {
+                name: 'nexus-vfs',
+                resolveId: (source, importer) => {
+                    let cleanName = source.replace(/^(\.\/|\.\.\/)+/, '').replace(/^\//, '');
+                    if (!cleanName.endsWith('.js') && !cleanName.endsWith('.mjs')) cleanName += '.js';
+                    
+                    if (this.state.vfs[cleanName]) return cleanName;
+                    return null;
+                },
+                load: (id) => {
+                    return this.state.vfs[id] || null;
+                }
+            };
+
+            // Create a temporary synthetic entry point to link the selected files
+            const syntheticEntry = selectedFiles.map(p => `export * from './${p}';\nimport './${p}';`).join('\n');
+            this.state.vfs['__nexus_synthetic__.js'] = syntheticEntry;
+
+            const bundle = await window.rollup.rollup({
+                input: '__nexus_synthetic__.js',
+                plugins: [memoryPlugin]
+            });
+
+            const { output } = await bundle.generate({ format: 'es' });
+            
+            // Save the merged code back into the Nexus IDE
+            this.state.vfs[outName] = output[0].code;
+            delete this.state.vfs['__nexus_synthetic__.js']; 
+            
+            // Refresh UI
+            this.renderExplorer();
+            this.loadFile(outName);
+            
+            statusEl.style.color = "var(--success)";
+            statusEl.innerText = `Successfully merged into ${outName}!`;
+            this.log(`[Merger] Created ${outName} from ${selectedFiles.length} files.`, "var(--success)");
+
+            checkboxes.forEach(cb => cb.checked = false);
+            this.saveVFS();
+        } catch (err) {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Merge Error (See Terminal)";
+            this.log(`[Merger Error] ${err.message}`, "var(--danger)");
+            console.error(err);
+        }
+    },
+
+    async downloadProjectZip() {
+        const statusEl = document.getElementById('merger-status');
+        if (!window.JSZip) {
+            this.log("[Error] JSZip not loaded.", "var(--danger)");
+            return;
+        }
+        
+        statusEl.style.color = "var(--gold)";
+        statusEl.innerText = "Packaging ZIP...";
+        
+        try {
+            const zip = new JSZip();
+            
+            Object.keys(this.state.vfs).forEach(filename => {
+                zip.file(filename, this.state.vfs[filename]);
+            });
+
+            const blob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'DevOS-Nexus-Project.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            statusEl.style.color = "var(--success)";
+            statusEl.innerText = "Project Downloaded!";
+            this.log("[Packager] Full project ZIP downloaded.", "var(--success)");
+        } catch (err) {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "ZIP generation failed.";
+            this.log(`[Packager Error] ${err.message}`, "var(--danger)");
+        }
     },
 
     // --- VFS & Persistence ---
@@ -232,8 +385,8 @@ window.Nexus = {
         }
         exp.innerHTML = keys.map(name => `
             <div class="explorer-item ${this.state.activeFile === name ? 'active' : ''}" onclick="Nexus.loadFile('${name}')">
-                <span style="font-size:12px;">${name}</span>
-                <button onclick="event.stopPropagation(); Nexus.deleteFile('${name}')" style="background:none; border:none; color:var(--danger);">🗑️</button>
+                <span style="font-size:12px; word-break: break-all;">${name}</span>
+                <button onclick="event.stopPropagation(); Nexus.deleteFile('${name}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>
             </div>
         `).join('');
     },
@@ -277,6 +430,7 @@ window.Nexus = {
     beautifyCode() { /* js-beautify logic */ },
     openIntel() { /* Analysis logic */ },
     nukeSystem() { if(confirm("Wipe cache?")) { localforage.clear(); location.reload(); } }
+
 };
 
 document.addEventListener('DOMContentLoaded', () => Nexus.boot());
