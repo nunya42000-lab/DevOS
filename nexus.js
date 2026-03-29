@@ -12,9 +12,7 @@ window.Nexus = {
 
     async boot() {
         console.log("Nexus Prime: Systems Online.");
-        this.initGestures();
-        this.verifyIntelligence();
-
+        
         const saved = await localforage.getItem('nexus_vfs_v4');
         if (saved) this.state.vfs = saved;
 
@@ -23,7 +21,12 @@ window.Nexus = {
             this.renderExplorer();
             this.initMobileSoftKeys();
             this.initSearch();
-            this.initPreviewHooks();
+            
+            // Ensure UI shows the loaded file
+            if (this.state.vfs[this.state.activeFile]) {
+                document.getElementById('active-file-display').innerText = this.state.activeFile;
+            }
+            
             this.log("DevOS Nexus Prime Initialized.", "var(--success)");
         });
     },
@@ -31,7 +34,7 @@ window.Nexus = {
     // --- Layout & View Switching ---
     switchTab(tabId) {
         // Update Buttons
-        document.querySelectorAll('.navbar .tool-btn').forEach(b => b.classList.remove('active-tab'));
+        document.querySelectorAll('.tabs-ribbon .tab-btn').forEach(b => b.classList.remove('active-tab'));
         const btn = document.getElementById(`tab-btn-${tabId}`);
         if (btn) btn.classList.add('active-tab');
 
@@ -94,13 +97,12 @@ window.Nexus = {
 
         ghost.innerHTML = ''; 
         
-        const html = this.state.vfs['index.html'] || '<div style="color:white; padding:20px;">No index.html found.</div>';
+        const html = this.state.vfs['index.html'] || '<div style="color:black; padding:20px;">No index.html found.</div>';
         
-        // If main.js exists, load it. If not, load whatever the active file is (for isolated testing)
         let jsToLoad = "";
         if (this.state.vfs['main.js']) {
             jsToLoad = this.state.vfs['main.js'];
-        } else if (this.state.activeFile.endsWith('.js')) {
+        } else if (this.state.activeFile && this.state.activeFile.endsWith('.js')) {
             jsToLoad = this.state.vfs[this.state.activeFile];
         }
         
@@ -115,7 +117,6 @@ window.Nexus = {
                     div.style.paddingBottom = '4px';
                     div.style.marginBottom = '4px';
                     
-                    // Convert objects to strings safely
                     const msg = Array.from(args).map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ');
                     div.innerText = "[" + type.toUpperCase() + "] " + msg;
                     ghost.appendChild(div);
@@ -136,7 +137,7 @@ window.Nexus = {
             <!DOCTYPE html>
             <html>
             <head>
-                <style>body { background: #000; color: #fff; font-family: sans-serif; }</style>
+                <style>body { margin: 0; padding: 0; font-family: sans-serif; }</style>
             </head>
             <body>
                 ${html}
@@ -149,28 +150,98 @@ window.Nexus = {
         const blob = new Blob([fullHTML], {type: 'text/html'});
         frame.src = URL.createObjectURL(blob);
     },
+    
+    stopSandbox() {
+        const frame = document.getElementById('live-preview-frame');
+        const consoleOut = document.getElementById('ghost-console');
+        if (frame) frame.src = 'about:blank';
+        if (consoleOut) {
+            consoleOut.innerHTML += '<div style="color:var(--warn); margin-bottom:4px;">> Sandbox execution stopped manually.</div>';
+            consoleOut.scrollTop = consoleOut.scrollHeight;
+        }
+    },
 
     resizePreview(width) {
         const frame = document.getElementById('live-preview-frame');
         if (frame) {
             frame.style.width = width;
-            // Center it if it's smaller than full width
             frame.style.margin = width === '100%' ? '0' : '0 auto';
         }
     },
 
-    initPreviewHooks() {
-        let last = performance.now();
-        const fpsCounter = document.getElementById('fps-counter');
-        if (!fpsCounter) return;
+    // --- Diagnostics Hub ---
+    runLinter() {
+        if(!this.state.activeFile || !this.state.cm) return;
+        const code = this.state.cm.state.doc.toString();
+        const ext = this.state.activeFile.split('.').pop().toLowerCase();
+        let html = '';
 
-        function track() {
-            let now = performance.now();
-            fpsCounter.innerText = Math.round(1000/(now-last)) + " FPS";
-            last = now;
-            requestAnimationFrame(track);
+        if (ext === 'js') {
+            if (typeof JSHINT === 'undefined') {
+                document.getElementById('diagnostic-results').innerHTML = '<div style="color:var(--danger)">JSHint library failed to load. Check network.</div>';
+                return;
+            }
+            JSHINT(code, { esversion: 11, browser: true, module: true });
+            if (JSHINT.errors.length > 0) {
+                JSHINT.errors.forEach(e => { if (e) html += `<div style="color:var(--danger); margin-bottom:4px;">Line ${e.line}: ${e.reason}</div>`; });
+            }
+        } else if (ext === 'json') {
+            try { JSON.parse(code); } 
+            catch (e) { html += `<div style="color:var(--danger)">JSON Error: ${e.message}</div>`; }
+        } else if (ext === 'html') {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(code, "text/html");
+            const errors = doc.getElementsByTagName("parsererror");
+            if (errors.length > 0) html += `<div style="color:var(--danger)">HTML Error: ${errors[0].innerText}</div>`;
         }
-        requestAnimationFrame(track);
+
+        document.getElementById('diagnostic-results').innerHTML = html || '<div style="color:var(--success)">No syntax errors found. File is clean.</div>';
+    },
+
+    runDependencyCheck() {
+        let html = '';
+        let missingCount = 0;
+        const importRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:<script\s+.*?src=['"]([^'"]+)['"])|(?:<link\s+.*?href=['"]([^'"]+)['"])/g;
+
+        for (const [fn, code] of Object.entries(this.state.vfs)) {
+            let match;
+            while ((match = importRegex.exec(code)) !== null) {
+                let importedPath = match[1] || match[2] || match[3];
+                if (importedPath.startsWith('http') || importedPath.startsWith('//')) continue;
+                
+                importedPath = importedPath.replace(/^(\.\/|\.\.\/)+/, '').replace(/^\//, '');
+                
+                if (!this.state.vfs[importedPath]) {
+                    html += `<div style="color:var(--danger); margin-bottom:4px;">[Missing File] <strong>${fn}</strong> imports missing file: <em>${importedPath}</em></div>`;
+                    missingCount++;
+                }
+            }
+        }
+        document.getElementById('diagnostic-results').innerHTML = html || `<div style="color:var(--success)">Scan complete. All local dependency paths resolved.</div>`;
+    },
+
+    autoFixCurrentFile() {
+        if(!this.state.activeFile) return;
+        const ext = this.state.activeFile.split('.').pop().toLowerCase();
+        
+        if (ext === 'json') {
+            try {
+                const looseParse = new Function('return ' + this.state.cm.state.doc.toString())();
+                this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: JSON.stringify(looseParse, null, 4) } });
+                document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--success)">Strict JSON format applied.</div>`;
+                this.saveVFS();
+            } catch (e) {
+                document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--danger)">Failed to auto-fix JSON: ${e.message}</div>`;
+            }
+        } else {
+            this.beautifyCode();
+            document.getElementById('diagnostic-results').innerHTML = `<div style="color:var(--accent)">Auto-formatter applied. Check for missing structural closures.</div>`;
+        }
+    },
+
+    copyDiagnostics() {
+        const text = document.getElementById('diagnostic-results').innerText;
+        navigator.clipboard.writeText(text).then(() => this.log("Diagnostics copied to clipboard.", "var(--success)"));
     },
 
     updateProjectStats() {
@@ -205,7 +276,6 @@ window.Nexus = {
                     if (v.docChanged && this.state.activeFile) {
                         this.state.vfs[this.state.activeFile] = v.state.doc.toString();
                         
-                        // Auto-Save Throttle
                         clearTimeout(this.state.autoSaveTimer);
                         this.state.autoSaveTimer = setTimeout(() => this.saveVFS(), 1500);
                     }
@@ -233,26 +303,6 @@ window.Nexus = {
             selection: { anchor: pos + key.length }
         });
         this.state.cm.focus();
-    },
-
-    // --- Core Routing ---
-    executeCommand(cmd) {
-        const args = cmd.split(' ');
-        const command = args[0].toLowerCase();
-
-        switch(command) {
-            case 'merger':
-            case 'bundle':
-                this.openAdvancedMerger();
-                break;
-            default:
-                try {
-                    const out = new Function(`return ${cmd}`).bind(this)();
-                    this.log(out || "Executed", "var(--success)");
-                } catch(e) {
-                    this.log(e.message, "var(--danger)");
-                }
-        }
     },
 
     // --- UI Helpers ---
@@ -322,10 +372,12 @@ window.Nexus = {
         }
         this.toggleSidebar(false);
         this.renderExplorer();
+        
+        const display = document.getElementById('active-file-display');
+        if (display) display.innerText = filename;
     },
 
     deleteFile(filename) {
-        if (filename === "main.js") { alert("main.js protected."); return; }
         if (confirm(`Delete ${filename}?`)) {
             delete this.state.vfs[filename];
             if (this.state.activeFile === filename) this.loadFile("main.js");
@@ -338,7 +390,62 @@ window.Nexus = {
         await localforage.setItem('nexus_vfs_v4', this.state.vfs);
     },
 
-    // --- Rollup & Zip (Intact from previous iteration) ---
+    clearWorkspace() {
+        if (confirm("Permanently wipe all files and data? This cannot be undone.")) {
+            localforage.clear().then(() => {
+                this.state.vfs = {};
+                this.state.activeFile = null;
+                if (this.state.cm) {
+                    this.state.cm.dispatch({
+                        changes: { from: 0, to: this.state.cm.state.doc.length, insert: "// Workspace wiped.\\n" }
+                    });
+                }
+                this.renderExplorer();
+                const display = document.getElementById('active-file-display');
+                if (display) display.innerText = "No File Selected";
+                this.saveVFS();
+                this.toggleSidebar(false);
+            });
+        }
+    },
+
+    // --- Utilities ---
+    exportForAI() {
+        let output = "DevOS Project Context\n\n";
+        for (const [name, code] of Object.entries(this.state.vfs)) {
+            output += `\n--- File: ${name} ---\n${code}\n`;
+        }
+        const blob = new Blob([output], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "Nexus_AI_Context.txt";
+        a.click();
+    },
+
+    beautifyCode() {
+        if (!this.state.activeFile || !this.state.cm) return;
+        
+        const code = this.state.cm.state.doc.toString();
+        const ext = this.state.activeFile.split('.').pop().toLowerCase();
+        let formatted = code;
+        
+        try {
+            if (ext === 'js' || ext === 'json') formatted = js_beautify(code, { indent_size: 4, space_in_empty_paren: true });
+            else if (ext === 'html') formatted = html_beautify(code, { indent_size: 4, wrap_line_length: 120 });
+            else if (ext === 'css') formatted = css_beautify(code, { indent_size: 4 });
+            
+            if (formatted !== code) {
+                this.state.cm.dispatch({
+                    changes: { from: 0, to: code.length, insert: formatted }
+                });
+                this.saveVFS();
+            }
+        } catch (err) {
+            console.error(`Format Error: ${err.message}`);
+        }
+    },
+
+    // --- Rollup & Zip ---
     async loadZipToVFS(file) {
         if (!file) return;
         if (!window.JSZip) return alert("JSZip not loaded.");
@@ -387,8 +494,8 @@ window.Nexus = {
                 </div>
                 <input type="text" id="merger-output-name" placeholder="Output filename (e.g. bundled.js)" style="padding:10px; background:#000; border:1px solid var(--border); color:var(--success); border-radius:6px; font-family:monospace;">
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button class="tool-btn" style="background:var(--purple); color:white; flex:1;" onclick="Nexus.executeMerge()">Merge Selected</button>
-                    <button class="tool-btn" style="background:var(--success); color:white; flex:1;" onclick="Nexus.downloadProjectZip()">Download ZIP</button>
+                    <button class="btn-purple" style="flex:1;" onclick="Nexus.executeMerge()">Merge Selected</button>
+                    <button class="btn-success" style="flex:1;" onclick="Nexus.downloadProjectZip()">Download ZIP</button>
                 </div>
                 <div id="merger-status" style="margin-top:10px; font-weight:bold; font-size:12px; text-align:center;"></div>
             </div>
@@ -402,11 +509,18 @@ window.Nexus = {
         let outName = document.getElementById('merger-output-name').value.trim();
         const statusEl = document.getElementById('merger-status');
 
-        if (selectedFiles.length < 2) { statusEl.innerText = "Select at least 2 files."; return; }
+        if (selectedFiles.length < 2) { 
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Select at least 2 files."; 
+            return; 
+        }
+        
         if (!outName) outName = 'merged-bundle.js';
         if (!outName.endsWith('.js')) outName += '.js';
 
+        statusEl.style.color = "var(--accent)";
         statusEl.innerText = "Merging...";
+
         try {
             const memoryPlugin = {
                 name: 'nexus-vfs',
@@ -427,15 +541,20 @@ window.Nexus = {
             });
 
             const { output } = await bundle.generate({ format: 'es' });
+            
             this.state.vfs[outName] = output[0].code;
             delete this.state.vfs['__nexus_synthetic__.js']; 
             
             this.renderExplorer();
             this.loadFile(outName);
-            statusEl.innerText = `Success: ${outName}`;
+            
+            statusEl.style.color = "var(--success)";
+            statusEl.innerText = `Success: Created ${outName}`;
             this.saveVFS();
+            
         } catch (err) {
-            statusEl.innerText = "Error: See Console";
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = `Merge Error: ${err.message}`; 
             console.error(err);
         }
     },
@@ -452,86 +571,5 @@ window.Nexus = {
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
         } catch (err) { alert(err.message); }
-    },
-
-    initGestures() {
-        let startX;
-        document.addEventListener('touchstart', e => startX = e.touches[0].clientX);
-        document.addEventListener('touchend', e => {
-            const diff = e.changedTouches[0].clientX - startX;
-            if (startX < 50 && diff > 100) this.toggleSidebar(true);
-            if (diff < -100) this.toggleSidebar(false);
-        });
-    },
-    // --- Restored Utilities ---
-    exportForAI() {
-        let output = "DevOS Project Context\n\n";
-        for (const [name, code] of Object.entries(this.state.vfs)) {
-            output += `\n--- File: ${name} ---\n${code}\n`;
-        }
-        const blob = new Blob([output], { type: "text/plain" });
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "Nexus_AI_Context.txt";
-        a.click();
-        this.log("AI Context exported.", "var(--success)");
-    },
-
-    beautifyCode() {
-        if (!this.state.activeFile || !this.state.cm) return;
-        
-        const code = this.state.cm.state.doc.toString();
-        const ext = this.state.activeFile.split('.').pop().toLowerCase();
-        let formatted = code;
-        
-        try {
-            if (ext === 'js' || ext === 'json') formatted = js_beautify(code, { indent_size: 4, space_in_empty_paren: true });
-            else if (ext === 'html') formatted = html_beautify(code, { indent_size: 4, wrap_line_length: 120 });
-            else if (ext === 'css') formatted = css_beautify(code, { indent_size: 4 });
-            
-            // Only update if changes were actually made to prevent losing cursor position unnecessarily
-            if (formatted !== code) {
-                this.state.cm.dispatch({
-                    changes: { from: 0, to: code.length, insert: formatted }
-                });
-                this.saveVFS();
-                this.log(`Successfully formatted ${this.state.activeFile}.`, "var(--success)");
-            } else {
-                this.log("File is already formatted.", "var(--text)");
-            }
-        } catch (err) {
-            this.log(`Format Error: ${err.message}`, "var(--danger)");
-        }
-    },
-
-    verifyIntelligence() {
-        if (!this.state.vfs["main.js"]) {
-            this.state.vfs["main.js"] = "// Main Script\nconsole.log('Online');";
-        }
-    },
-       clearWorkspace() {
-        if (confirm("Permanently wipe all files and data? This cannot be undone.")) {
-            localforage.clear().then(() => {
-                // 1. Reset memory
-                this.state.vfs = {};
-                this.state.activeFile = null;
-                
-                // 2. Clear the Editor
-                if (this.state.cm) {
-                    this.state.cm.dispatch({
-                        changes: { from: 0, to: this.state.cm.state.doc.length, insert: "// Workspace wiped.\n" }
-                    });
-                }
-                
-                // 3. Reset the UI
-                this.renderExplorer();
-                this.saveVFS();
-                this.log("Workspace Wiped.", "var(--danger)");
-            });
-        }
-       }
-   
-    nukeSystem() { 
-        if(confirm("Wipe cache?")) { localforage.clear(); location.reload(); } 
     }
 };
