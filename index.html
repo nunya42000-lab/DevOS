@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>DevOS Nexus Prime | Omni-Edition</title>
     
+    <link rel="manifest" href="./manifest.json">
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
     
@@ -39,7 +41,7 @@
 
         #nexus-app-root { display: flex; flex-direction: column; height: 100vh; }
 
-        /* --- OMNI RIBBON (New Wrapper) --- */
+        /* --- OMNI RIBBON --- */
         .omni-ribbon { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
         .ribbon-toolbar { padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
         .ribbon-tabs { display: flex; gap: 4px; padding: 0 10px 10px 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
@@ -51,18 +53,16 @@
         }
         .tool-btn:active { opacity: 0.8; }
         
-        /* Tab States */
         .tab-btn { background: #000; color: #8b949e; border-color: var(--border); }
         .tab-btn.active-tab { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-        /* Button Accents */
         .btn-blue { border-color: var(--accent); color: var(--accent); }
         .btn-green { border-color: var(--success); color: var(--success); }
         .btn-gold { border-color: var(--gold); color: var(--gold); }
         .btn-red { border-color: var(--danger); color: var(--danger); }
         .btn-purple { border-color: var(--purple); color: var(--purple); }
 
-        /* Main Workspace */
+        /* Workspace & Panels */
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         .view-panel { flex: 1; display: none; flex-direction: column; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); overflow-y: auto; }
         .view-panel.active { display: flex; }
@@ -119,10 +119,11 @@
                 <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
                 
                 <button class="tool-btn btn-gold" onclick="document.getElementById('zip-upload-input').click()">📁 LOAD</button>
+                <button class="tool-btn btn-green" onclick="Nexus.saveVFS()">💾 SAVE</button>
                 <button class="tool-btn btn-purple" onclick="Nexus.openAdvancedMerger()">⚡ MERGE</button>
                 <button class="tool-btn btn-green" onclick="Nexus.downloadProjectZip()">📦 ZIP</button>
                 <button class="tool-btn btn-red" onclick="Nexus.clearWorkspace()">🗑️ WIPE</button>
-</div>
+            </div>
         </div>
 
         <nav class="ribbon-tabs">
@@ -176,9 +177,17 @@
 
         <div id="visual-view" class="view-panel" style="padding:20px;">
             <h2 style="margin-top:0; color:var(--accent);">Visual Creative Labs</h2>
-            <div class="tool-card">
+            <div class="tool-card" onclick="Nexus.log('State Machine Builder Online.', 'var(--success)')">
                 <h3 style="margin-top:0;">⚙️ State Machine</h3>
                 <p style="font-size:12px; color:#888;">Generate logic blocks for IDLE, WIN, LOSE, and Upside Down states.</p>
+            </div>
+            <div class="tool-card" onclick="Nexus.log('Audio Synth Online.', 'var(--success)')">
+                <h3 style="margin-top:0;">🎵 Audio Synth</h3>
+                <p style="font-size:12px; color:#888;">Design retro sound effects with code.</p>
+            </div>
+            <div class="tool-card" onclick="Nexus.log('Sprite Slicer Online.', 'var(--success)')">
+                <h3 style="margin-top:0;">🖼️ Sprite Slicer</h3>
+                <p style="font-size:12px; color:#888;">Map CSS positions for sprite sheets.</p>
             </div>
         </div>
 
@@ -216,6 +225,12 @@
 <script src="./nexus.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
+        // Register the Service Worker to make the PWA work offline
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW Error:', err));
+        }
+        
+        // Boot the main app logic
         if (window.Nexus) window.Nexus.boot();
     });
 </script>
