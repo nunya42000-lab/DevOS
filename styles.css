@@ -1,4 +1,4 @@
-/* ========================================
+1/* ========================================
    FILE: styles.css (DevOS Nexus Prime)
    ======================================== */
 
@@ -209,6 +209,21 @@ body, html {
 }
 
 #kb-drawer.active { transform: translateY(0); }
+#kb-drawer {
+    display: flex;
+    overflow-x: scroll;
+    scroll-behavior: smooth;
+    white-space: nowrap;
+    -ms-overflow-style: none; /* Hide scrollbar */
+    scrollbar-width: none;
+}
+#kb-drawer::-webkit-scrollbar { display: none; }
+
+.kb-item {
+    flex: 0 0 auto;
+    width: 60px; /* Fixed width for predictable looping */
+    margin: 5px;
+}
 
 /* --- Sidebar --- */
 .sidebar {
