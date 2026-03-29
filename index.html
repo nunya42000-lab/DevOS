@@ -7,7 +7,11 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
+    
     <script src="https://unpkg.com/@rollup/browser@4.13.0/dist/rollup.browser.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
@@ -35,15 +39,23 @@
 
         #nexus-app-root { display: flex; flex-direction: column; height: 100vh; }
 
-        /* Navigation & Toolbars */
-        .navbar { display: flex; gap: 8px; padding: 8px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
-        .toolbar-track { padding: 8px; display: flex; gap: 8px; overflow-x: auto; background: var(--bg); border-bottom: 1px solid var(--border); }
+        /* --- OMNI RIBBON (New Wrapper) --- */
+        .omni-ribbon { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
+        .ribbon-toolbar { padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+        .ribbon-tabs { display: flex; gap: 4px; padding: 0 10px 10px 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .ribbon-tabs::-webkit-scrollbar { display: none; }
         
         .tool-btn {
             background: var(--surface); color: var(--text); border: 1px solid var(--border);
-            padding: 8px 14px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+            padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
         }
-        .active-tab { border-color: var(--accent); color: var(--accent); }
+        .tool-btn:active { opacity: 0.8; }
+        
+        /* Tab States */
+        .tab-btn { background: #000; color: #8b949e; border-color: var(--border); }
+        .tab-btn.active-tab { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        /* Button Accents */
         .btn-blue { border-color: var(--accent); color: var(--accent); }
         .btn-green { border-color: var(--success); color: var(--success); }
         .btn-gold { border-color: var(--gold); color: var(--gold); }
@@ -52,7 +64,6 @@
 
         /* Main Workspace */
         .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
-        
         .view-panel { flex: 1; display: none; flex-direction: column; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); overflow-y: auto; }
         .view-panel.active { display: flex; }
 
@@ -66,7 +77,6 @@
         #sidebar.active { left: 0; }
         
         .side-sec { padding: 10px; border-bottom: 1px solid var(--border); }
-        .side-title { font-size: 10px; text-transform: uppercase; color: #8b949e; margin-bottom: 8px; letter-spacing: 1px; }
 
         /* Editor Addons */
         #editor-wrapper { flex: 1; background: #000; position: relative; overflow: hidden; }
@@ -77,11 +87,10 @@
         /* Preview Addons */
         #live-preview-frame { width: 100%; flex: 1; border: none; background: #fff; transition: width 0.3s, margin 0.3s; }
         #ghost-console { height: 150px; background: rgba(0,0,0,0.9); border-top: 2px solid var(--accent); color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; }
-        .preview-controls { padding: 8px; background: var(--panel); display: flex; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; }
+        .preview-controls { padding: 8px; background: var(--panel); display: flex; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--border); }
 
         /* Visual Labs */
         .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); cursor: pointer; }
-        .tool-card:active { background: #2d333b; }
 
         /* Modals & Overlays */
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; }
@@ -96,14 +105,34 @@
 
 <div id="nexus-app-root">
     
-    <nav class="navbar">
-        <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">📂 Files</button>
-        <button class="tool-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">Code</button>
-        <button class="tool-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">Preview</button>
-        <button class="tool-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">Visual Labs</button>
-        <button class="tool-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">Intel</button>
-        <button class="tool-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">Time</button>
-    </nav>
+    <header class="omni-ribbon">
+        <div class="ribbon-toolbar">
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Files</button>
+                <span style="font-weight: bold; color: var(--accent); font-size: 14px;">DEVOS NEXUS</span>
+            </div>
+            
+            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ FORMAT</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.exportForAI()">🤖 AI TXT</button>
+                
+                <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
+                
+                <button class="tool-btn btn-gold" onclick="document.getElementById('zip-upload-input').click()">📁 LOAD</button>
+                <button class="tool-btn btn-purple" onclick="Nexus.openAdvancedMerger()">⚡ MERGE</button>
+                <button class="tool-btn btn-green" onclick="Nexus.downloadProjectZip()">📦 ZIP</button>
+                <button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">🗑️ WIPE</button>
+            </div>
+        </div>
+
+        <nav class="ribbon-tabs">
+            <button class="tool-btn tab-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">1. Code</button>
+            <button class="tool-btn tab-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">2. Sandbox</button>
+            <button class="tool-btn tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">3. Visual Labs</button>
+            <button class="tool-btn tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">4. Intel</button>
+            <button class="tool-btn tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">5. Time</button>
+        </nav>
+    </header>
 
     <div class="main-container">
         
@@ -119,44 +148,27 @@
             </div>
 
             <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
-            
-            <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
-                <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
-                <button class="tool-btn btn-gold" onclick="document.getElementById('zip-upload-input').click()">📁 Load ZIP</button>
-                <button class="tool-btn btn-purple" onclick="Nexus.openAdvancedMerger()">⚡ PWA Merger</button>
-                <button class="tool-btn btn-green" onclick="Nexus.saveVFS()">💾 Persist Changes</button>
-            </div>
         </aside>
 
         <div id="editor-view" class="view-panel active">
-            <div class="toolbar-track">
-                <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ CMD</button>
-                <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ Format</button>
-                <button class="tool-btn btn-red" onclick="Nexus.nukeSystem()">☢️ Nuke</button>
-            </div>
             <div id="editor-wrapper"></div>
             <div id="mobile-soft-keys"></div>
         </div>
 
         <div id="preview-view" class="view-panel">
             <div class="preview-controls">
-                <button class="tool-btn btn-green" onclick="Nexus.refreshLivePreview()">▶ Run</button>
+                <button class="tool-btn btn-green" onclick="Nexus.refreshLivePreview()">▶ REBUILD & RUN</button>
                 <select class="tool-btn" id="preview-size" onchange="Nexus.resizePreview(this.value)">
                     <option value="100%">Full Screen</option>
                     <option value="375px">iPhone SE</option>
                     <option value="414px">iPhone Pro</option>
                 </select>
-                <button class="tool-btn" onclick="document.getElementById('sensor-sim').style.display = document.getElementById('sensor-sim').style.display === 'none' ? 'flex' : 'none'">📳 Sensors</button>
-                <span id="fps-counter" style="font-size:10px; color:var(--success); font-weight:bold;">0 FPS</span>
+                <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ CMD INJECT</button>
+                <span id="fps-counter" style="font-size:10px; color:var(--success); font-weight:bold; margin-left:auto;">0 FPS</span>
             </div>
             
-            <div id="sensor-sim" style="display:none; padding:10px; background:var(--surface); gap:10px; flex-direction:column; border-bottom: 1px solid var(--border);">
-                <label style="font-size:12px;">Tilt (Beta): <input type="range" id="sim-beta" min="-180" max="180" value="0" style="width:100%;"></label>
-                <label style="font-size:12px;">Rotate (Alpha): <input type="range" id="sim-alpha" min="0" max="360" value="0" style="width:100%;"></label>
-            </div>
-
             <div style="flex:1; background:#000; display:flex; justify-content:center; overflow:hidden;">
-                <iframe id="live-preview-frame"></iframe>
+                <iframe id="live-preview-frame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
             </div>
             
             <div id="ghost-console"></div>
@@ -164,28 +176,19 @@
 
         <div id="visual-view" class="view-panel" style="padding:20px;">
             <h2 style="margin-top:0; color:var(--accent);">Visual Creative Labs</h2>
-            <div class="tool-card" onclick="Nexus.log('State Machine Builder Online.', 'var(--success)')">
+            <div class="tool-card">
                 <h3 style="margin-top:0;">⚙️ State Machine</h3>
                 <p style="font-size:12px; color:#888;">Generate logic blocks for IDLE, WIN, LOSE, and Upside Down states.</p>
-            </div>
-            <div class="tool-card" onclick="Nexus.log('Audio Synth Online.', 'var(--success)')">
-                <h3 style="margin-top:0;">🎵 Audio Synth</h3>
-                <p style="font-size:12px; color:#888;">Design retro sound effects.</p>
-            </div>
-            <div class="tool-card" onclick="Nexus.log('Sprite Slicer Online.', 'var(--success)')">
-                <h3 style="margin-top:0;">🖼️ Sprite Slicer</h3>
-                <p style="font-size:12px; color:#888;">Map CSS positions for image assets.</p>
             </div>
         </div>
 
         <div id="intel-view" class="view-panel" style="padding:20px;">
             <h2 style="margin-top:0; color:var(--gold);">System Intelligence</h2>
-            <div id="project-stats-container" style="font-family:monospace; font-size:12px;"></div>
+            <div id="project-stats-container"></div>
         </div>
 
         <div id="time-view" class="view-panel" style="padding:20px;">
             <h2 style="margin-top:0; color:var(--purple);">Time Machine</h2>
-            <p style="font-size:12px; color:#888;">Local snapshot history.</p>
             <div id="history-list"></div>
         </div>
 
