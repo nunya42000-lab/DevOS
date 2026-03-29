@@ -1,5 +1,5 @@
 /* =============================================================================
-   FILE: nexus.js (Omni-Merged & Multi-Pane)
+   FILE: nexus.js (Omni-Merged with Sync, Injector, & Virtual Keyboard)
    ============================================================================= */
 
 window.Nexus = {
@@ -8,7 +8,8 @@ window.Nexus = {
         activeFile: "main.js", 
         cm: null,
         autoSaveTimer: null,
-        diffEditorInstance: null
+        diffEditorInstance: null,
+        loadedSprite: null
     },
 
     async boot() {
@@ -20,7 +21,7 @@ window.Nexus = {
         window.addEventListener('cm6-ready', () => {
             this.initEditor();
             this.renderExplorer();
-            this.initMobileSoftKeys();
+            this.initMobileSoftKeys(); // Uses the upgraded looping logic now
             this.initSearch();
             
             if (this.state.vfs[this.state.activeFile]) {
@@ -40,10 +41,19 @@ window.Nexus = {
         const panel = document.getElementById(`${tabId}-view`);
         if (panel) panel.classList.add('active');
 
-        // Context-Aware Hooks for the new features
         if (tabId === 'intel') this.updateProjectStats();
         if (tabId === 'diagnostic') this.refreshStorageInspector();
         if (tabId === 'time') this.initDiffViewer();
+    },
+
+    // --- PeerJS Sync Module ---
+    initSync() {
+        if (!window.NexusSync) return;
+        window.NexusSync.init();
+    },
+    connectSync() {
+        const id = prompt("Enter the Host ID of the peer you want to connect to:");
+        if (id && window.NexusSync) window.NexusSync.connect(id);
     },
 
     // --- Search & Jump ---
@@ -223,7 +233,7 @@ window.Nexus = {
         navigator.clipboard.writeText(text).then(() => this.log("Diagnostics copied to clipboard.", "var(--success)"));
     },
 
-    // --- REINCORPORATED: Data Inspector (data-tools.js) ---
+    // --- Data Inspector ---
     refreshStorageInspector() {
         const container = document.getElementById('storage-inspector-ui');
         if (!container) return;
@@ -304,7 +314,7 @@ window.Nexus = {
         a.click();
     },
 
-    // --- REINCORPORATED: Diff Comparator (diff.js) ---
+    // --- Diff Comparator ---
     initDiffViewer() {
         const selectA = document.getElementById('diff-file-a');
         const selectB = document.getElementById('diff-file-b');
@@ -342,9 +352,9 @@ window.Nexus = {
         if (fileA.includes('.css') || fileB.includes('.css')) mode = 'css';
 
         this.state.diffEditorInstance = window.CodeMirror.MergeView(container, {
-            value: contentB,       // Modified version goes on the Right
+            value: contentB,       
             origLeft: null, 
-            orig: contentA,        // Original version goes on the Left
+            orig: contentA,        
             lineNumbers: true,
             mode: mode,
             theme: 'dracula',
@@ -354,7 +364,6 @@ window.Nexus = {
             revertButtons: false
         });
 
-        // Ensure proper sizing within flexbox
         if (this.state.diffEditorInstance.edit && this.state.diffEditorInstance.right) {
             this.state.diffEditorInstance.edit.setSize("100%", "100%");
             this.state.diffEditorInstance.right.orig.setSize("100%", "100%");
@@ -378,7 +387,7 @@ window.Nexus = {
         `;
     },
 
-    // --- Editor & Soft Keys ---
+    // --- Editor & Upgraded Soft Keys ---
     initEditor() {
         const parent = document.getElementById('editor-wrapper');
         if (!parent || !window.CM6) return;
@@ -402,13 +411,36 @@ window.Nexus = {
     },
 
     initMobileSoftKeys() {
-        const container = document.getElementById('mobile-soft-keys');
-        if (!container) return;
+        const kb = document.getElementById('mobile-soft-keys');
+        if (!kb) return;
+        kb.innerHTML = '';
         
-        const keys = ['{', '}', '(', ')', '[', ']', ';', '=>', '"', "'", '=', '+', '-'];
-        container.innerHTML = keys.map(k => `
-            <button class="soft-key" onclick="Nexus.insertSoftKey('${k}')">${k}</button>
-        `).join('');
+        // Extended logic from virtual-keyboard.js (Looping Ribbon)
+        const keys = ['{', '}', '(', ')', '[', ']', ';', '=>', '"', "'", '=', '+', '-', ':', '===', '!=='];
+        const tripleKeys = [...keys, ...keys, ...keys]; // Tripled to allow seamless infinite scrolling
+        
+        tripleKeys.forEach(key => {
+            const btn = document.createElement('button');
+            btn.className = 'soft-key';
+            btn.innerText = key;
+            btn.onclick = () => this.insertSoftKey(key);
+            kb.appendChild(btn);
+        });
+
+        // Loop detection for ribbon
+        kb.onscroll = () => {
+            const itemWidth = 55; // Approx width of each key + gap
+            const totalWidth = keys.length * itemWidth;
+            
+            if (kb.scrollLeft >= totalWidth * 2) {
+                kb.scrollLeft = totalWidth; 
+            } else if (kb.scrollLeft <= 0) {
+                kb.scrollLeft = totalWidth; 
+            }
+        };
+
+        // Jump to middle on load
+        setTimeout(() => kb.scrollLeft = keys.length * 55, 100);
     },
 
     insertSoftKey(key) {
@@ -419,6 +451,64 @@ window.Nexus = {
             selection: { anchor: pos + key.length }
         });
         this.state.cm.focus();
+    },
+
+    // --- Visual Labs Integration ---
+    generateStateMachine() {
+        const name = prompt("Enter Machine Name (e.g. 'SlotState'):");
+        if (!name) return;
+        const code = `class ${name}Machine {\n    constructor() {\n        this.state = 'IDLE';\n    }\n    transition(newState) {\n        console.log(\`Transition: \${this.state} -> \${newState}\`);\n        this.state = newState;\n    }\n}\nexport default new ${name}Machine();`;
+        this.state.vfs[`${name.toLowerCase()}-machine.js`] = code;
+        this.saveVFS();
+        this.renderExplorer();
+        this.loadFile(`${name.toLowerCase()}-machine.js`);
+        this.switchTab('editor');
+        this.log("State Machine generated.", "var(--success)");
+    },
+
+    handleSpriteUpload(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                this.state.loadedSprite = img;
+                const canvas = document.getElementById('sprite-canvas-tool');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                this.log(`Sprite loaded: ${img.width}x${img.height}`, "var(--success)");
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    },
+
+    generateSpriteCSS() {
+        if (!this.state.loadedSprite) return alert("Upload a sprite sheet first.");
+        const w = parseInt(document.getElementById('sprite-w').value) || 32;
+        const h = parseInt(document.getElementById('sprite-h').value) || 32;
+        
+        let css = `.sprite {\n    background-image: url('YOUR_IMAGE_HERE');\n    display: inline-block;\n    width: ${w}px;\n    height: ${h}px;\n}\n`;
+        
+        const cols = Math.floor(this.state.loadedSprite.width / w);
+        const rows = Math.floor(this.state.loadedSprite.height / h);
+        
+        let index = 0;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                css += `.sprite-${index} { background-position: -${c * w}px -${r * h}px; }\n`;
+                index++;
+            }
+        }
+        
+        this.state.vfs['sprites.css'] = css;
+        this.saveVFS();
+        this.renderExplorer();
+        this.loadFile('sprites.css');
+        this.switchTab('editor');
+        this.log("Sprite CSS generated and saved to sprites.css", "var(--success)");
     },
 
     // --- UI Helpers ---
@@ -499,6 +589,8 @@ window.Nexus = {
 
     async saveVFS() {
         await localforage.setItem('nexus_vfs_v4', this.state.vfs);
+        // Automatically push sync state if connected
+        if (window.NexusSync && window.NexusSync.pushState) window.NexusSync.pushState();
     },
 
     clearWorkspace() {
@@ -518,7 +610,7 @@ window.Nexus = {
         }
     },
 
-    // --- Utilities ---
+    // --- Component & Build Utilities ---
     exportForAI() {
         let output = "DevOS Project Context\n\n";
         for (const [name, code] of Object.entries(this.state.vfs)) {
@@ -552,7 +644,6 @@ window.Nexus = {
         }
     },
 
-    // --- REINCORPORATED: Component Generator (build-tools.js) ---
     generateComponent() {
         const name = prompt("Enter Component Name (e.g. 'BetSelector'):");
         if (!name) return;
@@ -569,21 +660,15 @@ window.Nexus = {
         this.log(`Component ${name} generated.`, "var(--success)");
     },
 
-    // --- REINCORPORATED: Production Bundler (build-tools.js) ---
     async minifyJS(code) {
-        if (typeof Terser === 'undefined') {
-            this.log("Terser not loaded. Exporting unminified JS.", "var(--warn)");
-            return code;
-        }
+        if (typeof Terser === 'undefined') return code;
         try {
             const result = await Terser.minify(code, {
                 mangle: true,
                 compress: { dead_code: true, drop_console: false, drop_debugger: true }
             });
             return result.code;
-        } catch (err) {
-            throw err;
-        }
+        } catch (err) { throw err; }
     },
 
     async buildForProduction() {
@@ -612,9 +697,7 @@ window.Nexus = {
             buildFolder.file(file, minifiedCss);
         }
 
-        for (const file of otherFiles) {
-            buildFolder.file(file, this.state.vfs[file]);
-        }
+        for (const file of otherFiles) buildFolder.file(file, this.state.vfs[file]);
 
         const content = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(content);
@@ -739,5 +822,113 @@ window.Nexus = {
             statusEl.innerText = `Merge Error: ${err.message}`; 
             console.error(err);
         }
+    }
+};
+
+/* =============================================================================
+   Appended Core Systems: Sync Engine & Smart Code Injector
+   ============================================================================= */
+
+// PeerJS Networking Engine
+window.NexusSync = {
+    peer: null,
+    conn: null,
+    isSyncing: false,
+
+    init() {
+        if (!window.Peer) {
+            window.Nexus.log("[Sync] PeerJS library not loaded.", "var(--danger)");
+            return;
+        }
+        window.Nexus.log("[Sync] Initializing PeerJS...", "var(--gold)");
+        
+        this.peer = new Peer(); 
+        this.peer.on('open', (id) => {
+            window.Nexus.log(`[Sync] Online! Your Host ID: ${id}`, "var(--success)");
+            alert(`Your Host ID is: ${id}\nShare this so others can connect.`);
+        });
+
+        this.peer.on('connection', (connection) => {
+            this.conn = connection;
+            this.setupConnection();
+            window.Nexus.log(`[Sync] Peer connected: ${connection.peer}`, "var(--accent)");
+        });
+
+        this.peer.on('error', (err) => {
+            window.Nexus.log(`[Sync Error] ${err.type}`, "var(--danger)");
+        });
+    },
+
+    connect(targetId) {
+        if (!this.peer) this.peer = new Peer(); 
+
+        window.Nexus.log(`[Sync] Connecting to ${targetId}...`, "var(--gold)");
+        
+        this.peer.on('open', () => {
+            this.conn = this.peer.connect(targetId);
+            this.conn.on('open', () => {
+                this.setupConnection();
+                window.Nexus.log(`[Sync] Successfully connected to ${targetId}!`, "var(--success)");
+            });
+        });
+    },
+
+    setupConnection() {
+        this.conn.on('data', (data) => {
+            if (data.type === 'vfs_sync') {
+                this.isSyncing = true;
+                window.Nexus.state.vfs = data.vfs;
+                window.Nexus.renderExplorer();
+                if (window.Nexus.state.vfs[window.Nexus.state.activeFile] !== undefined) {
+                    window.Nexus.loadFile(window.Nexus.state.activeFile);
+                }
+                window.Nexus.log("[Sync] Files updated from peer.", "var(--accent)");
+                setTimeout(() => { this.isSyncing = false; }, 100);
+            }
+        });
+        this.conn.on('close', () => {
+            window.Nexus.log("[Sync] Connection closed.", "var(--warn)");
+            this.conn = null;
+        });
+    },
+
+    pushState() {
+        if (!this.conn || this.isSyncing) return;
+        this.conn.send({ type: 'vfs_sync', vfs: window.Nexus.state.vfs });
+    }
+};
+
+// Global Code Injector Class
+window.CodeInjector = class CodeInjector {
+    static inject(currentContent, patchContent, anchorLabel) {
+        const startMarker = `// START: ${anchorLabel}`;
+        const endMarker = `// END: ${anchorLabel}`;
+
+        const startIndex = currentContent.indexOf(startMarker);
+        const endIndex = currentContent.indexOf(endMarker);
+
+        if (startIndex === -1 || endIndex === -1) {
+            console.error(`Markers for "${anchorLabel}" not found.`);
+            return { error: "Markers not found", content: currentContent };
+        }
+
+        const contentBefore = currentContent.substring(0, startIndex + startMarker.length);
+        const existingLogic = currentContent.substring(startIndex + startMarker.length, endIndex).trim();
+        const contentAfter = currentContent.substring(endIndex);
+
+        if (existingLogic.length > 0 && existingLogic !== patchContent.trim()) {
+            return {
+                status: "CONFLICT",
+                current: existingLogic,
+                incoming: patchContent,
+                apply: (choice) => {
+                    const finalContent = choice === 'incoming' ? patchContent : existingLogic;
+                    return `${contentBefore}\n${finalContent}\n${contentAfter}`;
+                }
+            };
+        }
+
+        const merged = `${contentBefore}\n${patchContent}\n${contentAfter}`;
+        return { status: "SUCCESS", content: merged };
     }
 };
