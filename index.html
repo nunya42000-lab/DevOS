@@ -2,259 +2,716 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>DevOS Nexus Prime | Omni-Edition</title>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOS Workspace</title>
     <link rel="manifest" href="./manifest.json">
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121120/diff_match_patch.js"></script>
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/terser/dist/bundle.min.js"></script>
-    <script src="https://unpkg.com/@rollup/browser@3.29.4/dist/rollup.browser.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/merge/merge.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/merge/merge.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
 
-    <script type="module">
-        import { EditorView, basicSetup } from "https://esm.sh/codemirror@6.0.1";
-        import { javascript } from "https://esm.sh/@codemirror/lang-javascript@6.2.1";
-        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark@6.1.2";
-        window.CM6 = { EditorView, basicSetup, javascript, oneDark };
-        window.dispatchEvent(new CustomEvent('cm6-ready'));
-    </script>
-    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closetag.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/fold/xml-fold.min.js"></script>
+
     <style>
         :root {
-            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
-            --border: #30363d; --text: #c9d1d9; --accent: #58a6ff;
-            --success: #238636; --gold: #d29922; --danger: #da3633; --purple: #bb86fc;
+            --bg: #0d1117;
+            --surface: #161b22;
+            --surface-light: #21262d;
+            --border: #30363d;
+            --text: #c9d1d9;
+            --accent: #2f81f7;
+            --success: #238636;
+            --warn: #d29922;
+            --danger: #f85149;
         }
-
-        body, html {
-            margin: 0; padding: 0; width: 100%; height: 100%;
-            background: var(--bg); color: var(--text);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden; touch-action: none;
-        }
-
-        #nexus-app-root { display: flex; flex-direction: column; height: 100vh; }
-
-        /* --- OMNI RIBBON (Per 378.png) --- */
-        .omni-ribbon { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; }
-        .ribbon-toolbar { padding: 10px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; justify-content: space-between; }
-        .ribbon-tabs { display: flex; gap: 6px; padding: 0 10px 10px 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-        .ribbon-tabs::-webkit-scrollbar { display: none; }
+        body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+        * { box-sizing: border-box; }
         
-        .tool-btn {
-            background: var(--surface); color: var(--text); border: 1px solid var(--border);
-            padding: 8px 12px; border-radius: 6px; font-size: 11px; font-weight: bold; cursor: pointer; white-space: nowrap;
-        }
-        .tool-btn:active { opacity: 0.7; }
+        button { cursor: pointer; border: none; border-radius: 6px; font-weight: 600; padding: 6px 12px; }
+        .btn-primary { background: var(--success); color: white; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        input[type="text"] { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px; border-radius: 4px; width: 100%; margin-bottom: 10px; }
         
-        .tab-btn { background: #000; color: #8b949e; border: 1px solid var(--border); }
-        .tab-btn.active-tab { background: var(--accent); color: #fff; border-color: var(--accent); }
-
-        .btn-blue { border-color: var(--accent); color: var(--accent); }
-        .btn-green { border-color: var(--success); color: var(--success); }
-        .btn-gold { border-color: var(--gold); color: var(--gold); }
-        .btn-red { border-color: var(--danger); color: var(--danger); }
-        .btn-purple { border-color: var(--purple); color: var(--purple); }
-
-        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
-        .view-panel { flex: 1; display: none; flex-direction: column; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); }
-        .view-panel.active { display: flex; }
-
-        /* Sidebar (Per 380.png) */
-        #sidebar {
-            position: absolute; left: -280px; top: 0; width: 280px; height: 100%;
-            background: var(--panel); border-right: 1px solid var(--border);
-            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 8000;
-            box-shadow: 10px 0 30px rgba(0,0,0,0.5); display: flex; flex-direction: column;
-        }
-        #sidebar.active { left: 0; }
-        .side-sec { padding: 10px; border-bottom: 1px solid var(--border); }
-
-        /* Editor Area (Per 381.png) */
-        #editor-wrapper { flex: 1; background: #000; position: relative; overflow: hidden; }
-        .cm-editor { height: 100%; }
-        #mobile-soft-keys { display: flex; overflow-x: auto; padding: 6px; background: var(--panel); gap: 6px; border-top: 1px solid var(--border); scrollbar-width: none; scroll-behavior: smooth; }
-        #mobile-soft-keys::-webkit-scrollbar { display: none; }
-        .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; flex-shrink: 0; min-width: 45px; text-align: center; }
-
-        /* Sandbox View (Per 382.png) */
-        #live-preview-frame { width: 100%; flex: 1; border: none; background: #fff; transition: width 0.3s; }
-        #ghost-console { height: 150px; background: rgba(0,0,0,0.9); border-top: 2px solid var(--accent); color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; flex-shrink: 0; }
-        .preview-controls { padding: 8px; background: var(--panel); display: flex; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--border); flex-shrink: 0; }
-
-        /* Visual Labs (Per 379.png) */
-        .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); }
-
-        /* Modals */
-        #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; }
-        .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 550px; max-height: 85vh; padding: 20px; border-radius: 8px; overflow-y: auto; }
+        .app-container { display: flex; flex: 1; overflow: hidden; }
         
-        #search-results-tree { max-height: 150px; overflow-y: auto; margin-top: 10px; font-size: 12px; }
-        .search-hit { padding: 8px 5px; cursor: pointer; border-bottom: 1px solid #222; }
+        /* Sidebar Styling */
+        .sidebar { width: 250px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; transition: transform 0.3s ease; }
+        @media (max-width: 768px) { .sidebar { position: absolute; z-index: 100; height: 100%; transform: translateX(-100%); } .sidebar.open { transform: translateX(0); } }
+        
+        /* Main Layout */
+        .main-content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; }
+        .tab { padding: 10px 15px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500;}
+        .tab.active { border-bottom-color: var(--accent); color: var(--accent); }
+        .panel-box { display: none; flex: 1; overflow-y: auto; padding: 15px; }
+        .panel-box.active { display: block; }
+        
+        /* Editor Flex Layout */
+        #view-editor { padding: 0; display: none; flex-direction: column; height: 100%; overflow: hidden; }
+        #view-editor.active { display: flex; }
+        .CodeMirror { flex: 1; height: auto; font-size: 14px; }
+        
+        /* Mobile Quick-Symbol Toolbar */
+        #mobile-toolbar { display: flex; overflow-x: auto; background: var(--surface); padding: 6px; gap: 6px; border-bottom: 1px solid var(--border); scrollbar-width: none; }
+        #mobile-toolbar::-webkit-scrollbar { display: none; }
+        .tool-btn { background: var(--surface-light); color: var(--accent); border: 1px solid var(--border); padding: 8px 16px; border-radius: 6px; font-family: monospace; font-size: 16px; font-weight: bold; white-space: nowrap; touch-action: manipulation; }
+        .tool-btn:active { background: var(--accent); color: #fff; }
 
-        /* Diff Styles */
-        .CodeMirror-merge, .CodeMirror-merge .CodeMirror { height: 100%; }
+        /* Preview & Console Interceptor Output */
+        #preview-container { flex: 1; border-top: 1px solid var(--border); display: flex; flex-direction: column; background: #fff; min-height: 250px;}
+        iframe { border: none; flex: 1; width: 100%; }
+        #console-output { background: #000; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; height: 150px; overflow-y: auto; border-top: 1px solid var(--border); margin: 0; }
+        .log-msg { margin-bottom: 4px; border-bottom: 1px dashed #333; padding-bottom: 2px;}
+        .log-error { color: #ff5555; margin-bottom: 4px; border-bottom: 1px dashed #333;}
+        
+        .status-flash { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--accent); color: white; padding: 8px 16px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 1000;}
     </style>
 </head>
 <body>
+    <div class="tab-bar">
+        <button class="btn-outline" style="margin: 5px; padding: 6px 10px;" onclick="document.getElementById('ui-sidebar').classList.toggle('open')">☰</button>
+        <div class="tab active" onclick="switchTab('editor')">Code</div>
+        <div class="tab" onclick="switchTab('tools')">Tools</div>
+        <div class="tab" onclick="switchTab('vault')">Vault</div>
+        <div style="flex:1"></div>
+        <button class="btn-primary" style="margin: 5px;" onclick="runPreview()">▶ Run</button>
+    </div>
 
-<div id="nexus-app-root">
-    
-    <header class="omni-ribbon">
-        <div class="ribbon-toolbar">
-            <div style="display: flex; gap: 8px; align-items: center;">
-                <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰</button>
-                <span id="active-file-display" style="font-weight: bold; color: var(--accent); font-size: 13px;">DEVOS NEXUS</span>
+    <div class="app-container">
+        <aside class="sidebar" id="ui-sidebar">
+            <div style="padding: 15px; border-bottom: 1px solid var(--border);">
+                <div class="file-upload-wrapper">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <span style="font-size: 12px; font-weight: bold; color: var(--accent);">📁 WORKSPACE</span>
+                    </div>
+                    <button class="btn-primary" style="width:100%; padding: 6px;" onclick="createNewFile()">+ NEW FILE</button>
+                    <input type="file" multiple id="file-input" onchange="loadFiles(event)" style="margin-top: 10px; width: 100%; font-size: 12px; color: transparent;">
+                </div>
             </div>
-            
-            <div style="display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end;">
-                <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ FMT</button>
-                <button class="tool-btn btn-blue" onclick="Nexus.exportForAI()">🤖 AI TXT</button>
-                <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
-                <button class="tool-btn btn-gold" onclick="document.getElementById('zip-upload-input').click()">📁 LOAD</button>
-                <button class="tool-btn btn-green" onclick="Nexus.saveVFS()">💾 SAVE</button>
-                <button class="tool-btn btn-purple" onclick="Nexus.openAdvancedMerger()">⚡ MERGE</button>
-                <button class="tool-btn btn-green" onclick="Nexus.downloadProjectZip()">📦 ZIP</button>
-                <button class="tool-btn btn-red" onclick="Nexus.clearWorkspace()">🗑️ WIPE</button>
-            </div>
-        </div>
-
-        <nav class="ribbon-tabs">
-            <button class="tool-btn tab-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">1. Code</button>
-            <button class="tool-btn tab-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">2. Sandbox</button>
-            <button class="tool-btn tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">3. Visual Labs</button>
-            <button class="tool-btn tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">4. Intel</button>
-            <button class="tool-btn tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">5. Time & Diff</button>
-        </nav>
-    </header>
-
-    <div class="main-container">
-        
-        <aside id="sidebar">
-            <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: bold; color: var(--accent);">EXPLORER</span>
-                <button class="tool-btn" onclick="Nexus.toggleSidebar(false)">✕</button>
-            </div>
-            <div class="side-sec">
-                <input type="text" id="global-search-input" placeholder="Search code..." style="width:100%; padding:8px; background:#000; border:1px solid var(--border); border-radius:4px; color:white; box-sizing:border-box;">
-                <div id="search-results-tree"></div>
-            </div>
-            <div id="explorer" style="flex: 1; overflow-y: auto;"></div>
-            <div style="padding: 10px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px;">
-                <button class="tool-btn btn-purple" onclick="Nexus.initSync()">📡 Start Sync</button>
-                <button class="tool-btn btn-blue" onclick="Nexus.connectSync()">🔗 Connect Peer</button>
-                <button class="tool-btn btn-green" onclick="Nexus.generateComponent()">🧩 New Component</button>
-                <button class="tool-btn btn-red" onclick="Nexus.clearWorkspace()">🗑️ Wipe Workspace</button>
+            <div id="file-list" style="flex:1; overflow-y: auto;"></div>
+            <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; gap: 5px;">
+                <button class="btn-outline" style="flex:1; font-size: 11px;" onclick="exportProject()">Export Zip</button>
             </div>
         </aside>
 
-        <div id="editor-view" class="view-panel active">
-            <div id="editor-wrapper"></div>
-            <div id="mobile-soft-keys"></div>
-        </div>
-
-        <div id="preview-view" class="view-panel">
-            <div class="preview-controls">
-                <button class="tool-btn btn-green" onclick="Nexus.refreshLivePreview()">▶ REBUILD & RUN</button>
-                <select class="tool-btn" id="preview-size" onchange="Nexus.resizePreview(this.value)">
-                    <option value="100%">Full Screen</option>
-                    <option value="375px">iPhone SE</option>
-                    <option value="414px">iPhone Pro</option>
-                </select>
-                <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ CMD INJECT</button>
-                <span id="fps-counter" style="font-size:10px; color:var(--success); font-weight:bold; margin-left:auto;">0 FPS</span>
-            </div>
-            <div style="flex:1; background:#000; display:flex; justify-content:center; overflow:hidden;">
-                <iframe id="live-preview-frame" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
-            </div>
-            <div id="ghost-console"></div>
-        </div>
-
-        <div id="visual-view" class="view-panel" style="padding:20px; overflow-y:auto;">
-            <h2 style="margin-top:0; color:var(--accent);">Visual Creative Labs</h2>
-            <div class="tool-card">
-                <h3>⚙️ State Machine</h3>
-                <p style="font-size:12px; color:#888;">Generate logic blocks for IDLE, WIN, LOSE, and states.</p>
-                <button class="tool-btn btn-blue" style="width:100%" onclick="Nexus.generateStateMachine()">Build Skeleton</button>
-            </div>
-            <div class="tool-card">
-                <h3>🖼️ Sprite Slicer</h3>
-                <p style="font-size:12px; color:#888;">Upload and map sheet grid coordinates.</p>
-                <input type="file" id="sprite-upload" accept="image/*" style="color:white; font-size:12px; margin-bottom:10px;" onchange="Nexus.handleSpriteUpload(event)">
-                <div style="display:flex; gap:10px; margin-bottom:10px;">
-                    <input type="number" id="sprite-w" placeholder="W" style="width:50px; background:#000; color:white; border:1px solid var(--border); padding:5px;">
-                    <input type="number" id="sprite-h" placeholder="H" style="width:50px; background:#000; color:white; border:1px solid var(--border); padding:5px;">
-                    <button class="tool-btn btn-green" style="flex:1" onclick="Nexus.generateSpriteCSS()">Generate CSS</button>
+        <main class="main-content">
+            
+            <div id="view-editor" class="panel-box active">
+                
+                <div id="editor-header" style="padding: 10px; background: var(--surface); border-bottom: 1px solid var(--border); user-select: none;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 5px; flex-wrap: wrap;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <strong id="current-file-label" style="color:var(--accent); font-size: 14px; word-break: break-all;">Swipe here to switch files</strong>
+                            <button class="btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="renameCurrentFile()">✏️ Rename</button>
+                        </div>
+                        <div style="display: flex; gap: 5px;">
+                            <button class="btn-outline" style="padding: 2px 8px; font-size: 11px; color: var(--warn); border-color: var(--warn);" onclick="stripFileToSnippets()">✂️ Strip File</button>
+                            <button class="btn-outline" style="padding: 2px 8px; font-size: 11px;" onclick="extractCodeToFile()">📦 Extract</button>
+                        </div>
+                    </div>
                 </div>
-                <canvas id="sprite-canvas-tool" style="max-width:100%; border:1px dashed #444; background:#000;"></canvas>
+                
+                <div id="mobile-toolbar">
+                    <button class="tool-btn" onclick="insertSymbol('{')">{</button>
+                    <button class="tool-btn" onclick="insertSymbol('}')">}</button>
+                    <button class="tool-btn" onclick="insertSymbol('(')">(</button>
+                    <button class="tool-btn" onclick="insertSymbol(')')">)</button>
+                    <button class="tool-btn" onclick="insertSymbol(';')">;</button>
+                    <button class="tool-btn" onclick="insertSymbol('=')">=</button>
+                    <button class="tool-btn" onclick="insertSymbol('>')">&gt;</button>
+                    <button class="tool-btn" onclick="insertSymbol('<')">&lt;</button>
+                    <button class="tool-btn" onclick="insertSymbol('/')">/</button>
+                    <button class="tool-btn" onclick="insertSymbol('`')">`</button>
+                    <button class="tool-btn" onclick="insertSymbol('$', true)">${}</button>
+                </div>
+                
+                <textarea id="code-editor"></textarea>
             </div>
-        </div>
 
-        <div id="intel-view" class="view-panel" style="padding:15px; overflow-y:auto;">
-            <h2 style="margin-top:0; color:var(--gold);">Diagnostics Hub</h2>
-            <div style="display:flex; gap:10px; margin-bottom:15px;">
-                <button class="tool-btn btn-red" style="flex:1" onclick="Nexus.runLinter()">LINT FILE</button>
-                <button class="tool-btn btn-gold" style="flex:1" onclick="Nexus.runDependencyCheck()">SCAN IMPORTS</button>
-                <button class="tool-btn btn-green" style="flex:1" onclick="Nexus.autoFixCurrentFile()">🔧 FIX</button>
-            </div>
-            <div id="diagnostic-results" style="height:150px; background:#000; border:1px solid var(--border); padding:10px; font-family:monospace; font-size:12px; overflow-y:auto; margin-bottom:20px;"></div>
-            <h3 style="color:var(--accent)">Storage Inspector</h3>
-            <div id="storage-inspector-ui"></div>
-        </nav>
+            <div id="view-tools" class="panel-box">
+                <h3>Diagnostics & Search</h3>
+                <div style="margin-bottom: 15px;">
+                    <button class="btn-outline" onclick="runLinter()">Run Strict Linter</button>
+                    <div id="diagnostic-results" style="margin-top: 10px; font-size: 12px; background: var(--surface-light); padding: 10px; border-radius: 4px;"></div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <input type="text" id="search-query" placeholder="Search workspace...">
+                    <input type="text" id="replace-query" placeholder="Replace with...">
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-outline" style="flex:1;" onclick="performSearch()">Search</button>
+                        <button class="btn-outline" style="flex:1;" onclick="performReplace()">Replace All</button>
+                    </div>
+                    <div id="search-results" style="margin-top: 10px; font-size: 12px; max-height: 150px; overflow-y:auto;"></div>
+                </div>
 
-        <div id="time-view" class="view-panel" style="padding:15px; display:flex; flex-direction:column;">
-            <h2 style="margin-top:0; color:var(--purple);">Diff Comparator</h2>
-            <div style="display: flex; gap: 10px; margin-bottom:15px;">
-                <select id="diff-file-a" class="tool-btn" style="flex:1"></select>
-                <select id="diff-file-b" class="tool-btn" style="flex:1"></select>
-                <button class="tool-btn btn-purple" onclick="Nexus.executeDiff()">Compare</button>
-            </div>
-            <div id="diff-container" style="flex:1; border:1px solid var(--border); background:#000;"></div>
-            <div id="history-list" style="margin-top:15px;"></div>
-        </div>
+                <h3>Advanced Dev Tools</h3>
+                <div style="margin-bottom: 20px; border: 1px solid var(--border); padding: 10px; border-radius: 6px;">
+                    <h4 style="margin-top:0; margin-bottom:10px; color:var(--accent);">PWA Controller</h4>
+                    <button class="btn-primary" onclick="clearPWACache()">Nuke SW & Caches</button>
+                    <p style="font-size: 11px; color: #888; margin-top: 5px; margin-bottom:0;">Force-clears service workers and storage caches to ensure fresh reloads.</p>
+                </div>
 
-        <div id="cmd-panel" style="position:absolute; bottom:-400px; left:0; width:100%; height:400px; background:var(--panel); border-top:2px solid var(--accent); z-index:7500; transition:bottom 0.3s; display:flex; flex-direction:column; padding:12px; box-sizing:border-box;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                <span style="color:var(--accent); font-weight:bold;">NEXUS INJECTOR</span>
-                <div style="display:flex; gap:8px;">
-                    <button class="tool-btn btn-green" onclick="Nexus.runCMD()">EXECUTE</button>
-                    <button class="tool-btn" onclick="Nexus.toggleCMD()">CLOSE</button>
+                <div style="margin-bottom: 20px; border: 1px solid var(--border); padding: 10px; border-radius: 6px;">
+                    <h4 style="margin-top:0; margin-bottom:10px; color:var(--success);">Time Machine Backups</h4>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-outline" style="flex:1;" onclick="takeSnapshot()">Take Snapshot</button>
+                        <button class="btn-outline" style="flex:1;" onclick="renderSnapshots()">View History</button>
+                    </div>
+                    <div id="snapshot-list" style="margin-top: 10px; max-height: 150px; overflow-y: auto;"></div>
+                </div>
+
+                <div style="margin-bottom: 20px; border: 1px solid var(--border); padding: 10px; border-radius: 6px;">
+                    <h4 style="margin-top:0; margin-bottom:10px; color:var(--warn);">Storage Explorer</h4>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn-outline" style="flex:1;" onclick="exploreStorage()">View Storage</button>
+                        <button class="btn-outline" style="flex:1; color:var(--danger); border-color:var(--danger);" onclick="clearLocalStorage()">Clear Local</button>
+                    </div>
+                    <div id="storage-list" style="margin-top: 10px; font-family: monospace; font-size: 11px; overflow-wrap: anywhere;"></div>
                 </div>
             </div>
-            <textarea id="cmd-input" placeholder="// Paste script to edit VFS..." style="flex:1; background:#000; color:#22c55e; border:1px solid var(--border); padding:12px; font-family:monospace; font-size:14px; outline:none;"></textarea>
-        </div>
 
+            <div id="view-vault" class="panel-box">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Snippet Vault</h3>
+                    <button class="btn-outline" style="padding: 4px 10px; font-size: 12px;" onclick="createManualSnippet()">+ NEW</button>
+                </div>
+                <div id="snippet-list" style="overflow-y: auto; height:calc(100% - 60px); margin-top:10px;"></div>
+            </div>
+
+            <div id="preview-container">
+                <iframe id="preview-frame"></iframe>
+                <div id="console-output"></div>
+            </div>
+        </main>
     </div>
-</div>
+    
+    <div id="status-msg" class="status-flash">Saved</div>
+    <script>
+        let vfs = {};
+        let currentFileName = null;
+        let cmEditor = null;
+        let saveTimer = null;
+        let snippets = [];
+        let snapshots = [];
 
-<div id="modal-overlay" onclick="if(event.target === this) Nexus.closeModal()">
-    <div class="modal-content">
-        <h2 id="modal-title" style="margin-top:0; font-size: 16px;"></h2>
-        <div id="modal-body"></div>
-    </div>
-</div>
+        // --- Initialization ---
+        async function init() {
+            cmEditor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+                mode: "javascript",
+                theme: "dracula",
+                lineNumbers: true,
+                autoCloseBrackets: true,
+                autoCloseTags: true,
+                viewportMargin: Infinity,
+                lineWrapping: true
+            });
 
-<script src="./nexus.js"></script>
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js');
-        if (window.Nexus) window.Nexus.boot();
-    });
-</script>
+            cmEditor.on('change', triggerAutoSave);
+
+            const savedVfs = await localforage.getItem('devos_vfs');
+            if (savedVfs) vfs = savedVfs;
+            
+            const savedSnippets = await localforage.getItem('vault_snippets');
+            if (savedSnippets) snippets = savedSnippets;
+
+            await loadSnapshots();
+            
+            rebuildSidebar();
+            renderVault();
+            if (Object.keys(vfs).length > 0) openFile(Object.keys(vfs)[0]);
+
+            // Register Service Worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW Registration failed', err));
+            }
+
+            // Listen for Console Interceptor Messages
+            window.addEventListener('message', (e) => {
+                if (e.data && e.data.type === 'devos-console') {
+                    const out = document.getElementById('console-output');
+                    const cssClass = e.data.level === 'error' ? 'log-error' : 'log-msg';
+                    const prefix = e.data.level === 'error' ? '❌ ' : '▶ ';
+                    out.innerHTML += `<div class="${cssClass}">${prefix}${e.data.msg}</div>`;
+                    out.scrollTop = out.scrollHeight;
+                }
+            });
+
+            // Start Auto-Snapshot Interval (15 mins)
+            setInterval(takeSnapshot, 15 * 60 * 1000);
+        }
+
+        // --- Core UI & File System ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.panel-box').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${tabId}`).classList.add('active');
+            event.currentTarget.classList.add('active');
+            if (tabId === 'editor') cmEditor.refresh();
+        }
+
+        function flashSaveStatus(msg = "Saved") {
+            const el = document.getElementById('status-msg');
+            el.innerText = msg;
+            el.style.opacity = 1;
+            setTimeout(() => el.style.opacity = 0, 1500);
+        }
+
+        function triggerAutoSave() {
+            clearTimeout(saveTimer);
+            saveTimer = setTimeout(async () => {
+                if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
+                await localforage.setItem('devos_vfs', vfs);
+                flashSaveStatus();
+            }, 1000);
+        }
+
+        function rebuildSidebar() {
+            const list = document.getElementById('file-list');
+            list.innerHTML = '';
+            for (const fn of Object.keys(vfs)) {
+                const el = document.createElement('div');
+                el.style.cssText = `padding: 10px 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: ${fn === currentFileName ? 'var(--surface-light)' : 'transparent'}`;
+                
+                const nameSpan = document.createElement('span');
+                nameSpan.innerText = fn;
+                nameSpan.style.cssText = `color: ${fn === currentFileName ? 'var(--accent)' : 'var(--text)'}; font-size: 14px; cursor: pointer; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;`;
+                nameSpan.onclick = () => { openFile(fn); document.getElementById('ui-sidebar').classList.remove('open'); };
+                
+                const delBtn = document.createElement('button');
+                delBtn.innerText = '🗑️';
+                delBtn.style.cssText = "background:transparent; border:none; padding:2px; font-size:12px;";
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    if(confirm(`Delete ${fn}?`)) {
+                        delete vfs[fn];
+                        if(currentFileName === fn) { cmEditor.setValue(''); currentFileName = null; }
+                        rebuildSidebar();
+                        triggerAutoSave();
+                    }
+                };
+                
+                el.appendChild(nameSpan);
+                el.appendChild(delBtn);
+                list.appendChild(el);
+            }
+        }
+
+        function openFile(fn) {
+            if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
+            currentFileName = fn;
+            cmEditor.setValue(vfs[fn] || '');
+            
+            const ext = fn.split('.').pop().toLowerCase();
+            let mode = "javascript";
+            if (ext === "html") mode = "htmlmixed";
+            else if (ext === "css") mode = "css";
+            else if (ext === "json") mode = "application/json";
+            
+            cmEditor.setOption("mode", mode);
+            document.getElementById('current-file-label').innerText = fn;
+            rebuildSidebar();
+            switchTab('editor');
+        }
+
+        // --- File Management ---
+        async function loadFiles(e) {
+            const files = e.target.files;
+            for (let i = 0; i < files.length; i++) {
+                const f = files[i];
+                const text = await f.text();
+                vfs[f.name] = text;
+            }
+            rebuildSidebar();
+            triggerAutoSave();
+        }
+
+        function createNewFile() {
+            const fn = prompt("Enter new filename (e.g., module.js, styles.css):");
+            if (!fn || vfs[fn]) return alert("Invalid or duplicate name.");
+            
+            let boilerplate = '';
+            if (fn.endsWith('.html')) boilerplate = '<!DOCTYPE html>\n<html lang="en">\n<head>\n\t<meta charset="UTF-8">\n\t<title>New Document</title>\n</head>\n<body>\n\n</body>\n</html>';
+            else if (fn.endsWith('.js')) boilerplate = '// New Module\n';
+            
+            vfs[fn] = boilerplate;
+            rebuildSidebar();
+            openFile(fn);
+            triggerAutoSave();
+        }
+
+        function renameCurrentFile() {
+            if (!currentFileName) return;
+            const newName = prompt("Rename file to:", currentFileName);
+            if (!newName || newName === currentFileName || vfs[newName]) return;
+            
+            const oldName = currentFileName;
+            vfs[newName] = vfs[oldName];
+            delete vfs[oldName];
+            
+            updateImportsAcrossWorkspace(oldName, newName);
+            
+            currentFileName = newName;
+            rebuildSidebar();
+            openFile(newName);
+            triggerAutoSave();
+        }
+
+        function updateImportsAcrossWorkspace(oldName, newName) {
+            let updatedCount = 0;
+            const regexWithDotSlash = new RegExp(`(['"\`])\\.\\/${oldName}\\1`, 'g');
+            const regexWithoutDotSlash = new RegExp(`(['"\`])${oldName}\\1`, 'g');
+
+            for (const [filename, content] of Object.entries(vfs)) {
+                if (filename === newName) continue;
+                if (!filename.endsWith('.js') && !filename.endsWith('.html')) continue;
+
+                let newContent = content;
+                newContent = newContent.replace(regexWithDotSlash, `$1./${newName}$1`);
+                newContent = newContent.replace(regexWithoutDotSlash, `$1${newName}$1`);
+
+                if (newContent !== content) {
+                    vfs[filename] = newContent;
+                    updatedCount++;
+                }
+            }
+            if (updatedCount > 0) flashSaveStatus(`Updated imports in ${updatedCount} files`);
+        }
+
+        // --- Mobile Toolbar & Gestures ---
+        function insertSymbol(sym, isTemplate = false) {
+            if(!cmEditor) return;
+            const cursor = cmEditor.getCursor();
+            if (isTemplate) {
+                cmEditor.replaceRange('${}', cursor);
+                cmEditor.setCursor({line: cursor.line, ch: cursor.ch + 2});
+            } else {
+                cmEditor.replaceRange(sym, cursor);
+                cmEditor.setCursor({line: cursor.line, ch: cursor.ch + 1});
+            }
+            cmEditor.focus();
+        }
+
+        let touchStartX = 0;
+        const headerEl = document.getElementById('editor-header');
+        headerEl.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});
+        headerEl.addEventListener('touchend', e => {
+            let diff = e.changedTouches[0].screenX - touchStartX;
+            if (Math.abs(diff) > 60) {
+                const files = Object.keys(vfs);
+                if (files.length === 0) return;
+                let idx = files.indexOf(currentFileName);
+                if (diff < 0 && idx < files.length - 1) openFile(files[idx + 1]);
+                else if (diff > 0 && idx > 0) openFile(files[idx - 1]);
+            }
+        }, {passive: true});
+
+        // --- Modularization & Code Tools ---
+        async function extractCodeToFile() {
+            const selectedCode = cmEditor.getSelection();
+            if(!selectedCode) return alert("Highlight code to extract.");
+            const newFileName = prompt("Enter new filename (e.g., ui.js):");
+            if(!newFileName) return;
+
+            const ext = currentFileName.split('.').pop().toLowerCase();
+            let replacement = '';
+            let newContent = selectedCode;
+
+            if (ext === 'js') {
+                const cleanName = newFileName.replace('.js', '').replace(/[^a-zA-Z0-9]/g, '');
+                const exportName = prompt("Enter export function name (leave blank for standard):", `init${cleanName}`);
+                if (exportName) {
+                    newContent = `export function ${exportName}() {\n${selectedCode}\n}`;
+                    replacement = `import { ${exportName} } from './${newFileName}';\n\n// TODO: Execute ${exportName}()`;
+                } else {
+                    replacement = `import * as Module from './${newFileName}';`;
+                }
+            } else if (ext === 'html') {
+                replacement = `<script src="${newFileName}"><\/script>`;
+            }
+            
+            vfs[newFileName] = newContent;
+            cmEditor.replaceSelection(replacement);
+            triggerAutoSave();
+            rebuildSidebar();
+            flashSaveStatus("Extracted");
+        }
+
+        async function stripFileToSnippets() {
+            if (!currentFileName || !currentFileName.endsWith('.js')) return alert("Only supports .js files.");
+            const code = cmEditor.getValue();
+            if (!confirm("Strip top-level functions and constants to Vault?")) return;
+
+            let remainingCode = "", currentBlock = "", blockName = "";
+            let braceDepth = 0, capturing = false, newSnippetsCount = 0;
+            const lines = code.split('\n');
+            
+            for (let i = 0; i < lines.length; i++) {
+                const line = lines[i];
+                if (!capturing && braceDepth === 0) {
+                    const funcMatch = line.match(/^(?:export\s+)?(?:async\s+)?function\s+([a-zA-Z0-9_]+)/);
+                    const constMatch = line.match(/^(?:export\s+)?(?:const|let|var)\s+([a-zA-Z0-9_]+)\s*=/);
+                    if (funcMatch || constMatch) {
+                        capturing = true;
+                        blockName = funcMatch ? funcMatch[1] : constMatch[1];
+                        currentBlock = "";
+                    }
+                }
+
+                if (capturing) {
+                    currentBlock += line + '\n';
+                    const cleanLine = line.replace(/(["'`]).*?\1/g, ''); 
+                    braceDepth += ((cleanLine.match(/\{/g) || []).length - (cleanLine.match(/\}/g) || []).length);
+
+                    if (braceDepth === 0) {
+                        snippets.push({ name: `${currentFileName.replace('.js','')}: ${blockName}`, code: currentBlock.trim() });
+                        newSnippetsCount++;
+                        capturing = false; blockName = ""; currentBlock = "";
+                    }
+                } else {
+                    remainingCode += line + '\n';
+                }
+            }
+
+            if (newSnippetsCount > 0) {
+                remainingCode = remainingCode.replace(/\n\s*\n/g, '\n\n').trim();
+                vfs[currentFileName] = remainingCode;
+                cmEditor.setValue(remainingCode);
+                triggerAutoSave();
+                await localforage.setItem('vault_snippets', snippets);
+                renderVault();
+                flashSaveStatus(`Stripped ${newSnippetsCount} items`);
+            } else {
+                alert("No target structures found.");
+            }
+        }
+
+        // --- Snippet Vault ---
+        async function createManualSnippet() {
+            const name = prompt("Enter snippet name:");
+            if (!name) return;
+            const code = prompt("Paste snippet code:");
+            if (code !== null) {
+                snippets.push({ name, code });
+                await localforage.setItem('vault_snippets', snippets);
+                renderVault();
+            }
+        }
+
+        function renderVault() {
+            const list = document.getElementById('snippet-list');
+            list.innerHTML = snippets.map((s, i) => `
+                <div style="background:var(--surface-light); padding:10px; margin-bottom:10px; border-radius:6px; border:1px solid var(--border);">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                        <strong style="color:var(--accent); font-size:12px;">${s.name}</strong>
+                        <div>
+                            <button class="btn-outline" style="padding:2px 6px; font-size:10px;" onclick="insertSnippet(${i})">Insert</button>
+                            <button class="btn-outline" style="padding:2px 6px; font-size:10px; color:var(--danger); border-color:var(--danger);" onclick="deleteSnippet(${i})">X</button>
+                        </div>
+                    </div>
+                    <pre style="margin:0; font-size:10px; color:#888; overflow:hidden; max-height:40px;">${s.code}</pre>
+                </div>
+            `).join('') || '<div style="font-size:12px; color:#888;">Vault is empty.</div>';
+        }
+
+        function insertSnippet(idx) {
+            if(!cmEditor) return;
+            cmEditor.replaceRange(snippets[idx].code, cmEditor.getCursor());
+            switchTab('editor');
+        }
+
+        async function deleteSnippet(idx) {
+            if(confirm("Delete snippet?")) {
+                snippets.splice(idx, 1);
+                await localforage.setItem('vault_snippets', snippets);
+                renderVault();
+            }
+        }
+
+        // --- Live Preview & Console Interceptor ---
+        const consoleInterceptorScript = `
+        <script>
+            const _log = console.log;
+            const _err = console.error;
+            console.log = function(...args) {
+                _log(...args);
+                window.parent.postMessage({ type: 'devos-console', level: 'log', msg: args.join(' ') }, '*');
+            };
+            console.error = function(...args) {
+                _err(...args);
+                window.parent.postMessage({ type: 'devos-console', level: 'error', msg: args.join(' ') }, '*');
+            };
+            window.onerror = function(msg, url, line) {
+                window.parent.postMessage({ type: 'devos-console', level: 'error', msg: msg + ' (Line ' + line + ')' }, '*');
+            };
+        <\/script>
+        `;
+
+        function runPreview() {
+            if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
+            let html = vfs['index.html'] || '<h1>No index.html found</h1>';
+            
+            // Inject Module Scripts
+            const scripts = Object.keys(vfs).filter(fn => fn.endsWith('.js') && fn !== 'sw.js');
+            let scriptTags = scripts.map(fn => {
+                const blob = new Blob([vfs[fn]], {type: 'application/javascript'});
+                return `<script type="module" src="${URL.createObjectURL(blob)}"><\/script>`;
+            }).join('\n');
+            
+            // Insert Console Interceptor & Scripts
+            if(html.includes('<head>')) {
+                html = html.replace('<head>', '<head>\n' + consoleInterceptorScript);
+            } else {
+                html = consoleInterceptorScript + html;
+            }
+            html = html.replace('</body>', scriptTags + '\n</body>');
+            
+            document.getElementById('console-output').innerHTML = ''; // Clear logs
+            const frame = document.getElementById('preview-frame');
+            frame.srcdoc = html;
+        }
+
+        // --- Advanced Tools ---
+        async function loadSnapshots() {
+            const stored = await localforage.getItem('devos_snapshots');
+            if (stored) snapshots = stored;
+        }
+
+        async function takeSnapshot() {
+            if (Object.keys(vfs).length === 0) return;
+            const snap = { 
+                id: Date.now(),
+                time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
+                data: JSON.parse(JSON.stringify(vfs)) 
+            };
+            snapshots.unshift(snap);
+            if (snapshots.length > 15) snapshots.pop();
+            await localforage.setItem('devos_snapshots', snapshots);
+            flashSaveStatus("Snapshot Saved");
+            renderSnapshots();
+        }
+
+        function renderSnapshots() {
+            const list = document.getElementById('snapshot-list');
+            list.innerHTML = snapshots.map(s => `
+                <div style="display:flex; justify-content:space-between; border-bottom:1px solid var(--border); padding: 6px 0;">
+                    <span style="font-size:12px; color:var(--text);">🕒 ${s.time}</span>
+                    <button class="btn-outline" style="padding: 2px 6px; font-size: 10px;" onclick="restoreSnapshot(${s.id})">Restore</button>
+                </div>
+            `).join('') || "<div style='font-size:12px; color:#888;'>No snapshots yet.</div>";
+        }
+
+        function restoreSnapshot(id) {
+            if(!confirm("Warning: Overwrite workspace with snapshot?")) return;
+            const snap = snapshots.find(s => s.id === id);
+            if (snap) {
+                vfs = JSON.parse(JSON.stringify(snap.data));
+                rebuildSidebar();
+                if(currentFileName && vfs[currentFileName]) openFile(currentFileName);
+                else cmEditor.setValue("");
+                triggerAutoSave();
+                alert("Workspace restored!");
+            }
+        }
+
+        async function clearPWACache() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for(let r of regs) await r.unregister();
+                }
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    for(let k of keys) await caches.delete(k);
+                }
+                alert("Service Workers & Caches purged. Refresh IDE.");
+            } catch (err) { alert("Error: " + err.message); }
+        }
+
+        function exploreStorage() {
+            const list = document.getElementById('storage-list');
+            let html = '<strong style="color:var(--text);">LocalStorage Keys:</strong><br>';
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const val = localStorage.getItem(key);
+                const displayVal = val.length > 50 ? val.substring(0, 50) + '...' : val;
+                html += `<div style="margin-bottom: 6px; border-bottom:1px dashed var(--border); padding-bottom:4px;">
+                    <span style="color:var(--accent)">${key}</span>: <span style="color:#888;">${displayVal}</span>
+                </div>`;
+            }
+            if(localStorage.length === 0) html += "<i style='color:#888;'>Empty</i>";
+            list.innerHTML = html;
+        }
+
+        function clearLocalStorage() {
+            if(confirm("Clear ALL standard LocalStorage? (Does not affect VFS)")) {
+                localStorage.clear();
+                exploreStorage();
+            }
+        }
+
+        // --- Diagnostics, Search & Format ---
+        function runLinter() {
+            if(!currentFileName) return;
+            const code = cmEditor.getValue();
+            const ext = currentFileName.split('.').pop().toLowerCase();
+            let html = '';
+
+            if (ext === 'js') {
+                JSHINT(code, { esversion: 11, browser: true, module: true, undef: true, unused: true, latedef: "nofunc", shadow: false });
+                if (JSHINT.errors.length > 0) {
+                    JSHINT.errors.forEach(e => { if (e) html += `<div style="color:var(--danger); margin-bottom: 4px;">Line ${e.line}: ${e.reason}</div>`; });
+                }
+            } else if (ext === 'json') {
+                try { JSON.parse(code); } catch (e) { html += `<div style="color:var(--danger)">JSON Error: ${e.message}</div>`; }
+            }
+            document.getElementById('diagnostic-results').innerHTML = html || '<div style="color:var(--success)">Pass: No strict errors found.</div>';
+        }
+
+        function performSearch() {
+            const q = document.getElementById('search-query').value;
+            if(!q) return;
+            let html = '';
+            for (const [fn, code] of Object.entries(vfs)) {
+                if(code.includes(q)) html += `<div onclick="openFile('${fn}'); switchTab('editor')" style="cursor:pointer; padding:8px; border-bottom:1px solid var(--border); color:var(--accent); font-size:12px;">📄 ${fn}</div>`;
+            }
+            document.getElementById('search-results').innerHTML = html || '<div style="color:#888; font-size:12px;">No matches found.</div>';
+        }
+
+        function performReplace() {
+            const q = document.getElementById('search-query').value;
+            const rep = document.getElementById('replace-query').value;
+            if(!q || !confirm(`Replace all "${q}" with "${rep}"?`)) return;
+            for (const fn of Object.keys(vfs)) vfs[fn] = vfs[fn].split(q).join(rep);
+            if(currentFileName) cmEditor.setValue(vfs[currentFileName]);
+            triggerAutoSave();
+        }
+
+        async function exportProject() {
+            const zip = new JSZip();
+            for (const [fn, code] of Object.entries(vfs)) zip.file(fn, code);
+            const c = await zip.generateAsync({type: "blob"});
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(c);
+            a.download = "DevOS_Project.zip";
+            a.click();
+        }
+
+        // Run Init
+        window.onload = init;
+    </script>
 </body>
 </html>
