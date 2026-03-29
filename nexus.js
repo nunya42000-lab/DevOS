@@ -463,12 +463,74 @@ window.Nexus = {
             if (diff < -100) this.toggleSidebar(false);
         });
     },
+    // --- Restored Utilities ---
+    exportForAI() {
+        let output = "DevOS Project Context\n\n";
+        for (const [name, code] of Object.entries(this.state.vfs)) {
+            output += `\n--- File: ${name} ---\n${code}\n`;
+        }
+        const blob = new Blob([output], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "Nexus_AI_Context.txt";
+        a.click();
+        this.log("AI Context exported.", "var(--success)");
+    },
+
+    beautifyCode() {
+        if (!this.state.activeFile || !this.state.cm) return;
+        
+        const code = this.state.cm.state.doc.toString();
+        const ext = this.state.activeFile.split('.').pop().toLowerCase();
+        let formatted = code;
+        
+        try {
+            if (ext === 'js' || ext === 'json') formatted = js_beautify(code, { indent_size: 4, space_in_empty_paren: true });
+            else if (ext === 'html') formatted = html_beautify(code, { indent_size: 4, wrap_line_length: 120 });
+            else if (ext === 'css') formatted = css_beautify(code, { indent_size: 4 });
+            
+            // Only update if changes were actually made to prevent losing cursor position unnecessarily
+            if (formatted !== code) {
+                this.state.cm.dispatch({
+                    changes: { from: 0, to: code.length, insert: formatted }
+                });
+                this.saveVFS();
+                this.log(`Successfully formatted ${this.state.activeFile}.`, "var(--success)");
+            } else {
+                this.log("File is already formatted.", "var(--text)");
+            }
+        } catch (err) {
+            this.log(`Format Error: ${err.message}`, "var(--danger)");
+        }
+    },
 
     verifyIntelligence() {
         if (!this.state.vfs["main.js"]) {
             this.state.vfs["main.js"] = "// Main Script\nconsole.log('Online');";
         }
     },
+       clearWorkspace() {
+        if (confirm("Permanently wipe all files and data? This cannot be undone.")) {
+            localforage.clear().then(() => {
+                // 1. Reset memory
+                this.state.vfs = {};
+                this.state.activeFile = null;
+                
+                // 2. Clear the Editor
+                if (this.state.cm) {
+                    this.state.cm.dispatch({
+                        changes: { from: 0, to: this.state.cm.state.doc.length, insert: "// Workspace wiped.\n" }
+                    });
+                }
+                
+                // 3. Reset the UI
+                this.renderExplorer();
+                this.saveVFS();
+                this.log("Workspace Wiped.", "var(--danger)");
+            });
+        }
+       }
+   
     nukeSystem() { 
         if(confirm("Wipe cache?")) { localforage.clear(); location.reload(); } 
     }
