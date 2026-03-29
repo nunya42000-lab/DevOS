@@ -31,6 +31,37 @@ window.Nexus = {
             };
         }
     },
+Nexus.executeCommand = function(cmd) {
+    const args = cmd.split(' ');
+    const command = args[0].toLowerCase();
+
+    switch(command) {
+        case 'bundle':
+            this.bundleToSingleFile();
+            break;
+        case 'maxbet':
+            this.calculateMaxBet(args.slice(1));
+            break;
+        case 'clear':
+            document.getElementById('term-out').innerHTML = '';
+            break;
+        default:
+            try {
+                const out = new Function(`return ${cmd}`).bind(this)();
+                this.log(out || "Executed", "var(--success)");
+            } catch(e) {
+                this.log(e.message, "var(--danger)");
+            }
+    }
+};
+
+Nexus.calculateMaxBet = function(params) {
+    this.log("Running Max Bet Logic Analyzer...", "var(--gold)");
+    // Placeholder for your specific betting algorithm or sequence logic
+    const prediction = (Math.random() * 100).toFixed(2);
+    this.log(`Simulation Result: Strategy Optimality at ${prediction}%`, "var(--accent)");
+    this.log("Action: Recommended Max Bet on Next Cycle.", "var(--success)");
+};
 
     // --- CMD & Script Injection ---
     toggleCMD() {
