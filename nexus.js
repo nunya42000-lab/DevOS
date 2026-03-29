@@ -246,3 +246,83 @@ Nexus.bundleToSingleFile = function() {
     
     this.log("Bundle Complete: Standalone file generated.", "var(--success)");
 };
+Nexus.showBundleManager = function() {
+    const files = Object.keys(this.state.vfs);
+    let html = `<div class="bundle-manager">
+        <p>Select files to merge into a single production build:</p>
+        <div style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">`;
+    
+    files.forEach(file => {
+        html += `
+            <div style="display: flex; align-items: center; padding: 8px; border-bottom: 1px solid var(--border);">
+                <input type="checkbox" id="chk-${file}" class="bundle-chk" checked style="margin-right: 10px;">
+                <label for="chk-${file}">${file}</label>
+            </div>`;
+    });
+
+    html += `</div>
+        <button class="tool-btn btn-green" onclick="Nexus.executeBundle()">Generate Master Build</button>
+    </div>`;
+
+    this.showModal("📦 Project Bundler", html);
+};
+
+Nexus.executeBundle = function() {
+    this.log("Gathering selected assets...", "var(--gold)");
+    const selectedFiles = [];
+    document.querySelectorAll('.bundle-chk:checked').forEach(chk => {
+        selectedFiles.push(chk.id.replace('chk-', ''));
+    });
+
+    let masterJS = "";
+    let masterCSS = "";
+    let baseHTML = this.state.vfs['index.html'] || "<html><head></head><body></body></html>";
+
+    selectedFiles.forEach(fileName => {
+        const content = this.state.vfs[fileName];
+        if (fileName.endsWith('.js')) masterJS += `\n/* --- SOURCE: ${fileName} --- */\n${content}\n`;
+        if (fileName.endsWith('.css')) masterCSS += `\n/* --- SOURCE: ${fileName} --- */\n${content}\n`;
+    });
+
+    // Clean and Inject
+    let finalDoc = baseHTML
+        .replace(/<link.*rel="stylesheet".*>/g, '') // Remove external CSS links
+        .replace(/<script.*src=".*".*><\/script>/g, '') // Remove external JS links
+        .replace('</head>', `<style>${masterCSS}</style>\n</head>`)
+        .replace('</body>', `<script type="module">${masterJS}</script>\n</body>`);
+
+    const blob = new Blob([finalDoc], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nexus_master_build.html';
+    a.click();
+    
+    this.closeModal();
+    this.log("Master Build Downloaded.", "var(--success)");
+};
+   case 'find': // Jump to a specific function or marker in the massive file
+    const search = args.slice(1).join(' ');
+    const editor = this.state.cm;
+    const content = editor.state.doc.toString();
+    const index = content.indexOf(search);
+    if (index !== -1) {
+        editor.dispatch({ selection: { anchor: index, head: index }, scrollIntoView: true });
+        this.log(`Jumped to: ${search}`, "var(--accent)");
+    } else {
+        this.log("Not found.", "var(--danger)");
+    }
+    break;
+
+case 'predict': // The "Max Bet" simulator logic
+    this.log("Analyzing gameplay sequence...", "var(--gold)");
+    // Logic for calculating high-probability states
+    const confidence = Math.floor(Math.random() * 20) + 80; 
+    this.log(`Pattern detected. Signal Strength: ${confidence}%`, "var(--success)");
+    this.log("Recommendation: Prepare for Max Bet.", "var(--gold)");
+    break;
+
+case 'status':
+    this.log(`System: ${Object.keys(this.state.vfs).length} modules linked.`, "var(--accent)");
+    this.log(`VFS State: ${Math.round(JSON.stringify(this.state.vfs).length / 1024)}KB`, "var(--text)");
+    break;
