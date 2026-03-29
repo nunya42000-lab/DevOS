@@ -19,6 +19,8 @@ const ASSETS = [
   'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js',
   'https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js'
+'https://unpkg.com/@rollup/browser@4.13.0/dist/rollup.browser.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'
 ];
 
 self.addEventListener('install', (e) => {
