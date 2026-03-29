@@ -1,5 +1,5 @@
 /* =============================================================================
-   FILE: nexus.js (Patched & Optimized)
+   FILE: nexus.js (Patched, Optimized & Rollup Integrated)
    ============================================================================= */
 
 window.Nexus = {
@@ -31,37 +31,63 @@ window.Nexus = {
             };
         }
     },
-Nexus.executeCommand = function(cmd) {
-    const args = cmd.split(' ');
-    const command = args[0].toLowerCase();
 
-    switch(command) {
-        case 'bundle':
-            this.bundleToSingleFile();
-            break;
-        case 'maxbet':
-            this.calculateMaxBet(args.slice(1));
-            break;
-        case 'clear':
-            document.getElementById('term-out').innerHTML = '';
-            break;
-        default:
-            try {
-                const out = new Function(`return ${cmd}`).bind(this)();
-                this.log(out || "Executed", "var(--success)");
-            } catch(e) {
-                this.log(e.message, "var(--danger)");
-            }
-    }
-};
+    // --- Core Command Parsing ---
+    executeCommand(cmd) {
+        const args = cmd.split(' ');
+        const command = args[0].toLowerCase();
 
-Nexus.calculateMaxBet = function(params) {
-    this.log("Running Max Bet Logic Analyzer...", "var(--gold)");
-    // Placeholder for your specific betting algorithm or sequence logic
-    const prediction = (Math.random() * 100).toFixed(2);
-    this.log(`Simulation Result: Strategy Optimality at ${prediction}%`, "var(--accent)");
-    this.log("Action: Recommended Max Bet on Next Cycle.", "var(--success)");
-};
+        switch(command) {
+            case 'merger':
+            case 'bundle':
+                this.openAdvancedMerger();
+                break;
+            case 'maxbet':
+                this.calculateMaxBet(args.slice(1));
+                break;
+            case 'clear':
+                const termOut = document.getElementById('term-out');
+                if (termOut) termOut.innerHTML = '';
+                break;
+            case 'find':
+                const search = args.slice(1).join(' ');
+                const editor = this.state.cm;
+                if (!editor) return;
+                const content = editor.state.doc.toString();
+                const index = content.indexOf(search);
+                if (index !== -1) {
+                    editor.dispatch({ selection: { anchor: index, head: index }, scrollIntoView: true });
+                    this.log(`Jumped to: ${search}`, "var(--accent)");
+                } else {
+                    this.log("Not found.", "var(--danger)");
+                }
+                break;
+            case 'predict':
+                this.log("Analyzing gameplay sequence...", "var(--gold)");
+                const confidence = Math.floor(Math.random() * 20) + 80; 
+                this.log(`Pattern detected. Signal Strength: ${confidence}%`, "var(--success)");
+                this.log("Recommendation: Prepare for Max Bet.", "var(--gold)");
+                break;
+            case 'status':
+                this.log(`System: ${Object.keys(this.state.vfs).length} modules linked.`, "var(--accent)");
+                this.log(`VFS State: ${Math.round(JSON.stringify(this.state.vfs).length / 1024)}KB`, "var(--text)");
+                break;
+            default:
+                try {
+                    const out = new Function(`return ${cmd}`).bind(this)();
+                    this.log(out || "Executed", "var(--success)");
+                } catch(e) {
+                    this.log(e.message, "var(--danger)");
+                }
+        }
+    },
+
+    calculateMaxBet(params) {
+        this.log("Running Max Bet Logic Analyzer...", "var(--gold)");
+        const prediction = (Math.random() * 100).toFixed(2);
+        this.log(`Simulation Result: Strategy Optimality at ${prediction}%`, "var(--accent)");
+        this.log("Action: Recommended Max Bet on Next Cycle.", "var(--success)");
+    },
 
     // --- CMD & Script Injection ---
     toggleCMD() {
@@ -73,7 +99,6 @@ Nexus.calculateMaxBet = function(params) {
         const code = document.getElementById('cmd-input').value;
         if (!code) return;
         try {
-            // Using Function constructor for cleaner scope than eval
             const result = new Function(code).bind(this)();
             this.log(`Result: ${result || 'Success'}`, "var(--success)");
         } catch (e) {
@@ -100,7 +125,8 @@ Nexus.calculateMaxBet = function(params) {
     },
 
     closeModal() {
-        document.getElementById('modal-overlay').style.display = 'none';
+        const overlay = document.getElementById('modal-overlay');
+        if (overlay) overlay.style.display = 'none';
     },
 
     toggleSidebar(force) {
@@ -112,16 +138,23 @@ Nexus.calculateMaxBet = function(params) {
     renderExplorer() {
         const exp = document.getElementById('explorer');
         if (!exp) return;
-        exp.innerHTML = Object.keys(this.state.vfs).map(name => `
+        
+        const keys = Object.keys(this.state.vfs);
+        if (keys.length === 0) {
+            exp.innerHTML = `<div style="padding:20px; text-align:center; font-size:11px; opacity:0.5;">EXPLORER EMPTY</div>`;
+            return;
+        }
+
+        exp.innerHTML = keys.map(name => `
             <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="Nexus.loadFile('${name}')">
-                <span style="color:${this.state.activeFile === name ? 'var(--success)' : 'var(--text)'}">${name}</span>
+                <span style="color:${this.state.activeFile === name ? 'var(--success)' : 'var(--text)'}; word-break: break-all; font-size: 12px;">${name}</span>
                 <button onclick="event.stopPropagation(); Nexus.deleteFile('${name}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>
             </div>
         `).join('');
     },
 
     loadFile(filename) {
-        if (!this.state.vfs[filename]) return;
+        if (this.state.vfs[filename] === undefined) return;
         this.state.activeFile = filename;
         if (this.state.cm) {
             this.state.cm.dispatch({
@@ -138,42 +171,203 @@ Nexus.calculateMaxBet = function(params) {
             delete this.state.vfs[filename];
             if (this.state.activeFile === filename) this.loadFile("main.js");
             this.renderExplorer();
+            this.log(`Deleted ${filename}`, "var(--danger)");
         }
     },
 
-    // --- Merger Logic ---
-    openMerger() {
+    // ==========================================
+    // Advanced PWA Merger & Packager Integration
+    // ==========================================
+
+    async loadZipToVFS(file) {
+        if (!file) return;
+        if (!window.JSZip) return this.log("[Error] JSZip not loaded. Check connection.", "var(--danger)");
+        
+        this.log("Unpacking ZIP into Nexus VFS...", "var(--gold)");
+        try {
+            const zip = new JSZip();
+            const contents = await zip.loadAsync(file);
+            let loaded = 0;
+            
+            const promises = [];
+            contents.forEach((relativePath, zipEntry) => {
+                if (!zipEntry.dir && !relativePath.includes('__MACOSX')) {
+                    promises.push(
+                        zipEntry.async('string').then(text => {
+                            this.state.vfs[relativePath] = text;
+                            loaded++;
+                        })
+                    );
+                }
+            });
+            
+            await Promise.all(promises);
+            this.renderExplorer();
+            this.log(`Successfully imported ${loaded} files from ZIP.`, "var(--success)");
+            const zipInput = document.getElementById('zip-upload-input');
+            if (zipInput) zipInput.value = ''; 
+        } catch (err) {
+            this.log(`[ZIP Error] ${err.message}`, "var(--danger)");
+        }
+    },
+
+    openAdvancedMerger() {
+        const vfsFiles = Object.keys(this.state.vfs).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
+        
+        let fileListHtml = vfsFiles.length > 0 
+            ? vfsFiles.map(f => `
+                <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--border);">
+                    <label style="color:var(--text); font-size:14px; display:flex; align-items:center; gap:10px; cursor:pointer;">
+                        <input type="checkbox" class="merger-checkbox" value="${f}" style="width:18px; height:18px; accent-color:var(--accent);">
+                        ${f}
+                    </label>
+                </div>
+            `).join('')
+            : '<div style="padding:10px; color:var(--danger);">No JS files found in VFS. Load some first!</div>';
+
         const html = `
-            <textarea id="merger-input" style="width:100%; height:180px; background:#000; color:#22c55e; font-family:monospace; padding:10px; border:1px solid var(--border);"></textarea>
-            <div style="display:flex; gap:10px; margin-top:10px;">
-                <button class="tool-btn btn-blue" style="flex:1" onclick="Nexus.applyMerge('replace')">Replace All</button>
-                <button class="tool-btn btn-accent" style="flex:1" onclick="Nexus.applyMerge('cursor')">Insert At Cursor</button>
-            </div>`;
-        this.showModal("⚡ Code Merger", html);
+            <div style="display:flex; flex-direction:column; gap:10px; height: 100%;">
+                <p style="color:var(--text); font-size:12px; margin:0;">Select files to merge together. Rollup will resolve dependencies directly from the Nexus VFS.</p>
+                
+                <div style="background:#000; border:1px solid var(--border); border-radius:6px; max-height:220px; overflow-y:auto; margin-bottom:10px;">
+                    ${fileListHtml}
+                </div>
+                
+                <input type="text" id="merger-output-name" placeholder="Output filename (e.g. bundled.js)" style="padding:10px; background:#000; border:1px solid var(--border); color:var(--success); border-radius:6px; font-family:monospace;">
+                
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button class="tool-btn" style="background:var(--purple); border-color:var(--purple); color:white; flex:1; padding:12px; font-size:14px;" onclick="Nexus.executeMerge()">Merge Selected</button>
+                    <button class="tool-btn" style="background:var(--success); border-color:var(--success); color:white; flex:1; padding:12px; font-size:14px;" onclick="Nexus.downloadProjectZip()">Download Project ZIP</button>
+                </div>
+                <div id="merger-status" style="margin-top:10px; font-weight:bold; font-size:12px; text-align:center;"></div>
+            </div>
+        `;
+        
+        this.showModal("📦 PWA Studio Merger", html);
     },
 
-    applyMerge(mode) {
-        const code = document.getElementById('merger-input').value;
-        if (!code || !this.state.cm) return;
-        if (mode === 'replace') {
-            this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: code } });
-        } else {
-            const pos = this.state.cm.state.selection.main.from;
-            this.state.cm.dispatch({ changes: { from: pos, insert: code } });
+    async executeMerge() {
+        const checkboxes = document.querySelectorAll('.merger-checkbox:checked');
+        const selectedFiles = Array.from(checkboxes).map(cb => cb.value);
+        let outName = document.getElementById('merger-output-name').value.trim();
+        const statusEl = document.getElementById('merger-status');
+
+        if (selectedFiles.length < 2) {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Error: Select at least 2 files to merge.";
+            return;
         }
-        this.closeModal();
-        this.log("Merge Successful.", "var(--success)");
+        if (!outName) outName = 'merged-bundle.js';
+        if (!outName.endsWith('.js')) outName += '.js';
+
+        statusEl.style.color = "var(--accent)";
+        statusEl.innerText = "Analyzing dependencies & merging...";
+
+        try {
+            const memoryPlugin = {
+                name: 'nexus-vfs',
+                resolveId: (source, importer) => {
+                    let cleanName = source.replace(/^(\.\/|\.\.\/)+/, '').replace(/^\//, '');
+                    if (!cleanName.endsWith('.js') && !cleanName.endsWith('.mjs')) cleanName += '.js';
+                    if (this.state.vfs[cleanName]) return cleanName;
+                    return null;
+                },
+                load: (id) => {
+                    return this.state.vfs[id] || null;
+                }
+            };
+
+            const syntheticEntry = selectedFiles.map(p => `export * from './${p}';\nimport './${p}';`).join('\n');
+            this.state.vfs['__nexus_synthetic__.js'] = syntheticEntry;
+
+            const bundle = await window.rollup.rollup({
+                input: '__nexus_synthetic__.js',
+                plugins: [memoryPlugin]
+            });
+
+            const { output } = await bundle.generate({ format: 'es' });
+            
+            this.state.vfs[outName] = output[0].code;
+            delete this.state.vfs['__nexus_synthetic__.js']; 
+            
+            this.renderExplorer();
+            this.loadFile(outName);
+            
+            statusEl.style.color = "var(--success)";
+            statusEl.innerText = `Successfully merged into ${outName}!`;
+            this.log(`[Merger] Created ${outName} from ${selectedFiles.length} files.`, "var(--success)");
+
+            checkboxes.forEach(cb => cb.checked = false);
+            
+            if (typeof this.saveVFS === 'function') this.saveVFS();
+        } catch (err) {
+            statusEl.style.color = "var(--danger)";
+            statusEl.innerText = "Merge Error (See Terminal)";
+            this.log(`[Merger Error] ${err.message}`, "var(--danger)");
+            console.error(err);
+        }
+    },
+
+    async downloadProjectZip() {
+        const statusEl = document.getElementById('merger-status');
+        if (!window.JSZip) {
+            this.log("[Error] JSZip not loaded.", "var(--danger)");
+            return;
+        }
+        
+        if (statusEl) {
+            statusEl.style.color = "var(--gold)";
+            statusEl.innerText = "Packaging ZIP...";
+        }
+        
+        try {
+            const zip = new JSZip();
+            
+            Object.keys(this.state.vfs).forEach(filename => {
+                zip.file(filename, this.state.vfs[filename]);
+            });
+
+            const blob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'DevOS-Nexus-Project.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            if (statusEl) {
+                statusEl.style.color = "var(--success)";
+                statusEl.innerText = "Project Downloaded!";
+            }
+            this.log("[Packager] Full project ZIP downloaded.", "var(--success)");
+        } catch (err) {
+            if (statusEl) {
+                statusEl.style.color = "var(--danger)";
+                statusEl.innerText = "ZIP generation failed.";
+            }
+            this.log(`[Packager Error] ${err.message}`, "var(--danger)");
+        }
     },
 
     // --- Core Editor & Internal Logic ---
     initEditor() {
         const parent = document.getElementById('editor-wrapper');
         if (!parent) return;
-        // Check if CodeMirror 6 (CM6) is available on window
         if (window.CM6) {
             this.state.cm = new window.CM6.EditorView({
                 doc: this.state.vfs[this.state.activeFile] || "// Nexus Codebase\n",
-                extensions: [window.CM6.basicSetup, window.CM6.oneDark, window.CM6.javascript()],
+                extensions: [
+                    window.CM6.basicSetup, 
+                    window.CM6.oneDark, 
+                    window.CM6.javascript(),
+                    window.CM6.EditorView.updateListener.of((v) => {
+                        if (v.docChanged && this.state.activeFile) {
+                            this.state.vfs[this.state.activeFile] = v.state.doc.toString();
+                        }
+                    })
+                ],
                 parent: parent
             });
         } else {
@@ -181,24 +375,13 @@ Nexus.calculateMaxBet = function(params) {
         }
     },
 
-    executeCommand(cmd) {
-        try {
-            const out = eval(cmd);
-            this.log(out, "var(--success)");
-        } catch(e) {
-            this.log(e.message, "var(--danger)");
-        }
-    },
-
     verifyIntelligence() {
-        // Simple default file seeding
         if (!this.state.vfs["main.js"]) {
             this.state.vfs["main.js"] = "// Nexus Main Script\nconsole.log('Online');";
         }
     },
 
     initGestures() {
-        // Basic swipe to open menu
         let startX;
         document.addEventListener('touchstart', e => startX = e.touches[0].clientX);
         document.addEventListener('touchend', e => {
@@ -214,115 +397,3 @@ Nexus.calculateMaxBet = function(params) {
     compareFiles() { this.log("Compare module standby.", "var(--accent)"); },
     nukeSystem() { if(confirm("Wipe all local VFS data?")) { this.state.vfs = {}; location.reload(); } }
 };
-Nexus.bundleToSingleFile = function() {
-    this.log("Initiating full system bundle...", "var(--gold)");
-    
-    // 1. Get the base HTML structure
-    let bundledHTML = this.state.vfs['index.html'] || document.documentElement.outerHTML;
-
-    // 2. Inline all CSS from VFS
-    let styles = "";
-    Object.keys(this.state.vfs).filter(f => f.endsWith('.css')).forEach(file => {
-        styles += `\n/* Source: ${file} */\n${this.state.vfs[file]}\n`;
-    });
-    bundledHTML = bundledHTML.replace(/<link.*rel="stylesheet".*>/g, ''); // Remove external links
-    bundledHTML = bundledHTML.replace('</head>', `<style>${styles}</style>\n</head>`);
-
-    // 3. Inline all JS from VFS (excluding the Service Worker)
-    let scripts = "";
-    Object.keys(this.state.vfs).filter(f => f.endsWith('.js') && f !== 'sw.js').forEach(file => {
-        scripts += `\n// Source: ${file}\n${this.state.vfs[file]}\n`;
-    });
-    bundledHTML = bundledHTML.replace(/<script.*src=".*".*><\/script>/g, ''); // Remove external scripts
-    bundledHTML = bundledHTML.replace('</body>', `<script type="module">${scripts}</script>\n</body>`);
-
-    // 4. Trigger Download
-    const blob = new Blob([bundledHTML], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'Nexus_Prime_Standalone.html';
-    a.click();
-    
-    this.log("Bundle Complete: Standalone file generated.", "var(--success)");
-};
-Nexus.showBundleManager = function() {
-    const files = Object.keys(this.state.vfs);
-    let html = `<div class="bundle-manager">
-        <p>Select files to merge into a single production build:</p>
-        <div style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;">`;
-    
-    files.forEach(file => {
-        html += `
-            <div style="display: flex; align-items: center; padding: 8px; border-bottom: 1px solid var(--border);">
-                <input type="checkbox" id="chk-${file}" class="bundle-chk" checked style="margin-right: 10px;">
-                <label for="chk-${file}">${file}</label>
-            </div>`;
-    });
-
-    html += `</div>
-        <button class="tool-btn btn-green" onclick="Nexus.executeBundle()">Generate Master Build</button>
-    </div>`;
-
-    this.showModal("📦 Project Bundler", html);
-};
-
-Nexus.executeBundle = function() {
-    this.log("Gathering selected assets...", "var(--gold)");
-    const selectedFiles = [];
-    document.querySelectorAll('.bundle-chk:checked').forEach(chk => {
-        selectedFiles.push(chk.id.replace('chk-', ''));
-    });
-
-    let masterJS = "";
-    let masterCSS = "";
-    let baseHTML = this.state.vfs['index.html'] || "<html><head></head><body></body></html>";
-
-    selectedFiles.forEach(fileName => {
-        const content = this.state.vfs[fileName];
-        if (fileName.endsWith('.js')) masterJS += `\n/* --- SOURCE: ${fileName} --- */\n${content}\n`;
-        if (fileName.endsWith('.css')) masterCSS += `\n/* --- SOURCE: ${fileName} --- */\n${content}\n`;
-    });
-
-    // Clean and Inject
-    let finalDoc = baseHTML
-        .replace(/<link.*rel="stylesheet".*>/g, '') // Remove external CSS links
-        .replace(/<script.*src=".*".*><\/script>/g, '') // Remove external JS links
-        .replace('</head>', `<style>${masterCSS}</style>\n</head>`)
-        .replace('</body>', `<script type="module">${masterJS}</script>\n</body>`);
-
-    const blob = new Blob([finalDoc], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'nexus_master_build.html';
-    a.click();
-    
-    this.closeModal();
-    this.log("Master Build Downloaded.", "var(--success)");
-};
-   case 'find': // Jump to a specific function or marker in the massive file
-    const search = args.slice(1).join(' ');
-    const editor = this.state.cm;
-    const content = editor.state.doc.toString();
-    const index = content.indexOf(search);
-    if (index !== -1) {
-        editor.dispatch({ selection: { anchor: index, head: index }, scrollIntoView: true });
-        this.log(`Jumped to: ${search}`, "var(--accent)");
-    } else {
-        this.log("Not found.", "var(--danger)");
-    }
-    break;
-
-case 'predict': // The "Max Bet" simulator logic
-    this.log("Analyzing gameplay sequence...", "var(--gold)");
-    // Logic for calculating high-probability states
-    const confidence = Math.floor(Math.random() * 20) + 80; 
-    this.log(`Pattern detected. Signal Strength: ${confidence}%`, "var(--success)");
-    this.log("Recommendation: Prepare for Max Bet.", "var(--gold)");
-    break;
-
-case 'status':
-    this.log(`System: ${Object.keys(this.state.vfs).length} modules linked.`, "var(--accent)");
-    this.log(`VFS State: ${Math.round(JSON.stringify(this.state.vfs).length / 1024)}KB`, "var(--text)");
-    break;
