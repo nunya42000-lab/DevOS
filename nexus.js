@@ -1,5 +1,5 @@
 /* =============================================================================
-   FILE: nexus.js (Patched, Optimized & Rollup Integrated)
+   FILE: nexus.js (Omni-Merged Version)
    ============================================================================= */
 
 window.Nexus = {
@@ -9,17 +9,21 @@ window.Nexus = {
         cm: null 
     },
 
-    boot() {
+    async boot() {
         console.log("Nexus Prime: Systems Online.");
         this.initGestures();
         this.verifyIntelligence();
 
-        // Listen for CodeMirror ready signal (if external) or manual init
-        setTimeout(() => {
+        // Load saved state from LocalForage
+        const saved = await localforage.getItem('nexus_vfs_v4');
+        if (saved) this.state.vfs = saved;
+
+        // Listen for CodeMirror ready signal
+        window.addEventListener('cm6-ready', () => {
             this.initEditor();
             this.renderExplorer();
             this.log("DevOS Nexus Prime Initialized.", "var(--success)");
-        }, 100);
+        });
 
         const termIn = document.getElementById('term-in');
         if (termIn) {
@@ -146,8 +150,8 @@ window.Nexus = {
         }
 
         exp.innerHTML = keys.map(name => `
-            <div style="padding:10px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="Nexus.loadFile('${name}')">
-                <span style="color:${this.state.activeFile === name ? 'var(--success)' : 'var(--text)'}; word-break: break-all; font-size: 12px;">${name}</span>
+            <div class="explorer-item ${this.state.activeFile === name ? 'active' : ''}" onclick="Nexus.loadFile('${name}')">
+                <span style="font-size:12px; word-break: break-all;">${name}</span>
                 <button onclick="event.stopPropagation(); Nexus.deleteFile('${name}')" style="background:none; border:none; color:var(--danger); cursor:pointer;">🗑️</button>
             </div>
         `).join('');
@@ -161,6 +165,7 @@ window.Nexus = {
                 changes: { from: 0, to: this.state.cm.state.doc.length, insert: this.state.vfs[filename] }
             });
         }
+        this.toggleSidebar(false);
         this.renderExplorer();
         this.log(`Switched to: ${filename}`, "var(--accent)");
     },
@@ -171,8 +176,14 @@ window.Nexus = {
             delete this.state.vfs[filename];
             if (this.state.activeFile === filename) this.loadFile("main.js");
             this.renderExplorer();
+            this.saveVFS();
             this.log(`Deleted ${filename}`, "var(--danger)");
         }
+    },
+
+    async saveVFS() {
+        await localforage.setItem('nexus_vfs_v4', this.state.vfs);
+        this.log("VFS State Saved to Local Cache.", "var(--success)");
     },
 
     // ==========================================
@@ -181,7 +192,7 @@ window.Nexus = {
 
     async loadZipToVFS(file) {
         if (!file) return;
-        if (!window.JSZip) return this.log("[Error] JSZip not loaded. Check connection.", "var(--danger)");
+        if (!window.JSZip) return this.log("[Error] JSZip not loaded.", "var(--danger)");
         
         this.log("Unpacking ZIP into Nexus VFS...", "var(--gold)");
         try {
@@ -203,7 +214,8 @@ window.Nexus = {
             
             await Promise.all(promises);
             this.renderExplorer();
-            this.log(`Successfully imported ${loaded} files from ZIP.`, "var(--success)");
+            this.saveVFS();
+            this.log(`Successfully imported ${loaded} files.`, "var(--success)");
             const zipInput = document.getElementById('zip-upload-input');
             if (zipInput) zipInput.value = ''; 
         } catch (err) {
@@ -298,8 +310,7 @@ window.Nexus = {
             this.log(`[Merger] Created ${outName} from ${selectedFiles.length} files.`, "var(--success)");
 
             checkboxes.forEach(cb => cb.checked = false);
-            
-            if (typeof this.saveVFS === 'function') this.saveVFS();
+            this.saveVFS();
         } catch (err) {
             statusEl.style.color = "var(--danger)";
             statusEl.innerText = "Merge Error (See Terminal)";
@@ -322,7 +333,6 @@ window.Nexus = {
         
         try {
             const zip = new JSZip();
-            
             Object.keys(this.state.vfs).forEach(filename => {
                 zip.file(filename, this.state.vfs[filename]);
             });
@@ -394,6 +404,11 @@ window.Nexus = {
     // Stubs
     openVault() { this.log("Vault Encrypted. Access Denied.", "var(--gold)"); },
     openIntel() { this.log("Analyzing local data streams...", "var(--gold)"); },
-    compareFiles() { this.log("Compare module standby.", "var(--accent)"); },
-    nukeSystem() { if(confirm("Wipe all local VFS data?")) { this.state.vfs = {}; location.reload(); } }
+    beautifyCode() { this.log("Format module standby.", "var(--accent)"); },
+    nukeSystem() { 
+        if(confirm("Wipe cache?")) { 
+            localforage.clear(); 
+            location.reload(); 
+        } 
+    }
 };
