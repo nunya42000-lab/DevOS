@@ -14,7 +14,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-html.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify-css.min.js"></script>
     
-    <script src="https://unpkg.com/@rollup/browser@4.13.0/dist/rollup.browser.js"></script>
+    <script src="https://unpkg.com/@rollup/browser@3.29.4/dist/rollup.browser.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     
     <script type="module">
@@ -32,6 +32,7 @@
             --success: #238636; --gold: #d29922; --danger: #da3633; --purple: #bb86fc;
         }
 
+        /* --- STRICT FULL-SCREEN LAYOUT --- */
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             background: var(--bg); color: var(--text);
@@ -39,22 +40,34 @@
             overflow: hidden; touch-action: none;
         }
 
-        #nexus-app-root { display: flex; flex-direction: column; height: 100vh; }
+        #nexus-app-root { 
+            display: flex; flex-direction: column; height: 100%; width: 100%; 
+        }
 
         /* --- OMNI RIBBON --- */
-        .omni-ribbon { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; flex-direction: column; }
-        .ribbon-toolbar { padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
-        .ribbon-tabs { display: flex; gap: 4px; padding: 0 10px 10px 10px; overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
+        .omni-ribbon { 
+            background: var(--panel); border-bottom: 1px solid var(--border); 
+            display: flex; flex-direction: column; flex-shrink: 0;
+        }
+        .ribbon-toolbar { 
+            padding: 10px; display: flex; flex-wrap: wrap; gap: 8px; 
+            align-items: center; justify-content: space-between; 
+        }
+        .ribbon-tabs { 
+            display: flex; gap: 6px; padding: 0 10px 10px 10px; 
+            overflow-x: auto; white-space: nowrap; scrollbar-width: none; 
+        }
         .ribbon-tabs::-webkit-scrollbar { display: none; }
         
+        /* Buttons */
         .tool-btn {
             background: var(--surface); color: var(--text); border: 1px solid var(--border);
-            padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+            padding: 8px 12px; border-radius: 6px; font-size: 12px; font-weight: bold; cursor: pointer; white-space: nowrap;
         }
         .tool-btn:active { opacity: 0.8; }
         
-        .tab-btn { background: #000; color: #8b949e; border-color: var(--border); }
-        .tab-btn.active-tab { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .tab-btn { background: transparent; color: #8b949e; border-color: transparent; }
+        .tab-btn.active-tab { background: var(--surface); color: var(--accent); border-color: var(--border); }
 
         .btn-blue { border-color: var(--accent); color: var(--accent); }
         .btn-green { border-color: var(--success); color: var(--success); }
@@ -62,12 +75,19 @@
         .btn-red { border-color: var(--danger); color: var(--danger); }
         .btn-purple { border-color: var(--purple); color: var(--purple); }
 
-        /* Workspace & Panels */
-        .main-container { display: flex; flex: 1; overflow: hidden; position: relative; }
-        .view-panel { flex: 1; display: none; flex-direction: column; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); overflow-y: auto; }
+        /* --- WORKSPACE --- */
+        .main-container { 
+            display: flex; flex: 1; overflow: hidden; position: relative; width: 100%;
+        }
+        
+        .view-panel { 
+            display: none; flex-direction: column; 
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+            background: var(--bg); 
+        }
         .view-panel.active { display: flex; }
 
-        /* Sidebar */
+        /* --- SIDEBAR --- */
         #sidebar {
             position: absolute; left: -280px; top: 0; width: 280px; height: 100%;
             background: var(--panel); border-right: 1px solid var(--border);
@@ -75,29 +95,34 @@
             box-shadow: 10px 0 30px rgba(0,0,0,0.5); display: flex; flex-direction: column;
         }
         #sidebar.active { left: 0; }
-        
         .side-sec { padding: 10px; border-bottom: 1px solid var(--border); }
 
-        /* Editor Addons */
-        #editor-wrapper { flex: 1; background: #000; position: relative; overflow: hidden; }
-        .cm-editor { height: 100%; }
-        #mobile-soft-keys { display: flex; overflow-x: auto; padding: 6px; background: var(--panel); gap: 6px; border-top: 1px solid var(--border); }
-        .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; }
+        /* --- EDITOR OVERRIDES --- */
+        #editor-wrapper { flex: 1; position: relative; overflow: hidden; background: #000; }
+        .cm-editor { height: 100%; width: 100%; outline: none !important; }
+        .cm-scroller { overflow: auto; font-family: 'Fira Code', monospace; }
 
-        /* Preview Addons */
-        #live-preview-frame { width: 100%; flex: 1; border: none; background: #fff; transition: width 0.3s, margin 0.3s; }
-        #ghost-console { height: 150px; background: rgba(0,0,0,0.9); border-top: 2px solid var(--accent); color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; }
-        .preview-controls { padding: 8px; background: var(--panel); display: flex; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--border); }
+        #mobile-soft-keys { 
+            display: flex; overflow-x: auto; padding: 6px; background: var(--panel); 
+            gap: 6px; border-top: 1px solid var(--border); flex-shrink: 0;
+            scrollbar-width: none;
+        }
+        #mobile-soft-keys::-webkit-scrollbar { display: none; }
+        .soft-key { padding: 10px 15px; background: var(--surface); border: 1px solid var(--border); color: var(--accent); border-radius: 4px; font-family: monospace; font-size: 16px; font-weight: bold; flex-shrink: 0; }
 
-        /* Visual Labs */
+        /* --- PREVIEW & MODULES --- */
+        #live-preview-frame { width: 100%; flex: 1; border: none; background: #fff; }
+        #ghost-console { height: 150px; background: rgba(0,0,0,0.9); border-top: 2px solid var(--accent); color: #0f0; font-family: monospace; font-size: 11px; padding: 10px; overflow-y: auto; flex-shrink: 0; }
+        .preview-controls { padding: 8px; background: var(--panel); display: flex; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+
         .tool-card { background: var(--surface); padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid var(--border); cursor: pointer; }
 
-        /* Modals & Overlays */
+        /* Modals */
         #modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 9999; }
-        .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 550px; padding: 20px; border-radius: 8px; }
+        .modal-content { background: var(--panel); border: 1px solid var(--border); width: 90%; max-width: 550px; max-height: 90vh; overflow-y: auto; padding: 20px; border-radius: 8px; }
         
         #search-results-tree { max-height: 150px; overflow-y: auto; margin-top: 10px; font-size: 12px; }
-        .search-hit { padding: 5px; cursor: pointer; border-bottom: 1px solid #222; }
+        .search-hit { padding: 8px 5px; cursor: pointer; border-bottom: 1px solid var(--border); }
         .search-hit:hover { background: var(--surface); }
     </style>
 </head>
@@ -109,11 +134,11 @@
         <div class="ribbon-toolbar">
             <div style="display: flex; gap: 8px; align-items: center;">
                 <button class="tool-btn" onclick="Nexus.toggleSidebar(true)">☰ Files</button>
-                <span style="font-weight: bold; color: var(--accent); font-size: 14px;">DEVOS NEXUS</span>
+                <span style="font-weight: bold; color: var(--text); font-size: 14px;">DEVOS NEXUS</span>
             </div>
             
             <div style="display: flex; gap: 6px; flex-wrap: wrap;">
-                <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ FORMAT</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.beautifyCode()">✨ FMT</button>
                 <button class="tool-btn btn-blue" onclick="Nexus.exportForAI()">🤖 AI TXT</button>
                 
                 <input type="file" id="zip-upload-input" accept=".zip,application/zip" style="display:none" onchange="Nexus.loadZipToVFS(this.files[0])">
@@ -127,11 +152,11 @@
         </div>
 
         <nav class="ribbon-tabs">
-            <button class="tool-btn tab-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">1. Code</button>
-            <button class="tool-btn tab-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">2. Sandbox</button>
-            <button class="tool-btn tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">3. Visual Labs</button>
-            <button class="tool-btn tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">4. Intel</button>
-            <button class="tool-btn tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">5. Time</button>
+            <button class="tool-btn tab-btn active-tab" id="tab-btn-editor" onclick="Nexus.switchTab('editor')">Code</button>
+            <button class="tool-btn tab-btn" id="tab-btn-preview" onclick="Nexus.switchTab('preview')">Sandbox</button>
+            <button class="tool-btn tab-btn" id="tab-btn-visual" onclick="Nexus.switchTab('visual')">Visual Labs</button>
+            <button class="tool-btn tab-btn" id="tab-btn-intel" onclick="Nexus.switchTab('intel')">Intel</button>
+            <button class="tool-btn tab-btn" id="tab-btn-time" onclick="Nexus.switchTab('time')">Time</button>
         </nav>
     </header>
 
@@ -139,12 +164,12 @@
         
         <aside id="sidebar">
             <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: bold; color: var(--accent);">NEXUS EXPLORER</span>
+                <span style="font-weight: bold; color: var(--accent);">EXPLORER</span>
                 <button class="tool-btn" onclick="Nexus.toggleSidebar(false)">✕</button>
             </div>
             
             <div class="side-sec">
-                <input type="text" id="global-search-input" placeholder="Search code..." style="width:100%; padding:8px; background:#000; border:1px solid var(--border); border-radius:4px; color:white; box-sizing:border-box;">
+                <input type="text" id="global-search-input" placeholder="Search code..." style="width:100%; padding:10px; background:#000; border:1px solid var(--border); border-radius:4px; color:white; box-sizing:border-box;">
                 <div id="search-results-tree"></div>
             </div>
 
@@ -158,13 +183,13 @@
 
         <div id="preview-view" class="view-panel">
             <div class="preview-controls">
-                <button class="tool-btn btn-green" onclick="Nexus.refreshLivePreview()">▶ REBUILD & RUN</button>
+                <button class="tool-btn btn-green" onclick="Nexus.refreshLivePreview()">▶ RUN</button>
                 <select class="tool-btn" id="preview-size" onchange="Nexus.resizePreview(this.value)">
                     <option value="100%">Full Screen</option>
                     <option value="375px">iPhone SE</option>
                     <option value="414px">iPhone Pro</option>
                 </select>
-                <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ CMD INJECT</button>
+                <button class="tool-btn btn-blue" onclick="Nexus.toggleCMD()">⚡ INJECT CMD</button>
                 <span id="fps-counter" style="font-size:10px; color:var(--success); font-weight:bold; margin-left:auto;">0 FPS</span>
             </div>
             
@@ -225,12 +250,9 @@
 <script src="./nexus.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Register the Service Worker to make the PWA work offline
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./sw.js').catch(err => console.error('SW Error:', err));
         }
-        
-        // Boot the main app logic
         if (window.Nexus) window.Nexus.boot();
     });
 </script>
