@@ -9,7 +9,9 @@ window.Nexus = {
         cm: null,
         autoSaveTimer: null,
         diffEditorInstance: null,
-        loadedSprite: null
+        loadedSprite: null,
+        fps: 0,
+        lastFrameTime: performance.now()
     },
 
     async boot() {
@@ -21,8 +23,9 @@ window.Nexus = {
         window.addEventListener('cm6-ready', () => {
             this.initEditor();
             this.renderExplorer();
-            this.initMobileSoftKeys(); // Uses the upgraded looping logic now
+            this.initMobileSoftKeys(); 
             this.initSearch();
+            this.initFPSTicker(); // Restored FPS Logic
             
             if (this.state.vfs[this.state.activeFile]) {
                 document.getElementById('active-file-display').innerText = this.state.activeFile;
@@ -31,8 +34,17 @@ window.Nexus = {
         });
     },
 
+    // --- Haptic Feedback (For Pixel 7 Pro) ---
+    triggerHaptic(type = 'light') {
+        if (!navigator.vibrate) return;
+        if (type === 'light') navigator.vibrate(10);
+        else if (type === 'medium') navigator.vibrate(25);
+        else if (type === 'heavy') navigator.vibrate([30, 50, 30]);
+    },
+
     // --- Layout & View Switching ---
     switchTab(tabId) {
+        this.triggerHaptic('light');
         document.querySelectorAll('.tabs-ribbon .tab-btn').forEach(b => b.classList.remove('active-tab'));
         const btn = document.getElementById(`tab-btn-${tabId}`);
         if (btn) btn.classList.add('active-tab');
@@ -94,8 +106,22 @@ window.Nexus = {
         };
     },
 
-    // --- Live Preview & Ghost Console ---
+    // --- Live Preview & Sandbox Controls ---
+    initFPSTicker() {
+        const fpsEl = document.getElementById('fps-counter');
+        const tick = () => {
+            const now = performance.now();
+            const delta = now - this.state.lastFrameTime;
+            this.state.fps = Math.round(1000 / delta);
+            this.state.lastFrameTime = now;
+            if (fpsEl) fpsEl.innerText = `${this.state.fps} FPS`;
+            requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
+    },
+
     refreshLivePreview() {
+        this.triggerHaptic('medium');
         const frame = document.getElementById('live-preview-frame');
         const ghost = document.getElementById('ghost-console');
         if (!frame || !ghost) return;
@@ -132,7 +158,7 @@ window.Nexus = {
         const fullHTML = `
             <!DOCTYPE html>
             <html>
-            <head><style>body { margin: 0; padding: 0; font-family: sans-serif; }</style></head>
+            <head><style>body { margin: 0; padding: 0; font-family: sans-serif; overflow: hidden; }</style></head>
             <body>
                 ${html}
                 ${injection}
@@ -146,11 +172,12 @@ window.Nexus = {
     },
     
     stopSandbox() {
+        this.triggerHaptic('heavy');
         const frame = document.getElementById('live-preview-frame');
         const consoleOut = document.getElementById('ghost-console');
         if (frame) frame.src = 'about:blank';
         if (consoleOut) {
-            consoleOut.innerHTML += '<div style="color:var(--warn); margin-bottom:4px;">> Sandbox execution stopped manually.</div>';
+            consoleOut.innerHTML += '<div style="color:var(--gold); margin-bottom:4px;">> Sandbox execution stopped manually.</div>';
             consoleOut.scrollTop = consoleOut.scrollHeight;
         }
     },
@@ -192,7 +219,6 @@ window.Nexus = {
 
     runDependencyCheck() {
         let html = '';
-        let missingCount = 0;
         const importRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:<script\s+.*?src=['"]([^'"]+)['"])|(?:<link\s+.*?href=['"]([^'"]+)['"])/g;
 
         for (const [fn, code] of Object.entries(this.state.vfs)) {
@@ -204,7 +230,6 @@ window.Nexus = {
                 
                 if (!this.state.vfs[importedPath]) {
                     html += `<div style="color:var(--danger); margin-bottom:4px;">[Missing] <strong>${fn}</strong> imports: <em>${importedPath}</em></div>`;
-                    missingCount++;
                 }
             }
         }
@@ -212,6 +237,7 @@ window.Nexus = {
     },
 
     autoFixCurrentFile() {
+        this.triggerHaptic('medium');
         if(!this.state.activeFile) return;
         const ext = this.state.activeFile.split('.').pop().toLowerCase();
         
@@ -415,31 +441,27 @@ window.Nexus = {
         if (!kb) return;
         kb.innerHTML = '';
         
-        // Extended logic from virtual-keyboard.js (Looping Ribbon)
         const keys = ['{', '}', '(', ')', '[', ']', ';', '=>', '"', "'", '=', '+', '-', ':', '===', '!=='];
-        const tripleKeys = [...keys, ...keys, ...keys]; // Tripled to allow seamless infinite scrolling
+        const tripleKeys = [...keys, ...keys, ...keys]; 
         
         tripleKeys.forEach(key => {
             const btn = document.createElement('button');
             btn.className = 'soft-key';
             btn.innerText = key;
-            btn.onclick = () => this.insertSoftKey(key);
+            btn.onclick = () => {
+                this.triggerHaptic('light');
+                this.insertSoftKey(key);
+            };
             kb.appendChild(btn);
         });
 
-        // Loop detection for ribbon
         kb.onscroll = () => {
-            const itemWidth = 55; // Approx width of each key + gap
+            const itemWidth = 55; 
             const totalWidth = keys.length * itemWidth;
-            
-            if (kb.scrollLeft >= totalWidth * 2) {
-                kb.scrollLeft = totalWidth; 
-            } else if (kb.scrollLeft <= 0) {
-                kb.scrollLeft = totalWidth; 
-            }
+            if (kb.scrollLeft >= totalWidth * 2) kb.scrollLeft = totalWidth; 
+            else if (kb.scrollLeft <= 0) kb.scrollLeft = totalWidth; 
         };
 
-        // Jump to middle on load
         setTimeout(() => kb.scrollLeft = keys.length * 55, 100);
     },
 
@@ -491,7 +513,6 @@ window.Nexus = {
         const h = parseInt(document.getElementById('sprite-h').value) || 32;
         
         let css = `.sprite {\n    background-image: url('YOUR_IMAGE_HERE');\n    display: inline-block;\n    width: ${w}px;\n    height: ${h}px;\n}\n`;
-        
         const cols = Math.floor(this.state.loadedSprite.width / w);
         const rows = Math.floor(this.state.loadedSprite.height / h);
         
@@ -508,16 +529,18 @@ window.Nexus = {
         this.renderExplorer();
         this.loadFile('sprites.css');
         this.switchTab('editor');
-        this.log("Sprite CSS generated and saved to sprites.css", "var(--success)");
+        this.log("Sprite CSS generated and saved.", "var(--success)");
     },
 
     // --- UI Helpers ---
     toggleCMD() {
+        this.triggerHaptic('light');
         const panel = document.getElementById('cmd-panel');
         if (panel) panel.style.bottom = panel.style.bottom === '0px' ? '-400px' : '0px';
     },
 
     runCMD() {
+        this.triggerHaptic('medium');
         const code = document.getElementById('cmd-input').value;
         if (!code) return;
         try {
@@ -540,6 +563,7 @@ window.Nexus = {
         if (overlay) overlay.style.display = 'none';
     },
     toggleSidebar(force) {
+        this.triggerHaptic('light');
         const s = document.getElementById('sidebar');
         if (s) s.classList.toggle('active', force);
     },
@@ -548,7 +572,6 @@ window.Nexus = {
     renderExplorer() {
         const exp = document.getElementById('explorer');
         if (!exp) return;
-        
         const keys = Object.keys(this.state.vfs);
         if (keys.length === 0) {
             exp.innerHTML = `<div style="padding:20px; text-align:center; font-size:11px; opacity:0.5;">EXPLORER EMPTY</div>`;
@@ -564,6 +587,7 @@ window.Nexus = {
     },
 
     loadFile(filename) {
+        this.triggerHaptic('light');
         if (this.state.vfs[filename] === undefined) return;
         this.state.activeFile = filename;
         if (this.state.cm) {
@@ -573,13 +597,13 @@ window.Nexus = {
         }
         this.toggleSidebar(false);
         this.renderExplorer();
-        
         const display = document.getElementById('active-file-display');
         if (display) display.innerText = filename;
     },
 
     deleteFile(filename) {
         if (confirm(`Delete ${filename}?`)) {
+            this.triggerHaptic('heavy');
             delete this.state.vfs[filename];
             if (this.state.activeFile === filename) this.loadFile("main.js");
             this.renderExplorer();
@@ -589,17 +613,17 @@ window.Nexus = {
 
     async saveVFS() {
         await localforage.setItem('nexus_vfs_v4', this.state.vfs);
-        // Automatically push sync state if connected
         if (window.NexusSync && window.NexusSync.pushState) window.NexusSync.pushState();
     },
 
     clearWorkspace() {
-        if (confirm("Permanently wipe all files and data? This cannot be undone.")) {
+        if (confirm("Permanently wipe all files and data?")) {
+            this.triggerHaptic('heavy');
             localforage.clear().then(() => {
                 this.state.vfs = {};
                 this.state.activeFile = null;
                 if (this.state.cm) {
-                    this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: "// Workspace wiped.\\n" } });
+                    this.state.cm.dispatch({ changes: { from: 0, to: this.state.cm.state.doc.length, insert: "" } });
                 }
                 this.renderExplorer();
                 const display = document.getElementById('active-file-display');
@@ -612,6 +636,7 @@ window.Nexus = {
 
     // --- Component & Build Utilities ---
     exportForAI() {
+        this.triggerHaptic('medium');
         let output = "DevOS Project Context\n\n";
         for (const [name, code] of Object.entries(this.state.vfs)) {
             output += `\n--- File: ${name} ---\n${code}\n`;
@@ -624,40 +649,46 @@ window.Nexus = {
     },
 
     beautifyCode() {
+        this.triggerHaptic('medium');
         if (!this.state.activeFile || !this.state.cm) return;
-        
         const code = this.state.cm.state.doc.toString();
         const ext = this.state.activeFile.split('.').pop().toLowerCase();
         let formatted = code;
-        
         try {
             if (ext === 'js' || ext === 'json') formatted = js_beautify(code, { indent_size: 4, space_in_empty_paren: true });
             else if (ext === 'html') formatted = html_beautify(code, { indent_size: 4, wrap_line_length: 120 });
             else if (ext === 'css') formatted = css_beautify(code, { indent_size: 4 });
-            
             if (formatted !== code) {
                 this.state.cm.dispatch({ changes: { from: 0, to: code.length, insert: formatted } });
                 this.saveVFS();
             }
-        } catch (err) {
-            console.error(`Format Error: ${err.message}`);
-        }
+        } catch (err) { console.error(err); }
     },
 
     generateComponent() {
         const name = prompt("Enter Component Name (e.g. 'BetSelector'):");
         if (!name) return;
+        this.triggerHaptic('medium');
         const lowerName = name.toLowerCase();
-        
         this.state.vfs[`${lowerName}.html`] = `<div id="${lowerName}-container">\n    \n</div>`;
         this.state.vfs[`${lowerName}.js`] = `// ${name} Logic\nfunction init${name}() {\n    console.log('${name} Initialized');\n}`;
         this.state.vfs[`${lowerName}.css`] = `#${lowerName}-container {\n    padding: 10px;\n}`;
-
         this.saveVFS();
         this.renderExplorer();
         this.loadFile(`${lowerName}.js`);
         this.switchTab('editor');
-        this.log(`Component ${name} generated.`, "var(--success)");
+    },
+
+    async downloadProjectZip() {
+        this.triggerHaptic('medium');
+        if (!window.JSZip) return alert("JSZip not loaded.");
+        const zip = new JSZip();
+        Object.keys(this.state.vfs).forEach(filename => zip.file(filename, this.state.vfs[filename]));
+        const blob = await zip.generateAsync({ type: "blob" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = 'DevOS-Project.zip';
+        a.click();
     },
 
     async minifyJS(code) {
@@ -672,12 +703,11 @@ window.Nexus = {
     },
 
     async buildForProduction() {
+        this.triggerHaptic('heavy');
         if (!window.JSZip) return alert("JSZip not loaded.");
         this.log("Starting Production Build...", "var(--gold)");
-        
         const zip = new JSZip();
         const buildFolder = zip.folder("production_build");
-
         const jsFiles = Object.keys(this.state.vfs).filter(f => f.endsWith('.js'));
         const cssFiles = Object.keys(this.state.vfs).filter(f => f.endsWith('.css'));
         const otherFiles = Object.keys(this.state.vfs).filter(f => !f.endsWith('.js') && !f.endsWith('.css'));
@@ -686,249 +716,109 @@ window.Nexus = {
             try {
                 const minified = await this.minifyJS(this.state.vfs[file]);
                 buildFolder.file(file, minified);
-            } catch (err) {
-                console.error(`Minification failed for ${file}:`, err);
-                buildFolder.file(file, this.state.vfs[file]);
-            }
+            } catch (err) { buildFolder.file(file, this.state.vfs[file]); }
         }
-
         for (const file of cssFiles) {
             const minifiedCss = this.state.vfs[file].replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
             buildFolder.file(file, minifiedCss);
         }
-
         for (const file of otherFiles) buildFolder.file(file, this.state.vfs[file]);
 
         const content = await zip.generateAsync({ type: "blob" });
         const url = URL.createObjectURL(content);
         const a = document.createElement("a");
-        a.href = url;
-        a.download = `DevOS_Build_${Date.now()}.zip`;
-        document.body.appendChild(a);
+        a.href = url; a.download = `DevOS_Build_${Date.now()}.zip`;
         a.click();
-        document.body.removeChild(a);
-        
         this.log("Production Build Downloaded.", "var(--success)");
     },
 
-    // --- Rollup & Zip ---
     async loadZipToVFS(file) {
         if (!file) return;
+        this.triggerHaptic('medium');
         if (!window.JSZip) return alert("JSZip not loaded.");
         try {
             const zip = new JSZip();
             const contents = await zip.loadAsync(file);
-            let loaded = 0;
             const promises = [];
             contents.forEach((relativePath, zipEntry) => {
                 if (!zipEntry.dir && !relativePath.includes('__MACOSX')) {
-                    promises.push(
-                        zipEntry.async('string').then(text => {
-                            this.state.vfs[relativePath] = text;
-                            loaded++;
-                        })
-                    );
+                    promises.push(zipEntry.async('string').then(text => { this.state.vfs[relativePath] = text; }));
                 }
             });
             await Promise.all(promises);
             this.renderExplorer();
             this.saveVFS();
-            const zipInput = document.getElementById('zip-upload-input');
-            if (zipInput) zipInput.value = ''; 
-        } catch (err) {
-            alert(`ZIP Error: ${err.message}`);
-        }
+        } catch (err) { alert(err.message); }
     },
 
     openAdvancedMerger() {
+        this.triggerHaptic('light');
         const vfsFiles = Object.keys(this.state.vfs).filter(f => f.endsWith('.js') || f.endsWith('.mjs'));
         let fileListHtml = vfsFiles.length > 0 
-            ? vfsFiles.map(f => `
-                <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--border);">
-                    <label style="color:var(--text); font-size:14px; display:flex; align-items:center; gap:10px; cursor:pointer;">
-                        <input type="checkbox" class="merger-checkbox" value="${f}" style="width:18px; height:18px; accent-color:var(--accent);">
-                        ${f}
-                    </label>
-                </div>
-            `).join('')
-            : '<div style="padding:10px; color:var(--danger);">No JS files found in VFS.</div>';
+            ? vfsFiles.map(f => `<div style="padding:8px; border-bottom:1px solid var(--border);"><label style="display:flex; align-items:center; gap:10px;"><input type="checkbox" class="merger-checkbox" value="${f}"> ${f}</label></div>`).join('')
+            : '<div style="padding:10px; color:var(--danger);">No JS files found.</div>';
 
-        const html = `
-            <div style="display:flex; flex-direction:column; gap:10px; height: 100%;">
-                <div style="background:#000; border:1px solid var(--border); border-radius:6px; max-height:220px; overflow-y:auto; margin-bottom:10px;">
-                    ${fileListHtml}
-                </div>
-                <input type="text" id="merger-output-name" placeholder="Output filename (e.g. bundled.js)" style="padding:10px; background:#000; border:1px solid var(--border); color:var(--success); border-radius:6px; font-family:monospace;">
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button class="btn-purple" style="flex:1;" onclick="Nexus.executeMerge()">Merge Selected</button>
-                </div>
-                <div id="merger-status" style="margin-top:10px; font-weight:bold; font-size:12px; text-align:center;"></div>
-            </div>
-        `;
+        const html = `<div style="display:flex; flex-direction:column; gap:10px;"><div style="background:#000; border-radius:6px; max-height:220px; overflow-y:auto;">${fileListHtml}</div><input type="text" id="merger-output-name" placeholder="bundled.js" style="padding:10px; background:#000; color:white; border:1px solid var(--border);"><button class="btn-purple" style="padding:10px;" onclick="Nexus.executeMerge()">Merge Selected</button><div id="merger-status"></div></div>`;
         this.showModal("📦 PWA Studio Merger", html);
     },
 
     async executeMerge() {
+        this.triggerHaptic('medium');
         const checkboxes = document.querySelectorAll('.merger-checkbox:checked');
         const selectedFiles = Array.from(checkboxes).map(cb => cb.value);
-        let outName = document.getElementById('merger-output-name').value.trim();
+        let outName = document.getElementById('merger-output-name').value.trim() || 'merged-bundle.js';
         const statusEl = document.getElementById('merger-status');
-
-        if (selectedFiles.length < 2) { 
-            statusEl.style.color = "var(--danger)";
-            statusEl.innerText = "Select at least 2 files."; 
-            return; 
-        }
+        if (selectedFiles.length < 2) return;
         
-        if (!outName) outName = 'merged-bundle.js';
-        if (!outName.endsWith('.js')) outName += '.js';
-
-        statusEl.style.color = "var(--accent)";
         statusEl.innerText = "Merging...";
-
         try {
-            const memoryPlugin = {
-                name: 'nexus-vfs',
-                resolveId: (source) => {
-                    let cleanName = source.replace(/^(\.\/|\.\.\/)+/, '').replace(/^\//, '');
-                    if (!cleanName.endsWith('.js')) cleanName += '.js';
-                    return this.state.vfs[cleanName] ? cleanName : null;
-                },
-                load: (id) => this.state.vfs[id] || null
-            };
-
-            const syntheticEntry = selectedFiles.map(p => `export * from './${p}';\nimport './${p}';`).join('\n');
-            this.state.vfs['__nexus_synthetic__.js'] = syntheticEntry;
-
-            const bundle = await window.rollup.rollup({
-                input: '__nexus_synthetic__.js',
-                plugins: [memoryPlugin]
-            });
-
+            const memoryPlugin = { name: 'nexus-vfs', resolveId: (id) => id, load: (id) => this.state.vfs[id] || null };
+            const entry = selectedFiles.map(p => `import './${p}';`).join('\n');
+            this.state.vfs['__temp_entry__.js'] = entry;
+            const bundle = await window.rollup.rollup({ input: '__temp_entry__.js', plugins: [memoryPlugin] });
             const { output } = await bundle.generate({ format: 'es' });
-            
             this.state.vfs[outName] = output[0].code;
-            delete this.state.vfs['__nexus_synthetic__.js']; 
-            
+            delete this.state.vfs['__temp_entry__.js'];
             this.renderExplorer();
             this.loadFile(outName);
-            
-            statusEl.style.color = "var(--success)";
-            statusEl.innerText = `Success: Created ${outName}`;
             this.saveVFS();
-            
-        } catch (err) {
-            statusEl.style.color = "var(--danger)";
-            statusEl.innerText = `Merge Error: ${err.message}`; 
-            console.error(err);
-        }
+            this.closeModal();
+        } catch (err) { statusEl.innerText = err.message; }
     }
 };
 
-/* =============================================================================
-   Appended Core Systems: Sync Engine & Smart Code Injector
-   ============================================================================= */
-
-// PeerJS Networking Engine
+/* --- Sync & Injector --- */
 window.NexusSync = {
-    peer: null,
-    conn: null,
-    isSyncing: false,
-
+    peer: null, conn: null, isSyncing: false,
     init() {
-        if (!window.Peer) {
-            window.Nexus.log("[Sync] PeerJS library not loaded.", "var(--danger)");
-            return;
-        }
-        window.Nexus.log("[Sync] Initializing PeerJS...", "var(--gold)");
-        
+        if (!window.Peer) return;
         this.peer = new Peer(); 
-        this.peer.on('open', (id) => {
-            window.Nexus.log(`[Sync] Online! Your Host ID: ${id}`, "var(--success)");
-            alert(`Your Host ID is: ${id}\nShare this so others can connect.`);
-        });
-
-        this.peer.on('connection', (connection) => {
-            this.conn = connection;
-            this.setupConnection();
-            window.Nexus.log(`[Sync] Peer connected: ${connection.peer}`, "var(--accent)");
-        });
-
-        this.peer.on('error', (err) => {
-            window.Nexus.log(`[Sync Error] ${err.type}`, "var(--danger)");
-        });
+        this.peer.on('open', (id) => alert(`Host ID: ${id}`));
+        this.peer.on('connection', (c) => { this.conn = c; this.setup(); });
     },
-
-    connect(targetId) {
+    connect(id) {
         if (!this.peer) this.peer = new Peer(); 
-
-        window.Nexus.log(`[Sync] Connecting to ${targetId}...`, "var(--gold)");
-        
-        this.peer.on('open', () => {
-            this.conn = this.peer.connect(targetId);
-            this.conn.on('open', () => {
-                this.setupConnection();
-                window.Nexus.log(`[Sync] Successfully connected to ${targetId}!`, "var(--success)");
-            });
-        });
+        this.peer.on('open', () => { this.conn = this.peer.connect(id); this.conn.on('open', () => this.setup()); });
     },
-
-    setupConnection() {
-        this.conn.on('data', (data) => {
-            if (data.type === 'vfs_sync') {
+    setup() {
+        this.conn.on('data', (d) => {
+            if (d.type === 'vfs_sync') {
                 this.isSyncing = true;
-                window.Nexus.state.vfs = data.vfs;
+                window.Nexus.state.vfs = d.vfs;
                 window.Nexus.renderExplorer();
-                if (window.Nexus.state.vfs[window.Nexus.state.activeFile] !== undefined) {
-                    window.Nexus.loadFile(window.Nexus.state.activeFile);
-                }
-                window.Nexus.log("[Sync] Files updated from peer.", "var(--accent)");
                 setTimeout(() => { this.isSyncing = false; }, 100);
             }
         });
-        this.conn.on('close', () => {
-            window.Nexus.log("[Sync] Connection closed.", "var(--warn)");
-            this.conn = null;
-        });
     },
-
-    pushState() {
-        if (!this.conn || this.isSyncing) return;
-        this.conn.send({ type: 'vfs_sync', vfs: window.Nexus.state.vfs });
-    }
+    pushState() { if (this.conn && !this.isSyncing) this.conn.send({ type: 'vfs_sync', vfs: window.Nexus.state.vfs }); }
 };
 
-// Global Code Injector Class
 window.CodeInjector = class CodeInjector {
-    static inject(currentContent, patchContent, anchorLabel) {
-        const startMarker = `// START: ${anchorLabel}`;
-        const endMarker = `// END: ${anchorLabel}`;
-
-        const startIndex = currentContent.indexOf(startMarker);
-        const endIndex = currentContent.indexOf(endMarker);
-
-        if (startIndex === -1 || endIndex === -1) {
-            console.error(`Markers for "${anchorLabel}" not found.`);
-            return { error: "Markers not found", content: currentContent };
-        }
-
-        const contentBefore = currentContent.substring(0, startIndex + startMarker.length);
-        const existingLogic = currentContent.substring(startIndex + startMarker.length, endIndex).trim();
-        const contentAfter = currentContent.substring(endIndex);
-
-        if (existingLogic.length > 0 && existingLogic !== patchContent.trim()) {
-            return {
-                status: "CONFLICT",
-                current: existingLogic,
-                incoming: patchContent,
-                apply: (choice) => {
-                    const finalContent = choice === 'incoming' ? patchContent : existingLogic;
-                    return `${contentBefore}\n${finalContent}\n${contentAfter}`;
-                }
-            };
-        }
-
-        const merged = `${contentBefore}\n${patchContent}\n${contentAfter}`;
-        return { status: "SUCCESS", content: merged };
+    static inject(current, patch, anchor) {
+        const sm = `// START: ${anchor}`, em = `// END: ${anchor}`;
+        const si = current.indexOf(sm), ei = current.indexOf(em);
+        if (si === -1 || ei === -1) return { error: "Markers not found", content: current };
+        const pre = current.substring(0, si + sm.length), post = current.substring(ei);
+        return { status: "SUCCESS", content: `${pre}\n${patch}\n${post}` };
     }
 };
