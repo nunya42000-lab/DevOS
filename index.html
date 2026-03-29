@@ -91,22 +91,62 @@
     </div>
 
     <div class="app-container">
-        <aside class="sidebar" id="ui-sidebar">
-            <div style="padding: 15px; border-bottom: 1px solid var(--border);">
-                <div class="file-upload-wrapper">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <span style="font-size: 12px; font-weight: bold; color: var(--accent);">📁 WORKSPACE</span>
-                    </div>
-                    <button class="btn-primary" style="width:100%; padding: 6px;" onclick="createNewFile()">+ NEW FILE</button>
-                    <input type="file" multiple id="file-input" onchange="loadFiles(event)" style="margin-top: 10px; width: 100%; font-size: 12px; color: transparent;">
+        <aside id="ui-sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <h2>DevOS <span style="color:var(--warn)">Ultimate</span></h2>
+                <button onclick="toggleSidebar()" class="mobile-only btn-danger" style="padding: 2px 6px;">✖</button>
+            </div>
+            
+            <div class="sidebar-actions" style="padding: 10px; display: flex; gap: 5px; flex-wrap: wrap;">
+                <button class="btn-primary" onclick="createNewFile()" title="Create a new file">+ New</button>
+                <button class="btn-primary" onclick="document.getElementById('file-upload').click()" title="Import Files">📁 Import</button>
+                <input type="file" id="file-upload" multiple accept=".js,.html,.css,.json,.txt,.zip,.md" style="display: none;" onchange="handleFileInput(event)">
+                <button class="btn-warn" onclick="switchTab('help')" title="Documentation & Help">❓ Help</button>
+            </div>
+
+            <div class="accordion">
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>📂 Explorer</span><span class="chevron">▶</span>
+                </div>
+                <div class="accordion-content open"><div id="file-list"></div></div>
+                
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>🌿 Branches</span><span class="chevron">▶</span>
+                </div>
+                <div class="accordion-content">
+                    <button class="btn-primary" style="width:100%; margin-bottom:5px;" onclick="createNewBranch()">+ New Branch</button>
+                    <div id="branch-list" style="font-size: 12px; margin-top: 10px;"></div>
+                </div>
+
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>🔐 Vault</span><span class="chevron">▶</span>
+                </div>
+                <div class="accordion-content">
+                    <button class="btn-primary" style="width:100%; margin-bottom:10px;" onclick="compileSelected()">Compile Vault</button>
+                    <div id="vault-list"></div>
+                </div>
+                
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>🔍 Search</span><span class="chevron">▶</span>
+                </div>
+                <div class="accordion-content">
+                    <input type="text" id="global-search-input" placeholder="Search codebase..." style="width:100%; padding:8px; margin-bottom:10px; border-radius:4px; border:1px solid var(--border); background:var(--bg); color:var(--text);">
+                    <div id="search-results-tree"></div>
+                </div>
+
+                <div class="accordion-header" onclick="toggleAccordion(this)">
+                    <span>🆔 Declarations</span><span class="chevron">▶</span>
+                </div>
+                <div class="accordion-content">
+                    <button class="btn-primary" style="width:100%; margin-bottom:10px;" onclick="scanDeclarations()">Scan Project IDs</button>
+                    <div id="declarations-list" style="font-size: 12px;"></div>
                 </div>
             </div>
-            <div id="file-list" style="flex:1; overflow-y: auto;"></div>
-            <div style="padding: 15px; border-top: 1px solid var(--border); display: flex; gap: 5px;">
-                <button class="btn-outline" style="flex:1; font-size: 11px;" onclick="exportProject()">Export Zip</button>
+            
+            <div class="sidebar-footer" style="padding: 15px;">
+                <button class="btn-warn" style="width:100%; margin-bottom:5px;" onclick="openSettings()">⚙️ Settings & Shortcuts</button>
             </div>
         </aside>
-
         <main class="main-content">
             
             <div id="view-editor" class="panel-box active">
