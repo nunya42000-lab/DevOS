@@ -439,6 +439,40 @@ window.NexusSync = {
         if (this.conn) this.conn.send({ type: 'vfs_sync', vfs: window.Nexus.state.vfs });
     }
 };
+Nexus.TerminalExtensions = {
+    // 1. Permanent Save to LocalForage
+    async forceSave() {
+        Nexus.triggerHaptic('heavy');
+        await localforage.setItem('devos_vfs', Nexus.state.vfs);
+        return "VFS Synchronized to IndexedDB.";
+    },
 
+    // 2. The "Bundle" Command: Move JS into HTML
+    bundleToHTML() {
+        let html = Nexus.state.vfs['index.html'];
+        if (!html) return "Error: No index.html found.";
+
+        // Gather all JS content
+        let combinedJS = "";
+        Object.keys(Nexus.state.vfs).forEach(file => {
+            if (file.endsWith('.js') && file !== 'nexus.js') {
+                combinedJS += `\n/* --- Source: ${file} --- */\n${Nexus.state.vfs[file]}\n`;
+            }
+        });
+
+        // Inject before </body>
+        const scriptTag = `\n<script>\n${combinedJS}\n<\/script>\n`;
+        if (html.includes('</body>')) {
+            html = html.replace('</body>', `${scriptTag}</body>`);
+        } else {
+            html += scriptTag;
+        }
+
+        Nexus.state.vfs['index.html'] = html;
+        Nexus.saveVFS();
+        return "All JavaScript bundled into index.html successfully.";
+    }
+};
+   
 // Start Kernel
-window.addEventListener('DOMContentLoaded', () => window.Nexus.boot());
+.addEventListener('DOMContentLoaded', () => window.Nexus.boot());
