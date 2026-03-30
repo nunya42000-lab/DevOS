@@ -3,13 +3,10 @@
  * ------------------------------------------
  * Combines the Dashboard UI, the Auto-Fixer, the core AST Analyzer,
  * and the Project-Wide Scanner into a single unified file.
- */
+================================================= */
 
-import * as acorn from 'acorn';
+import * as acorn from 'https://esm.sh/acorn@8.11.3';
 
-/* =========================================================
-   1. SENTINEL DASHBOARD (UI Component)
-   ========================================================= */
 export class SentinelDashboard {
   constructor(containerId, onFixRequest) {
     this.container = document.getElementById(containerId);
