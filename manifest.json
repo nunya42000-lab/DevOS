@@ -1,21 +1,16 @@
 {
   "name": "DevOS Nexus Prime",
-  "short_name": "Nexus",
-  "start_url": "./index.html",
+  "short_name": "DevOS",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
-  "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icon-512.png",
+      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968292.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
