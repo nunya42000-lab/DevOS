@@ -138,18 +138,8 @@ class DevOSSentinel {
 }
 
    
-    // UI Feedback
-    triggerHaptic(type = 'light') {
-        if (!navigator.vibrate) return;
-        navigator.vibrate(type === 'heavy' ? 50 : 15);
-    },
-
-    initEditor() {
-        this.state.cm = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
-            mode: "javascript", theme: "dracula", lineNumbers: true, autoCloseBrackets: true, lineWrapping: true
-        });
-    },
-
+    
+    
 
 window.Nexus = {
     state: { 
