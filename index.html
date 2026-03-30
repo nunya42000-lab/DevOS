@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0d1117">
-    <title>DevOS Nexus Prime</title>
+    <title>DevOS Nexus Prime v3.0</title>
     <link rel="manifest" href="manifest.json">
     <style>
         :root {
@@ -12,115 +12,131 @@
             --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
             --success: #3fb950; --warn: #d29922; --danger: #f85149;
             --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            --gutter-bg: #0d1117; --gutter-text: #484f58;
         }
 
-        /* Outdoor Mode High-Contrast Override */
         body.outdoor-mode {
             --bg: #ffffff; --panel: #f0f0f0; --surface: #e0e0e0;
             --border: #000000; --text: #000000; --accent: #004dc7; --gold: #855d00;
+            --gutter-bg: #f6f8fa; --gutter-text: #57606a;
         }
 
         * { box-sizing: border-box; user-select: none; }
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
-        
         #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
-        
-        /* Ribbon */
-        #ribbon-toolbar { height: 50px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
+
+        /* UI Components */
+        #ribbon-toolbar { height: 50px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch; }
         #ribbon-toolbar::-webkit-scrollbar { display: none; }
-        .ribbon-track { display: flex; align-items: center; height: 100%; padding: 0 10px; gap: 10px; width: max-content; }
-        .tool-btn { padding: 8px 16px; border-radius: 20px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-        body.outdoor-mode .tool-btn { border: 2px solid #000; font-weight: 800; }
+        .ribbon-track { display: inline-flex; align-items: center; height: 100%; padding: 0 10px; gap: 8px; }
+        .tool-btn { padding: 6px 14px; border-radius: 15px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 11px; font-weight: 600; cursor: pointer; }
         .btn-red { color: var(--danger); border-color: var(--danger); }
 
-        /* Workspace */
-        #editor-wrapper { flex: 1; position: relative; background: #000; display: flex; flex-direction: column; }
-        body.outdoor-mode #editor-wrapper { background: #fff; }
-        #editor-guard { display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; background: inherit; border-bottom: 1px solid var(--border); }
+        /* Editor Architecture */
+        #editor-container { flex: 1; display: flex; overflow: hidden; background: #000; position: relative; }
+        body.outdoor-mode #editor-container { background: #fff; }
         
-        /* Panels */
-        .side-panel { position: fixed; top: 0; bottom: 0; width: 85vw; max-width: 350px; background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        #gutter { width: 45px; background: var(--gutter-bg); border-right: 1px solid var(--border); color: var(--gutter-text); font-family: monospace; font-size: 12px; padding-top: 15px; text-align: right; padding-right: 10px; line-height: 20px; pointer-events: none; overflow: hidden; }
+        
+        #editor-wrapper { flex: 1; position: relative; }
+        #raw-terminal { 
+            width: 100%; height: 100%; background: transparent; color: inherit; 
+            border: none; padding: 15px 15px; font-family: 'Courier New', monospace; 
+            font-size: 14px; line-height: 20px; outline: none; resize: none; 
+            tab-size: 2; -moz-tab-size: 2; white-space: pre; overflow: auto;
+        }
+
+        /* Panels & Modals */
+        .side-panel { position: fixed; top: 0; bottom: 0; width: 85vw; max-width: 350px; background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; }
         .left-panel { left: 0; transform: translateX(-105%); border-right: 2px solid var(--gold); }
         .right-panel { right: 0; transform: translateX(105%); border-left: 2px solid var(--accent); }
         .side-panel.open { transform: translateX(0); }
-        .panel-header { padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-weight: bold; }
-        .panel-content { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        .panel-header { padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .panel-content { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; }
+
+        #status-bar { height: 25px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; gap: 20px; color: var(--gutter-text); }
         
-        /* Overlay */
-        #cmd-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: none; align-items: flex-start; justify-content: center; padding-top: 15vh; }
+        #cmd-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 3000; display: none; align-items: flex-start; justify-content: center; padding-top: 15vh; }
         #cmd-prompt { width: 90%; background: var(--surface); border: 1px solid var(--accent); border-radius: 8px; padding: 15px; display: flex; align-items: center; }
-        #cmd-input { flex: 1; background: transparent; border: none; color: inherit; font-family: monospace; outline: none; font-size: 16px; }
-        
-        #omni-canvas { position: fixed; inset: 0; z-index: 9999; pointer-events: none; }
-        .intel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
+        #cmd-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; font-size: 16px; outline: none; }
+
+        .intel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 10px; }
+        .fix-btn { margin-top: 8px; background: var(--success); color: #fff; border: none; padding: 4px 10px; border-radius: 4px; font-size: 10px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <canvas id="omni-canvas"></canvas>
     <div id="cmd-overlay"><div id="cmd-prompt"><span style="color:var(--success);margin-right:10px;">nexus&gt;</span><input type="text" id="cmd-input"></div></div>
 
     <aside id="panel-left" class="side-panel left-panel">
-        <div class="panel-header"><span style="color:var(--gold)">VORTEX EXPLORER</span><button class="close-btn" data-target="panel-left" style="background:none;border:none;color:inherit;font-size:20px;">&times;</button></div>
+        <div class="panel-header"><span style="color:var(--gold)">EXPLORER</span><button class="close-btn" data-target="panel-left" style="background:none;border:none;color:inherit;font-size:24px;">&times;</button></div>
         <div class="panel-content">
-            <div style="margin-bottom: 20px;">
-                <div style="font-size: 10px; color: var(--gold); margin-bottom: 8px; letter-spacing: 1px;">DATA MANAGEMENT</div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <button class="tool-btn" id="btn-import" style="width: 100%;">📥 Import</button>
-                    <button class="tool-btn" id="btn-export" style="width: 100%;">📤 Export</button>
-                </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px;">
+                <button class="tool-btn" id="btn-import">Import</button>
+                <button class="tool-btn" id="btn-export">Export</button>
             </div>
-            <div id="explorer-list">
-                <div style="font-size: 10px; opacity: 0.5; margin-bottom: 8px;">ACTIVE SESSION</div>
-                <div class="intel-card" style="border-left: 2px solid var(--gold);">
-                    <div style="font-size: 12px;">pattern_stream.js</div>
-                    <div style="font-size: 10px; opacity: 0.6;">Primary Data Buffer</div>
-                </div>
+            <div id="file-list">
+                <div class="intel-card" style="border-left: 2px solid var(--gold);">main.js</div>
             </div>
         </div>
     </aside>
 
     <aside id="panel-right" class="side-panel right-panel">
-        <div class="panel-header"><span style="color:var(--accent)">NEURAL INTEL</span><button class="close-btn" data-target="panel-right" style="background:none;border:none;color:inherit;font-size:20px;">&times;</button></div>
+        <div class="panel-header"><span style="color:var(--accent)">SENTINEL INTEL</span><button class="close-btn" data-target="panel-right" style="background:none;border:none;color:inherit;font-size:24px;">&times;</button></div>
         <div class="panel-content">
-            <div id="neural-review" style="background:rgba(210,153,34,0.1); padding:10px; border-radius:6px; margin-bottom:15px; font-size:11px;">Awaiting scan...</div>
+            <div id="neural-summary" style="padding:10px; border-radius:4px; font-size:11px; margin-bottom:15px; background: rgba(63, 185, 80, 0.1);">✅ System Stable</div>
             <div id="intel-list"></div>
         </div>
     </aside>
 
     <main id="app-root">
         <nav id="ribbon-toolbar"><div class="ribbon-track">
-            <button class="tool-btn" id="btn-vortex">🌌 Vortex</button>
+            <button class="tool-btn" id="btn-vortex">📁 Files</button>
             <button class="tool-btn" id="btn-intel">🧠 Intel</button>
             <button class="tool-btn" id="btn-sun">☀️ Outdoor</button>
-            <button class="tool-btn" id="btn-cmd">⌨️ CMD</button>
-            <button class="tool-btn" onclick="location.reload()">🔄 Reset</button>
+            <button class="tool-btn" id="btn-tab">⇥ Tab</button>
+            <button class="tool-btn" id="btn-run" style="color:var(--success)">▶ Run</button>
+            <button class="tool-btn" id="btn-cmd">⌨ CMD</button>
         </div></nav>
-        
-        <header id="editor-guard">
-            <div class="file-info"><span style="color:var(--gold)">nexus_core.js</span></div>
-            <div style="font-size:11px; opacity:0.8;">PROXIMITY: ACTIVE</div>
-        </header>
 
-        <div id="editor-wrapper"><textarea id="raw-terminal" spellcheck="false" style="width:100%;height:100%;background:transparent;color:inherit;border:none;padding:15px;font-family:monospace;font-size:14px;outline:none;resize:none;"></textarea></div>
+        <div id="editor-container">
+            <div id="gutter">1</div>
+            <div id="editor-wrapper">
+                <textarea id="raw-terminal" autocomplete="off" spellcheck="false" placeholder="Write code here..."></textarea>
+            </div>
+        </div>
+
+        <footer id="status-bar">
+            <div id="stat-pos">LN 1, COL 1</div>
+            <div id="stat-health">HEALTH: 100%</div>
+            <div style="margin-left: auto; color: var(--accent);">DEVOS NEXUS PRIME</div>
+        </footer>
     </main>
 
     <script type="module">
         import * as acorn from "https://esm.sh/acorn@8.11.3";
 
-        // --- ENGINES ---
+        const editor = document.getElementById('raw-terminal');
+        const gutter = document.getElementById('gutter');
+        const intelList = document.getElementById('intel-list');
+        const intelBtn = document.getElementById('btn-intel');
+
         const Sentinel = {
             analyze(code) {
+                const issues = [];
                 try {
                     const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
-                    const issues = [];
                     this.traverse(ast, (node) => {
-                        if (['WhileStatement', 'ForStatement'].includes(node.type) && node.test?.value === true) 
-                            issues.push({ severity: 'CRITICAL', message: 'Infinite Loop detected.', line: node.loc.start.line });
-                        if (node.type === 'VariableDeclarator' && node.id.name?.toLowerCase().includes('key') && typeof node.init?.value === 'string')
-                            issues.push({ severity: 'HIGH', message: 'Hardcoded Secret Key.', line: node.loc.start.line });
+                        if (['WhileStatement', 'ForStatement'].includes(node.type) && node.test?.value === true) {
+                            issues.push({ id: 'LOOP', severity: 'CRITICAL', message: 'Infinite Loop detected', line: node.loc.start.line });
+                        }
+                        if (node.type === 'VariableDeclarator' && node.id.name?.toLowerCase().includes('key') && node.init?.type === 'Literal') {
+                            issues.push({ id: 'KEY', severity: 'HIGH', message: 'Secret key leaked', line: node.loc.start.line });
+                        }
                     });
-                    return issues;
-                } catch (e) { return [{ severity: 'ERROR', message: 'Syntax Error' }]; }
+                } catch (e) {
+                    issues.push({ id: 'SYNTAX', severity: 'ERROR', message: 'Syntax: ' + e.message.split(' (')[0], line: e.loc?.line || '?' });
+                }
+                return issues;
             },
             traverse(node, cb) {
                 if (!node) return; cb(node);
@@ -130,81 +146,104 @@
             }
         };
 
-        // --- UI LOGIC ---
-        const textArea = document.getElementById('raw-terminal');
-        let lastIssues = [];
+        const updateUI = () => {
+            const lines = editor.value.split('\n');
+            gutter.innerHTML = lines.map((_, i) => i + 1).join('<br>');
+            
+            // Sync gutter scroll
+            gutter.scrollTop = editor.scrollTop;
 
-        const init = () => {
-            textArea.value = "// DevOS Terminal\n// Log patterns below...\n\n";
+            // Cursor position
+            const textBefore = editor.value.substring(0, editor.selectionStart);
+            const lineNum = textBefore.split('\n').length;
+            const colNum = textBefore.length - textBefore.lastIndexOf('\n');
+            document.getElementById('stat-pos').innerText = `LN ${lineNum}, COL ${colNum}`;
 
-            textArea.addEventListener('input', () => {
-                const issues = Sentinel.analyze(textArea.value);
-                const list = document.getElementById('intel-list');
-                const btn = document.getElementById('btn-intel');
-                list.innerHTML = issues.map(i => `<div class="intel-card"><b style="color:var(--danger)">[${i.severity}]</b> ${i.message}</div>`).join('');
-                btn.classList.toggle('btn-red', issues.length > 0);
-                document.getElementById('neural-review').innerText = issues.length > 0 ? "⚠️ Anomaly Detected." : "✅ Logic Stable.";
-            });
-
-            // Ribbon Clones
-            const track = document.querySelector('.ribbon-track');
-            track.innerHTML += track.innerHTML;
-
-            // Swipes (Bypass OS Bezel)
-            let startX = 0; let startY = 0;
-            document.addEventListener('touchstart', e => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; }, { passive: true });
-            document.addEventListener('touchend', e => {
-                const diffX = e.changedTouches[0].clientX - startX;
-                const diffY = e.changedTouches[0].clientY - startY;
-                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
-                    if (startX < 65 && diffX > 0) document.getElementById('panel-left').classList.add('open');
-                    if (startX > window.innerWidth - 65 && diffX < 0) document.getElementById('panel-right').classList.add('open');
-                }
-            }, { passive: true });
-
-            // Buttons
-            document.getElementById('btn-vortex').onclick = () => document.getElementById('panel-left').classList.add('open');
-            document.getElementById('btn-intel').onclick = () => document.getElementById('panel-right').classList.add('open');
-            document.getElementById('btn-cmd').onclick = () => { document.getElementById('cmd-overlay').style.display = 'flex'; document.getElementById('cmd-input').focus(); };
-            document.querySelectorAll('.close-btn').forEach(b => b.onclick = () => document.getElementById(b.dataset.target).classList.remove('open'));
-
-            // Outdoor Toggle
-            document.getElementById('btn-sun').onclick = () => {
-                document.body.classList.toggle('outdoor-mode');
-                document.getElementById('btn-sun').innerText = document.body.classList.contains('outdoor-mode') ? "🌑 Indoor" : "☀️ Outdoor";
-            };
-
-            // CMD
-            document.getElementById('cmd-input').onkeydown = (e) => {
-                if (e.key === 'Enter') {
-                    try { eval(e.target.value); } catch(err) { alert(err.message); }
-                    e.target.value = ''; document.getElementById('cmd-overlay').style.display = 'none';
-                }
-            };
-
-            // Import/Export
-            document.getElementById('btn-export').onclick = () => {
-                const blob = new Blob([textArea.value], { type: 'text/plain' });
-                const a = document.createElement('a');
-                a.download = `nexus_log_${new Date().getTime()}.txt`;
-                a.href = URL.createObjectURL(blob);
-                a.click();
-            };
-            document.getElementById('btn-import').onclick = () => {
-                const input = document.createElement('input'); input.type = 'file';
-                input.onchange = e => {
-                    const reader = new FileReader();
-                    reader.onload = ev => { textArea.value = ev.target.result; textArea.dispatchEvent(new Event('input')); };
-                    reader.readAsText(e.target.files[0]);
-                };
-                input.click();
-            };
-
-            // PWA
-            if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+            // Sentinel Analysis
+            const issues = Sentinel.analyze(editor.value);
+            intelList.innerHTML = issues.map(i => `
+                <div class="intel-card">
+                    <b style="color:var(--danger)">[${i.severity}]</b> Line ${i.line}: ${i.message}
+                    ${i.id === 'LOOP' ? '<br><button class="fix-btn" onclick="window.fixLoop()">Auto-Fix</button>' : ''}
+                </div>
+            `).join('');
+            
+            intelBtn.classList.toggle('btn-red', issues.length > 0);
+            document.getElementById('stat-health').innerText = `HEALTH: ${Math.max(0, 100 - (issues.length * 20))}%`;
+            document.getElementById('neural-summary').innerText = issues.length > 0 ? "⚠️ Anomaly Detected." : "✅ System Stable";
         };
 
-        init();
+        // Editor Functions
+        window.fixLoop = () => {
+            editor.value = editor.value.replace(/while\s*\(\s*true\s*\)/g, 'while(false /* Fixed */)');
+            updateUI();
+        };
+
+        const insertTab = () => {
+            const start = editor.selectionStart;
+            const end = editor.selectionEnd;
+            editor.value = editor.value.substring(0, start) + "  " + editor.value.substring(end);
+            editor.selectionStart = editor.selectionEnd = start + 2;
+            updateUI();
+        };
+
+        // Event Listeners
+        editor.addEventListener('input', updateUI);
+        editor.addEventListener('scroll', () => gutter.scrollTop = editor.scrollTop);
+        editor.addEventListener('click', updateUI);
+        editor.addEventListener('keyup', updateUI);
+
+        editor.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                insertTab();
+            }
+        });
+
+        document.getElementById('btn-tab').onclick = (e) => { e.preventDefault(); editor.focus(); insertTab(); };
+        
+        document.getElementById('btn-sun').onclick = () => {
+            document.body.classList.toggle('outdoor-mode');
+            document.getElementById('btn-sun').innerText = document.body.classList.contains('outdoor-mode') ? "🌑 Indoor" : "☀️ Outdoor";
+        };
+
+        document.getElementById('btn-run').onclick = () => {
+            try {
+                const log = console.log;
+                let output = "";
+                console.log = (msg) => { output += msg + "\n"; };
+                eval(editor.value);
+                console.log = log;
+                alert(output || "Executed successfully (no output)");
+            } catch (e) { alert("Execution Error: " + e.message); }
+        };
+
+        // UI Management
+        document.getElementById('btn-vortex').onclick = () => document.getElementById('panel-left').classList.add('open');
+        document.getElementById('btn-intel').onclick = () => document.getElementById('panel-right').classList.add('open');
+        document.getElementById('btn-cmd').onclick = () => { document.getElementById('cmd-overlay').style.display = 'flex'; document.getElementById('cmd-input').focus(); };
+        document.querySelectorAll('.close-btn').forEach(b => b.onclick = () => document.getElementById(b.dataset.target).classList.remove('open'));
+
+        // Swipes
+        let startX = 0;
+        document.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+        document.addEventListener('touchend', e => {
+            const diffX = e.changedTouches[0].clientX - startX;
+            if (startX < 65 && diffX > 60) document.getElementById('panel-left').classList.add('open');
+            if (startX > window.innerWidth - 65 && diffX < -60) document.getElementById('panel-right').classList.add('open');
+        }, { passive: true });
+
+        // CMD
+        document.getElementById('cmd-input').onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                try { eval(e.target.value); } catch(err) { alert(err.message); }
+                e.target.value = ''; document.getElementById('cmd-overlay').style.display = 'none';
+            }
+        };
+
+        // Initialize
+        editor.value = "/* DevOS Nexus Prime */\n\nfunction nexusCore() {\n  console.log('System initialized.');\n}\n\nnexusCore();";
+        updateUI();
     </script>
 </body>
 </html>
