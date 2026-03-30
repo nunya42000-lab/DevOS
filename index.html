@@ -34,17 +34,21 @@
         }
 
         * { box-sizing: border-box; }
-        button { cursor: pointer; border: none; border-radius: 6px; font-weight: 600; padding: 6px 12px; }
+        button { cursor: pointer; border: none; border-radius: 6px; font-weight: 600; padding: 6px 12px; transition: 0.2s; }
+        button:active { opacity: 0.7; }
+
         .btn-primary { background: var(--success); color: white; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
         .btn-danger { background: var(--danger); color: white; }
 
         .app-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         
+        /* Sidebars */
         .sidebar { 
             width: 280px; background: var(--surface); border-right: 1px solid var(--border); 
             position: fixed; left: 0; top: 0; height: 100vh; z-index: 2000; 
             transform: translateX(-100%); transition: transform 0.3s ease;
+            display: flex; flex-direction: column;
         }
         .sidebar.open { transform: translateX(0); }
 
@@ -63,6 +67,12 @@
         }
         .sidebar-bottom.open { transform: translateY(0); }
 
+        /* Accordion UI */
+        .accordion-header { padding: 12px 15px; background: var(--surface-light); border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; }
+        .accordion-content { display: none; padding: 5px; }
+        .accordion-content.open { display: block; }
+
+        /* Tabs & Editor */
         .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; height: 50px; padding: 0 5px; }
         .tab { padding: 10px 15px; cursor: pointer; color: #888; border-bottom: 2px solid transparent; }
         .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
@@ -76,7 +86,7 @@
 
         #terminal-log { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 13px; color: #aaa; }
         .terminal-input-row { display: flex; align-items: center; padding: 10px; background: #111; gap: 10px; }
-        #terminal-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; }
+        #terminal-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; width: 100%; }
 
         #preview-frame { border: none; flex: 1; background: #fff; }
         #console-output { background: #050505; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; height: 150px; overflow-y: auto; }
@@ -129,7 +139,7 @@
         <div id="terminal-log"><div>Nexus Kernel v4.2 Online. Type 'help' for commands.</div></div>
         <div class="terminal-input-row">
             <span style="color:var(--success)">$</span>
-            <input type="text" id="terminal-input" placeholder="Type command...">
+            <input type="text" id="terminal-input" placeholder="Type 'patch-ui' to upgrade sidebar...">
             <button class="btn-primary" onclick="Nexus.Terminal.run()">ENTER</button>
         </div>
     </div>
@@ -154,7 +164,6 @@
 
         const Nexus = {
             async boot() {
-                // Init Editor
                 cmEditor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
                     mode: "javascript", theme: "dracula", lineNumbers: true,
                     autoCloseBrackets: true, lineWrapping: true
@@ -165,19 +174,16 @@
                     saveTimer = setTimeout(() => this.saveVFS(), 1000);
                 });
 
-                // Load Data
                 const saved = await localforage.getItem('devos_vfs');
                 if (saved) vfs = saved;
                 
                 this.rebuildSidebar();
                 if (Object.keys(vfs).length > 0) this.openFile(Object.keys(vfs)[0]);
 
-                // Terminal Listener
                 document.getElementById('terminal-input').addEventListener('keydown', (e) => {
                     if (e.key === 'Enter') this.Terminal.run();
                 });
 
-                // Console Listener
                 window.addEventListener('message', e => {
                     const out = document.getElementById('console-output');
                     if (e.data.type === 'log') out.innerHTML += `<div style="color:#888">▶ ${e.data.data}</div>`;
@@ -196,8 +202,9 @@
 
             rebuildSidebar() {
                 const list = document.getElementById('file-list');
+                if(!list) return;
                 list.innerHTML = Object.keys(vfs).map(fn => `
-                    <div style="padding:8px; border-bottom:1px solid #222; cursor:pointer; ${fn === currentFileName ? 'color:var(--accent)' : ''}" onclick="Nexus.openFile('${fn}')">
+                    <div style="padding:8px; border-bottom:1px solid #222; cursor:pointer; font-size:13px; ${fn === currentFileName ? 'color:var(--accent)' : ''}" onclick="Nexus.openFile('${fn}')">
                         📄 ${fn}
                     </div>
                 `).join('');
@@ -258,91 +265,88 @@
                 document.getElementById(`view-${id}`).classList.add('active');
                 el.classList.add('active');
                 if(id === 'editor') cmEditor.refresh();
+            }
+        };
+
+        // --- Terminal System (Fixed & Nested) ---
+        Nexus.Terminal = {
+            async run() {
+                const input = document.getElementById('terminal-input');
+                const log = document.getElementById('terminal-log');
+                const rawInput = input.value.trim();
+                if (!rawInput) return;
+
+                log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${rawInput}</div>`;
+                const args = rawInput.split(' ');
+                const cmd = args[0].toLowerCase();
+                let feedback = "";
+
+                if (cmd === 'patch-ui') {
+                    feedback = await this.patchUI();
+                } else if (cmd === 'save') {
+                    await Nexus.saveVFS();
+                    feedback = "VFS Saved.";
+                } else if (cmd === 'help') {
+                    feedback = "Commands: patch-ui, save, cls, help";
+                } else if (cmd === 'cls') {
+                    log.innerHTML = ""; input.value = ""; return;
+                } else {
+                    feedback = `Unknown command: ${cmd}`;
+                }
+
+                log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${feedback}</div>`;
+                input.value = '';
+                log.scrollTop = log.scrollHeight;
             },
 
-            Nexus.Terminal = {
-    async run() {
-        const input = document.getElementById('terminal-input');
-        const log = document.getElementById('terminal-log');
-        const rawInput = input.value.trim();
-        if (!rawInput) return;
-
-        log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${rawInput}</div>`;
-        const args = rawInput.split(' ');
-        const cmd = args[0].toLowerCase();
-        let feedback = "";
-
-        switch(cmd) {
-            case 'patch-ui':
-                // 1. Generate the new Sidebar HTML
-                const newSidebarHTML = this.getUltimateSidebarHTML();
-                
-                // 2. Get current code from editor
-                let currentCode = cmEditor.getValue();
-                
-                // 3. Regex find the <aside id="ui-sidebar"> block and replace its guts
-                const sidebarRegex = /(<aside id="ui-sidebar"[^>]*>)([\s\S]*?)(<\/aside>)/;
-                
-                if (sidebarRegex.test(currentCode)) {
-                    // Update the editor content permanently
-                    const updatedCode = currentCode.replace(sidebarRegex, `$1${newSidebarHTML}$3`);
-                    cmEditor.setValue(updatedCode);
-                    
-                    // 4. Trigger an immediate VFS save
-                    await Nexus.saveVFS();
-                    feedback = "SUCCESS: Source code modified & VFS saved. Refresh to see permanent UI.";
-                } else {
-                    feedback = "ERROR: Could not find <aside id='ui-sidebar'> in source.";
-                }
-                break;
-
-            case 'save':
-                await Nexus.saveVFS();
-                feedback = "VFS Synced.";
-                break;
-
-            case 'cls':
-                log.innerHTML = ""; input.value = ""; return;
-
-            default:
-                feedback = `Unknown command. Try 'patch-ui' to permanently upgrade sidebar.`;
-        }
-
-        log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${feedback}</div>`;
-        input.value = '';
-        log.scrollTop = log.scrollHeight;
-    },
-
-    getUltimateSidebarHTML() {
-        return `
-        <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-            <h3 style="margin:0">DevOS <span style="color:var(--accent)">Ultimate</span></h3>
-            <button onclick="Nexus.toggleLeftSidebar(false)" style="background:var(--danger); color:white; border-radius:4px; padding:2px 8px;">✖</button>
-        </div>
-        <div style="padding: 12px; display: flex; gap: 8px; border-bottom:1px solid var(--border);">
-            <button class="btn-primary" style="flex:1;" onclick="Nexus.createNewFile()">+ New</button>
-            <button class="btn-outline" style="flex:1; background:#e3b341; color:#000;" onclick="document.getElementById('file-upload').click()">📁 Import</button>
-            <button class="btn-outline" style="flex:1; background:#d29922; color:#000;">❓ Help</button>
-        </div>
-        <div class="accordion">
-            <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:var(--warn)">📂 Explorer</div>
-            <div class="accordion-content open" id="file-list"></div>
-            <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#7ee787">🌿 Branches</div>
-            <div class="accordion-content" style="padding:10px;">
-                <button class="btn-primary" style="width:100%;">+ New Branch</button>
-                <div style="margin-top:10px; color:var(--accent)">● main</div>
+            async patchUI() {
+                const ultimateSidebarHTML = `
+            <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+                <h3 style="margin:0"><span style="color:var(--accent)">DevOS</span> <span style="color:var(--warn)">Ultimate</span></h3>
+                <button onclick="Nexus.toggleLeftSidebar(false)" style="background:var(--danger); color:white; border-radius:4px; padding:2px 8px;">✖</button>
             </div>
-            <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#e3b341">🔐 Vault</div>
-            <div class="accordion-content" style="padding:10px;">
-                <button class="btn-primary" style="width:100%;">Compile Vault</button>
+            <div style="padding: 12px; display: flex; gap: 5px; border-bottom:1px solid var(--border);">
+                <button class="btn-primary" style="flex:1; font-size:11px;" onclick="Nexus.createNewFile()">+ New</button>
+                <button class="btn-primary" style="flex:1; font-size:11px; background:#e3b341; color:#000;">📁 Import</button>
+                <button class="btn-outline" style="flex:1; font-size:11px; background:var(--warn); color:#000;">❓ Help</button>
             </div>
-        </div>
-        <div style="padding:10px; margin-top:auto;">
-            <button style="width:100%; background:#e3b341; color:#000; padding:10px; font-weight:bold;">⚙️ Settings</button>
-        </div>`;
-    }
-};
+            <div style="flex:1; overflow-y:auto;">
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:var(--warn)">📂 Explorer <span>▼</span></div>
+                <div class="accordion-content open" id="file-list"></div>
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#7ee787">🌿 Branches <span>▶</span></div>
+                <div class="accordion-content" style="padding:10px;">
+                    <button class="btn-primary" style="width:100%; margin-bottom:10px;">+ Branch</button>
+                    <div style="color:var(--accent); border:1px solid var(--accent); padding:5px; border-radius:4px;">● main</div>
+                </div>
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#e3b341">🔐 Vault <span>▶</span></div>
+                <div class="accordion-content" style="padding:10px;">
+                    <button class="btn-primary" style="width:100%;">Compile Vault</button>
+                </div>
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:var(--accent)">🔍 Search <span>▶</span></div>
+                <div class="accordion-content" style="padding:10px;">
+                    <input type="text" placeholder="Search..." style="width:100%; background:#000; border:1px solid #333; color:#fff; padding:5px;">
+                </div>
+            </div>
+            <div style="padding:10px; border-top:1px solid var(--border);">
+                <button style="width:100%; background:var(--warn); color:#000; padding:10px; font-weight:bold; border-radius:6px;">⚙️ Settings</button>
+            </div>`;
 
+                try {
+                    let code = cmEditor.getValue();
+                    const sidebarRegex = /(<aside id="ui-sidebar"[^>]*>)([\s\S]*?)(<\/aside>)/;
+
+                    if (sidebarRegex.test(code)) {
+                        const updatedCode = code.replace(sidebarRegex, \`$1\${ultimateSidebarHTML}$3\`);
+                        cmEditor.setValue(updatedCode);
+                        await Nexus.saveVFS();
+                        document.getElementById('ui-sidebar').innerHTML = ultimateSidebarHTML;
+                        Nexus.rebuildSidebar(); 
+                        return "SUCCESS: Permanent UI Patch Applied.";
+                    }
+                    return "ERROR: Sidebar tag not found in source.";
+                } catch (e) { return "PATCH FAILED: " + e.message; }
+            }
+        };
 
         window.onload = () => Nexus.boot();
     </script>
