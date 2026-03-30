@@ -115,67 +115,73 @@
     </main>
 
     <iframe id="chronos-sandbox" style="display: none;"></iframe>
-      
-             <script type="module">
-        try {
-            // Switched to jsDelivr (+esm) which handles mobile CORS and flattening much better
-            import { basicSetup } from "https://cdn.jsdelivr.net/npm/codemirror@6.0.1/+esm";
-            import { EditorState } from "https://cdn.jsdelivr.net/npm/@codemirror/state@6.4.1/+esm";
-            import { EditorView } from "https://cdn.jsdelivr.net/npm/@codemirror/view@6.26.0/+esm";
-            import { javascript } from "https://cdn.jsdelivr.net/npm/@codemirror/lang-javascript@6.2.2/+esm";
-            import { oneDark } from "https://cdn.jsdelivr.net/npm/@codemirror/theme-one-dark@6.1.2/+esm";
+          <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const editorParent = document.getElementById("primary-editor");
+            if (!editorParent) return;
 
-            document.addEventListener("DOMContentLoaded", () => {
-                const editorParent = document.getElementById("primary-editor");
-                if (!editorParent) return;
-                
-                const updateCallbacks = [];
-
-                const state = EditorState.create({
-                    doc: "// DevOS Nexus Prime Active.\n// Sentinel Core Online...\n// Begin typing to engage heuristics.\n\n",
-                    extensions: [
-                        basicSetup,
-                        javascript(), 
-                        oneDark,      
-                        EditorView.theme({
-                            "&": { height: "100%", fontSize: "14px" },
-                            ".cm-scroller": { overflow: "auto" }
-                        }),
-                        EditorView.updateListener.of((update) => {
-                            updateCallbacks.forEach(cb => cb(update));
-                        })
-                    ]
-                });
-
-                const view = new EditorView({
-                    state,
-                    parent: editorParent
-                });
-
-                window.myEditor = view;
-                window.myEditor.onUpdate = (callback) => {
-                    updateCallbacks.push(callback);
-                };
-
-                console.log("[Nexus] CodeMirror mounted successfully.");
-            });
+            // 1. Inject a native, unblockable text area
+            editorParent.innerHTML = `
+                <textarea id="raw-terminal" spellcheck="false" 
+                style="width: 100%; height: 100%; background: #000; color: #c9d1d9; border: none; outline: none; font-family: monospace; font-size: 14px; padding: 10px; resize: none;"></textarea>
+            `;
             
-        } catch (error) {
-            // If the CDN or local server blocks it, print the error directly to the UI
-            document.addEventListener("DOMContentLoaded", () => {
-                const editorParent = document.getElementById("primary-editor");
-                if (editorParent) {
-                    editorParent.innerHTML = `
-                        <div style="color: var(--danger); padding: 20px; font-family: monospace; border: 1px solid var(--danger); margin: 10px; border-radius: 8px; background: rgba(248, 81, 73, 0.1);">
-                            <h3>⚠️ Editor Mount Failure</h3>
-                            <p>${error.message}</p>
-                            <p style="font-size: 11px; color: var(--text); opacity: 0.7;">Check your network connection, or your mobile editor is blocking external CDN scripts.</p>
-                        </div>
-                    `;
-                }
+            const textArea = document.getElementById("raw-terminal");
+            textArea.value = "// DevOS Terminal Active.\n// Zero-Dependency Mode Online.\n// Paste your script here to engage Sentinel...\n\n";
+
+            // 2. Create a "Ghost" CodeMirror object so wires.js doesn't crash
+            const updateCallbacks = [];
+            
+            window.myEditor = {
+                state: {
+                    doc: {
+                        toString: () => textArea.value
+                    }
+                },
+                dispatch: (action) => {
+                    // This allows SentinelFixer to auto-update the text area
+                    if (action.changes && action.changes.insert !== undefined) {
+                        textArea.value = action.changes.insert;
+                    }
+                },
+                onUpdate: (cb) => updateCallbacks.push(cb)
+            };
+
+            // 3. Tell wires.js to run Sentinel whenever you type
+            textArea.addEventListener('input', () => {
+                updateCallbacks.forEach(cb => cb({
+                    docChanged: true,
+                    state: window.myEditor.state
+                }));
             });
-        }
+
+            // 4. Activate the CMD Overlay to execute scripts
+            const cmdInput = document.getElementById('cmd-input');
+            const cmdOverlay = document.getElementById('cmd-overlay');
+            if (cmdInput) {
+                // Remove any old listeners from wires.js by cloning the node
+                const newCmdInput = cmdInput.cloneNode(true);
+                cmdInput.parentNode.replaceChild(newCmdInput, cmdInput);
+                
+                newCmdInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        try {
+                            const result = eval(newCmdInput.value);
+                            console.log("[CMD Result]:", result);
+                            alert("Result: " + (result !== undefined ? result : "Executed Successfully"));
+                        } catch(err) {
+                            alert("CMD Error: " + err.message);
+                        }
+                        newCmdInput.value = '';
+                        if (cmdOverlay) cmdOverlay.classList.remove('active');
+                    }
+                });
+            }
+
+            console.log("[Nexus] Native Terminal Editor mounted. Firewall bypassed.");
+        });
     </script>
+
 
     
     <script type="module" src="wires.js"></script>
