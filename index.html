@@ -189,7 +189,24 @@
                     <button class="tool-btn" onclick="insertSymbol('`')">`</button>
                     <button class="tool-btn" onclick="insertSymbol('$', true)">${}</button>
                 </div>
-                
+                <div id="bottom-terminal" class="sidebar-bottom">
+    <div class="terminal-header">
+        <span>COMMAND PROMPT</span>
+        <div style="display:flex; gap:10px;">
+            <button onclick="Nexus.saveVFS()" style="background:var(--success); color:white; font-size:10px; padding:2px 6px;">SAVE VFS</button>
+            <button onclick="toggleTerminal()" style="background:transparent; color:white; border:none;">✖</button>
+        </div>
+    </div>
+    <div id="terminal-log" style="flex:1; padding:10px; font-family:monospace; color:#fff; overflow-y:auto; font-size: 13px;">
+        <div>System Online. Ready for instructions.</div>
+    </div>
+    <div class="terminal-input-row" style="display:flex; align-items:center; background:#000; padding:5px 10px;">
+        <span style="color:var(--success); margin-right:8px;">$</span>
+        <input type="text" id="terminal-input" placeholder="Type command..." style="flex:1; background:transparent; border:none; color:white; outline:none;">
+        <button id="term-enter-btn" class="btn-primary" style="padding:8px 15px; margin-left:10px;">ENTER</button>
+    </div>
+</div>
+
                 <textarea id="code-editor"></textarea>
             </div>
 
@@ -229,20 +246,6 @@
         <div id="console-output"></div>
     </aside>
 
-    <div id="bottom-terminal" class="sidebar-bottom">
-        <div style="background:#111; padding:5px 15px; font-size:12px; display:flex; justify-content:space-between;">
-            <span>DEV_OS TERMINAL</span>
-            <button onclick="toggleTerminal()" style="background:none; color:white;">✖</button>
-        </div>
-        <div id="terminal-log" style="flex:1; padding:10px; font-family:monospace; overflow-y:auto;">
-            <div style="color:var(--success)">Nexus System Online. Type 'help' to begin.</div>
-        </div>
-        <div style="display:flex; padding:10px; background:#000;">
-            <span style="color:var(--success); margin-right:10px;">$</span>
-            <input type="text" id="terminal-input" style="flex:1; background:none; border:none; color:white; outline:none; margin:0;">
-        </div>
-    </div>
-    
     <div id="status-msg" class="status-flash">Changes Saved</div>
 
     <script>
