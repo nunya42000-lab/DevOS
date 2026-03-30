@@ -56,6 +56,61 @@ window.Nexus = {
         if (tabId === 'intel') this.updateProjectStats();
         if (tabId === 'diagnostic') this.refreshStorageInspector();
         if (tabId === 'time') this.initDiffViewer();
+ // Navigation & Sidebar Logic
+function toggleLeftSidebar(state) {
+    const sb = document.getElementById('ui-sidebar');
+    sb.classList.toggle('open', state);
+}
+
+function toggleRightSidebar(state) {
+    const rb = document.getElementById('testing-sidebar');
+    rb.classList.toggle('open', state);
+}
+
+function toggleCommandPrompt() {
+    const tb = document.getElementById('bottom-terminal');
+    tb.classList.toggle('open');
+    if (tb.classList.contains('open')) {
+        document.getElementById('terminal-input').focus();
+    }
+}
+
+function runTestingPanel() {
+    toggleRightSidebar(true);
+    if (window.Nexus) window.Nexus.refreshLivePreview(); // Triggers existing preview logic
+}
+
+// Swipe Gesture Implementation
+let touchStartX = 0;
+let touchStartY = 0;
+
+document.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].screenX;
+    touchStartY = e.changedTouches[0].screenY;
+}, false);
+
+document.addEventListener('touchend', e => {
+    const touchEndX = e.changedTouches[0].screenX;
+    const diffX = touchEndX - touchStartX;
+    const edgeThreshold = 40; // Sensitivity for edge swipes
+
+    // Open Left Sidebar (Swipe from left edge)
+    if (touchStartX < edgeThreshold && diffX > 50) {
+        toggleLeftSidebar(true);
+    }
+    
+    // Open Testing Sidebar (Swipe from right edge)
+    if (touchStartX > (window.innerWidth - edgeThreshold) && diffX < -50) {
+        runTestingPanel();
+    }
+
+    // Close Sidebars (Regular swipe away from the sidebar)
+    if (Math.abs(diffX) > 100) {
+        if (diffX < 0) toggleLeftSidebar(false); // Swipe left closes left sidebar
+        if (diffX > 0) toggleRightSidebar(false); // Swipe right closes right sidebar
+    }
+}, false);
+       
     },
 
     // --- PeerJS Sync Module ---
