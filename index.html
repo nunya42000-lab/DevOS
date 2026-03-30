@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <link rel="manifest" href="manifest.json">
-    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0d1117">
-    <title>DevOS Nexus Prime: Master Monolith</title>
+    <title>DevOS Nexus Prime</title>
+    <link rel="manifest" href="manifest.json">
     <style>
         :root {
             --bg: #0d1117; --panel: #161b22; --surface: #21262d;
@@ -14,30 +13,46 @@
             --success: #3fb950; --warn: #d29922; --danger: #f85149;
             --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         }
+
+        /* Outdoor Mode High-Contrast Override */
+        body.outdoor-mode {
+            --bg: #ffffff; --panel: #f0f0f0; --surface: #e0e0e0;
+            --border: #000000; --text: #000000; --accent: #004dc7; --gold: #855d00;
+        }
+
         * { box-sizing: border-box; user-select: none; }
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
+        
         #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
+        
+        /* Ribbon */
         #ribbon-toolbar { height: 50px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
         #ribbon-toolbar::-webkit-scrollbar { display: none; }
         .ribbon-track { display: flex; align-items: center; height: 100%; padding: 0 10px; gap: 10px; width: max-content; }
         .tool-btn { padding: 8px 16px; border-radius: 20px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-        .btn-gold { color: var(--gold); border-color: var(--gold); }
+        body.outdoor-mode .tool-btn { border: 2px solid #000; font-weight: 800; }
         .btn-red { color: var(--danger); border-color: var(--danger); }
+
+        /* Workspace */
         #editor-wrapper { flex: 1; position: relative; background: #000; display: flex; flex-direction: column; }
-        #editor-guard { display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; background: #000; border-bottom: 1px solid var(--border); }
-        .side-panel { position: fixed; top: 0; bottom: 0; width: 85vw; max-width: 350px; background: rgba(22, 27, 34, 0.98); backdrop-filter: blur(10px); border: 1px solid var(--border); z-index: 2000; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; }
-        .left-panel { left: 0; transform: translateX(-105%); border-right: 1px solid var(--accent); }
-        .right-panel { right: 0; transform: translateX(105%); border-left: 1px solid var(--gold); }
+        body.outdoor-mode #editor-wrapper { background: #fff; }
+        #editor-guard { display: flex; justify-content: space-between; align-items: center; padding: 8px 15px; background: inherit; border-bottom: 1px solid var(--border); }
+        
+        /* Panels */
+        .side-panel { position: fixed; top: 0; bottom: 0; width: 85vw; max-width: 350px; background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(0,0,0,0.5); }
+        .left-panel { left: 0; transform: translateX(-105%); border-right: 2px solid var(--gold); }
+        .right-panel { right: 0; transform: translateX(105%); border-left: 2px solid var(--accent); }
         .side-panel.open { transform: translateX(0); }
         .panel-header { padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; font-weight: bold; }
         .panel-content { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+        
+        /* Overlay */
         #cmd-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 3000; display: none; align-items: flex-start; justify-content: center; padding-top: 15vh; }
         #cmd-prompt { width: 90%; background: var(--surface); border: 1px solid var(--accent); border-radius: 8px; padding: 15px; display: flex; align-items: center; }
-        #cmd-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; font-size: 16px; }
+        #cmd-input { flex: 1; background: transparent; border: none; color: inherit; font-family: monospace; outline: none; font-size: 16px; }
+        
         #omni-canvas { position: fixed; inset: 0; z-index: 9999; pointer-events: none; }
-        #omni-canvas.active { pointer-events: auto; background: rgba(47, 129, 247, 0.05); }
-        .intel-card { background: #1a1f26; border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
-        .neural-box { background: rgba(210, 153, 34, 0.1); border: 1px solid var(--gold); padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 11px; }
+        .intel-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
@@ -45,134 +60,151 @@
     <div id="cmd-overlay"><div id="cmd-prompt"><span style="color:var(--success);margin-right:10px;">nexus&gt;</span><input type="text" id="cmd-input"></div></div>
 
     <aside id="panel-left" class="side-panel left-panel">
-        <div class="panel-header"><span style="color:var(--gold)">VORTEX GRAPH</span><button onclick="document.getElementById('panel-left').classList.remove('open')" style="background:none;border:none;color:#fff;font-size:20px;">&times;</button></div>
-        <div class="panel-content" id="vortex-content">Initializing Graph...</div>
+        <div class="panel-header"><span style="color:var(--gold)">VORTEX EXPLORER</span><button class="close-btn" data-target="panel-left" style="background:none;border:none;color:inherit;font-size:20px;">&times;</button></div>
+        <div class="panel-content">
+            <div style="margin-bottom: 20px;">
+                <div style="font-size: 10px; color: var(--gold); margin-bottom: 8px; letter-spacing: 1px;">DATA MANAGEMENT</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <button class="tool-btn" id="btn-import" style="width: 100%;">📥 Import</button>
+                    <button class="tool-btn" id="btn-export" style="width: 100%;">📤 Export</button>
+                </div>
+            </div>
+            <div id="explorer-list">
+                <div style="font-size: 10px; opacity: 0.5; margin-bottom: 8px;">ACTIVE SESSION</div>
+                <div class="intel-card" style="border-left: 2px solid var(--gold);">
+                    <div style="font-size: 12px;">pattern_stream.js</div>
+                    <div style="font-size: 10px; opacity: 0.6;">Primary Data Buffer</div>
+                </div>
+            </div>
+        </div>
     </aside>
 
     <aside id="panel-right" class="side-panel right-panel">
-        <div class="panel-header"><span style="color:var(--accent)">NEURAL INTEL</span><button onclick="document.getElementById('panel-right').classList.remove('open')" style="background:none;border:none;color:#fff;font-size:20px;">&times;</button></div>
+        <div class="panel-header"><span style="color:var(--accent)">NEURAL INTEL</span><button class="close-btn" data-target="panel-right" style="background:none;border:none;color:inherit;font-size:20px;">&times;</button></div>
         <div class="panel-content">
-            <div id="neural-review" class="neural-box">Awaiting first scan...</div>
+            <div id="neural-review" style="background:rgba(210,153,34,0.1); padding:10px; border-radius:6px; margin-bottom:15px; font-size:11px;">Awaiting scan...</div>
             <div id="intel-list"></div>
         </div>
     </aside>
 
     <main id="app-root">
         <nav id="ribbon-toolbar"><div class="ribbon-track">
-            <button class="tool-btn" id="btn-intel">🧠 Intel</button>
             <button class="tool-btn" id="btn-vortex">🌌 Vortex</button>
+            <button class="tool-btn" id="btn-intel">🧠 Intel</button>
+            <button class="tool-btn" id="btn-sun">☀️ Outdoor</button>
             <button class="tool-btn" id="btn-cmd">⌨️ CMD</button>
-            <button class="tool-btn" id="btn-dream">🌙 Dreamer</button>
             <button class="tool-btn" onclick="location.reload()">🔄 Reset</button>
         </div></nav>
+        
         <header id="editor-guard">
             <div class="file-info"><span style="color:var(--gold)">nexus_core.js</span></div>
-            <div style="font-size:12px;"><span id="read-only-status" style="color:var(--success)">Read-Only</span></div>
+            <div style="font-size:11px; opacity:0.8;">PROXIMITY: ACTIVE</div>
         </header>
-        <div id="editor-wrapper"><div id="primary-editor" style="height:100%;"></div></div>
+
+        <div id="editor-wrapper"><textarea id="raw-terminal" spellcheck="false" style="width:100%;height:100%;background:transparent;color:inherit;border:none;padding:15px;font-family:monospace;font-size:14px;outline:none;resize:none;"></textarea></div>
     </main>
 
     <script type="module">
-        // Direct CDN import to ensure AST parsing works on mobile
         import * as acorn from "https://esm.sh/acorn@8.11.3";
 
-        // --- 1. THE SENTINEL ENGINE (Heuristics) ---
+        // --- ENGINES ---
         const Sentinel = {
             analyze(code) {
                 try {
                     const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
                     const issues = [];
                     this.traverse(ast, (node) => {
-                        // Logic: Infinite Loop
-                        if (['WhileStatement', 'ForStatement'].includes(node.type) && node.test?.value === true) {
-                            issues.push({ id: 'INF_LOOP', severity: 'CRITICAL', message: 'Infinite Loop detected.', line: node.loc.start.line });
-                        }
-                        // Security: Secret Leak
-                        if (node.type === 'VariableDeclarator' && node.id.name?.toLowerCase().includes('key') && typeof node.init?.value === 'string') {
-                            issues.push({ id: 'SEC_LEAK', severity: 'HIGH', message: 'Hardcoded Secret Key detected.', line: node.loc.start.line });
-                        }
+                        if (['WhileStatement', 'ForStatement'].includes(node.type) && node.test?.value === true) 
+                            issues.push({ severity: 'CRITICAL', message: 'Infinite Loop detected.', line: node.loc.start.line });
+                        if (node.type === 'VariableDeclarator' && node.id.name?.toLowerCase().includes('key') && typeof node.init?.value === 'string')
+                            issues.push({ severity: 'HIGH', message: 'Hardcoded Secret Key.', line: node.loc.start.line });
                     });
                     return issues;
-                } catch (e) { return [{ severity: 'FATAL', message: e.message }]; }
+                } catch (e) { return [{ severity: 'ERROR', message: 'Syntax Error' }]; }
             },
             traverse(node, cb) {
                 if (!node) return; cb(node);
-                for (let k in node) {
-                    if (node[k] && typeof node[k] === 'object') {
-                        if (Array.isArray(node[k])) node[k].forEach(c => this.traverse(c, cb));
-                        else this.traverse(node[k], cb);
-                    }
+                for (let k in node) if (node[k] && typeof node[k] === 'object') {
+                    if (Array.isArray(node[k])) node[k].forEach(c => this.traverse(c, cb)); else this.traverse(node[k], cb);
                 }
             }
         };
 
-        // --- 2. NEURAL DELTA ENGINE ---
-        const Neural = {
-            calculate(oldIssues, newIssues) {
-                if (newIssues.length > oldIssues.length) return ["📉 Quality dropped: New issues introduced."];
-                if (newIssues.length < oldIssues.length) return ["📈 Quality improved: Issues resolved."];
-                return ["✅ Logic stable."];
-            }
-        };
-
-        // --- 3. UI INITIALIZATION ---
+        // --- UI LOGIC ---
+        const textArea = document.getElementById('raw-terminal');
         let lastIssues = [];
-        const textArea = document.createElement('textarea');
-        
+
         const init = () => {
-            const editor = document.getElementById('primary-editor');
-            textArea.style.cssText = "width:100%;height:100%;background:#000;color:#c9d1d9;border:none;padding:15px;font-family:monospace;font-size:14px;outline:none;resize:none;";
-            textArea.value = "// DevOS Nexus Prime\n// Sentinel Engines Online.\n\nconst apiKey = 'sk_test_51HG...';\n\nwhile(true) {\n  console.log('scanning...');\n}";
-            editor.appendChild(textArea);
+            textArea.value = "// DevOS Terminal\n// Log patterns below...\n\n";
 
             textArea.addEventListener('input', () => {
                 const issues = Sentinel.analyze(textArea.value);
-                renderIntel(issues);
-                const delta = Neural.calculate(lastIssues, issues);
-                document.getElementById('neural-review').innerText = delta[0];
-                lastIssues = issues;
+                const list = document.getElementById('intel-list');
+                const btn = document.getElementById('btn-intel');
+                list.innerHTML = issues.map(i => `<div class="intel-card"><b style="color:var(--danger)">[${i.severity}]</b> ${i.message}</div>`).join('');
+                btn.classList.toggle('btn-red', issues.length > 0);
+                document.getElementById('neural-review').innerText = issues.length > 0 ? "⚠️ Anomaly Detected." : "✅ Logic Stable.";
             });
 
-            // Ribbon Infinite Loop logic
+            // Ribbon Clones
             const track = document.querySelector('.ribbon-track');
-            track.innerHTML += track.innerHTML; // Clone items
-            
-            // Edge Swipes (OS Bypass)
-            let startX = 0;
-            document.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, { passive: true });
+            track.innerHTML += track.innerHTML;
+
+            // Swipes (Bypass OS Bezel)
+            let startX = 0; let startY = 0;
+            document.addEventListener('touchstart', e => { startX = e.touches[0].clientX; startY = e.touches[0].clientY; }, { passive: true });
             document.addEventListener('touchend', e => {
                 const diffX = e.changedTouches[0].clientX - startX;
-                if (startX < 60 && diffX > 50) document.getElementById('panel-left').classList.add('open');
-                if (startX > window.innerWidth - 60 && diffX < -50) document.getElementById('panel-right').classList.add('open');
+                const diffY = e.changedTouches[0].clientY - startY;
+                if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 50) {
+                    if (startX < 65 && diffX > 0) document.getElementById('panel-left').classList.add('open');
+                    if (startX > window.innerWidth - 65 && diffX < 0) document.getElementById('panel-right').classList.add('open');
+                }
             }, { passive: true });
 
             // Buttons
+            document.getElementById('btn-vortex').onclick = () => document.getElementById('panel-left').classList.add('open');
             document.getElementById('btn-intel').onclick = () => document.getElementById('panel-right').classList.add('open');
-            document.getElementById('btn-cmd').onclick = () => document.getElementById('cmd-overlay').style.display = 'flex';
-            
-            // CMD Execute
+            document.getElementById('btn-cmd').onclick = () => { document.getElementById('cmd-overlay').style.display = 'flex'; document.getElementById('cmd-input').focus(); };
+            document.querySelectorAll('.close-btn').forEach(b => b.onclick = () => document.getElementById(b.dataset.target).classList.remove('open'));
+
+            // Outdoor Toggle
+            document.getElementById('btn-sun').onclick = () => {
+                document.body.classList.toggle('outdoor-mode');
+                document.getElementById('btn-sun').innerText = document.body.classList.contains('outdoor-mode') ? "🌑 Indoor" : "☀️ Outdoor";
+            };
+
+            // CMD
             document.getElementById('cmd-input').onkeydown = (e) => {
                 if (e.key === 'Enter') {
                     try { eval(e.target.value); } catch(err) { alert(err.message); }
                     e.target.value = ''; document.getElementById('cmd-overlay').style.display = 'none';
                 }
             };
+
+            // Import/Export
+            document.getElementById('btn-export').onclick = () => {
+                const blob = new Blob([textArea.value], { type: 'text/plain' });
+                const a = document.createElement('a');
+                a.download = `nexus_log_${new Date().getTime()}.txt`;
+                a.href = URL.createObjectURL(blob);
+                a.click();
+            };
+            document.getElementById('btn-import').onclick = () => {
+                const input = document.createElement('input'); input.type = 'file';
+                input.onchange = e => {
+                    const reader = new FileReader();
+                    reader.onload = ev => { textArea.value = ev.target.result; textArea.dispatchEvent(new Event('input')); };
+                    reader.readAsText(e.target.files[0]);
+                };
+                input.click();
+            };
+
+            // PWA
+            if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
         };
 
-        const renderIntel = (issues) => {
-            const list = document.getElementById('intel-list');
-            const btn = document.getElementById('btn-intel');
-            list.innerHTML = issues.map(i => `<div class="intel-card"><b style="color:var(--danger)">[${i.severity}]</b> ${i.message}<br><small>Line ${i.line}</small></div>`).join('');
-            btn.classList.toggle('btn-red', issues.some(i => i.severity === 'CRITICAL'));
-        };
-
-     
         init();
-        if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js')
-        .then(() => console.log("[PWA] Service Worker Registered"));
-        }
-        
     </script>
 </body>
 </html>
