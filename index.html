@@ -189,21 +189,18 @@
                     <button class="tool-btn" onclick="insertSymbol('`')">`</button>
                     <button class="tool-btn" onclick="insertSymbol('$', true)">${}</button>
                 </div>
-                <div id="bottom-terminal" class="sidebar-bottom">
+<div id="bottom-terminal" class="sidebar-bottom">
     <div class="terminal-header">
-        <span>COMMAND PROMPT</span>
-        <div style="display:flex; gap:10px;">
-            <button onclick="Nexus.saveVFS()" style="background:var(--success); color:white; font-size:10px; padding:2px 6px;">SAVE VFS</button>
-            <button onclick="toggleTerminal()" style="background:transparent; color:white; border:none;">✖</button>
-        </div>
+        <span>DEV_OS TERMINAL</span>
+        <button onclick="toggleTerminal()" style="background:transparent; color:white; border:none;">✖</button>
     </div>
-    <div id="terminal-log" style="flex:1; padding:10px; font-family:monospace; color:#fff; overflow-y:auto; font-size: 13px;">
-        <div>System Online. Ready for instructions.</div>
+    <div id="terminal-log">
+        <div>Nexus Terminal v4.2 Online.</div>
     </div>
-    <div class="terminal-input-row" style="display:flex; align-items:center; background:#000; padding:5px 10px;">
-        <span style="color:var(--success); margin-right:8px;">$</span>
-        <input type="text" id="terminal-input" placeholder="Type command..." style="flex:1; background:transparent; border:none; color:white; outline:none;">
-        <button id="term-enter-btn" class="btn-primary" style="padding:8px 15px; margin-left:10px;">ENTER</button>
+    <div class="terminal-input-row">
+        <span style="color:var(--success)">$</span>
+        <input type="text" id="terminal-input" placeholder="Type 'save' or 'bundle'...">
+        <button id="term-enter-btn" class="btn-primary" onclick="Nexus.Terminal.run()">ENTER</button>
     </div>
 </div>
 
@@ -727,7 +724,8 @@ window.Nexus = {
         await localforage.setItem('nexus_vfs_v4', this.state.vfs);
         if (window.NexusSync) window.NexusSync.pushState();
     },
-Nexus.TerminalEngine = {
+
+    Nexus.TerminalEngine = {
     // Standard File System Commands
     commands: {
         // Create an empty file: touch index.html
@@ -800,7 +798,78 @@ Nexus.TerminalEngine = {
             return "Nuke aborted.";
         }
     },
+async run() {
+        const input = document.getElementById('terminal-input');
+        const log = document.getElementById('terminal-log');
+        const cmd = input.value.trim().toLowerCase();
 
+        if (!cmd) return;
+
+        // Print to screen
+        log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
+        
+        let feedback = "";
+
+        if (cmd === 'save') {
+            // PERMANENT SAVE to LocalForage
+            await localforage.setItem('devos_vfs', vfs);
+            feedback = "VFS saved permanently to IndexedDB.";
+            Nexus.flashSaveStatus("VFS Synced");
+        } 
+        else if (cmd === 'bundle') {
+            // MOVE ALL JS TO HTML
+            feedback = this.bundleToHTML();
+        } 
+        else if (cmd === 'nuke') {
+            if(confirm("Wipe everything?")) {
+                await localforage.clear();
+                localStorage.clear();
+                location.reload();
+            }
+        } 
+        else {
+            feedback = "Unknown command. Try: save, bundle, nuke";
+        }
+
+        log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${feedback}</div>`;
+        input.value = ''; // Clear input
+        log.scrollTop = log.scrollHeight; // Auto-scroll
+        Nexus.triggerHaptic('light');
+    },
+
+    bundleToHTML() {
+        // 1. Get current index.html
+        let html = vfs['index.html'] || document.documentElement.outerHTML;
+        
+        // 2. Collect all .js files from the Virtual File System
+        let scripts = "\n\n<script>\n";
+        for (const [name, code] of Object.entries(vfs)) {
+            if (name.endsWith('.js')) {
+                scripts += `\n/* File: ${name} */\n${code}\n`;
+            }
+        }
+        scripts += "<\/script>\n";
+
+        // 3. Inject into the HTML (before closing body)
+        if (html.includes('</body>')) {
+            html = html.replace('</body>', scripts + '</body>');
+        } else {
+            html += scripts;
+        }
+
+        // 4. Update the VFS and the Editor
+        vfs['index.html'] = html;
+        if (currentFileName === 'index.html') {
+            cmEditor.setValue(html);
+        }
+        
+        return "All JS moved into index.html (VFS updated).";
+    }
+};
+
+// Also listen for physical Enter key
+
+    
     async exec(rawInput) {
         const [cmd, ...args] = rawInput.trim().split(/\s+/);
         if (this.commands[cmd]) {
@@ -831,7 +900,10 @@ Nexus.TerminalEngine = {
             </div>
         `).join('');
     },
-
+document.getElementById('terminal-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') Nexus.Terminal.run();
+});
+        
     goToLine(line) {
         try {
             const pos = this.state.cm.state.doc.line(line).from;
