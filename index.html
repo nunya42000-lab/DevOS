@@ -115,12 +115,13 @@
     </main>
 
     <iframe id="chronos-sandbox" style="display: none;"></iframe>
-    <script type="module">
-        import { basicSetup } from "codemirror";
-        import { EditorState } from "@codemirror/state";
-        import { EditorView } from "@codemirror/view";
-        import { javascript } from "@codemirror/lang-javascript";
-        import { oneDark } from "@codemirror/theme-one-dark";
+      <script type="module">
+        // Direct CDN links to bypass the broken import map
+        import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
+        import { EditorState } from "https://esm.sh/@codemirror/state@6.4.1";
+        import { EditorView } from "https://esm.sh/@codemirror/view@6.26.0";
+        import { javascript } from "https://esm.sh/@codemirror/lang-javascript@6.2.2";
+        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark@6.1.2";
 
         document.addEventListener("DOMContentLoaded", () => {
             const editorParent = document.getElementById("primary-editor");
@@ -128,8 +129,8 @@
             // 1. Setup the callback registry for wires.js
             const updateCallbacks = [];
 
-            // 2. Build the Editor State
-            const state = EditorState.create({
+            // ... (keep the rest of the script exactly the same)
+     
                 doc: "// Welcome to DevOS Nexus Prime\n// Begin typing to engage Sentinel Core...\n\n",
                 extensions: [
                     basicSetup,
