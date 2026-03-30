@@ -429,24 +429,44 @@
             if(isTemplate) cmEditor.setCursor({line: cursor.line, ch: cursor.ch + 2});
         }
 
-        function initTerminal() {
-            const input = document.getElementById('terminal-input');
-            input.addEventListener('keydown', e => {
-                if (e.key === 'Enter') {
-                    const cmd = input.value.trim();
-                    const log = document.getElementById('terminal-log');
-                    log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
-                    
-                    if (cmd === 'help') log.innerHTML += `<div>Available: clear, ls, run, nuke</div>`;
-                    else if (cmd === 'ls') log.innerHTML += `<div>${Object.keys(vfs).join('  ')}</div>`;
-                    else if (cmd === 'clear') log.innerHTML = '';
-                    else if (cmd === 'run') Nexus.runPreview();
-                    
-                    input.value = '';
-                    log.scrollTop = log.scrollHeight;
-                }
-            });
+        
+function initTerminal() {
+    const input = document.getElementById('terminal-input');
+    const btn = document.getElementById('term-enter-btn');
+
+    const processCommand = async () => {
+        const cmd = input.value.trim();
+        if (!cmd) return;
+
+        const log = document.getElementById('terminal-log');
+        log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
+
+        let response = "";
+
+        // Logic Switch
+        if (cmd === 'save') {
+            response = await Nexus.TerminalExtensions.forceSave();
+        } else if (cmd === 'bundle') {
+            response = Nexus.TerminalExtensions.bundleToHTML();
+        } else if (cmd === 'nuke') {
+            // Your nuke script here
+            response = "System wipe initialized...";
+        } else {
+            response = "Command not recognized. Try 'save' or 'bundle'.";
         }
+
+        log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${response}</div>`;
+        input.value = '';
+        log.scrollTop = log.scrollHeight;
+        Nexus.triggerHaptic('light');
+    };
+
+    // Listen for Enter Key
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') processCommand(); });
+    
+    // Listen for Button Click
+    btn.addEventListener('click', processCommand);
+}
 
         // Swipe Gestures
         let touchStart = 0;
