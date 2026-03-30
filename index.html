@@ -115,8 +115,8 @@
     </main>
 
     <iframe id="chronos-sandbox" style="display: none;"></iframe>
-      <script type="module">
-        // Direct CDN links to bypass the broken import map
+      
+         <script type="module">
         import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
         import { EditorState } from "https://esm.sh/@codemirror/state@6.4.1";
         import { EditorView } from "https://esm.sh/@codemirror/view@6.26.0";
@@ -125,46 +125,40 @@
 
         document.addEventListener("DOMContentLoaded", () => {
             const editorParent = document.getElementById("primary-editor");
+            if (!editorParent) return;
             
-            // 1. Setup the callback registry for wires.js
             const updateCallbacks = [];
 
-            // ... (keep the rest of the script exactly the same)
-     
+            const state = EditorState.create({
                 doc: "// Welcome to DevOS Nexus Prime\n// Begin typing to engage Sentinel Core...\n\n",
                 extensions: [
                     basicSetup,
-                    javascript(), // JS Syntax highlighting
-                    oneDark,      // Matches your UI variables
+                    javascript(), 
+                    oneDark,      
                     EditorView.theme({
                         "&": { height: "100%", fontSize: "14px" },
                         ".cm-scroller": { overflow: "auto" }
                     }),
-                    // This listens for keystrokes and passes them to wires.js
                     EditorView.updateListener.of((update) => {
                         updateCallbacks.forEach(cb => cb(update));
                     })
                 ]
             });
 
-            // 3. Mount the Editor
             const view = new EditorView({
                 state,
                 parent: editorParent
             });
 
-            // 4. Expose globally so wires.js can hook into it
             window.myEditor = view;
-            
-            // 5. Provide the bridge method wires.js is looking for
             window.myEditor.onUpdate = (callback) => {
                 updateCallbacks.push(callback);
             };
 
-            console.log("[Nexus Core] CodeMirror 6 initialized and bound to workspace.");
+            console.log("[Nexus] CodeMirror mounted.");
         });
-    </script>
-
+         </script>
+    
     <script type="module" src="wires.js"></script>
 </body>
 </html>
