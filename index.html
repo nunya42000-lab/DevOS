@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0d1117">
-    <title>DevOS Nexus Prime v10.0</title>
+    <title>DevOS Nexus Prime v14.0</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -19,217 +19,219 @@
             --success: #3fb950; --warn: #d29922; --danger: #f85149;
             --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             --gutter-bg: #0d1117; --gutter-text: #484f58;
+            --sidebar-w: 85vw; --sidebar-max: 420px;
         }
 
-        /* OUTDOOR HIGH-CONTRAST OVERRIDE */
         body.outdoor-mode {
             --bg: #ffffff; --panel: #f6f8fa; --surface: #ffffff;
             --border: #d0d7de; --text: #24292f; --accent: #0969da;
             --gold: #9a6700; --gutter-bg: #f6f8fa; --gutter-text: #57606a;
         }
 
-        * { box-sizing: border-box; user-select: none; }
-        body, html { 
-            margin: 0; padding: 0; width: 100vw; height: 100vh; 
-            background: var(--bg); color: var(--text); 
-            font-family: var(--font-ui); overflow: hidden; touch-action: none; 
-        }
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
 
         #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
 
-        /* RIBBON NAVIGATION */
-        #ribbon { 
-            height: 50px; background: var(--panel); border-bottom: 1px solid var(--border); 
-            display: flex; align-items: center; padding: 0 10px; gap: 8px; 
-            overflow-x: auto; -webkit-overflow-scrolling: touch; 
-        }
-        #ribbon::-webkit-scrollbar { display: none; }
-        .tool-btn { 
-            padding: 6px 14px; border-radius: 12px; background: var(--surface); 
-            color: var(--text); border: 1px solid var(--border); 
-            font-size: 11px; font-weight: 600; white-space: nowrap; cursor: pointer; 
-        }
+        /* --- INFINITE RIBBON --- */
+        #ribbon-container { height: 50px; background: var(--panel); border-bottom: 1px solid var(--border); overflow: hidden; white-space: nowrap; position: relative; z-index: 100; }
+        #ribbon-track { display: inline-flex; align-items: center; height: 100%; will-change: transform; transition: none; }
+        .tool-btn { padding: 8px 16px; margin: 0 4px; border-radius: 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 11px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
         .btn-gold { color: var(--gold); border-color: var(--gold); }
         .btn-accent { background: var(--accent); color: #fff; border: none; }
         .btn-danger { background: var(--danger); color: #fff; border: none; }
 
-        /* WORKSPACE LAYOUT */
+        /* --- WORKSPACE --- */
         #main-view { flex: 1; position: relative; display: flex; overflow: hidden; }
-        .view-panel { display: none; width: 100%; height: 100%; flex-direction: column; }
-        .view-panel.active { display: flex; }
+        #editor-pane { flex: 1; display: flex; background: #000; position: relative; }
+        body.outdoor-mode #editor-pane { background: #fff; }
+        #gutter { width: 45px; background: var(--gutter-bg); border-right: 1px solid var(--border); color: var(--gutter-text); font-family: monospace; font-size: 11px; text-align: right; padding: 15px 8px 0 0; line-height: 20px; pointer-events: none; overflow: hidden; }
+        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 20px; outline: none; resize: none; tab-size: 2; white-space: pre; overflow: auto; -webkit-overflow-scrolling: touch; }
 
-        /* EDITOR CORE */
-        #editor-container { flex: 1; display: flex; background: #000; position: relative; }
-        body.outdoor-mode #editor-container { background: #fff; }
-        #gutter { 
-            width: 45px; background: var(--gutter-bg); border-right: 1px solid var(--border); 
-            color: var(--gutter-text); font-family: monospace; font-size: 11px; 
-            text-align: right; padding: 15px 8px 0 0; line-height: 20px; 
-            pointer-events: none; overflow: hidden; 
-        }
-        #raw-terminal { 
-            flex: 1; background: transparent; color: inherit; border: none; 
-            padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; 
-            line-height: 20px; outline: none; resize: none; tab-size: 2; 
-            white-space: pre; overflow: auto; 
-        }
-
-        /* SIDEBARS */
-        .side-panel { 
-            position: fixed; top: 0; bottom: 0; width: 85vw; max-width: 330px; 
-            background: var(--panel); border: 1px solid var(--border); z-index: 2000; 
-            transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1); 
-            display: flex; flex-direction: column; box-shadow: 0 0 40px rgba(0,0,0,0.6);
-        }
+        /* --- SIDEBARS --- */
+        .side-panel { position: fixed; top: 0; bottom: 0; width: var(--sidebar-w); max-width: var(--sidebar-max); background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
         .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
-        .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); }
+        .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
         .side-panel.open { transform: translateX(0); }
-        .p-head { 
-            padding: 15px; border-bottom: 1px solid var(--border); 
-            display: flex; justify-content: space-between; align-items: center; 
-            font-weight: bold; font-size: 12px; letter-spacing: 1px;
-        }
-        .p-body { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; font-size: 12px; }
-        .section-label { font-size: 10px; color: var(--gold); margin-bottom: 10px; font-weight: bold; }
+        .p-head { padding: 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 800; font-size: 13px; color: var(--gold); }
+        .p-body { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; }
+        .p-section { margin-bottom: 25px; }
+        .section-label { font-size: 10px; opacity: 0.6; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1.5px; }
 
-        /* GHOST SANDBOX & CONSOLE */
-        #sandbox-wrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
-        #sandbox-frame { flex: 1; border: none; width: 100%; }
-        #ghost-console { 
-            height: 180px; background: #000; color: #3fb950; padding: 12px; 
-            font-family: monospace; font-size: 11px; overflow-y: auto; 
-            border-top: 2px solid var(--accent); white-space: pre-wrap;
-        }
-        .log-err { color: var(--danger); }
-        .log-warn { color: var(--warn); }
+        /* --- SLIDE COMPONENTS --- */
+        #diag-hub { position: fixed; top: 0; left: 0; right: 0; height: 380px; background: var(--panel); border-bottom: 3px solid var(--danger); z-index: 3000; transform: translateY(-105%); transition: transform 0.4s ease; padding: 20px; display: flex; flex-direction: column; }
+        #diag-hub.open { transform: translateY(0); }
+        #cmd-slide { position: fixed; bottom: 0; left: 0; right: 0; height: 85px; background: var(--surface); border-top: 3px solid var(--accent); z-index: 4000; transform: translateY(105%); transition: transform 0.3s ease; display: flex; align-items: center; padding: 0 20px; }
+        #cmd-slide.open { transform: translateY(0); }
 
-        /* CMD & OVERLAYS */
-        #cmd-overlay { 
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
-            z-index: 3000; display: none; align-items: flex-start; 
-            justify-content: center; padding-top: 15vh; 
-        }
-        #cmd-box { 
-            width: 90%; background: var(--surface); border: 1px solid var(--accent); 
-            border-radius: 8px; padding: 15px; display: flex; align-items: center; 
-            position: relative; box-shadow: 0 10px 50px rgba(0,0,0,1);
-        }
-        #cmd-input { 
-            flex: 1; background: transparent; border: none; color: #fff; 
-            font-family: monospace; font-size: 16px; outline: none; 
-        }
-        .close-icon { font-size: 24px; cursor: pointer; background: none; border: none; color: #fff; }
+        /* --- MODALS --- */
+        .nexus-modal { position: fixed; inset: 20px; background: rgba(13, 17, 23, 0.98); border: 1px solid var(--border); border-radius: 12px; z-index: 5000; display: none; flex-direction: column; backdrop-filter: blur(15px); box-shadow: 0 25px 60px rgba(0,0,0,0.9); }
+        .modal-body { flex: 1; padding: 20px; overflow-y: auto; }
 
-        /* FILE & VAULT ITEMS */
-        .item-row { 
-            padding: 10px; border-bottom: 1px solid var(--border); 
-            display: flex; justify-content: space-between; align-items: center; 
-        }
+        /* --- COMPARE & MERGE UI --- */
+        .diff-container { display: flex; gap: 10px; height: 100%; overflow: hidden; }
+        .diff-view { flex: 1; display: flex; flex-direction: column; background: #000; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .diff-header { padding: 10px; background: var(--surface); font-size: 10px; font-weight: bold; display: flex; justify-content: space-between; }
+        .diff-content { flex: 1; overflow: auto; padding: 10px; font-family: monospace; font-size: 11px; white-space: pre; }
+        .line-add { background: rgba(63, 185, 80, 0.15); color: var(--success); }
+        .line-rem { background: rgba(248, 81, 73, 0.15); color: var(--danger); }
+
+        /* --- SANDBOX --- */
+        #sandbox-container { flex: 1; display: flex; flex-direction: column; background: #fff; }
+        #sandbox-frame { flex: 1; border: none; }
+        #ghost-console { height: 220px; background: #000; color: #3fb950; padding: 15px; font-family: monospace; font-size: 11px; overflow-y: auto; border-top: 2px solid var(--accent); }
+
+        /* --- UI HELPERS --- */
+        .item-row { padding: 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
         .active-row { background: rgba(47, 129, 247, 0.15); color: var(--accent); font-weight: bold; }
-        
-        #footer { 
-            height: 30px; background: var(--panel); border-top: 1px solid var(--border); 
-            display: flex; align-items: center; padding: 0 15px; font-size: 10px; 
-            font-family: monospace; gap: 20px;
-        }
-        #health-bar { height: 4px; width: 60px; background: var(--surface); border-radius: 2px; overflow: hidden; }
-        #health-fill { height: 100%; background: var(--success); width: 100%; transition: width 0.5s; }
+        #footer { height: 30px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; z-index: 100; }
+        .close-x { font-size: 24px; cursor: pointer; color: var(--text); background: none; border: none; padding: 5px; }
     </style>
 </head>
 <body>
 
 <div id="app-root">
-    <nav id="ribbon">
-        <button class="tool-btn" onclick="toggleP('panel-left')">🌌 Vortex</button>
-        <button class="tool-btn" onclick="switchV('view-editor')">📝 Editor</button>
-        <button class="tool-btn" onclick="switchV('view-blueprint')">🎨 Blueprint</button>
-        <button class="tool-btn btn-accent" onclick="Nexus.runSandbox()">▶ Run</button>
-        <button class="tool-btn" onclick="toggleP('panel-right')">🧠 Intel</button>
-        <button class="tool-btn btn-gold" id="btn-cmd-open">⌨ CMD</button>
-        <button class="tool-btn" onclick="document.body.classList.toggle('outdoor-mode')">☀️ Sun</button>
-        <button class="tool-btn btn-gold" onclick="Nexus.exportZIP()">📦 ZIP</button>
+    <nav id="ribbon-container">
+        <div id="ribbon-track">
+            <button class="tool-btn" onclick="toggleP('left')">📁 VORTEX</button>
+            <button class="tool-btn" onclick="toggleSlide('diag')">🩺 DIAGNOSTICS</button>
+            <button class="tool-btn btn-accent" onclick="toggleP('right')">▶ PROVING GROUNDS</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.getNeuralIntel()">🧠 NEURAL INTEL</button>
+            <button class="tool-btn" onclick="Nexus.startVoiceCapture()">🎤 VOICE CMD</button>
+            <button class="tool-btn" onclick="openModal('dreamer')">🌙 DREAMER</button>
+            <button class="tool-btn" onclick="Nexus.renderSystemGraph(); openModal('vortex-graph');">🌌 SYSTEM GRAPH</button>
+            <button class="tool-btn btn-gold" onclick="toggleSlide('cmd')">⌨ SHELL</button>
+            <button class="tool-btn" onclick="Nexus.toggleSun()">☀️ SUN MODE</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.exportZIP()">📦 ZIP EXPORT</button>
+            <button class="tool-btn" onclick="openModal('settings')">⚙️ SETTINGS</button>
+        </div>
     </nav>
 
     <div id="main-view">
-        <div id="view-editor" class="view-panel active">
-            <div id="editor-container">
-                <div id="gutter">1</div>
-                <textarea id="raw-terminal" spellcheck="false" autocomplete="off" placeholder="Nexus Terminal Active. Ready for input..."></textarea>
-            </div>
-        </div>
-
-        <div id="view-blueprint" class="view-panel">
-            <div style="padding: 25px; overflow-y: auto;">
-                <h3 style="color:var(--accent); margin-bottom: 20px;">Visual UI Blueprint</h3>
-                <div style="background:var(--surface); padding:20px; border-radius:10px; border:1px solid var(--border);">
-                    <div class="section-label">COMPONENT GENERATOR</div>
-                    <input type="text" id="bp-name" placeholder="Display Label (e.g. 'Submit')" style="width:100%; margin-bottom:12px; padding:10px; background:var(--bg); border:1px solid var(--border); color:inherit;">
-                    <input type="text" id="bp-id" placeholder="ID (e.g. 'btn-submit')" style="width:100%; margin-bottom:12px; padding:10px; background:var(--bg); border:1px solid var(--border); color:inherit;">
-                    <select id="bp-type" style="width:100%; margin-bottom:20px; padding:10px; background:var(--bg); border:1px solid var(--border); color:inherit;">
-                        <option value="btn">Ribbon Button</option>
-                        <option value="panel">Side Panel</option>
-                        <option value="card">Data Card</option>
-                    </select>
-                    <button class="tool-btn btn-accent" style="width:100%; padding:12px;" onclick="Nexus.generateBlueprint()">Inject Component Code</button>
-                </div>
-            </div>
-        </div>
-
-        <div id="view-sandbox" class="view-panel">
-            <div id="sandbox-wrap">
-                <iframe id="sandbox-frame" sandbox="allow-scripts allow-modals"></iframe>
-                <div id="ghost-console"></div>
-            </div>
-            <button class="tool-btn btn-danger" style="border-radius:0; height:45px;" onclick="Nexus.stopSandbox()">⏹ TERMINATE SANDBOX PROCESS</button>
+        <div id="editor-pane">
+            <div id="gutter">1</div>
+            <textarea id="raw-terminal" spellcheck="false" autocomplete="off" placeholder="Nexus Prime v14.0 // Compare & Merge Active..."></textarea>
         </div>
     </div>
 
     <aside id="panel-left" class="side-panel left-p">
-        <div class="p-head"><span>VORTEX WORKSPACE</span><button class="close-icon" onclick="toggleP('panel-left')">&times;</button></div>
+        <div class="p-head"><span>VORTEX WORKSPACE</span><button class="close-x" onclick="toggleP('left')">&times;</button></div>
         <div class="p-body">
-            <div class="section-label">FILE MANAGER</div>
-            <div id="vfs-list"></div>
-            <button class="tool-btn" style="width:100%; margin-top:15px; padding:10px;" onclick="Nexus.newFile()">+ CREATE NEW FILE</button>
-            <button class="tool-btn btn-gold" style="width:100%; margin-top:10px; padding:10px;" onclick="Nexus.importMerge()">📥 IMPORT & MERGE DATA</button>
-            
-            <hr style="border:0; border-top:1px solid var(--border); margin:25px 0;">
-            
-            <div class="section-label">SNIPPET VAULT</div>
-            <div id="vault-list"></div>
-            <button class="tool-btn btn-gold" style="width:100%; margin-top:15px; padding:10px;" onclick="Nexus.compileVault()">⚡ COMPILE SELECTED</button>
+            <div class="p-section">
+                <div class="section-label">File Manager</div>
+                <div id="vfs-list"></div>
+                <button class="tool-btn" style="width:100%; margin-top:10px;" onclick="Nexus.newFile()">+ CREATE FILE</button>
+                <button class="tool-btn btn-gold" style="width:100%; margin-top:10px;" onclick="Nexus.openMergeSelect()">📥 MERGE & COMPARE</button>
+            </div>
+            <div class="p-section">
+                <div class="section-label">Snippet Vault</div>
+                <div id="vault-list"></div>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:10px;" onclick="Nexus.compileVault()">⚡ COMPILE VAULT</button>
+            </div>
+            <div class="p-section">
+                <div class="section-label">Time Machine</div>
+                <div id="snapshot-list"></div>
+                <button class="tool-btn" style="width:100%; margin-top:10px;" onclick="Nexus.createSnapshot()">🕒 TAKE SNAPSHOT</button>
+            </div>
         </div>
     </aside>
 
     <aside id="panel-right" class="side-panel right-p">
-        <div class="p-head"><span>NEURAL INTEL</span><button class="close-icon" onclick="toggleP('panel-right')">&times;</button></div>
-        <div class="p-body">
-            <button class="tool-btn btn-gold" style="width:100%; padding:14px; margin-bottom:12px;" onclick="Nexus.runMedic()">🩹 FILE MEDIC: AUTO-REPAIR</button>
-            <button class="tool-btn btn-accent" style="width:100%; padding:14px; margin-bottom:25px;" onclick="Nexus.formatFile()">✨ FORMAT & BEAUTIFY</button>
-            
-            <div class="section-label">DIAGNOSTIC LOG</div>
-            <div id="diag-out" style="background:#000; color:#3fb950; padding:12px; border-radius:6px; height:180px; overflow-y:auto; border:1px solid var(--border); margin-bottom:20px;">System Standing By.</div>
-
-            <div class="section-label">LOCAL STORAGE INSPECTOR</div>
-            <div id="storage-list"></div>
-            <button class="tool-btn" style="width:100%; margin-top:10px;" onclick="Nexus.wipeStorage()">Wipe Sandbox Storage</button>
+        <div class="p-head"><span>PROVING GROUNDS</span><button class="close-x" onclick="toggleP('right')">&times;</button></div>
+        <div id="sandbox-container">
+            <iframe id="sandbox-frame" sandbox="allow-scripts allow-modals"></iframe>
+            <div id="ghost-console"></div>
+        </div>
+        <div style="padding:15px; background:var(--panel); display:flex; gap:10px; border-top:1px solid var(--border);">
+            <button class="tool-btn btn-accent" style="flex:1; padding:12px;" onclick="Nexus.executeSandbox()">▶ REFRESH PROCESS</button>
+            <button class="tool-btn btn-danger" style="flex:1; padding:12px;" onclick="Nexus.stopSandbox()">⏹ TERMINATE</button>
         </div>
     </aside>
 
-    <div id="cmd-overlay">
-        <div id="cmd-box">
-            <button class="close-icon" style="position:absolute; right:10px; top:-40px;" onclick="document.getElementById('cmd-overlay').style.display='none'">&times;</button>
-            <span style="color:var(--success); margin-right:12px; font-weight:bold;">nexus&gt;</span>
-            <input type="text" id="cmd-input" placeholder="Execute direct JS command..." autocomplete="off">
+    <div id="diag-hub">
+        <div class="p-head" style="padding:0 0 15px 0; color:var(--danger);"><span>DIAGNOSTIC HUB v14</span><button class="close-x" onclick="toggleSlide('diag')">&times;</button></div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:15px;">
+            <button class="tool-btn btn-danger" onclick="Nexus.runLinter()">1. JSHINT LINT</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.runMedic()">2. FILE MEDIC</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.formatFile()">3. BEAUTIFY</button>
+            <button class="tool-btn" onclick="Nexus.scanDeps()">4. SCAN IMPORTS</button>
+        </div>
+        <div id="diag-out" style="flex:1; background:#000; color:#0f0; padding:15px; font-family:monospace; font-size:11px; overflow-y:auto; border-radius:6px; border:1px solid var(--border);">System Standing By...</div>
+    </div>
+
+    <div id="cmd-slide">
+        <span style="color:var(--success); font-weight:bold; margin-right:15px;">nexus&gt;</span>
+        <input type="text" id="cmd-input" placeholder="ls, touch, rm, mv..." autocomplete="off">
+        <button class="close-x" onclick="toggleSlide('cmd')">&times;</button>
+    </div>
+
+    <div id="modal-intel" class="nexus-modal">
+        <div class="p-head"><span>NEURAL INTEL</span><button class="close-x" onclick="closeModal('intel')">&times;</button></div>
+        <div class="modal-body" id="intel-body"></div>
+    </div>
+
+    <div id="modal-dreamer" class="nexus-modal">
+        <div class="p-head"><span>DREAMER BLUEPRINT</span><button class="close-x" onclick="closeModal('dreamer')">&times;</button></div>
+        <div class="modal-body">
+            <div class="section-label">Component Generator</div>
+            <input type="text" id="bp-name" placeholder="Component Label" style="width:100%; margin-bottom:10px; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;">
+            <select id="bp-type" style="width:100%; margin-bottom:20px; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;">
+                <option value="button">UI Button</option>
+                <option value="card">Data Container</option>
+                <option value="panel">Expansion Panel</option>
+            </select>
+            <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.generateBP()">GENERATE & INJECT</button>
+        </div>
+    </div>
+
+    <div id="modal-vortex-graph" class="nexus-modal">
+        <div class="p-head"><span>VORTEX SYSTEM GRAPH</span><button class="close-x" onclick="closeModal('vortex-graph')">&times;</button></div>
+        <div class="modal-body" id="graph-body"></div>
+    </div>
+
+    <div id="modal-merger" class="nexus-modal">
+        <div class="p-head"><span>COMPARE & MERGE ENGINE</span><button class="close-x" onclick="closeModal('merger')">&times;</button></div>
+        <div class="modal-body">
+            <div id="merger-selector" class="p-section">
+                <div class="section-label">Select Source for Merge</div>
+                <input type="file" id="merge-file-input" style="width:100%; margin-bottom:10px; padding:10px; background:var(--bg); color:#fff; border:1px solid var(--border);">
+                <div style="font-size:10px; opacity:0.5; margin-bottom:10px;">OR Select Snapshot:</div>
+                <div id="merge-snapshot-list"></div>
+            </div>
+            <div id="diff-workspace" style="display:none; height:100%; flex-direction:column;">
+                <div class="diff-container">
+                    <div class="diff-view">
+                        <div class="diff-header">INCOMING DATA <button class="tool-btn btn-accent" style="padding:2px 8px; font-size:9px;" onclick="Nexus.acceptMerge('incoming')">USE THIS</button></div>
+                        <div class="diff-content" id="diff-left"></div>
+                    </div>
+                    <div class="diff-view">
+                        <div class="diff-header">CURRENT FILE <button class="tool-btn btn-gold" style="padding:2px 8px; font-size:9px;" onclick="Nexus.acceptMerge('current')">KEEP MINE</button></div>
+                        <div class="diff-content" id="diff-right"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="nexus-modal">
+        <div class="p-head"><span>IDE SETTINGS</span><button class="close-x" onclick="closeModal('settings')">&times;</button></div>
+        <div class="modal-body">
+            <div class="p-section">
+                <div class="section-label">Editor Preferences</div>
+                <div class="item-row"><span>Font Size (px)</span><input type="number" id="pref-font" onchange="Nexus.updatePref('fontSize', this.value)" style="width:70px; background:var(--bg); color:#fff; border:1px solid var(--border); padding:5px;"></div>
+                <div class="item-row"><span>Tab Width</span><select onchange="Nexus.updatePref('tabWidth', this.value)" style="background:var(--bg); color:#fff; border:1px solid var(--border); padding:5px;"><option value="2">2 Spaces</option><option value="4">4 Spaces</option></select></div>
+            </div>
+            <div class="p-section">
+                <div class="section-label">Factory Reset</div>
+                <button class="tool-btn btn-danger" style="width:100%; padding:12px;" onclick="localforage.clear(); location.reload();">NUCLEAR WIPE</button>
+            </div>
         </div>
     </div>
 
     <footer id="footer">
-        <div id="footer-file">main.js</div>
-        <div style="display:flex; align-items:center; gap:8px;">
-            <div id="health-bar"><div id="health-fill"></div></div>
-            <span id="health-text">STABILITY: 100%</span>
-        </div>
-        <div id="footer-status" style="margin-left:auto; color:var(--gold);">IDLE</div>
+        <div id="foot-file" style="min-width:120px;">FILE: main.js</div>
+        <div id="foot-pos" style="color:var(--gold); min-width:100px;">LN 1, COL 1</div>
+        <div id="foot-status" style="margin-left:auto; color:var(--success); font-weight:bold;">BAT: -- | NET: --</div>
     </footer>
 </div>
 
@@ -239,272 +241,310 @@
     const editor = document.getElementById('raw-terminal');
     const gutter = document.getElementById('gutter');
 
-    // --- OMEGA ENGINE LOGIC ---
     window.Nexus = {
-        vfs: { "index.html": "<h1>DevOS v10</h1>", "main.js": "console.log('Nexus Core Online.');" },
-        vault: [],
-        activeFile: "main.js",
+        vfs: { "index.html": "<h1>Nexus v14</h1>", "main.js": "console.log('Omega Engine Online');" },
+        vault: [], snapshots: [], prefs: { fontSize: 14, tabWidth: 2, theme: 'dark' }, 
+        activeFile: "main.js", incomingMergeData: "",
 
         init: async function() {
-            // Load Persistent State
-            const savedVFS = await localforage.getItem('nexus_vfs_v10');
-            if (savedVFS) this.vfs = savedVFS;
-            const savedVault = await localforage.getItem('nexus_vault_v10');
-            if (savedVault) this.vault = savedVault;
+            this.vfs = (await localforage.getItem('devos_vfs_v14')) || this.vfs;
+            this.vault = (await localforage.getItem('devos_vault_v14')) || [];
+            this.snapshots = (await localforage.getItem('devos_snapshots_v14')) || [];
+            this.prefs = (await localforage.getItem('devos_prefs')) || this.prefs;
 
             this.switchFile(this.activeFile);
+            this.applyPrefs();
             this.renderVFS();
             this.renderVault();
-            this.inspectStorage();
+            this.renderSnapshots();
+            this.startEnvMonitor();
+            this.setupInfiniteRibbon();
 
-            // CMD Logic
-            document.getElementById('btn-cmd-open').onclick = () => {
-                document.getElementById('cmd-overlay').style.display = 'flex';
-                document.getElementById('cmd-input').focus();
-            };
+            editor.oninput = () => { this.vfs[this.activeFile] = editor.value; this.updateGutter(); this.save(); this.quickLint(); };
+            editor.onscroll = () => gutter.scrollTop = editor.scrollTop;
+            editor.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const s = editor.selectionStart; editor.value = editor.value.substring(0, s) + "  " + editor.value.substring(editor.selectionEnd); editor.selectionStart = editor.selectionEnd = s + 2; } };
+
+            // CLI Parser
             document.getElementById('cmd-input').onkeydown = (e) => {
                 if(e.key === 'Enter') {
-                    try { eval(e.target.value); } catch(err) { alert(err.message); }
-                    e.target.value = ''; document.getElementById('cmd-overlay').style.display = 'none';
+                    const raw = e.target.value.trim(); const [cmd, ...args] = raw.split(' ');
+                    try {
+                        switch(cmd.toLowerCase()) {
+                            case 'ls': alert("VFS: " + Object.keys(this.vfs).join(', ')); break;
+                            case 'touch': if (args[0]) { this.vfs[args[0]] = ""; this.renderVFS(); } break;
+                            case 'rm': if (args[0]) this.delFile(args[0]); break;
+                            case 'clear': document.getElementById('ghost-console').innerHTML = ""; break;
+                            default: console.log(eval(raw));
+                        }
+                    } catch(err) { console.error("CLI: " + err.message); }
+                    e.target.value = ''; toggleSlide('cmd');
                 }
             };
 
-            // Editor Handlers
-            editor.oninput = () => {
-                this.vfs[this.activeFile] = editor.value;
-                this.updateGutter();
-                this.save();
-                this.runLinter();
-            };
-            editor.onscroll = () => gutter.scrollTop = editor.scrollTop;
-            
-            // Tab Support
-            editor.onkeydown = (e) => {
-                if (e.key === 'Tab') {
-                    e.preventDefault();
-                    const s = editor.selectionStart;
-                    editor.value = editor.value.substring(0, s) + "  " + editor.value.substring(editor.selectionEnd);
-                    editor.selectionStart = editor.selectionEnd = s + 2;
-                }
+            // Merge File Input
+            document.getElementById('merge-file-input').onchange = (e) => {
+                const reader = new FileReader();
+                reader.onload = (ev) => this.initiateDiff(ev.target.result);
+                reader.readAsText(e.target.files[0]);
             };
 
-            // Double-Tap to Vault
             let lastTap = 0;
             editor.addEventListener('touchstart', (e) => {
                 const now = Date.now();
-                if (now - lastTap < 300) {
-                    const sel = window.getSelection().toString();
-                    if (sel) this.addSnippet(sel);
-                }
+                if (now - lastTap < 300) { const s = window.getSelection().toString(); if (s) this.addSnippet(s); }
                 lastTap = now;
             });
         },
 
         save: async function() {
-            await localforage.setItem('nexus_vfs_v10', this.vfs);
-            await localforage.setItem('nexus_vault_v10', this.vault);
-            document.getElementById('footer-status').innerText = "SYNCED";
-            setTimeout(() => document.getElementById('footer-status').innerText = "READY", 1000);
+            await localforage.setItem('devos_vfs_v14', this.vfs);
+            await localforage.setItem('devos_vault_v14', this.vault);
+            await localforage.setItem('devos_snapshots_v14', this.snapshots);
         },
 
         switchFile: function(fn) {
             this.activeFile = fn;
             editor.value = this.vfs[fn] || "";
-            document.getElementById('footer-file').innerText = fn.toUpperCase();
-            this.renderVFS();
-            this.updateGutter();
+            document.getElementById('foot-file').innerText = "FILE: " + fn.toUpperCase();
+            this.renderVFS(); this.updateGutter();
         },
 
         renderVFS: function() {
             document.getElementById('vfs-list').innerHTML = Object.keys(this.vfs).map(fn => `
                 <div class="item-row ${fn === this.activeFile ? 'active-row' : ''}" onclick="Nexus.switchFile('${fn}')">
                     <span>${fn}</span>
-                    <button style="background:none; border:none; color:var(--danger); font-size:16px;" onclick="event.stopPropagation(); Nexus.delFile('${fn}')">&times;</button>
+                    <button style="background:none; border:none; color:var(--danger);" onclick="event.stopPropagation(); Nexus.delFile('${fn}')">&times;</button>
                 </div>
             `).join('');
         },
 
-        newFile: function() {
-            const n = prompt("Filename:","script.js");
-            if(n) { this.vfs[n]=""; this.switchFile(n); }
-        },
+        newFile: function() { const n = prompt("Filename:","script.js"); if(n) { this.vfs[n]=""; this.switchFile(n); } },
+        delFile: function(fn) { if(confirm("Delete " + fn + "?")) { delete this.vfs[fn]; this.switchFile(Object.keys(this.vfs)[0]); } },
 
-        delFile: function(fn) {
-            if(confirm("Permanently delete " + fn + "?")) {
-                delete this.vfs[fn];
-                this.switchFile(Object.keys(this.vfs)[0]);
-            }
-        },
-
-        // SNIPPET VAULT LOGIC
-        addSnippet: function(code) {
-            const n = prompt("Save snippet as:", "Snippet " + (this.vault.length + 1));
-            if(n) { this.vault.push({ name: n, code }); this.renderVault(); this.save(); }
-        },
-
-        renderVault: function() {
-            document.getElementById('vault-list').innerHTML = this.vault.map((s, i) => `
-                <div class="item-row">
-                    <label style="display:flex; align-items:center; gap:10px;">
-                        <input type="checkbox" class="vault-check" value="${i}"> ${s.name}
-                    </label>
-                </div>
-            `).join('');
-        },
-
+        // VAULT
+        addSnippet: function(code) { const n = prompt("Snippet Name:", "Snippet " + (this.vault.length+1)); if(n) { this.vault.push({name:n, code}); this.renderVault(); this.save(); } },
+        renderVault: function() { document.getElementById('vault-list').innerHTML = this.vault.map((s,i) => `<div class="item-row"><label><input type="checkbox" class="v-chk" value="${i}"> ${s.name}</label></div>`).join('') || "Empty Vault"; },
         compileVault: function() {
-            const checked = document.querySelectorAll('.vault-check:checked');
-            if(checked.length === 0) return alert("Select snippets to compile.");
-            let compiled = "";
-            checked.forEach(cb => {
-                const s = this.vault[cb.value];
-                compiled += `\n// --- Snippet: ${s.name} ---\n${s.code}\n`;
-            });
-            const n = "compiled_" + Date.now().toString().slice(-4) + ".js";
-            this.vfs[n] = compiled;
-            this.switchFile(n);
-            toggleP('panel-left');
+            const checked = document.querySelectorAll('.v-chk:checked');
+            let comp = "/* COMPILED */\n";
+            checked.forEach(c => { const s = this.vault[c.value]; comp += `\n// --- ${s.name} ---\n${s.code}\n`; });
+            const name = "compiled_" + Date.now().toString().slice(-4) + ".js";
+            this.vfs[name] = comp; this.switchFile(name); toggleP('left');
         },
 
-        // GHOST SANDBOX
-        runSandbox: function() {
-            const frame = document.getElementById('sandbox-frame');
-            const con = document.getElementById('ghost-console');
-            con.innerHTML = "";
-            const code = editor.value;
-            const hook = `<script>
-                const log = console.log;
-                console.log = (...args) => window.parent.postMessage({type:'log', msg: args.join(' ')}, '*');
-                console.error = (...args) => window.parent.postMessage({type:'err', msg: args.join(' ')}, '*');
-                window.onerror = (m,u,l) => window.parent.postMessage({type:'err', msg: m + ' (Line ' + l + ')'}, '*');
-            <\/script>`;
-            frame.srcdoc = hook + `<script type="module">${code}<\/script>`;
-            switchV('view-sandbox');
+        // TIME MACHINE
+        createSnapshot: function() { this.snapshots.push({ time: new Date().toLocaleTimeString(), data: JSON.parse(JSON.stringify(this.vfs)) }); this.renderSnapshots(); this.save(); },
+        renderSnapshots: function() {
+            const list = document.getElementById('snapshot-list');
+            const mergeList = document.getElementById('merge-snapshot-list');
+            const html = this.snapshots.map((s,i) => `
+                <div class="item-row">
+                    <span>${s.time}</span>
+                    <div>
+                        <button class="tool-btn" style="padding:4px 8px; font-size:9px;" onclick="Nexus.restoreSnapshot(${i})">REST</button>
+                    </div>
+                </div>
+            `).reverse().join('');
+            const mergeHtml = this.snapshots.map((s,i) => `<button class="tool-btn" style="width:100%; margin-top:5px;" onclick="Nexus.initiateDiffFromSnapshot(${i})">Snapshot ${s.time}</button>`).join('');
+            list.innerHTML = html || "No Snapshots.";
+            mergeList.innerHTML = mergeHtml;
         },
+        restoreSnapshot: function(idx) { if(confirm("Restore snapshot?")) { this.vfs = this.snapshots[idx].data; this.switchFile(Object.keys(this.vfs)[0]); } },
 
-        stopSandbox: function() {
-            document.getElementById('sandbox-frame').srcdoc = '';
-            document.getElementById('ghost-console').innerHTML += '<div style="color:var(--warn)">> Execution Terminated by User.</div>';
+        // MERGE ENGINE (SIDE BY SIDE)
+        openMergeSelect: function() {
+            document.getElementById('merger-selector').style.display = 'block';
+            document.getElementById('diff-workspace').style.display = 'none';
+            openModal('merger');
         },
-
-        // DIAGNOSTICS & MEDIC
-        runLinter: function() {
-            const code = editor.value;
-            const fill = document.getElementById('health-fill');
-            const txt = document.getElementById('health-text');
-            try {
-                acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-                fill.style.width = "100%"; fill.style.background = "var(--success)";
-                txt.innerText = "STABILITY: 100%";
-            } catch(e) {
-                fill.style.width = "40%"; fill.style.background = "var(--danger)";
-                txt.innerText = "STABILITY: CRITICAL";
-                document.getElementById('diag-out').innerHTML = `<div class="log-err">Syntax Error: ${e.message}</div>`;
+        initiateDiffFromSnapshot: function(idx) {
+            const data = this.snapshots[idx].data[this.activeFile] || "";
+            this.initiateDiff(data);
+        },
+        initiateDiff: function(incoming) {
+            this.incomingMergeData = incoming;
+            const current = editor.value;
+            const leftEl = document.getElementById('diff-left');
+            const rightEl = document.getElementById('diff-right');
+            
+            const iLines = incoming.split('\n');
+            const cLines = current.split('\n');
+            
+            let iHtml = "", cHtml = "";
+            const max = Math.max(iLines.length, cLines.length);
+            
+            for(let i=0; i<max; i++) {
+                const iL = iLines[i] || "";
+                const cL = cLines[i] || "";
+                if(iL === cL) {
+                    iHtml += `<div>${i+1} ${iL}</div>`;
+                    cHtml += `<div>${i+1} ${cL}</div>`;
+                } else {
+                    iHtml += `<div class="line-add">${i+1} ${iL}</div>`;
+                    cHtml += `<div class="line-rem">${i+1} ${cL}</div>`;
+                }
             }
+            
+            leftEl.innerHTML = iHtml;
+            rightEl.innerHTML = cHtml;
+            document.getElementById('merger-selector').style.display = 'none';
+            document.getElementById('diff-workspace').style.display = 'flex';
+        },
+        acceptMerge: function(source) {
+            if(source === 'incoming') {
+                editor.value = this.incomingMergeData;
+                this.vfs[this.activeFile] = editor.value;
+                this.save(); this.updateGutter();
+            }
+            closeModal('merger');
+            this.logDiag("Merge Complete", "success");
         },
 
+        // PROVING GROUNDS
+        executeSandbox: function() {
+            const frame = document.getElementById('sandbox-frame'), con = document.getElementById('ghost-console');
+            con.innerHTML = "";
+            const hook = `<script>
+                const l = console.log, w = console.warn, e = console.error;
+                console.log = (...a) => window.parent.postMessage({t:'log', m: a.join(' ')}, '*');
+                console.warn = (...a) => window.parent.postMessage({t:'warn', m: a.join(' ')}, '*');
+                console.error = (...a) => window.parent.postMessage({t:'err', m: a.join(' ')}, '*');
+            <\/script>`;
+            frame.srcdoc = hook + `<script type="module">${editor.value}<\/script>`;
+        },
+        stopSandbox: function() { document.getElementById('sandbox-frame').srcdoc = ""; },
+
+        // DIAGNOSTICS
+        runLinter: function() {
+            const out = document.getElementById('diag-out');
+            if(typeof JSHINT === 'undefined') return out.innerHTML = "JSHint Fail.";
+            JSHINT(editor.value, { esversion: 11, browser: true, devel: true, asi: true });
+            if(JSHINT.errors.length > 0) {
+                out.innerHTML = JSHINT.errors.map(e => e ? `<div class="item-row"><span style="color:var(--danger)">L${e.line}:</span> ${e.reason}</div>` : '').join('');
+            } else out.innerHTML = "<div style='color:var(--success)'>[PASS] LINT OK</div>";
+        },
         runMedic: function() {
-            let c = editor.value;
-            let repairs = 0;
-            // Brace repair
+            let c = editor.value; let r = 0;
             const o = (c.match(/{/g)||[]).length, cl = (c.match(/}/g)||[]).length;
-            if(o > cl) { c += "\n" + "}".repeat(o-cl); repairs++; }
-            // Tag repair
-            ['div','b','i','span'].forEach(tag => {
-                const ot = (c.match(new RegExp('<'+tag,'g'))||[]).length;
-                const ct = (c.match(new RegExp('</'+tag+'>','g'))||[]).length;
-                if(ot > ct) { c += `</${tag}>`.repeat(ot-ct); repairs++; }
+            if(o > cl) { c += "\n" + "}".repeat(o-cl); r++; }
+            ['div','b','i','span'].forEach(t => {
+                const ot = (c.match(new RegExp('<'+t,'g'))||[]).length, ct = (c.match(new RegExp('</'+t+'>','g'))||[]).length;
+                if(ot > ct) { c += `</${t}>`.repeat(ot-ct); r++; }
             });
             editor.value = c; this.vfs[this.activeFile] = c; this.save();
-            document.getElementById('diag-out').innerHTML = `<div style="color:var(--gold)">Medic fixed ${repairs} structural issues.</div>`;
+            document.getElementById('diag-out').innerHTML = `<div style="color:var(--gold)">Medic fixed ${r} issues.</div>`;
+        },
+        formatFile: function() { 
+            const ext = this.activeFile.split('.').pop();
+            if(ext === 'js') editor.value = js_beautify(editor.value, { indent_size: 2 });
+            else if(ext === 'html') editor.value = html_beautify(editor.value, { indent_size: 2 });
+            this.save(); this.updateGutter();
+        },
+        scanDeps: function() {
+            const out = document.getElementById('diag-out');
+            const depRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:src=['"]([^'"]+)['"])/g;
+            let m, res = "<strong>LINK MAP:</strong>\n";
+            while((m = depRegex.exec(editor.value)) !== null) {
+                const p = m[1] || m[2]; if(p.startsWith('http')) continue;
+                const r = p.replace('./','');
+                res += this.vfs[r] ? `<span style="color:var(--success)">[OK]</span> ${r}\n` : `<span style="color:var(--danger)">[MISSING]</span> ${r}\n`;
+            }
+            out.innerHTML = res;
         },
 
-        formatFile: function() {
-            const code = editor.value;
-            editor.value = js_beautify(code, { indent_size: 2 });
-            this.save();
-            document.getElementById('diag-out').innerHTML = `<div style="color:var(--accent)">Beautification Complete.</div>`;
-        },
-
-        // UTILITIES
-        importMerge: function() {
-            const i = document.createElement('input'); i.type='file';
-            i.onchange = e => {
-                const r = new FileReader();
-                r.onload = ev => {
-                    const c = ev.target.result;
-                    const a = prompt("(A)ppend to current, (O)verwrite current, or (N)ew File?", "A");
-                    if(a === 'A') this.vfs[this.activeFile] += "\n// Merged Data\n" + c;
-                    else if (a === 'O') this.vfs[this.activeFile] = c;
-                    else { const name = "merged_"+Date.now()+".js"; this.vfs[name]=c; this.switchFile(name); }
-                    this.switchFile(this.activeFile);
-                };
-                r.readAsText(e.target.files[0]);
-            };
-            i.click();
-        },
-
-        generateBlueprint: function() {
-            const name = document.getElementById('bp-name').value;
-            const id = document.getElementById('bp-id').value;
-            const type = document.getElementById('bp-type').value;
-            if(!name || !id) return alert("Missing Blueprint Config.");
-            
-            let code = `\n/* Component Blueprint: ${name} */\n`;
-            if(type === 'btn') code += `<button id="${id}" class="tool-btn">${name}</button>`;
-            else if(type === 'card') code += `<div id="${id}" class="item-row"><strong>${name}</strong><span>Active</span></div>`;
-            
-            editor.value += code;
-            this.switchFile(this.activeFile);
-            alert("Blueprint injected into editor.");
-        },
-
-        exportZIP: async function() {
-            const zip = new JSZip();
-            Object.entries(this.vfs).forEach(([fn, code]) => zip.file(fn, code));
-            const blob = await zip.generateAsync({type: "blob"});
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = "Nexus_v10_Project.zip";
-            a.click();
-        },
-
-        inspectStorage: function() {
-            const ui = document.getElementById('storage-list');
-            ui.innerHTML = Object.keys(localStorage).map(k => `
-                <div style="background:rgba(0,0,0,0.2); padding:8px; margin-bottom:5px; border-radius:4px; font-size:10px;">
-                    <strong>${k}</strong>: ${localStorage.getItem(k).slice(0,20)}...
+        // INTEL
+        getNeuralIntel: function() {
+            const c = editor.value;
+            const funcs = (c.match(/function\s+|=>/g) || []).length;
+            const comp = (c.match(/if\s*\(|else|for\s*\(|while\s*\(|switch\s*\(|&&|\|\|/g) || []).length;
+            const health = Math.max(0, 100 - (comp * 2));
+            document.getElementById('intel-body').innerHTML = `
+                <div class="p-section">
+                    <div class="section-label">Heuristic Health: ${health}%</div>
+                    <div class="item-row"><span>Logic Depth:</span> <span>${comp} nodes</span></div>
+                    <div class="item-row"><span>Functions:</span> <span>${funcs}</span></div>
                 </div>
-            `).join('') || "Storage Empty";
+            `;
+            openModal('intel');
         },
 
-        wipeStorage: function() {
-            if(confirm("Wipe all Sandbox storage?")) { localStorage.clear(); this.inspectStorage(); }
+        // GRAPH
+        renderSystemGraph: function() {
+            const body = document.getElementById('graph-body'), files = Object.keys(this.vfs), w = body.clientWidth || 300, h = 400;
+            let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="background:#000;">`;
+            const cx = w/2, cy = h/2;
+            svg += `<circle cx="${cx}" cy="${cy}" r="15" fill="var(--gold)" />`;
+            files.forEach((fn, i) => {
+                const a = (i / files.length) * Math.PI * 2, r = 100, x = cx + r * Math.cos(a), y = cy + r * Math.sin(a);
+                svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="var(--border)" />`;
+                svg += `<circle cx="${x}" cy="${y}" r="8" fill="${fn===this.activeFile?'var(--accent)':'var(--surface)'}" onclick="Nexus.switchFile('${fn}'); closeModal('vortex-graph');" />`;
+                svg += `<text x="${x}" y="${y+20}" fill="var(--text)" font-size="9" text-anchor="middle">${fn}</text>`;
+            });
+            body.innerHTML = svg + `</svg>`;
         },
 
+        // UTILS
+        startVoiceCapture: function() {
+            const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            rec.onresult = (e) => { document.getElementById('cmd-input').value = e.results[0][0].transcript; toggleSlide('cmd'); };
+            rec.start();
+        },
+        setupInfiniteRibbon: function() { const t = document.getElementById('ribbon-track'); t.innerHTML += t.innerHTML; },
+        toggleSun: function() { document.body.classList.toggle('outdoor-mode'); },
+        exportZIP: async function() {
+            const zip = new JSZip(); Object.entries(this.vfs).forEach(([fn, code]) => zip.file(fn, code));
+            const blob = await zip.generateAsync({type: "blob"});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "Nexus_v14.zip"; a.click();
+        },
+        applyPrefs: function() { 
+            editor.style.fontSize = this.prefs.fontSize + 'px'; 
+            document.getElementById('pref-font').value = this.prefs.fontSize;
+        },
+        updatePref: function(k, v) { this.prefs[k] = v; localforage.setItem('devos_prefs', this.prefs); this.applyPrefs(); },
+        startEnvMonitor: function() {
+            const up = () => {
+                if(!navigator.getBattery) return;
+                navigator.getBattery().then(b => {
+                    const l = Math.floor(b.level*100), net = navigator.onLine ? 'ON' : 'OFF';
+                    document.getElementById('foot-status').innerText = `BAT: ${l}% | NET: ${net}`;
+                });
+            };
+            setInterval(up, 10000); up();
+        },
         updateGutter: function() {
             const l = editor.value.split('\n').length;
             gutter.innerHTML = Array.from({length:l}, (_,i)=>i+1).join('<br>');
+            const txt = editor.value.substring(0, editor.selectionStart);
+            document.getElementById('foot-pos').innerText = `LN ${txt.split('\n').length}, COL ${txt.length - txt.lastIndexOf('\n')}`;
+        },
+        quickLint: function() { 
+            try{ acorn.parse(editor.value, {ecmaVersion:2022, sourceType:'module'}); document.getElementById('foot-status').style.color="var(--success)"; } 
+            catch(e){ document.getElementById('foot-status').style.color="var(--danger)"; } 
+        },
+        generateBP: function() {
+            const n = document.getElementById('bp-name').value, t = document.getElementById('bp-type').value;
+            let c = `\n/* ${n} */\n`;
+            if(t==='button') c += `<button class="tool-btn">${n}</button>`;
+            else c += `<div class="item-row">${n}</div>`;
+            editor.value += c; this.switchFile(this.activeFile); closeModal('dreamer');
+        },
+        logDiag: function(msg, type) {
+            document.getElementById('diag-out').innerHTML = `<div style="color:var(--${type==='success'?'success':'danger'})">${msg}</div>`;
         }
     };
 
-    // UI COMMANDS
-    window.toggleP = (id) => document.getElementById(id).classList.toggle('open');
-    window.switchV = (id) => {
-        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-    };
+    window.toggleP = (s) => { const id = s==='left'?'panel-left':'panel-right'; document.getElementById(id).classList.toggle('open'); if(s==='right') Nexus.executeSandbox(); };
+    window.toggleSlide = (t) => document.getElementById(t==='diag'?'diag-hub':'cmd-slide').classList.toggle('open');
+    window.openModal = (id) => document.getElementById('modal-' + id).style.display = 'flex';
+    window.closeModal = (id) => document.getElementById('modal-' + id).style.display = 'none';
 
     window.addEventListener('message', e => {
         const out = document.getElementById('ghost-console');
-        const color = e.data.type === 'err' ? 'var(--danger)' : '#3fb950';
-        out.innerHTML += `<div style="color:${color}">> ${e.data.msg}</div>`;
+        out.innerHTML += `<div style="color:${e.data.t==='err'?'var(--danger)':'#3fb950'}">> ${e.data.m}</div>`;
         out.scrollTop = out.scrollHeight;
     });
 
-    // START NEXUS
     Nexus.init();
 </script>
-
 </body>
 </html>
