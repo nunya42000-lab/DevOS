@@ -7,7 +7,27 @@
     <title>DevOS Nexus Prime</title>
     
     <link rel="stylesheet" href="styles.css">
-    <link rel="manifest" href="manifest.json">
+  
+<link rel="manifest" href="manifest.json">
+    <script type="importmap">
+      {
+        "imports": {
+          "acorn": "https://esm.sh/acorn@8.11.3",
+          "acorn-walk": "https://esm.sh/acorn-walk@8.3.2",
+          "@codemirror/state": "https://esm.sh/@codemirror/state@6.4.1",
+          "@codemirror/view": "https://esm.sh/@codemirror/view@6.26.0",
+          "@codemirror/language": "https://esm.sh/@codemirror/language@6.10.1",
+          "@codemirror/commands": "https://esm.sh/@codemirror/commands@6.3.3",
+          "@codemirror/search": "https://esm.sh/@codemirror/search@6.5.6",
+          "@codemirror/autocomplete": "https://esm.sh/@codemirror/autocomplete@6.16.0",
+          "codemirror": "https://esm.sh/codemirror@6.0.1",
+          "@codemirror/lang-javascript": "https://esm.sh/@codemirror/lang-javascript@6.2.2",
+          "@codemirror/theme-one-dark": "https://esm.sh/@codemirror/theme-one-dark@6.1.2"
+        }
+      }
+    </script>
+
+    
 </head>
 <body>
     <canvas id="omni-canvas" class="omni-hidden"></canvas>
@@ -95,8 +115,55 @@
     </main>
 
     <iframe id="chronos-sandbox" style="display: none;"></iframe>
+    <script type="module">
+        import { basicSetup } from "codemirror";
+        import { EditorState } from "@codemirror/state";
+        import { EditorView } from "@codemirror/view";
+        import { javascript } from "@codemirror/lang-javascript";
+        import { oneDark } from "@codemirror/theme-one-dark";
+
+        document.addEventListener("DOMContentLoaded", () => {
+            const editorParent = document.getElementById("primary-editor");
+            
+            // 1. Setup the callback registry for wires.js
+            const updateCallbacks = [];
+
+            // 2. Build the Editor State
+            const state = EditorState.create({
+                doc: "// Welcome to DevOS Nexus Prime\n// Begin typing to engage Sentinel Core...\n\n",
+                extensions: [
+                    basicSetup,
+                    javascript(), // JS Syntax highlighting
+                    oneDark,      // Matches your UI variables
+                    EditorView.theme({
+                        "&": { height: "100%", fontSize: "14px" },
+                        ".cm-scroller": { overflow: "auto" }
+                    }),
+                    // This listens for keystrokes and passes them to wires.js
+                    EditorView.updateListener.of((update) => {
+                        updateCallbacks.forEach(cb => cb(update));
+                    })
+                ]
+            });
+
+            // 3. Mount the Editor
+            const view = new EditorView({
+                state,
+                parent: editorParent
+            });
+
+            // 4. Expose globally so wires.js can hook into it
+            window.myEditor = view;
+            
+            // 5. Provide the bridge method wires.js is looking for
+            window.myEditor.onUpdate = (callback) => {
+                updateCallbacks.push(callback);
+            };
+
+            console.log("[Nexus Core] CodeMirror 6 initialized and bound to workspace.");
+        });
+    </script>
 
     <script type="module" src="wires.js"></script>
 </body>
 </html>
-
