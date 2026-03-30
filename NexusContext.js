@@ -3,7 +3,7 @@
  * ------------------------------------
  * Semantic Context Engine, Assembler, and Visualizer.
  */
-import * as acorn from 'acorn';
+import * as acorn from 'https://esm.sh/acorn@8.11.3';
 
 export class NexusContext {
     constructor() {
