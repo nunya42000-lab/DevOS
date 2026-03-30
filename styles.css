@@ -1,0 +1,303 @@
+/* ========================================
+   FILE: styles.css (DevOS Nexus Prime)
+   MASTER MERGED STYLESHEET
+   ======================================== */
+
+:root {
+    /* Base Colors */
+    --bg: #0d1117;
+    --panel: #161b22;
+    --surface: #21262d;
+    --border: #30363d;
+    --text: #c9d1d9;
+    
+    /* Accents & Status */
+    --accent: #2f81f7;
+    --success: #3fb950;
+    --warn: #d29922;
+    --danger: #f85149;
+    --gold: #d29922;
+    
+    /* Diagnostic Squiggle Colors */
+    --diag-critical: #f85149;
+    --diag-high: #ff944d;
+    --diag-medium: #d29922;
+    --diag-low: #4d94ff;
+
+    /* Sizing & Typography */
+    --term-height: 180px;
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* --- RESETS & BASE --- */
+* { 
+    box-sizing: border-box; 
+    user-select: none; /* Disable selection for native app feel */
+}
+
+body, html {
+    margin: 0; 
+    padding: 0;
+    width: 100vw; 
+    height: 100vh;
+    background: var(--bg); 
+    color: var(--text);
+    font-family: var(--font-ui);
+    overflow: hidden; 
+    touch-action: none; /* Prevents pull-to-refresh on mobile */
+}
+
+/* --- MAIN LAYOUT SHELLS --- */
+#app-root, #nexus-app-root {
+    display: flex; 
+    flex-direction: column;
+    height: 100vh; 
+    width: 100vw;
+    position: relative; 
+    z-index: 1;
+    overflow: hidden;
+}
+
+.workspace {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* --- EDITOR WRAPPER & CANVASES --- */
+#editor-wrapper {
+    flex: 1; 
+    position: relative;
+    display: flex; 
+    flex-direction: column;
+    overflow: hidden;
+    background: #000;
+}
+
+#primary-editor, #secondary-editor {
+    flex: 1; 
+    background: #000; 
+    overflow: auto;
+    font-family: monospace; 
+    padding: 10px;
+}
+
+/* CodeMirror Specific Overrides */
+.cm-editor { height: 100%; }
+.cm-scroller { overflow: auto; }
+
+/* Read-only glass shield to stop keyboard popups while scrolling */
+#editor-shield {
+    position: absolute; inset: 0; z-index: 10;
+    display: none; 
+}
+#editor-shield.active { display: block; }
+
+/* --- EDITOR GUARD (Read-Only Toggle) --- */
+#editor-guard {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 15px; background: #000; border-bottom: 1px solid var(--border);
+}
+
+.file-info { display: flex; align-items: center; gap: 8px; font-size: 13px; font-family: monospace; color: var(--gold); }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; }
+.status-dot.clean { background: var(--success); }
+.status-dot.dirty { background: var(--warn); }
+
+/* iOS-Style Toggle Switch */
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .4s; border-radius: 24px; }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--accent); }
+input:checked + .slider:before { transform: translateX(20px); }
+.toggle-container { display: flex; align-items: center; gap: 10px; font-size: 12px; }
+
+/* --- RIBBON & TOOLBARS --- */
+#ribbon-toolbar, .toolbar-viewport {
+    height: 50px; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto; overflow-y: hidden;
+    scroll-behavior: auto; -webkit-overflow-scrolling: touch;
+}
+#ribbon-toolbar::-webkit-scrollbar, .toolbar-viewport::-webkit-scrollbar { display: none; }
+
+.ribbon-track, .toolbar-track {
+    display: flex; align-items: center;
+    height: 100%; padding: 0 10px; gap: 10px;
+    width: max-content; 
+    white-space: nowrap;
+}
+
+.tool-btn {
+    padding: 8px 16px; 
+    border-radius: 20px; /* Merged: utilizing the tactical pill shape */
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); font-size: 13px;
+    font-weight: 600; white-space: nowrap; cursor: pointer;
+    transition: transform 0.1s, border-color 0.2s, box-shadow 0.2s;
+}
+.tool-btn:active { transform: scale(0.95); border-color: var(--accent); }
+
+/* Active & Color Modifiers for buttons */
+.btn-active { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 5px rgba(210, 153, 34, 0.2); }
+.btn-gold { color: var(--gold); border-color: var(--gold); }
+.btn-blue { color: var(--accent); border-color: var(--accent); }
+.btn-green { color: var(--success); border-color: var(--success); }
+.btn-red { color: var(--danger); border-color: var(--danger); }
+.btn-gray { color: var(--text); }
+
+/* --- QUICK NAVIGATION BAR (Floating) --- */
+#quick-nav-bar {
+    position: absolute; right: 15px; top: 50%;
+    transform: translateY(-50%) translateX(0);
+    display: flex; flex-direction: column; gap: 12px;
+    background: rgba(33, 38, 45, 0.85); padding: 10px;
+    border-radius: 8px; border: 1px solid var(--border);
+    z-index: 100; backdrop-filter: blur(4px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+#quick-nav-bar.hidden {
+    opacity: 0; transform: translateY(-50%) translateX(150%); pointer-events: none;
+}
+#quick-nav-bar button {
+    background: var(--panel); color: var(--gold);
+    border: 1px solid var(--border); border-radius: 6px;
+    width: 40px; height: 40px; font-size: 18px;
+    font-weight: bold; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+}
+#quick-nav-bar button:active { background: var(--gold); color: #000; transform: scale(0.95); }
+
+/* --- INTEL ENGINE: SQUIGGLES & MARKERS --- */
+.squiggle-critical { text-decoration: underline wavy var(--diag-critical); text-decoration-skip-ink: none; }
+.squiggle-high { text-decoration: underline wavy var(--diag-high); }
+.squiggle-medium { text-decoration: underline wavy var(--diag-medium); }
+.squiggle-low { text-decoration: underline wavy var(--diag-low); }
+
+.diagnostics-gutter { width: 12px; }
+.gutter-dot { font-size: 10px; line-height: 1; margin-left: 2px; }
+
+/* --- MODALS & INTEL DASHBOARD --- */
+#intel-modal-backdrop, .overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);
+    z-index: 9998;
+}
+.overlay.active { display: flex; align-items: center; justify-content: center; }
+
+#intel-modal {
+    display: none; position: fixed; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); width: 85%; max-width: 600px; height: 70%;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    z-index: 9999; flex-direction: column; overflow: hidden;
+}
+
+.modal-box {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 20px; width: 90%; max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+#modal-title { margin-top: 0; color: var(--gold); border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+
+.intel-issue-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; margin-bottom: 10px;
+    transition: transform 0.2s ease;
+}
+.intel-issue-card:hover { border-color: var(--accent); }
+
+/* --- SIDE PANELS (Edge Swipes) --- */
+.side-panel {
+    position: fixed; top: 0; bottom: 0; width: 85vw; max-width: 350px;
+    background: rgba(22, 27, 34, 0.95); backdrop-filter: blur(10px);
+    border: 1px solid var(--border); z-index: 2000;
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    display: flex; flex-direction: column; box-shadow: 0 0 30px rgba(0,0,0,0.8);
+}
+.left-panel { left: 0; transform: translateX(-105%); border-right: 1px solid var(--accent); }
+.right-panel { right: 0; transform: translateX(105%); border-left: 1px solid var(--gold); }
+.side-panel.open { transform: translateX(0); }
+
+/* Legacy Sidebar Support */
+.sidebar {
+    position: fixed; left: -260px; top: 0; width: 260px; height: 100%;
+    background: var(--panel); border-right: 1px solid var(--border);
+    z-index: 2000; transition: left 0.3s ease; display: flex; flex-direction: column;
+}
+.sidebar.active { left: 0; }
+.sidebar-header {
+    padding: 15px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center; color: var(--gold);
+}
+.sidebar-scroll { flex: 1; overflow-y: auto; padding: 10px; }
+
+.panel-header {
+    padding: 15px; border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; font-weight: bold; letter-spacing: 1px;
+}
+.panel-content { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; }
+.close-panel { background: none; border: none; color: var(--text); font-size: 20px; cursor: pointer; }
+
+/* Text Utilities */
+.gold-text { color: var(--gold); } 
+.blue-text { color: var(--accent); }
+
+/* --- COMMAND PROMPT OVERLAY --- */
+#cmd-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+    z-index: 3000; display: flex; align-items: flex-start; justify-content: center; padding-top: 20vh;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s;
+}
+#cmd-overlay.active { opacity: 1; pointer-events: auto; }
+#cmd-prompt {
+    width: 90%; max-width: 500px; background: var(--surface);
+    border: 1px solid var(--accent); border-radius: 8px; display: flex; align-items: center;
+    padding: 10px 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+.cmd-prefix { color: var(--success); font-family: monospace; margin-right: 10px; font-weight: bold; }
+#cmd-input {
+    flex: 1; background: transparent; border: none; color: var(--text);
+    font-family: monospace; font-size: 16px; outline: none;
+}
+
+/* --- TERMINAL ZONE & KB DRAWER --- */
+#terminal-zone {
+    height: var(--term-height); background: #000;
+    border-top: 2px solid var(--border); font-family: monospace;
+    padding: 10px; overflow-y: auto; display: flex; flex-direction: column;
+}
+#term-out { flex: 1; overflow-y: auto; margin-bottom: 5px; }
+.term-input { display: flex; gap: 8px; align-items: center; }
+#term-in { background: transparent; border: none; color: var(--text); font-family: monospace; flex: 1; outline: none; }
+
+#kb-drawer {
+    position: fixed; bottom: 0; left: 0; width: 100%;
+    background: var(--panel); border-top: 2px solid var(--gold);
+    z-index: 1000; transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex; flex-direction: column;
+}
+#kb-drawer.active { transform: translateY(0); }
+.kb-header {
+    background: var(--surface); color: var(--gold); text-align: center;
+    padding: 8px; font-size: 12px; font-weight: bold; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+}
+.kb-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+    gap: 5px; padding: 10px; max-height: 30vh; overflow-y: auto;
+}
+.kb-grid button {
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 10px 5px; font-size: 14px; cursor: pointer;
+}
+.kb-grid button:active { background: var(--gold); color: #000; }
+
+/* --- OMNI GESTURE CANVAS --- */
+#omni-canvas { position: fixed; inset: 0; z-index: 9999; pointer-events: none; }
+#omni-canvas.active { pointer-events: auto; background: rgba(47, 129, 247, 0.05); }
