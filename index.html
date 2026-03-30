@@ -11,6 +11,28 @@
             --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
             --success: #3fb950; --warn: #d29922; --danger: #f85149;
             --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      /* High-Contrast Outdoor Mode Override */
+body.outdoor-mode {
+    --bg: #ffffff;
+    --panel: #f0f0f0;
+    --surface: #e0e0e0;
+    --border: #000000;
+    --text: #000000;
+    --accent: #004dc7; /* Deeper blue for visibility */
+    --gold: #855d00;   /* Darker gold for contrast */
+}
+
+body.outdoor-mode #editor-wrapper, 
+body.outdoor-mode #raw-terminal {
+    background: #ffffff !important;
+    color: #000000 !important;
+}
+
+body.outdoor-mode .tool-btn {
+    border: 2px solid #000 !important;
+    font-weight: 800;
+}
+            
         }
         * { box-sizing: border-box; user-select: none; }
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
@@ -62,6 +84,8 @@
             <button class="tool-btn" id="btn-cmd">⌨️ CMD</button>
             <button class="tool-btn" id="btn-dream">🌙 Dreamer</button>
             <button class="tool-btn" onclick="location.reload()">🔄 Reset</button>
+        <button class="tool-btn" id="btn-sun">☀️ Outdoor</button>
+            
         </div></nav>
         <header id="editor-guard">
             <div class="file-info"><span style="color:var(--gold)">nexus_core.js</span></div>
@@ -122,7 +146,12 @@
             textArea.style.cssText = "width:100%;height:100%;background:#000;color:#c9d1d9;border:none;padding:15px;font-family:monospace;font-size:14px;outline:none;resize:none;";
             textArea.value = "// DevOS Nexus Prime\n// Sentinel Engines Online.\n\nconst apiKey = 'sk_test_51HG...';\n\nwhile(true) {\n  console.log('scanning...');\n}";
             editor.appendChild(textArea);
-
+document.getElementById('btn-sun').onclick = () => {
+    document.body.classList.toggle('outdoor-mode');
+    const isOutdoor = document.body.classList.contains('outdoor-mode');
+    document.getElementById('btn-sun').innerHTML = isOutdoor ? "🌑 Indoor" : "☀️ Outdoor";
+    console.log(`[Nexus] Visibility Mode: ${isOutdoor ? 'High-Contrast' : 'Standard'}`);
+};
             textArea.addEventListener('input', () => {
                 const issues = Sentinel.analyze(textArea.value);
                 renderIntel(issues);
