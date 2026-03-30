@@ -1,6 +1,155 @@
 /* =============================================================================
-   FILE: nexus.js (Omni-Merged with Sync, Injector, & Virtual Keyboard)
+   FILE: nexus.js (Omni-Merged with DevOS Sentinel Engine)
    ============================================================================= */
+
+// --- DEVOS SENTINEL CLASS (Browser Optimized) ---
+class DevOSSentinel {
+  constructor() {
+    this.registry = [];
+    this.declarations = new Map();
+    this.references = new Set();
+    this.magicNumbers = new Map();
+    this.initDefaultCheckers();
+  }
+
+  initDefaultCheckers() {
+    // Logic & Critical Flow
+    this.use((node) => {
+      if (['WhileStatement', 'ForStatement'].includes(node.type)) {
+        if (node.test?.value === true && !this.findInNode(node.body, 'BreakStatement')) {
+          return { id: 'INF_LOOP', message: "Infinite Loop: No break found.", severity: 'CRITICAL' };
+        }
+      }
+    });
+
+    this.use((node, parent, context) => {
+      if (node.type === 'FunctionDeclaration' && node.id) context.currentFunctionName = node.id.name;
+      if (node.type === 'CallExpression' && node.callee.name === context.currentFunctionName) {
+        let isGuarded = false;
+        let tracer = node.parent;
+        while (tracer && tracer.type !== 'FunctionDeclaration') {
+          if (['IfStatement', 'SwitchStatement', 'ConditionalExpression'].includes(tracer.type)) { isGuarded = true; break; }
+          tracer = tracer.parent;
+        }
+        if (!isGuarded) return { id: 'STACK_OVERFLOW', message: `Recursion Risk: '${node.callee.name}' calls itself without an exit guard.`, severity: 'CRITICAL' };
+      }
+    });
+
+    // Security & Data Integrity
+    this.use((node) => {
+      if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
+        const name = node.id.name.toLowerCase();
+        const val = node.init?.value;
+        if ((name.includes('key') || name.includes('secret')) && typeof val === 'string' && val.length > 10) {
+          return { id: 'SEC_LEAK', message: `Secret Leak: Hardcoded '${node.id.name}'.`, severity: 'HIGH' };
+        }
+      }
+    });
+
+    this.use((node) => {
+      if (node.type === 'AssignmentExpression' && node.right.type === 'MemberExpression') {
+        const sink = node.left.property?.name || node.left.name;
+        if (['innerHTML', 'outerHTML'].includes(sink)) {
+          return { id: 'TAINT_FLOW', message: `XSS Risk: Flow into '${sink}'. Use textContent.`, severity: 'CRITICAL' };
+        }
+      }
+    });
+
+    // Performance & PWA
+    this.use((node, parent, context) => {
+      if ((node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression') && node.async) context.inAsync = true;
+      if (context?.inAsync && ['WhileStatement', 'ForStatement'].includes(node.type)) {
+        if (!this.findInNode(node.body, 'AwaitExpression')) {
+          return { id: 'ASYNC_FREEZE', message: "UI Thread Alert: Async loop missing 'await'. Tab will freeze.", severity: 'CRITICAL' };
+        }
+      }
+    });
+
+    this.use((node) => {
+      if (node.type === 'CallExpression' && node.callee.name === 'fetch') {
+        let tracer = node.parent;
+        let inTry = false;
+        while (tracer) { if (tracer.type === 'TryStatement') { inTry = true; break; } tracer = tracer.parent; }
+        if (!inTry) return { id: 'OFFLINE_FAIL', message: "PWA Reliability: 'fetch' outside try/catch.", severity: 'CRITICAL' };
+      }
+    });
+
+    // Zombie Code & Cleanliness
+    this.use((node) => {
+      if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') this.declarations.set(node.id.name, node);
+      if (node.type === 'FunctionDeclaration' && node.id) this.declarations.set(node.id.name, node);
+    });
+
+    this.use((node, parent) => {
+      if (node.type === 'Identifier') {
+        const isUsage = parent && !['VariableDeclarator', 'FunctionDeclaration'].includes(parent.type) &&
+                        !(parent.type === 'MemberExpression' && parent.property === node);
+        if (isUsage) this.references.add(node.name);
+      }
+    });
+  }
+
+  use(checkerFunc) { this.registry.push(checkerFunc); }
+
+  analyze(code) {
+    this.declarations.clear();
+    this.references.clear();
+    this.magicNumbers.clear();
+    const issues = [];
+    let ast;
+    try {
+      ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
+    } catch (e) {
+      return [{ message: `Syntax Error: ${e.message}`, line: e.loc?.line, severity: 'FATAL' }];
+    }
+    const context = { inAsync: false, currentFunctionName: null };
+    this.traverse(ast, (node, parent) => {
+      this.registry.forEach(check => {
+        const result = check(node, parent, context);
+        if (result) issues.push({ ...result, line: node.loc?.start.line, column: node.loc?.start.column });
+      });
+    });
+    for (const [name, node] of this.declarations) {
+      if (!this.references.has(name)) {
+        issues.push({ id: 'ZOMBIE_CODE', message: `Unused variable: '${name}'.`, severity: 'LOW', line: node.loc?.start.line });
+      }
+    }
+    return issues;
+  }
+
+  traverse(node, callback, parent = null) {
+    if (!node) return;
+    node.parent = parent; 
+    callback(node, parent);
+    for (const key in node) {
+      const child = node[key];
+      if (child && typeof child === 'object') {
+        if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node));
+        else this.traverse(child, callback, node);
+      }
+    }
+  }
+
+  findInNode(node, type, filter = () => true) {
+    let found = false;
+    this.traverse(node, (n) => { if (n.type === type && filter(n)) found = true; });
+    return found;
+  }
+}
+
+   
+    // UI Feedback
+    triggerHaptic(type = 'light') {
+        if (!navigator.vibrate) return;
+        navigator.vibrate(type === 'heavy' ? 50 : 15);
+    },
+
+    initEditor() {
+        this.state.cm = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+            mode: "javascript", theme: "dracula", lineNumbers: true, autoCloseBrackets: true, lineWrapping: true
+        });
+    },
+
 
 window.Nexus = {
     state: { 
@@ -26,7 +175,9 @@ window.Nexus = {
             this.initMobileSoftKeys(); 
             this.initSearch();
             this.initFPSTicker(); // Restored FPS Logic
-            
+            this.rebuildSidebar();
+
+           
             if (this.state.vfs[this.state.activeFile]) {
                 document.getElementById('active-file-display').innerText = this.state.activeFile;
             }
@@ -841,7 +992,48 @@ document.addEventListener('touchend', e => {
         } catch (err) { statusEl.innerText = err.message; }
     }
 };
+    // --- NEW SENTINEL SCANNER ---
+    runSentinel() {
+        if (!this.state.activeFile || !this.state.activeFile.endsWith('.js')) {
+            alert("Sentinel only scans JavaScript files.");
+            return;
+        }
 
+        this.triggerHaptic('medium');
+        const code = this.state.cm.getValue();
+        const results = this.state.sentinel.analyze(code);
+        const container = document.getElementById('sentinel-results');
+        
+        if (results.length === 0) {
+            container.innerHTML = `<div style="color:var(--success)">✅ All systems clear. No issues detected.</div>`;
+            return;
+        }
+
+        const severityColors = {
+            'CRITICAL': '#ff5555',
+            'HIGH': '#ffb86c',
+            'MEDIUM': '#f1fa8c',
+            'LOW': '#6272a4',
+            'FATAL': '#ff5555'
+        };
+
+        container.innerHTML = results.map(issue => `
+            <div style="border-left: 3px solid ${severityColors[issue.severity] || '#fff'}; padding: 8px; margin-bottom: 10px; background: #111;">
+                <div style="display:flex; justify-content:space-between;">
+                    <strong style="color:${severityColors[issue.severity]}">[${issue.severity}] ${issue.id || 'SYS'}</strong>
+                    <span style="color:#888; cursor:pointer;" onclick="Nexus.goToLine(${issue.line})">Line ${issue.line} ↗</span>
+                </div>
+                <div style="margin-top:4px;">${issue.message}</div>
+            </div>
+        `).join('');
+    },
+
+    goToLine(line) {
+        this.state.cm.setCursor(line - 1, 0);
+        this.state.cm.focus();
+        this.switchTab('editor');
+    },
+   
 /* --- Sync & Injector --- */
 window.NexusSync = {
     peer: null, conn: null, isSyncing: false,
