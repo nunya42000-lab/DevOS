@@ -10,7 +10,7 @@ let currentIssues = [];
 let lastKnownGoodIssues = [];
 let lastKnownGoodContext = null;
 
-const intelBtn = document.getElementById('intel-button');
+const intelBtn = document.getElementById('btn-intel');
 const intelModal = document.getElementById('intel-modal');
 const intelBackdrop = document.getElementById('intel-modal-backdrop');
 const closeIntel = document.getElementById('close-intel');
