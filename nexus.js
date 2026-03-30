@@ -251,6 +251,88 @@ window.Nexus = {
         await localforage.setItem('nexus_vfs_v4', this.state.vfs);
         if (window.NexusSync) window.NexusSync.pushState();
     },
+Nexus.TerminalEngine = {
+    // Standard File System Commands
+    commands: {
+        // Create an empty file: touch index.html
+        touch: (args) => {
+            const fileName = args[0];
+            if (!fileName) return "Usage: touch <filename>";
+            if (Nexus.state.vfs[fileName]) return `Error: ${fileName} already exists.`;
+            Nexus.state.vfs[fileName] = "";
+            Nexus.renderExplorer();
+            Nexus.saveVFS();
+            return `File ${fileName} created.`;
+        },
+
+        // Delete a file: rm temp.js
+        rm: (args) => {
+            const fileName = args[0];
+            if (!fileName || !Nexus.state.vfs[fileName]) return "Error: File not found.";
+            delete Nexus.state.vfs[fileName];
+            Nexus.renderExplorer();
+            Nexus.saveVFS();
+            return `File ${fileName} removed permanently.`;
+        },
+
+        // Write to file: echo "console.log('hi')" > main.js
+        // Append to file: echo "// comment" >> main.js
+        echo: (args) => {
+            const raw = args.join(' ');
+            const mode = raw.includes(' >> ') ? 'append' : raw.includes(' > ') ? 'write' : null;
+            if (!mode) return "Usage: echo 'content' > filename";
+
+            const parts = raw.split(mode === 'append' ? ' >> ' : ' > ');
+            const content = parts[0].replace(/['"]/g, '').trim();
+            const fileName = parts[1].trim();
+
+            if (mode === 'write') {
+                Nexus.state.vfs[fileName] = content;
+            } else {
+                Nexus.state.vfs[fileName] = (Nexus.state.vfs[fileName] || "") + "\n" + content;
+            }
+
+            if (Nexus.state.activeFile === fileName) Nexus.loadFile(fileName);
+            Nexus.saveVFS();
+            return `Updated ${fileName}.`;
+        },
+
+        // Execute a JS file as a system script: run update_ui.js
+        run: async (args) => {
+            const fileName = args[0];
+            const script = Nexus.state.vfs[fileName];
+            if (!script) return `Error: Script '${fileName}' not found.`;
+
+            try {
+                // We wrap the script in an async function and provide 'Nexus' as a local variable
+                const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+                const execute = new AsyncFunction('Nexus', script);
+                await execute(Nexus);
+                return `Script '${fileName}' executed successfully.`;
+            } catch (err) {
+                return `Script Error: ${err.message}`;
+            }
+        },
+
+        // The Nuke Command from earlier
+        nuke: async () => {
+            if (confirm("☢️ NUCLEAR OVERRIDE: Clear all system data?")) {
+                // Call the systemNuke function we defined previously
+                await systemNuke(); 
+                return "System wiped.";
+            }
+            return "Nuke aborted.";
+        }
+    },
+
+    async exec(rawInput) {
+        const [cmd, ...args] = rawInput.trim().split(/\s+/);
+        if (this.commands[cmd]) {
+            return await this.commands[cmd](args);
+        }
+        return `Unknown command: ${cmd}`;
+    }
+};
 
     // --- Diagnostic Hub ---
     runSentinel() {
