@@ -3,8 +3,9 @@
  * ----------------------------------------
  * Automated branch testing and Time-Dilation Sandbox via Web Workers.
  */
-import * as acorn from 'acorn';
-import * as walk from 'acorn-walk';
+import * as acorn from 'https://esm.sh/acorn@8.11.3';
+import * as walk from 'https://esm.sh/acorn-walk@8.3.2';
+
 
 export class NexusChronos {
     constructor() {
