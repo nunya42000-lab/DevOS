@@ -116,48 +116,67 @@
 
     <iframe id="chronos-sandbox" style="display: none;"></iframe>
       
-         <script type="module">
-        import { basicSetup } from "https://esm.sh/codemirror@6.0.1";
-        import { EditorState } from "https://esm.sh/@codemirror/state@6.4.1";
-        import { EditorView } from "https://esm.sh/@codemirror/view@6.26.0";
-        import { javascript } from "https://esm.sh/@codemirror/lang-javascript@6.2.2";
-        import { oneDark } from "https://esm.sh/@codemirror/theme-one-dark@6.1.2";
+             <script type="module">
+        try {
+            // Switched to jsDelivr (+esm) which handles mobile CORS and flattening much better
+            import { basicSetup } from "https://cdn.jsdelivr.net/npm/codemirror@6.0.1/+esm";
+            import { EditorState } from "https://cdn.jsdelivr.net/npm/@codemirror/state@6.4.1/+esm";
+            import { EditorView } from "https://cdn.jsdelivr.net/npm/@codemirror/view@6.26.0/+esm";
+            import { javascript } from "https://cdn.jsdelivr.net/npm/@codemirror/lang-javascript@6.2.2/+esm";
+            import { oneDark } from "https://cdn.jsdelivr.net/npm/@codemirror/theme-one-dark@6.1.2/+esm";
 
-        document.addEventListener("DOMContentLoaded", () => {
-            const editorParent = document.getElementById("primary-editor");
-            if (!editorParent) return;
+            document.addEventListener("DOMContentLoaded", () => {
+                const editorParent = document.getElementById("primary-editor");
+                if (!editorParent) return;
+                
+                const updateCallbacks = [];
+
+                const state = EditorState.create({
+                    doc: "// DevOS Nexus Prime Active.\n// Sentinel Core Online...\n// Begin typing to engage heuristics.\n\n",
+                    extensions: [
+                        basicSetup,
+                        javascript(), 
+                        oneDark,      
+                        EditorView.theme({
+                            "&": { height: "100%", fontSize: "14px" },
+                            ".cm-scroller": { overflow: "auto" }
+                        }),
+                        EditorView.updateListener.of((update) => {
+                            updateCallbacks.forEach(cb => cb(update));
+                        })
+                    ]
+                });
+
+                const view = new EditorView({
+                    state,
+                    parent: editorParent
+                });
+
+                window.myEditor = view;
+                window.myEditor.onUpdate = (callback) => {
+                    updateCallbacks.push(callback);
+                };
+
+                console.log("[Nexus] CodeMirror mounted successfully.");
+            });
             
-            const updateCallbacks = [];
-
-            const state = EditorState.create({
-                doc: "// Welcome to DevOS Nexus Prime\n// Begin typing to engage Sentinel Core...\n\n",
-                extensions: [
-                    basicSetup,
-                    javascript(), 
-                    oneDark,      
-                    EditorView.theme({
-                        "&": { height: "100%", fontSize: "14px" },
-                        ".cm-scroller": { overflow: "auto" }
-                    }),
-                    EditorView.updateListener.of((update) => {
-                        updateCallbacks.forEach(cb => cb(update));
-                    })
-                ]
+        } catch (error) {
+            // If the CDN or local server blocks it, print the error directly to the UI
+            document.addEventListener("DOMContentLoaded", () => {
+                const editorParent = document.getElementById("primary-editor");
+                if (editorParent) {
+                    editorParent.innerHTML = `
+                        <div style="color: var(--danger); padding: 20px; font-family: monospace; border: 1px solid var(--danger); margin: 10px; border-radius: 8px; background: rgba(248, 81, 73, 0.1);">
+                            <h3>⚠️ Editor Mount Failure</h3>
+                            <p>${error.message}</p>
+                            <p style="font-size: 11px; color: var(--text); opacity: 0.7;">Check your network connection, or your mobile editor is blocking external CDN scripts.</p>
+                        </div>
+                    `;
+                }
             });
+        }
+    </script>
 
-            const view = new EditorView({
-                state,
-                parent: editorParent
-            });
-
-            window.myEditor = view;
-            window.myEditor.onUpdate = (callback) => {
-                updateCallbacks.push(callback);
-            };
-
-            console.log("[Nexus] CodeMirror mounted.");
-        });
-         </script>
     
     <script type="module" src="wires.js"></script>
 </body>
