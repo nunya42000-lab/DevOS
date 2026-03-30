@@ -260,45 +260,89 @@
                 if(id === 'editor') cmEditor.refresh();
             },
 
-            Terminal: {
-                async run() {
-                    const input = document.getElementById('terminal-input');
-                    const log = document.getElementById('terminal-log');
-                    const cmd = input.value.trim().toLowerCase();
-                    if (!cmd) return;
+            Nexus.Terminal = {
+    async run() {
+        const input = document.getElementById('terminal-input');
+        const log = document.getElementById('terminal-log');
+        const rawInput = input.value.trim();
+        if (!rawInput) return;
 
-                    log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
-                    let res = "";
+        log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${rawInput}</div>`;
+        const args = rawInput.split(' ');
+        const cmd = args[0].toLowerCase();
+        let feedback = "";
 
-                    if (cmd === 'save') {
-                        await Nexus.saveVFS();
-                        res = "VFS Sync Complete.";
-                    } else if (cmd === 'bundle') {
-                        res = this.bundle();
-                    } else if (cmd === 'nuke') {
-                        if(confirm("Wipe all data?")) { await localforage.clear(); location.reload(); }
-                    } else if (cmd === 'help') {
-                        res = "Commands: save, bundle, nuke, help";
-                    } else {
-                        res = "Unknown command.";
-                    }
-
-                    log.innerHTML += `<div style="color:#666">> ${res}</div>`;
-                    input.value = "";
-                    log.scrollTop = log.scrollHeight;
-                },
-                bundle() {
-                    let html = vfs['index.html'];
-                    if(!html) return "Error: index.html missing.";
-                    let bundle = "\n<script>\n";
-                    Object.keys(vfs).forEach(f => { if(f.endsWith('.js')) bundle += vfs[f] + "\n"; });
-                    bundle += "<\/script>";
-                    vfs['index.html'] = html.includes('</body>') ? html.replace('</body>', bundle + '</body>') : html + bundle;
-                    Nexus.openFile('index.html');
-                    return "JS bundled into index.html";
+        switch(cmd) {
+            case 'patch-ui':
+                // 1. Generate the new Sidebar HTML
+                const newSidebarHTML = this.getUltimateSidebarHTML();
+                
+                // 2. Get current code from editor
+                let currentCode = cmEditor.getValue();
+                
+                // 3. Regex find the <aside id="ui-sidebar"> block and replace its guts
+                const sidebarRegex = /(<aside id="ui-sidebar"[^>]*>)([\s\S]*?)(<\/aside>)/;
+                
+                if (sidebarRegex.test(currentCode)) {
+                    // Update the editor content permanently
+                    const updatedCode = currentCode.replace(sidebarRegex, `$1${newSidebarHTML}$3`);
+                    cmEditor.setValue(updatedCode);
+                    
+                    // 4. Trigger an immediate VFS save
+                    await Nexus.saveVFS();
+                    feedback = "SUCCESS: Source code modified & VFS saved. Refresh to see permanent UI.";
+                } else {
+                    feedback = "ERROR: Could not find <aside id='ui-sidebar'> in source.";
                 }
-            }
-        };
+                break;
+
+            case 'save':
+                await Nexus.saveVFS();
+                feedback = "VFS Synced.";
+                break;
+
+            case 'cls':
+                log.innerHTML = ""; input.value = ""; return;
+
+            default:
+                feedback = `Unknown command. Try 'patch-ui' to permanently upgrade sidebar.`;
+        }
+
+        log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${feedback}</div>`;
+        input.value = '';
+        log.scrollTop = log.scrollHeight;
+    },
+
+    getUltimateSidebarHTML() {
+        return `
+        <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <h3 style="margin:0">DevOS <span style="color:var(--accent)">Ultimate</span></h3>
+            <button onclick="Nexus.toggleLeftSidebar(false)" style="background:var(--danger); color:white; border-radius:4px; padding:2px 8px;">✖</button>
+        </div>
+        <div style="padding: 12px; display: flex; gap: 8px; border-bottom:1px solid var(--border);">
+            <button class="btn-primary" style="flex:1;" onclick="Nexus.createNewFile()">+ New</button>
+            <button class="btn-outline" style="flex:1; background:#e3b341; color:#000;" onclick="document.getElementById('file-upload').click()">📁 Import</button>
+            <button class="btn-outline" style="flex:1; background:#d29922; color:#000;">❓ Help</button>
+        </div>
+        <div class="accordion">
+            <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:var(--warn)">📂 Explorer</div>
+            <div class="accordion-content open" id="file-list"></div>
+            <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#7ee787">🌿 Branches</div>
+            <div class="accordion-content" style="padding:10px;">
+                <button class="btn-primary" style="width:100%;">+ New Branch</button>
+                <div style="margin-top:10px; color:var(--accent)">● main</div>
+            </div>
+            <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#e3b341">🔐 Vault</div>
+            <div class="accordion-content" style="padding:10px;">
+                <button class="btn-primary" style="width:100%;">Compile Vault</button>
+            </div>
+        </div>
+        <div style="padding:10px; margin-top:auto;">
+            <button style="width:100%; background:#e3b341; color:#000; padding:10px; font-weight:bold;">⚙️ Settings</button>
+        </div>`;
+    }
+};
+
 
         window.onload = () => Nexus.boot();
     </script>
