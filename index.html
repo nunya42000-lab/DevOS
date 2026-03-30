@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DevOS Workspace | Ultimate</title>
-    <link rel="manifest" href="./manifest.json">
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
@@ -23,15 +22,9 @@
 
     <style>
         :root {
-            --bg: #0d1117;
-            --surface: #161b22;
-            --surface-light: #21262d;
-            --border: #30363d;
-            --text: #c9d1d9;
-            --accent: #2f81f7;
-            --success: #238636;
-            --warn: #d29922;
-            --danger: #f85149;
+            --bg: #0d1117; --surface: #161b22; --surface-light: #21262d;
+            --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
+            --success: #238636; --warn: #d29922; --danger: #f85149;
         }
 
         body { 
@@ -41,35 +34,24 @@
         }
 
         * { box-sizing: border-box; }
-        
-        button { cursor: pointer; border: none; border-radius: 6px; font-weight: 600; padding: 6px 12px; transition: opacity 0.2s; }
-        button:active { opacity: 0.7; }
-
+        button { cursor: pointer; border: none; border-radius: 6px; font-weight: 600; padding: 6px 12px; }
         .btn-primary { background: var(--success); color: white; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-        .btn-warn { background: var(--warn); color: #000; }
         .btn-danger { background: var(--danger); color: white; }
 
-        input[type="text"] { 
-            background: var(--surface); border: 1px solid var(--border); 
-            color: var(--text); padding: 8px; border-radius: 4px; width: 100%; margin-bottom: 10px; 
-        }
-        
         .app-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         
-        /* Sidebars */
         .sidebar { 
             width: 280px; background: var(--surface); border-right: 1px solid var(--border); 
-            display: flex; flex-direction: column; position: fixed; left: 0; top: 0; 
-            height: 100vh; z-index: 2000; transform: translateX(-100%); 
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            position: fixed; left: 0; top: 0; height: 100vh; z-index: 2000; 
+            transform: translateX(-100%); transition: transform 0.3s ease;
         }
         .sidebar.open { transform: translateX(0); }
 
         .sidebar-right { 
             position: fixed; right: 0; top: 0; width: 100vw; height: 100vh; 
             background: var(--bg); z-index: 3000; transform: translateX(100%); 
-            transition: transform 0.3s ease-in-out; display: flex; flex-direction: column; 
+            transition: transform 0.3s ease; display: flex; flex-direction: column; 
         }
         .sidebar-right.open { transform: translateX(0); }
 
@@ -81,65 +63,34 @@
         }
         .sidebar-bottom.open { transform: translateY(0); }
 
-        /* Navigation & Tabs */
-        .tab-bar { 
-            display: flex; background: var(--surface); border-bottom: 1px solid var(--border); 
-            align-items: center; height: 50px; flex-shrink: 0; padding: 0 5px;
-        }
-        .tab { padding: 10px 15px; cursor: pointer; border-bottom: 2px solid transparent; font-size: 14px; color: #888; }
-        .tab.active { border-bottom-color: var(--accent); color: var(--accent); font-weight: bold; }
+        .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; height: 50px; padding: 0 5px; }
+        .tab { padding: 10px 15px; cursor: pointer; color: #888; border-bottom: 2px solid transparent; }
+        .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
 
-        /* Panels */
         .panel-box { display: none; flex: 1; overflow-y: auto; padding: 15px; }
         .panel-box.active { display: block; }
         
-        /* Editor Customization */
-        #view-editor { padding: 0; flex-direction: column; height: 100%; }
+        #view-editor { padding: 0; flex-direction: column; height: 100%; display: none; }
         #view-editor.active { display: flex; }
         .CodeMirror { flex: 1; height: auto; font-size: 15px; background: #0d1117 !important; }
-        
-        /* Mobile Symbols */
-        #mobile-toolbar { 
-            display: flex; overflow-x: auto; background: var(--surface); 
-            padding: 6px; gap: 6px; border-bottom: 1px solid var(--border); 
-            scrollbar-width: none; 
-        }
-        .tool-btn { 
-            background: var(--surface-light); color: var(--accent); border: 1px solid var(--border); 
-            padding: 8px 14px; border-radius: 6px; font-family: monospace; font-size: 16px; 
-        }
 
-        /* Console Output */
-        #preview-frame { border: none; flex: 1; width: 100%; background: #fff; }
-        #console-output { 
-            background: #050505; color: #0f0; font-family: 'Courier New', monospace; 
-            font-size: 12px; padding: 10px; height: 200px; overflow-y: auto; border-top: 2px solid #333; 
-        }
-        .log-msg { border-bottom: 1px solid #111; padding: 4px 0; }
-        .log-error { color: #ff5555; border-bottom: 1px solid #111; padding: 4px 0; }
-        
-        .status-flash { 
-            position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); 
-            background: var(--accent); color: white; padding: 6px 16px; 
-            border-radius: 20px; opacity: 0; transition: opacity 0.3s; z-index: 4000;
-        }
+        #terminal-log { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 13px; color: #aaa; }
+        .terminal-input-row { display: flex; align-items: center; padding: 10px; background: #111; gap: 10px; }
+        #terminal-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; }
 
-        .accordion-header { 
-            padding: 12px 15px; background: var(--surface-light); 
-            border-bottom: 1px solid var(--border); cursor: pointer; 
-            display: flex; justify-content: space-between; font-size: 13px; font-weight: bold;
-        }
-        .accordion-content { display: none; padding: 10px; }
-        .accordion-content.open { display: block; }
+        #preview-frame { border: none; flex: 1; background: #fff; }
+        #console-output { background: #050505; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; height: 150px; overflow-y: auto; }
+        
+        .status-flash { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--accent); color: white; padding: 6px 16px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; z-index: 4000; }
     </style>
 </head>
 <body>
 
     <div class="tab-bar">
-        <button class="btn-outline" onclick="toggleLeftSidebar(true)">☰</button>
-        <button class="btn-outline" style="margin-left:5px" onclick="toggleTerminal()">>_ Term</button>
-        <div class="tab active" onclick="switchTab('editor')">Editor</div>
-        <div class="tab" onclick="switchTab('tools')">Diagnostics</div>
+        <button class="btn-outline" onclick="Nexus.toggleLeftSidebar(true)">☰</button>
+        <button class="btn-outline" style="margin-left:5px" onclick="Nexus.toggleTerminal()">>_ Term</button>
+        <div class="tab active" onclick="Nexus.switchTab('editor', this)">Editor</div>
+        <div class="tab" onclick="Nexus.switchTab('tools', this)">Diagnostics</div>
         <div style="flex:1"></div>
         <button class="btn-primary" onclick="Nexus.runPreview()">▶ LIVE RUN</button>
     </div>
@@ -148,96 +99,45 @@
         <aside id="ui-sidebar" class="sidebar">
             <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
                 <h3 style="margin:0">DevOS <span style="color:var(--accent)">4.0</span></h3>
-                <button onclick="toggleLeftSidebar(false)">✖</button>
+                <button onclick="Nexus.toggleLeftSidebar(false)">✖</button>
             </div>
-            
-            <div style="padding: 10px; display: flex; gap: 5px;">
-                <button class="btn-primary" style="flex:1" onclick="createNewFile()">+ File</button>
-                <button class="btn-outline" onclick="document.getElementById('file-upload').click()">📁</button>
-                <input type="file" id="file-upload" multiple style="display: none;" onchange="handleFileInput(event)">
-            </div>
-
-            <div class="accordion">
-                <div class="accordion-header" onclick="toggleAccordion(this)">FILES <span class="chevron">▶</span></div>
-                <div class="accordion-content open" id="file-list"></div>
-                
-                <div class="accordion-header" onclick="toggleAccordion(this)">SNIPPET VAULT <span class="chevron">▶</span></div>
-                <div class="accordion-content" id="vault-list">
-                    <button class="btn-outline" style="width:100%" onclick="createManualSnippet()">+ Create Snippet</button>
-                    <div id="snippet-list" style="margin-top:10px"></div>
-                </div>
-
-                <div class="accordion-header" onclick="toggleAccordion(this)">TIME MACHINE <span class="chevron">▶</span></div>
-                <div class="accordion-content" id="snapshot-list"></div>
-            </div>
+            <div style="padding: 10px;"><button class="btn-primary" style="width:100%" onclick="Nexus.createNewFile()">+ New File</button></div>
+            <div id="file-list" style="padding:10px;"></div>
         </aside>
 
-        <main class="main-content" style="flex:1; display:flex; flex-direction:column;">
+        <main style="flex:1; display:flex; flex-direction:column;">
             <div id="view-editor" class="panel-box active">
-                <div id="editor-header" style="padding:8px 15px; background:var(--surface); display:flex; justify-content:space-between; align-items:center;">
+                <div style="padding:8px 15px; background:var(--surface); display:flex; justify-content:space-between;">
                     <span id="current-file-label" style="font-family:monospace; color:var(--accent)">No file open</span>
-                    <button class="btn-outline" style="font-size:10px" onclick="Nexus.beautify()">{ } Format</button>
                 </div>
-                
-                <div id="mobile-toolbar">
-                    <button class="tool-btn" onclick="insertSymbol('{')">{</button>
-                    <button class="tool-btn" onclick="insertSymbol('}')">}</button>
-                    <button class="tool-btn" onclick="insertSymbol('(')">(</button>
-                    <button class="tool-btn" onclick="insertSymbol(')')">)</button>
-                    <button class="tool-btn" onclick="insertSymbol(';')">;</button>
-                    <button class="tool-btn" onclick="insertSymbol('=')">=</button>
-                    <button class="tool-btn" onclick="insertSymbol('`')">`</button>
-                    <button class="tool-btn" onclick="insertSymbol('$', true)">${}</button>
-                </div>
-<div id="bottom-terminal" class="sidebar-bottom">
-    <div class="terminal-header">
-        <span>DEV_OS TERMINAL</span>
-        <button onclick="toggleTerminal()" style="background:transparent; color:white; border:none;">✖</button>
-    </div>
-    <div id="terminal-log">
-        <div>Nexus Terminal v4.2 Online.</div>
-    </div>
-    <div class="terminal-input-row">
-        <span style="color:var(--success)">$</span>
-        <input type="text" id="terminal-input" placeholder="Type 'save' or 'bundle'...">
-        <button id="term-enter-btn" class="btn-primary" onclick="Nexus.Terminal.run()">ENTER</button>
-    </div>
-</div>
-
                 <textarea id="code-editor"></textarea>
             </div>
 
             <div id="view-tools" class="panel-box">
-                <h3 style="color:var(--accent)">Sentinel Scanner</h3>
-                <div style="background:var(--surface); padding:15px; border-radius:8px; border:1px solid var(--border);">
-                    <button class="btn-primary" onclick="Nexus.runSentinel()">🚀 Initialize Global Scan</button>
-                    <div id="sentinel-results" style="margin-top:15px; font-family:monospace; font-size:12px; max-height:200px; overflow-y:auto;">
-                        <div style="color:#666;">Waiting for scan...</div>
-                    </div>
-                </div>
-
-                <h3 style="margin-top:25px;">Search & Replace</h3>
-                <input type="text" id="search-query" placeholder="Find string...">
-                <input type="text" id="replace-query" placeholder="Replace with...">
-                <div style="display:flex; gap:10px;">
-                    <button class="btn-outline" style="flex:1" onclick="performSearch()">Search</button>
-                    <button class="btn-outline" style="flex:1" onclick="performReplace()">Replace All</button>
-                </div>
-
-                <h3 style="margin-top:25px;">Storage Manager</h3>
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
-                    <button class="btn-danger" onclick="Nexus.clearPWACache()">Nuke SW/Cache</button>
-                    <button class="btn-outline" onclick="Nexus.exploreStorage()">Inspect IndexedDB</button>
-                </div>
-                <div id="storage-list" style="margin-top:10px; font-family:monospace; font-size:11px;"></div>
+                <h3>Sentinel Scanner</h3>
+                <button class="btn-primary" onclick="Nexus.runSentinel()">🚀 Initialize Scan</button>
+                <div id="sentinel-results" style="margin-top:15px; font-family:monospace; font-size:12px; background: #000; padding: 10px; border-radius: 5px;"></div>
             </div>
         </main>
     </div>
 
+    <div id="bottom-terminal" class="sidebar-bottom">
+        <div style="padding:10px; background:#111; display:flex; justify-content:space-between; border-bottom:1px solid #333;">
+            <span>DEV_OS TERMINAL</span>
+            <button onclick="Nexus.toggleTerminal()" style="background:transparent; color:white;">✖</button>
+        </div>
+        <div id="terminal-log"><div>Nexus Kernel v4.2 Online. Type 'help' for commands.</div></div>
+        <div class="terminal-input-row">
+            <span style="color:var(--success)">$</span>
+            <input type="text" id="terminal-input" placeholder="Type command...">
+            <button class="btn-primary" onclick="Nexus.Terminal.run()">ENTER</button>
+        </div>
+    </div>
+
     <aside id="testing-sidebar" class="sidebar-right">
         <div class="tab-bar" style="background:var(--surface-light); justify-content:space-between; padding:0 15px;">
-            <strong>ENVIRONMENT PREVIEW</strong>
-            <button class="btn-danger" onclick="toggleRightSidebar(false)">Close Panel ✖</button>
+            <strong>LIVE PREVIEW</strong>
+            <button class="btn-danger" onclick="Nexus.toggleRightSidebar(false)">Close ✖</button>
         </div>
         <iframe id="preview-frame"></iframe>
         <div id="console-output"></div>
@@ -246,785 +146,161 @@
     <div id="status-msg" class="status-flash">Changes Saved</div>
 
     <script>
+        // --- Core Globals ---
         let vfs = {};
         let currentFileName = null;
         let cmEditor = null;
         let saveTimer = null;
-        let snippets = [];
-        let snapshots = [];
 
-        // --- Core Application Logic (Nexus Namespace) ---
         const Nexus = {
-            async runSentinel() {
-                const results = document.getElementById('sentinel-results');
-                results.innerHTML = '<div style="color:var(--warn)">Scanning VFS structure...</div>';
+            async boot() {
+                // Init Editor
+                cmEditor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+                    mode: "javascript", theme: "dracula", lineNumbers: true,
+                    autoCloseBrackets: true, lineWrapping: true
+                });
+
+                cmEditor.on('change', () => {
+                    clearTimeout(saveTimer);
+                    saveTimer = setTimeout(() => this.saveVFS(), 1000);
+                });
+
+                // Load Data
+                const saved = await localforage.getItem('devos_vfs');
+                if (saved) vfs = saved;
                 
+                this.rebuildSidebar();
+                if (Object.keys(vfs).length > 0) this.openFile(Object.keys(vfs)[0]);
+
+                // Terminal Listener
+                document.getElementById('terminal-input').addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') this.Terminal.run();
+                });
+
+                // Console Listener
+                window.addEventListener('message', e => {
+                    const out = document.getElementById('console-output');
+                    if (e.data.type === 'log') out.innerHTML += `<div style="color:#888">▶ ${e.data.data}</div>`;
+                    if (e.data.type === 'err') out.innerHTML += `<div style="color:var(--danger)">❌ ${e.data.data}</div>`;
+                    out.scrollTop = out.scrollHeight;
+                });
+            },
+
+            async saveVFS() {
+                if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
+                await localforage.setItem('devos_vfs', vfs);
+                const flash = document.getElementById('status-msg');
+                flash.style.opacity = 1;
+                setTimeout(() => flash.style.opacity = 0, 1000);
+            },
+
+            rebuildSidebar() {
+                const list = document.getElementById('file-list');
+                list.innerHTML = Object.keys(vfs).map(fn => `
+                    <div style="padding:8px; border-bottom:1px solid #222; cursor:pointer; ${fn === currentFileName ? 'color:var(--accent)' : ''}" onclick="Nexus.openFile('${fn}')">
+                        📄 ${fn}
+                    </div>
+                `).join('');
+            },
+
+            openFile(fn) {
+                if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
+                currentFileName = fn;
+                cmEditor.setValue(vfs[fn] || '');
+                const ext = fn.split('.').pop();
+                const modeMap = { 'html': 'htmlmixed', 'css': 'css', 'js': 'javascript' };
+                cmEditor.setOption("mode", modeMap[ext] || 'javascript');
+                document.getElementById('current-file-label').innerText = fn;
+                this.rebuildSidebar();
+            },
+
+            createNewFile() {
+                const name = prompt("Filename (e.g. index.html):");
+                if (name) { vfs[name] = ""; this.openFile(name); }
+            },
+
+            runSentinel() {
+                const results = document.getElementById('sentinel-results');
+                results.innerHTML = '<div style="color:var(--warn)">Scanning...</div>';
                 setTimeout(() => {
-                    let log = `<div style="color:var(--success)">[OK] VFS Integrity verified. Files found: ${Object.keys(vfs).length}</div>`;
-                    const hasIndex = vfs['index.html'] ? '✅' : '❌';
-                    log += `<div>${hasIndex} Entry Point (index.html)</div>`;
-                    
-                    if (currentFileName && currentFileName.endsWith('.js')) {
-                        log += `<div>[LINT] Checking ${currentFileName}...</div>`;
-                        JSHINT(cmEditor.getValue(), { esversion: 11 });
+                    const code = cmEditor.getValue();
+                    let log = `<div style="color:var(--success)">VFS Verified. Files: ${Object.keys(vfs).length}</div>`;
+                    if (currentFileName.endsWith('.js')) {
+                        JSHINT(code, { esversion: 11 });
                         if (JSHINT.errors.length > 0) {
                             JSHINT.errors.forEach(err => {
-                                if(err) log += `<div style="color:var(--danger)">- Line ${err.line}: ${err.reason}</div>`;
+                                if(err) log += `<div style="color:var(--danger)">Line ${err.line}: ${err.reason}</div>`;
                             });
-                        } else {
-                            log += `<div style="color:var(--success)">- Code is clean!</div>`;
-                        }
+                        } else { log += "<div>Code is clean!</div>"; }
                     }
                     results.innerHTML = log;
-                }, 800);
-            },
-
-            async clearPWACache() {
-                if ('serviceWorker' in navigator) {
-                    const regs = await navigator.serviceWorker.getRegistrations();
-                    for(let reg of regs) await reg.unregister();
-                }
-                const keys = await caches.keys();
-                for(let key of keys) await caches.delete(key);
-                alert("PWA Assets and Service Workers cleared.");
-            },
-
-            async exploreStorage() {
-                const out = document.getElementById('storage-list');
-                const size = new Blob([JSON.stringify(vfs)]).size;
-                out.innerHTML = `VFS Disk Usage: ${(size / 1024).toFixed(2)} KB<br>`;
-                out.innerHTML += `LocalForage Driver: ${localforage.driver()}`;
-            },
-
-            beautify() {
-                if (!currentFileName) return;
-                const code = cmEditor.getValue();
-                const ext = currentFileName.split('.').pop();
-                let formatted = code;
-                
-                if (ext === 'html') formatted = html_beautify(code);
-                else formatted = js_beautify(code);
-                
-                cmEditor.setValue(formatted);
+                }, 500);
             },
 
             runPreview() {
                 if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
-                toggleRightSidebar(true);
-                
-                let html = vfs['index.html'] || '<h1>Error</h1><p>index.html not found in workspace.</p>';
-                const injection = `
-                <script>
-                    const _log = console.log;
-                    const _err = console.error;
+                this.toggleRightSidebar(true);
+                let html = vfs['index.html'] || '<h1>index.html not found</h1>';
+                const injection = `<script>
                     console.log = (...args) => window.parent.postMessage({type: 'log', data: args.join(' ')}, '*');
                     console.error = (...args) => window.parent.postMessage({type: 'err', data: args.join(' ')}, '*');
-                    window.onerror = (m, u, l) => console.error(m + " at Line: " + l);
+                    window.onerror = (m,u,l) => console.error(m + " at line " + l);
                 <\/script>`;
-                
                 html = html.replace('<head>', '<head>' + injection);
-                document.getElementById('console-output').innerHTML = '<div style="color:#444">-- Kernel Initialized --</div>';
                 document.getElementById('preview-frame').srcdoc = html;
-            }
-        };
+            },
 
-        // --- Init & File System ---
-        async function init() {
-            cmEditor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
-                mode: "javascript",
-                theme: "dracula",
-                lineNumbers: true,
-                autoCloseBrackets: true,
-                lineWrapping: true
-            });
+            toggleLeftSidebar(s) { document.getElementById('ui-sidebar').classList.toggle('open', s); },
+            toggleRightSidebar(s) { document.getElementById('testing-sidebar').classList.toggle('open', s); },
+            toggleTerminal() { document.getElementById('bottom-terminal').classList.toggle('open'); },
+            switchTab(id, el) {
+                document.querySelectorAll('.panel-box, .tab').forEach(x => x.classList.remove('active'));
+                document.getElementById(`view-${id}`).classList.add('active');
+                el.classList.add('active');
+                if(id === 'editor') cmEditor.refresh();
+            },
 
-            cmEditor.on('change', () => {
-                clearTimeout(saveTimer);
-                saveTimer = setTimeout(saveVFS, 1000);
-            });
+            Terminal: {
+                async run() {
+                    const input = document.getElementById('terminal-input');
+                    const log = document.getElementById('terminal-log');
+                    const cmd = input.value.trim().toLowerCase();
+                    if (!cmd) return;
 
-            const saved = await localforage.getItem('devos_vfs');
-            if (saved) vfs = saved;
-            
-            const savedSnips = await localforage.getItem('vault_snippets');
-            if (savedSnips) snippets = savedSnips;
+                    log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
+                    let res = "";
 
-            rebuildSidebar();
-            renderVault();
-            if (Object.keys(vfs).length > 0) openFile(Object.keys(vfs)[0]);
-
-            window.addEventListener('message', e => {
-                const out = document.getElementById('console-output');
-                if (e.data.type === 'log') out.innerHTML += `<div class="log-msg">▶ ${e.data.data}</div>`;
-                if (e.data.type === 'err') out.innerHTML += `<div class="log-error">❌ ${e.data.data}</div>`;
-                out.scrollTop = out.scrollHeight;
-            });
-
-            initTerminal();
-        }
-
-        async function saveVFS() {
-            if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
-            await localforage.setItem('devos_vfs', vfs);
-            const flash = document.getElementById('status-msg');
-            flash.style.opacity = 1;
-            setTimeout(() => flash.style.opacity = 0, 1000);
-        }
-
-        function rebuildSidebar() {
-            const list = document.getElementById('file-list');
-            list.innerHTML = Object.keys(vfs).map(fn => `
-                <div style="display:flex; padding:8px; border-bottom:1px solid #222; font-size:13px; ${fn === currentFileName ? 'background:#1c2128' : ''}">
-                    <span style="flex:1; cursor:pointer;" onclick="openFile('${fn}')">${fn}</span>
-                    <span style="cursor:pointer; color:var(--danger)" onclick="deleteFile('${fn}')">🗑️</span>
-                </div>
-            `).join('');
-        }
-
-        function openFile(fn) {
-            if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
-            currentFileName = fn;
-            cmEditor.setValue(vfs[fn] || '');
-            
-            const ext = fn.split('.').pop();
-            const modeMap = { 'html': 'htmlmixed', 'css': 'css', 'js': 'javascript', 'json': 'application/json' };
-            cmEditor.setOption("mode", modeMap[ext] || 'javascript');
-            
-            document.getElementById('current-file-label').innerText = fn;
-            rebuildSidebar();
-        }
-
-        function createNewFile() {
-            const name = prompt("Filename (e.g. app.js):");
-            if (name) { vfs[name] = ""; openFile(name); }
-        }
-
-        function deleteFile(fn) {
-            if(confirm(`Delete ${fn}?`)) { delete vfs[fn]; rebuildSidebar(); }
-        }
-
-        // --- UI Interactions ---
-        function toggleLeftSidebar(state) { document.getElementById('ui-sidebar').classList.toggle('open', state); }
-        function toggleRightSidebar(state) { document.getElementById('testing-sidebar').classList.toggle('open', state); }
-        function toggleTerminal() { document.getElementById('bottom-terminal').classList.toggle('open'); }
-        function switchTab(id) {
-            document.querySelectorAll('.panel-box, .tab').forEach(el => el.classList.remove('active'));
-            document.getElementById(`view-${id}`).classList.add('active');
-            event.currentTarget.classList.add('active');
-            if(id === 'editor') cmEditor.refresh();
-        }
-
-        function toggleAccordion(header) {
-            header.nextElementSibling.classList.toggle('open');
-        }
-
-        function insertSymbol(sym, isTemplate = false) {
-            const cursor = cmEditor.getCursor();
-            const content = isTemplate ? '${}' : sym;
-            cmEditor.replaceRange(content, cursor);
-            cmEditor.focus();
-            if(isTemplate) cmEditor.setCursor({line: cursor.line, ch: cursor.ch + 2});
-        }
-
-        
-function initTerminal() {
-    const input = document.getElementById('terminal-input');
-    const btn = document.getElementById('term-enter-btn');
-
-    const processCommand = async () => {
-        const cmd = input.value.trim();
-        if (!cmd) return;
-
-        const log = document.getElementById('terminal-log');
-        log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
-
-        let response = "";
-
-        // Logic Switch
-        if (cmd === 'save') {
-            response = await Nexus.TerminalExtensions.forceSave();
-        } else if (cmd === 'bundle') {
-            response = Nexus.TerminalExtensions.bundleToHTML();
-        } else if (cmd === 'nuke') {
-            // Your nuke script here
-            response = "System wipe initialized...";
-        } else {
-            response = "Command not recognized. Try 'save' or 'bundle'.";
-        }
-
-        log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${response}</div>`;
-        input.value = '';
-        log.scrollTop = log.scrollHeight;
-        Nexus.triggerHaptic('light');
-    };
-
-    // Listen for Enter Key
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') processCommand(); });
-    
-    // Listen for Button Click
-    btn.addEventListener('click', processCommand);
-}
-
-        // Swipe Gestures
-        let touchStart = 0;
-        document.addEventListener('touchstart', e => { touchStart = e.touches[0].clientX; }, {passive:true});
-        document.addEventListener('touchend', e => {
-            const diff = e.changedTouches[0].clientX - touchStart;
-            if (touchStart < 40 && diff > 80) toggleLeftSidebar(true);
-            if (touchStart > window.innerWidth - 40 && diff < -80) Nexus.runPreview();
-        }, {passive:true});
-
-        window.onload = init;
-    </script>
-    <script type="module">
-class DevOSSentinel {
-    constructor() {
-        this.registry = [];
-        this.declarations = new Map();
-        this.references = new Set();
-        this.initDefaultCheckers();
-    }
-
-    initDefaultCheckers() {
-        // Logic & Critical Flow
-        this.use((node) => {
-            if (['WhileStatement', 'ForStatement'].includes(node.type)) {
-                if (node.test?.value === true && !this.findInNode(node.body, 'BreakStatement')) {
-                    return { id: 'INF_LOOP', message: "Infinite Loop: No break found.", severity: 'CRITICAL' };
-                }
-            }
-        });
-
-        // Recursion Guard
-        this.use((node, parent, context) => {
-            if (node.type === 'FunctionDeclaration' && node.id) context.currentFunctionName = node.id.name;
-            if (node.type === 'CallExpression' && node.callee.name === context.currentFunctionName) {
-                let isGuarded = false;
-                let tracer = node.parent;
-                while (tracer && tracer.type !== 'FunctionDeclaration') {
-                    if (['IfStatement', 'SwitchStatement', 'ConditionalExpression'].includes(tracer.type)) { isGuarded = true; break; }
-                    tracer = tracer.parent;
-                }
-                if (!isGuarded) return { id: 'STACK_OVERFLOW', message: `Recursion Risk: '${node.callee.name}' calls itself without an exit guard.`, severity: 'CRITICAL' };
-            }
-        });
-
-        // Security: Hardcoded Secrets
-        this.use((node) => {
-            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
-                const name = node.id.name.toLowerCase();
-                const val = node.init?.value;
-                if ((name.includes('key') || name.includes('secret')) && typeof val === 'string' && val.length > 10) {
-                    return { id: 'SEC_LEAK', message: `Secret Leak: Hardcoded '${node.id.name}'.`, severity: 'HIGH' };
-                }
-            }
-        });
-
-        // UI Performance: Async Loops
-        this.use((node, parent, context) => {
-            if ((node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression') && node.async) context.inAsync = true;
-            if (context?.inAsync && ['WhileStatement', 'ForStatement'].includes(node.type)) {
-                if (!this.findInNode(node.body, 'AwaitExpression')) {
-                    return { id: 'ASYNC_FREEZE', message: "UI Thread Alert: Async loop missing 'await'.", severity: 'CRITICAL' };
-                }
-            }
-        });
-
-        // Zombie Code Detection
-        this.use((node) => {
-            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') this.declarations.set(node.id.name, node);
-            if (node.type === 'FunctionDeclaration' && node.id) this.declarations.set(node.id.name, node);
-        });
-
-        this.use((node, parent) => {
-            if (node.type === 'Identifier') {
-                const isUsage = parent && !['VariableDeclarator', 'FunctionDeclaration'].includes(parent.type) &&
-                                !(parent.type === 'MemberExpression' && parent.property === node);
-                if (isUsage) this.references.add(node.name);
-            }
-        });
-    }
-
-    use(checkerFunc) { this.registry.push(checkerFunc); }
-
-    analyze(code) {
-        this.declarations.clear();
-        this.references.clear();
-        const issues = [];
-        let ast;
-        try {
-            ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
-        } catch (e) {
-            return [{ message: `Syntax Error: ${e.message}`, line: e.loc?.line, severity: 'FATAL' }];
-        }
-        const context = { inAsync: false, currentFunctionName: null };
-        this.traverse(ast, (node, parent) => {
-            this.registry.forEach(check => {
-                const result = check(node, parent, context);
-                if (result) issues.push({ ...result, line: node.loc?.start.line });
-            });
-        });
-        for (const [name, node] of this.declarations) {
-            if (!this.references.has(name)) {
-                issues.push({ id: 'ZOMBIE_CODE', message: `Unused variable: '${name}'.`, severity: 'LOW', line: node.loc?.start.line });
-            }
-        }
-        return issues;
-    }
-
-    traverse(node, callback, parent = null) {
-        if (!node) return;
-        node.parent = parent; 
-        callback(node, parent);
-        for (const key in node) {
-            const child = node[key];
-            if (child && typeof child === 'object') {
-                if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node));
-                else this.traverse(child, callback, node);
-            }
-        }
-    }
-
-    findInNode(node, type) {
-        let found = false;
-        this.traverse(node, (n) => { if (n.type === type) found = true; });
-        return found;
-    }
-}
-
-// --- 2. NEXUS CORE OBJECT ---
-window.Nexus = {
-    state: { 
-        vfs: {}, 
-        activeFile: "main.js", 
-        cm: null,
-        sentinel: new DevOSSentinel(),
-        autoSaveTimer: null,
-        fps: 0,
-        lastFrameTime: performance.now(),
-        touchStart: { x: 0, y: 0 }
-    },
-
-    async boot() {
-        console.log("Nexus Prime: Systems Online.");
-        
-        // Load Data
-        const saved = await localforage.getItem('nexus_vfs_v4');
-        if (saved) this.state.vfs = saved;
-
-        // Initialize UI
-        this.initEditor();
-        this.initGestures();
-        this.initMobileSoftKeys();
-        this.initFPSTicker();
-        this.renderExplorer();
-        this.initSearch();
-
-        // Load Default File
-        if (this.state.vfs[this.state.activeFile]) {
-            this.loadFile(this.state.activeFile);
-        }
-
-        this.log("DevOS Nexus Prime Initialized.", "var(--success)");
-    },
-
-    // --- System Utilities ---
-    log(msg, color = "var(--text)") {
-        console.log(`%c[Nexus] ${msg}`, `color: ${color}`);
-    },
-
-    triggerHaptic(type = 'light') {
-        if (!navigator.vibrate) return;
-        const patterns = { light: 10, medium: 25, heavy: [30, 50, 30] };
-        navigator.vibrate(patterns[type] || 10);
-    },
-
-    // --- Layout & View Control ---
-    switchTab(tabId) {
-        this.triggerHaptic('light');
-        
-        // Update Ribbon
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active-tab'));
-        const btn = document.getElementById(`tab-btn-${tabId}`);
-        if (btn) btn.classList.add('active-tab');
-
-        // Update Panel
-        document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
-        const panel = document.getElementById(`${tabId}-view`);
-        if (panel) panel.classList.add('active');
-
-        // Contextual Refresh
-        if (tabId === 'intel') this.updateProjectStats();
-        if (tabId === 'diagnostic') this.refreshStorageInspector();
-        if (tabId === 'time') this.initDiffViewer();
-        if (this.state.cm) this.state.cm.focus();
-    },
-
-    toggleSidebar(force) {
-        const s = document.getElementById('sidebar') || document.getElementById('ui-sidebar');
-        if (s) s.classList.toggle('open', force);
-    },
-
-    // --- Gesture Engine ---
-    initGestures() {
-        document.addEventListener('touchstart', e => {
-            this.state.touchStart.x = e.changedTouches[0].screenX;
-            this.state.touchStart.y = e.changedTouches[0].screenY;
-        }, { passive: true });
-
-        document.addEventListener('touchend', e => {
-            const diffX = e.changedTouches[0].screenX - this.state.touchStart.x;
-            const threshold = 60;
-
-            // Edge Swipes
-            if (this.state.touchStart.x < 40 && diffX > threshold) this.toggleSidebar(true);
-            if (this.state.touchStart.x > (window.innerWidth - 40) && diffX < -threshold) this.refreshLivePreview();
-
-            // Generic Side Closures
-            if (Math.abs(diffX) > 100) {
-                if (diffX < 0) this.toggleSidebar(false);
-            }
-        }, { passive: true });
-    },
-
-    // --- VFS & Editor Logic ---
-    initEditor() {
-        const wrapper = document.getElementById('editor-wrapper');
-        if (!wrapper || !window.CM6) return;
-
-        this.state.cm = new window.CM6.EditorView({
-            doc: this.state.vfs[this.state.activeFile] || "",
-            extensions: [
-                window.CM6.basicSetup, 
-                window.CM6.oneDark, 
-                window.CM6.javascript(),
-                window.CM6.EditorView.updateListener.of((v) => {
-                    if (v.docChanged) {
-                        this.state.vfs[this.state.activeFile] = v.state.doc.toString();
-                        clearTimeout(this.state.autoSaveTimer);
-                        this.state.autoSaveTimer = setTimeout(() => this.saveVFS(), 1500);
+                    if (cmd === 'save') {
+                        await Nexus.saveVFS();
+                        res = "VFS Sync Complete.";
+                    } else if (cmd === 'bundle') {
+                        res = this.bundle();
+                    } else if (cmd === 'nuke') {
+                        if(confirm("Wipe all data?")) { await localforage.clear(); location.reload(); }
+                    } else if (cmd === 'help') {
+                        res = "Commands: save, bundle, nuke, help";
+                    } else {
+                        res = "Unknown command.";
                     }
-                })
-            ],
-            parent: wrapper
-        });
-    },
 
-    async loadFile(filename) {
-        if (!this.state.vfs[filename] && this.state.vfs[filename] !== "") return;
-        this.state.activeFile = filename;
-        this.state.cm.dispatch({
-            changes: { from: 0, to: this.state.cm.state.doc.length, insert: this.state.vfs[filename] }
-        });
-        document.getElementById('active-file-display').innerText = filename;
-        this.renderExplorer();
-    },
-
-    async saveVFS() {
-        await localforage.setItem('nexus_vfs_v4', this.state.vfs);
-        if (window.NexusSync) window.NexusSync.pushState();
-    },
-
-    Nexus.TerminalEngine = {
-    // Standard File System Commands
-    commands: {
-        // Create an empty file: touch index.html
-        touch: (args) => {
-            const fileName = args[0];
-            if (!fileName) return "Usage: touch <filename>";
-            if (Nexus.state.vfs[fileName]) return `Error: ${fileName} already exists.`;
-            Nexus.state.vfs[fileName] = "";
-            Nexus.renderExplorer();
-            Nexus.saveVFS();
-            return `File ${fileName} created.`;
-        },
-
-        // Delete a file: rm temp.js
-        rm: (args) => {
-            const fileName = args[0];
-            if (!fileName || !Nexus.state.vfs[fileName]) return "Error: File not found.";
-            delete Nexus.state.vfs[fileName];
-            Nexus.renderExplorer();
-            Nexus.saveVFS();
-            return `File ${fileName} removed permanently.`;
-        },
-
-        // Write to file: echo "console.log('hi')" > main.js
-        // Append to file: echo "// comment" >> main.js
-        echo: (args) => {
-            const raw = args.join(' ');
-            const mode = raw.includes(' >> ') ? 'append' : raw.includes(' > ') ? 'write' : null;
-            if (!mode) return "Usage: echo 'content' > filename";
-
-            const parts = raw.split(mode === 'append' ? ' >> ' : ' > ');
-            const content = parts[0].replace(/['"]/g, '').trim();
-            const fileName = parts[1].trim();
-
-            if (mode === 'write') {
-                Nexus.state.vfs[fileName] = content;
-            } else {
-                Nexus.state.vfs[fileName] = (Nexus.state.vfs[fileName] || "") + "\n" + content;
+                    log.innerHTML += `<div style="color:#666">> ${res}</div>`;
+                    input.value = "";
+                    log.scrollTop = log.scrollHeight;
+                },
+                bundle() {
+                    let html = vfs['index.html'];
+                    if(!html) return "Error: index.html missing.";
+                    let bundle = "\n<script>\n";
+                    Object.keys(vfs).forEach(f => { if(f.endsWith('.js')) bundle += vfs[f] + "\n"; });
+                    bundle += "<\/script>";
+                    vfs['index.html'] = html.includes('</body>') ? html.replace('</body>', bundle + '</body>') : html + bundle;
+                    Nexus.openFile('index.html');
+                    return "JS bundled into index.html";
+                }
             }
-
-            if (Nexus.state.activeFile === fileName) Nexus.loadFile(fileName);
-            Nexus.saveVFS();
-            return `Updated ${fileName}.`;
-        },
-
-        // Execute a JS file as a system script: run update_ui.js
-        run: async (args) => {
-            const fileName = args[0];
-            const script = Nexus.state.vfs[fileName];
-            if (!script) return `Error: Script '${fileName}' not found.`;
-
-            try {
-                // We wrap the script in an async function and provide 'Nexus' as a local variable
-                const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
-                const execute = new AsyncFunction('Nexus', script);
-                await execute(Nexus);
-                return `Script '${fileName}' executed successfully.`;
-            } catch (err) {
-                return `Script Error: ${err.message}`;
-            }
-        },
-
-        // The Nuke Command from earlier
-        nuke: async () => {
-            if (confirm("☢️ NUCLEAR OVERRIDE: Clear all system data?")) {
-                // Call the systemNuke function we defined previously
-                await systemNuke(); 
-                return "System wiped.";
-            }
-            return "Nuke aborted.";
-        }
-    },
-async run() {
-        const input = document.getElementById('terminal-input');
-        const log = document.getElementById('terminal-log');
-        const cmd = input.value.trim().toLowerCase();
-
-        if (!cmd) return;
-
-        // Print to screen
-        log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
-        
-        let feedback = "";
-
-        if (cmd === 'save') {
-            // PERMANENT SAVE to LocalForage
-            await localforage.setItem('devos_vfs', vfs);
-            feedback = "VFS saved permanently to IndexedDB.";
-            Nexus.flashSaveStatus("VFS Synced");
-        } 
-        else if (cmd === 'bundle') {
-            // MOVE ALL JS TO HTML
-            feedback = this.bundleToHTML();
-        } 
-        else if (cmd === 'nuke') {
-            if(confirm("Wipe everything?")) {
-                await localforage.clear();
-                localStorage.clear();
-                location.reload();
-            }
-        } 
-        else {
-            feedback = "Unknown command. Try: save, bundle, nuke";
-        }
-
-        log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${feedback}</div>`;
-        input.value = ''; // Clear input
-        log.scrollTop = log.scrollHeight; // Auto-scroll
-        Nexus.triggerHaptic('light');
-    },
-
-    bundleToHTML() {
-        // 1. Get current index.html
-        let html = vfs['index.html'] || document.documentElement.outerHTML;
-        
-        // 2. Collect all .js files from the Virtual File System
-        let scripts = "\n\n<script>\n";
-        for (const [name, code] of Object.entries(vfs)) {
-            if (name.endsWith('.js')) {
-                scripts += `\n/* File: ${name} */\n${code}\n`;
-            }
-        }
-        scripts += "<\/script>\n";
-
-        // 3. Inject into the HTML (before closing body)
-        if (html.includes('</body>')) {
-            html = html.replace('</body>', scripts + '</body>');
-        } else {
-            html += scripts;
-        }
-
-        // 4. Update the VFS and the Editor
-        vfs['index.html'] = html;
-        if (currentFileName === 'index.html') {
-            cmEditor.setValue(html);
-        }
-        
-        return "All JS moved into index.html (VFS updated).";
-    }
-};
-
-// Also listen for physical Enter key
-
-    
-    async exec(rawInput) {
-        const [cmd, ...args] = rawInput.trim().split(/\s+/);
-        if (this.commands[cmd]) {
-            return await this.commands[cmd](args);
-        }
-        return `Unknown command: ${cmd}`;
-    }
-};
-
-    // --- Diagnostic Hub ---
-    runSentinel() {
-        if (!this.state.activeFile.endsWith('.js')) return alert("Sentinel only scans JS.");
-        
-        this.triggerHaptic('medium');
-        const code = this.state.cm.state.doc.toString();
-        const results = this.state.sentinel.analyze(code);
-        const container = document.getElementById('sentinel-results');
-        
-        if (results.length === 0) {
-            container.innerHTML = `<div style="color:var(--success)">✅ Clean: No risks detected.</div>`;
-            return;
-        }
-
-        container.innerHTML = results.map(issue => `
-            <div class="sentinel-issue" onclick="Nexus.goToLine(${issue.line})" style="border-left: 3px solid var(--danger); padding:8px; margin-bottom:5px; background:#111; cursor:pointer;">
-                <small style="color:var(--accent)">Line ${issue.line}</small>
-                <div>${issue.message}</div>
-            </div>
-        `).join('');
-    },
-document.getElementById('terminal-input')?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') Nexus.Terminal.run();
-});
-        
-    goToLine(line) {
-        try {
-            const pos = this.state.cm.state.doc.line(line).from;
-            this.state.cm.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-            this.state.cm.focus();
-            this.switchTab('editor');
-        } catch(e) {}
-    },
-
-    // --- Live Preview ---
-    refreshLivePreview() {
-        this.triggerHaptic('medium');
-        const frame = document.getElementById('live-preview-frame');
-        if (!frame) return;
-
-        const html = this.state.vfs['index.html'] || "<h1>No index.html</h1>";
-        const js = this.state.vfs['main.js'] || "";
-        
-        const blob = new Blob([`
-            <html>
-                <body>${html}</body>
-                <script type="module">${js}<\/script>
-            </html>
-        `], { type: 'text/html' });
-        
-        frame.src = URL.createObjectURL(blob);
-        this.switchTab('preview');
-    },
-
-    // --- Mobile Interface ---
-    initMobileSoftKeys() {
-        const kb = document.getElementById('mobile-soft-keys');
-        if (!kb) return;
-        const keys = ['{', '}', '(', ')', '[', ']', ';', '=>', '"', "'", '=', '+', ':', '?', '!', '/'];
-        kb.innerHTML = keys.map(k => `<button class="soft-key" onclick="Nexus.insertSoftKey('${k}')">${k}</button>`).join('');
-    },
-
-    insertSoftKey(key) {
-        if (!this.state.cm) return;
-        this.triggerHaptic('light');
-        const pos = this.state.cm.state.selection.main.head;
-        this.state.cm.dispatch({
-            changes: { from: pos, insert: key },
-            selection: { anchor: pos + key.length }
-        });
-        this.state.cm.focus();
-    },
-
-    initFPSTicker() {
-        const fpsEl = document.getElementById('fps-counter');
-        const tick = () => {
-            const now = performance.now();
-            this.state.fps = Math.round(1000 / (now - this.state.lastFrameTime));
-            this.state.lastFrameTime = now;
-            if (fpsEl) fpsEl.innerText = `${this.state.fps} FPS`;
-            requestAnimationFrame(tick);
         };
-        requestAnimationFrame(tick);
-    }
-};
 
-// --- 3. PEER SYNC MODULE ---
-window.NexusSync = {
-    peer: null, 
-    conn: null,
-    init() {
-        if (!window.Peer) return;
-        this.peer = new Peer();
-        this.peer.on('open', id => console.log("Sync ID:", id));
-        this.peer.on('connection', c => { this.conn = c; this.listen(); });
-    },
-    listen() {
-        this.conn.on('data', data => {
-            if (data.type === 'vfs_sync') {
-                window.Nexus.state.vfs = data.vfs;
-                window.Nexus.renderExplorer();
-            }
-        });
-    },
-    pushState() {
-        if (this.conn) this.conn.send({ type: 'vfs_sync', vfs: window.Nexus.state.vfs });
-    }
-};
-Nexus.TerminalExtensions = {
-    // 1. Permanent Save to LocalForage
-    async forceSave() {
-        Nexus.triggerHaptic('heavy');
-        await localforage.setItem('devos_vfs', Nexus.state.vfs);
-        return "VFS Synchronized to IndexedDB.";
-    },
-
-    // 2. The "Bundle" Command: Move JS into HTML
-    bundleToHTML() {
-        let html = Nexus.state.vfs['index.html'];
-        if (!html) return "Error: No index.html found.";
-
-        // Gather all JS content
-        let combinedJS = "";
-        Object.keys(Nexus.state.vfs).forEach(file => {
-            if (file.endsWith('.js') && file !== 'nexus.js') {
-                combinedJS += `\n/* --- Source: ${file} --- */\n${Nexus.state.vfs[file]}\n`;
-            }
-        });
-
-        // Inject before </body>
-        const scriptTag = `\n<script>\n${combinedJS}\n<\/script>\n`;
-        if (html.includes('</body>')) {
-            html = html.replace('</body>', `${scriptTag}</body>`);
-        } else {
-            html += scriptTag;
-        }
-
-        Nexus.state.vfs['index.html'] = html;
-        Nexus.saveVFS();
-        return "All JavaScript bundled into index.html successfully.";
-    }
-};
-   
-// Start Kernel
-.addEventListener('DOMContentLoaded', () => window.Nexus.boot());
-</script>
-
+        window.onload = () => Nexus.boot();
+    </script>
 </body>
 </html>
