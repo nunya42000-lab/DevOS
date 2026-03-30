@@ -5,346 +5,204 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>DevOS Workspace | Ultimate</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.9/beautify.min.js"></script>
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/javascript/javascript.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/xml/xml.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/css/css.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/htmlmixed/htmlmixed.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closebrackets.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/addon/edit/closetag.min.js"></script>
 
     <style>
-        :root {
-            --bg: #0d1117; --surface: #161b22; --surface-light: #21262d;
-            --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
-            --success: #238636; --warn: #d29922; --danger: #f85149;
-        }
-
-        body { 
-            margin: 0; padding: 0; background: var(--bg); color: var(--text); 
-            font-family: system-ui, -apple-system, sans-serif; 
-            display: flex; flex-direction: column; height: 100vh; overflow: hidden; 
-        }
-
+        :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #c9d1d9; --accent: #2f81f7; --warn: #d29922; --danger: #f85149; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
         * { box-sizing: border-box; }
-        button { cursor: pointer; border: none; border-radius: 6px; font-weight: 600; padding: 6px 12px; transition: 0.2s; }
-        button:active { opacity: 0.7; }
-
-        .btn-primary { background: var(--success); color: white; }
-        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
-        .btn-danger { background: var(--danger); color: white; }
-
-        .app-container { display: flex; flex: 1; overflow: hidden; position: relative; }
         
-        /* Sidebars */
-        .sidebar { 
-            width: 280px; background: var(--surface); border-right: 1px solid var(--border); 
-            position: fixed; left: 0; top: 0; height: 100vh; z-index: 2000; 
-            transform: translateX(-100%); transition: transform 0.3s ease;
-            display: flex; flex-direction: column;
-        }
-        .sidebar.open { transform: translateX(0); }
+        /* Layout */
+        .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); height: 50px; align-items: center; padding: 0 10px; gap: 10px; }
+        .app-container { display: flex; flex: 1; position: relative; overflow: hidden; }
+        
+        .sidebar { width: 280px; background: var(--surface); border-right: 1px solid var(--border); height: 100%; display: flex; flex-direction: column; transition: 0.3s; }
+        .sidebar.closed { margin-left: -280px; }
+        
+        main { flex: 1; display: flex; flex-direction: column; background: #000; }
+        .CodeMirror { flex: 1; font-size: 14px; }
 
-        .sidebar-right { 
-            position: fixed; right: 0; top: 0; width: 100vw; height: 100vh; 
-            background: var(--bg); z-index: 3000; transform: translateX(100%); 
-            transition: transform 0.3s ease; display: flex; flex-direction: column; 
-        }
-        .sidebar-right.open { transform: translateX(0); }
+        /* Terminal */
+        #bottom-terminal { position: fixed; bottom: 0; left: 0; right: 0; height: 35vh; background: #000; border-top: 2px solid var(--accent); transform: translateY(100%); transition: 0.3s; display: flex; flex-direction: column; z-index: 3000; }
+        #bottom-terminal.open { transform: translateY(0); }
+        #terminal-log { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; color: #aaa; font-size: 12px; }
+        .terminal-input-row { display: flex; background: #111; padding: 10px; gap: 10px; border-top: 1px solid #222; }
+        #terminal-input { flex: 1; background: transparent; border: none; color: #fff; outline: none; font-family: monospace; }
 
-        .sidebar-bottom { 
-            position: fixed; bottom: 0; left: 0; right: 0; height: 40vh; 
-            background: #000; border-top: 2px solid var(--accent); z-index: 2500; 
-            transform: translateY(100%); transition: transform 0.3s ease; 
-            display: flex; flex-direction: column;
-        }
-        .sidebar-bottom.open { transform: translateY(0); }
-
-        /* Accordion UI */
-        .accordion-header { padding: 12px 15px; background: var(--surface-light); border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; font-weight: bold; display: flex; justify-content: space-between; }
+        /* UI Elements */
+        button { cursor: pointer; border: none; border-radius: 4px; padding: 6px 12px; font-weight: bold; background: var(--accent); color: #fff; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+        .accordion-header { padding: 10px; background: #21262d; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 12px; font-weight: bold; }
         .accordion-content { display: none; padding: 5px; }
         .accordion-content.open { display: block; }
-
-        /* Tabs & Editor */
-        .tab-bar { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); align-items: center; height: 50px; padding: 0 5px; }
-        .tab { padding: 10px 15px; cursor: pointer; color: #888; border-bottom: 2px solid transparent; }
-        .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: bold; }
-
-        .panel-box { display: none; flex: 1; overflow-y: auto; padding: 15px; }
-        .panel-box.active { display: block; }
-        
-        #view-editor { padding: 0; flex-direction: column; height: 100%; display: none; }
-        #view-editor.active { display: flex; }
-        .CodeMirror { flex: 1; height: auto; font-size: 15px; background: #0d1117 !important; }
-
-        #terminal-log { flex: 1; overflow-y: auto; padding: 10px; font-family: monospace; font-size: 13px; color: #aaa; }
-        .terminal-input-row { display: flex; align-items: center; padding: 10px; background: #111; gap: 10px; }
-        #terminal-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; outline: none; width: 100%; }
-
-        #preview-frame { border: none; flex: 1; background: #fff; }
-        #console-output { background: #050505; color: #0f0; font-family: monospace; font-size: 12px; padding: 10px; height: 150px; overflow-y: auto; }
-        
-        .status-flash { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: var(--accent); color: white; padding: 6px 16px; border-radius: 20px; opacity: 0; transition: opacity 0.3s; z-index: 4000; }
     </style>
 </head>
 <body>
 
     <div class="tab-bar">
-        <button class="btn-outline" onclick="Nexus.toggleLeftSidebar(true)">☰</button>
-        <button class="btn-outline" style="margin-left:5px" onclick="Nexus.toggleTerminal()">>_ Term</button>
-        <div class="tab active" onclick="Nexus.switchTab('editor', this)">Editor</div>
-        <div class="tab" onclick="Nexus.switchTab('tools', this)">Diagnostics</div>
+        <button class="btn-outline" onclick="Nexus.toggleSidebar()">☰</button>
+        <button class="btn-outline" onclick="Nexus.toggleTerminal()">>_ Term</button>
+        <span id="current-file-label" style="font-family:monospace; color:var(--accent); margin-left:10px;">No File</span>
         <div style="flex:1"></div>
-        <button class="btn-primary" onclick="Nexus.runPreview()">▶ LIVE RUN</button>
+        <button onclick="Nexus.runPreview()">▶ LIVE RUN</button>
     </div>
 
     <div class="app-container">
         <aside id="ui-sidebar" class="sidebar">
-            <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
-                <h3 style="margin:0">DevOS <span style="color:var(--accent)">4.0</span></h3>
-                <button onclick="Nexus.toggleLeftSidebar(false)">✖</button>
-            </div>
-            <div style="padding: 10px;"><button class="btn-primary" style="width:100%" onclick="Nexus.createNewFile()">+ New File</button></div>
-            <div id="file-list" style="padding:10px;"></div>
+            <div style="padding:15px; border-bottom:1px solid var(--border);"><strong>DevOS 4.0</strong></div>
+            <div style="padding:10px;"><button style="width:100%" onclick="Nexus.createNewFile()">+ New File</button></div>
+            <div id="file-list"></div>
         </aside>
 
-        <main style="flex:1; display:flex; flex-direction:column;">
-            <div id="view-editor" class="panel-box active">
-                <div style="padding:8px 15px; background:var(--surface); display:flex; justify-content:space-between;">
-                    <span id="current-file-label" style="font-family:monospace; color:var(--accent)">No file open</span>
-                </div>
-                <textarea id="code-editor"></textarea>
-            </div>
-
-            <div id="view-tools" class="panel-box">
-                <h3>Sentinel Scanner</h3>
-                <button class="btn-primary" onclick="Nexus.runSentinel()">🚀 Initialize Scan</button>
-                <div id="sentinel-results" style="margin-top:15px; font-family:monospace; font-size:12px; background: #000; padding: 10px; border-radius: 5px;"></div>
-            </div>
+        <main>
+            <textarea id="code-editor"></textarea>
         </main>
     </div>
 
-    <div id="bottom-terminal" class="sidebar-bottom">
-        <div style="padding:10px; background:#111; display:flex; justify-content:space-between; border-bottom:1px solid #333;">
-            <span>DEV_OS TERMINAL</span>
-            <button onclick="Nexus.toggleTerminal()" style="background:transparent; color:white;">✖</button>
-        </div>
-        <div id="terminal-log"><div>Nexus Kernel v4.2 Online. Type 'help' for commands.</div></div>
+    <div id="bottom-terminal">
+        <div id="terminal-log"><div>Nexus Kernel v4.5 Ready. Type 'patch-ui' to fix everything.</div></div>
         <div class="terminal-input-row">
-            <span style="color:var(--success)">$</span>
-            <input type="text" id="terminal-input" placeholder="Type 'patch-ui' to upgrade sidebar...">
-            <button class="btn-primary" onclick="Nexus.Terminal.run()">ENTER</button>
+            <span style="color:var(--warn)">$</span>
+            <input type="text" id="terminal-input" placeholder="Enter command...">
         </div>
     </div>
 
-    <aside id="testing-sidebar" class="sidebar-right">
-        <div class="tab-bar" style="background:var(--surface-light); justify-content:space-between; padding:0 15px;">
-            <strong>LIVE PREVIEW</strong>
-            <button class="btn-danger" onclick="Nexus.toggleRightSidebar(false)">Close ✖</button>
-        </div>
-        <iframe id="preview-frame"></iframe>
-        <div id="console-output"></div>
-    </aside>
-
-    <div id="status-msg" class="status-flash">Changes Saved</div>
-
     <script>
-        // --- Core Globals ---
-        let vfs = {};
-        let currentFileName = null;
-        let cmEditor = null;
-        let saveTimer = null;
-
         const Nexus = {
+            vfs: {},
+            activeFile: null,
+            editor: null,
+
             async boot() {
-                cmEditor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
-                    mode: "javascript", theme: "dracula", lineNumbers: true,
-                    autoCloseBrackets: true, lineWrapping: true
-                });
-
-                cmEditor.on('change', () => {
-                    clearTimeout(saveTimer);
-                    saveTimer = setTimeout(() => this.saveVFS(), 1000);
-                });
-
-                const saved = await localforage.getItem('devos_vfs');
-                if (saved) vfs = saved;
+                console.log("Nexus: Initializing...");
                 
-                this.rebuildSidebar();
-                if (Object.keys(vfs).length > 0) this.openFile(Object.keys(vfs)[0]);
+                // Initialize Editor
+                this.editor = CodeMirror.fromTextArea(document.getElementById("code-editor"), {
+                    mode: "htmlmixed", theme: "dracula", lineNumbers: true, autoCloseBrackets: true
+                });
 
+                // Load Data
+                const saved = await localforage.getItem('devos_vfs');
+                if (saved) this.vfs = saved;
+
+                this.renderFiles();
+                if (Object.keys(this.vfs).length > 0) this.openFile(Object.keys(this.vfs)[0]);
+
+                // Input listener
                 document.getElementById('terminal-input').addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') this.Terminal.run();
+                    if (e.key === 'Enter') this.terminalExec();
                 });
-
-                window.addEventListener('message', e => {
-                    const out = document.getElementById('console-output');
-                    if (e.data.type === 'log') out.innerHTML += `<div style="color:#888">▶ ${e.data.data}</div>`;
-                    if (e.data.type === 'err') out.innerHTML += `<div style="color:var(--danger)">❌ ${e.data.data}</div>`;
-                    out.scrollTop = out.scrollHeight;
-                });
+                
+                console.log("Nexus: Systems Online.");
             },
 
-            async saveVFS() {
-                if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
-                await localforage.setItem('devos_vfs', vfs);
-                const flash = document.getElementById('status-msg');
-                flash.style.opacity = 1;
-                setTimeout(() => flash.style.opacity = 0, 1000);
-            },
-
-            rebuildSidebar() {
+            renderFiles() {
                 const list = document.getElementById('file-list');
-                if(!list) return;
-                list.innerHTML = Object.keys(vfs).map(fn => `
-                    <div style="padding:8px; border-bottom:1px solid #222; cursor:pointer; font-size:13px; ${fn === currentFileName ? 'color:var(--accent)' : ''}" onclick="Nexus.openFile('${fn}')">
-                        📄 ${fn}
-                    </div>
+                if (!list) return;
+                list.innerHTML = Object.keys(this.vfs).map(fn => `
+                    <div style="padding:10px; border-bottom:1px solid #222; cursor:pointer;" onclick="Nexus.openFile('${fn}')">📄 ${fn}</div>
                 `).join('');
             },
 
             openFile(fn) {
-                if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
-                currentFileName = fn;
-                cmEditor.setValue(vfs[fn] || '');
-                const ext = fn.split('.').pop();
-                const modeMap = { 'html': 'htmlmixed', 'css': 'css', 'js': 'javascript' };
-                cmEditor.setOption("mode", modeMap[ext] || 'javascript');
+                if (this.activeFile) this.vfs[this.activeFile] = this.editor.getValue();
+                this.activeFile = fn;
+                this.editor.setValue(this.vfs[fn] || "");
                 document.getElementById('current-file-label').innerText = fn;
-                this.rebuildSidebar();
+                this.renderFiles();
+            },
+
+            async saveVFS() {
+                if (this.activeFile) this.vfs[this.activeFile] = this.editor.getValue();
+                await localforage.setItem('devos_vfs', this.vfs);
             },
 
             createNewFile() {
-                const name = prompt("Filename (e.g. index.html):");
-                if (name) { vfs[name] = ""; this.openFile(name); }
+                const n = prompt("Filename:");
+                if (n) { this.vfs[n] = ""; this.openFile(n); }
             },
 
-            runSentinel() {
-                const results = document.getElementById('sentinel-results');
-                results.innerHTML = '<div style="color:var(--warn)">Scanning...</div>';
-                setTimeout(() => {
-                    const code = cmEditor.getValue();
-                    let log = `<div style="color:var(--success)">VFS Verified. Files: ${Object.keys(vfs).length}</div>`;
-                    if (currentFileName.endsWith('.js')) {
-                        JSHINT(code, { esversion: 11 });
-                        if (JSHINT.errors.length > 0) {
-                            JSHINT.errors.forEach(err => {
-                                if(err) log += `<div style="color:var(--danger)">Line ${err.line}: ${err.reason}</div>`;
-                            });
-                        } else { log += "<div>Code is clean!</div>"; }
-                    }
-                    results.innerHTML = log;
-                }, 500);
-            },
-
-            runPreview() {
-                if (currentFileName) vfs[currentFileName] = cmEditor.getValue();
-                this.toggleRightSidebar(true);
-                let html = vfs['index.html'] || '<h1>index.html not found</h1>';
-                const injection = `<script>
-                    console.log = (...args) => window.parent.postMessage({type: 'log', data: args.join(' ')}, '*');
-                    console.error = (...args) => window.parent.postMessage({type: 'err', data: args.join(' ')}, '*');
-                    window.onerror = (m,u,l) => console.error(m + " at line " + l);
-                <\/script>`;
-                html = html.replace('<head>', '<head>' + injection);
-                document.getElementById('preview-frame').srcdoc = html;
-            },
-
-            toggleLeftSidebar(s) { document.getElementById('ui-sidebar').classList.toggle('open', s); },
-            toggleRightSidebar(s) { document.getElementById('testing-sidebar').classList.toggle('open', s); },
             toggleTerminal() { document.getElementById('bottom-terminal').classList.toggle('open'); },
-            switchTab(id, el) {
-                document.querySelectorAll('.panel-box, .tab').forEach(x => x.classList.remove('active'));
-                document.getElementById(`view-${id}`).classList.add('active');
-                el.classList.add('active');
-                if(id === 'editor') cmEditor.refresh();
-            }
-        };
+            toggleSidebar() { document.getElementById('ui-sidebar').classList.toggle('closed'); },
 
-        // --- Terminal System (Fixed & Nested) ---
-        Nexus.Terminal = {
-            async run() {
+            terminalExec() {
                 const input = document.getElementById('terminal-input');
                 const log = document.getElementById('terminal-log');
-                const rawInput = input.value.trim();
-                if (!rawInput) return;
+                const cmd = input.value.trim().toLowerCase();
+                if (!cmd) return;
 
-                log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${rawInput}</div>`;
-                const args = rawInput.split(' ');
-                const cmd = args[0].toLowerCase();
-                let feedback = "";
-
+                log.innerHTML += `<div><span style="color:var(--accent)">$</span> ${cmd}</div>`;
+                
                 if (cmd === 'patch-ui') {
-                    feedback = await this.patchUI();
+                    this.applyUltimatePatch();
+                    log.innerHTML += `<div style="color:var(--warn)">> Permanent Patch Applied. Restarting...</div>`;
                 } else if (cmd === 'save') {
-                    await Nexus.saveVFS();
-                    feedback = "VFS Saved.";
+                    this.saveVFS();
+                    log.innerHTML += `<div>> VFS Synced.</div>`;
                 } else if (cmd === 'help') {
-                    feedback = "Commands: patch-ui, save, cls, help";
-                } else if (cmd === 'cls') {
-                    log.innerHTML = ""; input.value = ""; return;
+                    log.innerHTML += `<div>> Commands: patch-ui, save, help</div>`;
                 } else {
-                    feedback = `Unknown command: ${cmd}`;
+                    log.innerHTML += `<div style="color:var(--danger)">> Unknown command.</div>`;
                 }
 
-                log.innerHTML += `<div style="color:#888; padding-left:10px;">> ${feedback}</div>`;
-                input.value = '';
+                input.value = "";
                 log.scrollTop = log.scrollHeight;
             },
 
-            async patchUI() {
-                const ultimateSidebarHTML = `
+            applyUltimatePatch() {
+                // This is the HTML from your screenshots
+                const ultimateHTML = `
             <div style="padding:15px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
                 <h3 style="margin:0"><span style="color:var(--accent)">DevOS</span> <span style="color:var(--warn)">Ultimate</span></h3>
-                <button onclick="Nexus.toggleLeftSidebar(false)" style="background:var(--danger); color:white; border-radius:4px; padding:2px 8px;">✖</button>
+                <button onclick="Nexus.toggleSidebar()" style="background:var(--danger); font-size:10px;">✖</button>
             </div>
-            <div style="padding: 12px; display: flex; gap: 5px; border-bottom:1px solid var(--border);">
-                <button class="btn-primary" style="flex:1; font-size:11px;" onclick="Nexus.createNewFile()">+ New</button>
-                <button class="btn-primary" style="flex:1; font-size:11px; background:#e3b341; color:#000;">📁 Import</button>
-                <button class="btn-outline" style="flex:1; font-size:11px; background:var(--warn); color:#000;">❓ Help</button>
+            <div style="padding: 10px; display: flex; gap: 5px;">
+                <button style="flex:1; background:var(--accent);" onclick="Nexus.createNewFile()">+ NEW</button>
+                <button style="flex:1; background:var(--warn); color:#000;" onclick="document.getElementById('file-upload').click()">📁 IMPORT</button>
             </div>
             <div style="flex:1; overflow-y:auto;">
-                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:var(--warn)">📂 Explorer <span>▼</span></div>
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:var(--warn)">📂 EXPLORER <span>▼</span></div>
                 <div class="accordion-content open" id="file-list"></div>
-                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#7ee787">🌿 Branches <span>▶</span></div>
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#7ee787">🌿 BRANCHES <span>▶</span></div>
                 <div class="accordion-content" style="padding:10px;">
-                    <button class="btn-primary" style="width:100%; margin-bottom:10px;">+ Branch</button>
                     <div style="color:var(--accent); border:1px solid var(--accent); padding:5px; border-radius:4px;">● main</div>
                 </div>
-                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#e3b341">🔐 Vault <span>▶</span></div>
-                <div class="accordion-content" style="padding:10px;">
-                    <button class="btn-primary" style="width:100%;">Compile Vault</button>
-                </div>
-                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:var(--accent)">🔍 Search <span>▶</span></div>
-                <div class="accordion-content" style="padding:10px;">
-                    <input type="text" placeholder="Search..." style="width:100%; background:#000; border:1px solid #333; color:#fff; padding:5px;">
-                </div>
+                <div class="accordion-header" onclick="this.nextElementSibling.classList.toggle('open')" style="color:#e3b341">🔐 VAULT <span>▶</span></div>
+                <div class="accordion-content" style="padding:10px; color:#666; font-size:10px; text-align:center;">Vault Empty</div>
             </div>
-            <div style="padding:10px; border-top:1px solid var(--border);">
-                <button style="width:100%; background:var(--warn); color:#000; padding:10px; font-weight:bold; border-radius:6px;">⚙️ Settings</button>
-            </div>`;
+            <div style="padding:10px;"><button style="width:100%; background:var(--warn); color:#000;">⚙️ SETTINGS</button></div>`;
 
-                try {
-                    let code = cmEditor.getValue();
-                    const sidebarRegex = /(<aside id="ui-sidebar"[^>]*>)([\s\S]*?)(<\/aside>)/;
+                // PERMANENT REFRACTORING
+                let code = this.editor.getValue();
+                const regex = /(<aside id="ui-sidebar"[^>]*>)([\s\S]*?)(<\/aside>)/;
+                
+                if (regex.test(code)) {
+                    // Inject the new UI into the editor text
+                    const newCode = code.replace(regex, "$1" + ultimateHTML + "$3");
+                    this.editor.setValue(newCode);
+                    
+                    // Force Save & Update Live UI
+                    this.saveVFS().then(() => {
+                        document.getElementById('ui-sidebar').innerHTML = ultimateHTML;
+                        this.renderFiles();
+                    });
+                } else {
+                    alert("Patch Error: Could not find <aside id='ui-sidebar'> in the code editor.");
+                }
+            },
 
-                    if (sidebarRegex.test(code)) {
-                        const updatedCode = code.replace(sidebarRegex, \`$1\${ultimateSidebarHTML}$3\`);
-                        cmEditor.setValue(updatedCode);
-                        await Nexus.saveVFS();
-                        document.getElementById('ui-sidebar').innerHTML = ultimateSidebarHTML;
-                        Nexus.rebuildSidebar(); 
-                        return "SUCCESS: Permanent UI Patch Applied.";
-                    }
-                    return "ERROR: Sidebar tag not found in source.";
-                } catch (e) { return "PATCH FAILED: " + e.message; }
+            runPreview() {
+                this.saveVFS();
+                const html = this.vfs['index.html'] || "<h1>Create index.html first!</h1>";
+                const win = window.open();
+                win.document.write(html);
+                win.document.close();
             }
         };
 
