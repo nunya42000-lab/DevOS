@@ -1,4 +1,4 @@
-const CACHE_NAME = 'devos-v1';
+const CACHE_NAME = 'devos-v2';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 self.addEventListener('install', (e) => {
