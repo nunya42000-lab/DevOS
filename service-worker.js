@@ -1,4 +1,4 @@
-const CACHE_NAME = 'devos-nexus-v1';
+const CACHE_NAME = 'devos-nexus-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
