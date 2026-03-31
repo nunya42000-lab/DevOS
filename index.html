@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0d1117">
-    <title>DevOS Nexus Prime v31.0</title>
+    <title>DevOS Nexus Prime v30.0</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -45,21 +45,10 @@
 
         /* --- 2. MAIN WORKSPACE --- */
         #workspace { flex: 1; display: flex; position: relative; overflow: hidden; }
-        #editor-view { flex: 1; display: flex; background: #000; position: relative; border-left: 0px solid var(--danger); transition: border 0.3s ease; }
-        #editor-view.error-state { border-left: 4px solid var(--danger) !important; }
+        #editor-view { flex: 1; display: flex; background: #000; position: relative; }
         body.outdoor-mode #editor-view { background: #fff; }
-        
-        #gutter { 
-            width: 40px; background: var(--bg); border-right: 1px solid var(--border); 
-            color: #484f58; font-family: 'Courier New', monospace; font-size: 14px; 
-            line-height: 22px; padding-top: 15px; text-align: right; padding-right: 8px;
-            overflow: hidden; pointer-events: none;
-        }
-        #raw-terminal { 
-            flex: 1; background: transparent; color: inherit; border: none; padding: 15px; 
-            font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; 
-            outline: none; resize: none; white-space: pre; overflow: auto; 
-        }
+        #gutter { width: 45px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 11px; text-align: right; padding: 15px 10px 0 0; pointer-events: none; }
+        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; }
         #raw-terminal[readonly] { opacity: 0.4; }
 
         /* --- 3. SIDEBARS --- */
@@ -93,9 +82,11 @@
         .modal-content { width: 90%; height: 80%; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,1); }
         .modal-body { flex: 1; padding: 25px; overflow-y: auto; }
 
-        /* --- KINETIC & SEARCH OVERLAYS --- */
-        #search-widget { display: none; position: fixed; top: 60px; left: 50%; transform: translateX(-50%); width: 90%; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 10px; z-index: 4500; box-shadow: 0 20px 50px rgba(0,0,0,0.8); }
-        
+        /* --- SANDBOX & CONSOLE --- */
+        #sandbox-wrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
+        #sandbox-frame { flex: 1; border: none; }
+        #ghost-console { height: 35vh; background: #000; color: #3fb950; padding: 15px; font-family: monospace; font-size: 11px; overflow-y: auto; border-top: 3px solid var(--accent); line-height: 1.5; }
+
         /* --- UI HELPERS --- */
         .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; }
@@ -108,14 +99,14 @@
     <nav id="ribbon-container">
         <div id="ribbon-track">
             <button id="edit-toggle" class="tool-btn btn-edit-lock" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
-            <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
+            <button class="tool-btn btn-danger" onclick="Nexus.ui.openModal('settings')">☢ FACTORY RESET</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
             <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ PROVING GROUNDS</button>
             
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
-            <button class="tool-btn" style="color:var(--danger)" onclick="Nexus.vfs.cutToSnippet()">✂️ CUT ALL</button>
-            <button class="tool-btn" style="color:var(--success)" onclick="Nexus.vfs.copyToSnippet()">📋 COPY ALL</button>
+            <button class="tool-btn" style="color:var(--danger)" onclick="Nexus.vault.cutAll()">✂️ CUT ALL</button>
+            <button class="tool-btn" style="color:var(--success)" onclick="Nexus.vault.copyAll()">📋 COPY VAULT</button>
             
             <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('merger')">📥 COMPARE & MERGE</button>
@@ -124,58 +115,17 @@
             <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('graph')">🌌 SYSTEM GRAPH</button>
             
-            <button class="tool-btn" onclick="Nexus.ui.openModal('help')">❓ HELP</button>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleSlide('shell')">⌨ SHELL</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️ SUN MODE</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️ SETTINGS</button>
         </div>
     </nav>
 
-    <div id="floating-tool" style="position:fixed; top:150px; right:10px; width:50px; background:var(--panel); border:1px solid var(--gold); border-radius:10px; display:flex; flex-direction:column; z-index:9000; box-shadow:0 10px 30px rgba(0,0,0,0.5); touch-action:none;">
-        <div id="drag-handle" style="height:20px; background:var(--gold); border-radius:8px 8px 0 0; cursor:move; display:flex; justify-content:center; align-items:center;">
-            <div style="width:15px; height:2px; background:rgba(0,0,0,0.3); border-radius:1px;"></div>
-        </div>
-        <button class="tool-btn" style="border:none; background:transparent; padding:15px 0; justify-content:center;" onclick="Nexus.ui.jumpPrompt()">📍</button>
-        <button class="tool-btn" style="border:none; background:transparent; padding:15px 0; justify-content:center;" onclick="document.execCommand('undo')">↩️</button>
-        <button class="tool-btn" style="border:none; background:transparent; padding:15px 0; justify-content:center;" onclick="document.execCommand('redo')">↪️</button>
-    </div>
-
-    <div id="search-widget">
-        <div style="display:flex; gap:5px; margin-bottom:8px;">
-            <input type="text" id="find-input" placeholder="Find..." style="flex:1; padding:10px; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:6px;">
-            <button class="tool-btn" onclick="Nexus.ui.closeSearch()">&times;</button>
-        </div>
-        <div style="display:flex; gap:5px;">
-            <input type="text" id="replace-input" placeholder="Replace with..." style="flex:1; padding:10px; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:6px;">
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.execReplace()">REPLACE</button>
-        </div>
-    </div>
-
     <div id="workspace">
         <div id="editor-view">
             <div id="gutter">1</div>
-            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v31.0 // Monolith Ready."></textarea>
+            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v30.0 // Sovereign Monolith Ready."></textarea>
         </div>
-    </div>
-
-    <div id="tactical-keys" style="height:50px; background:var(--panel); border-top:1px solid var(--border); display:flex; overflow-x:auto; padding:5px; gap:6px; z-index:1000; align-items:center;">
-        <button class="tool-btn" onclick="Nexus.ui.openSearch()">🔍</button>
-        <div style="width:1px; height:20px; background:var(--border); margin:0 5px;"></div>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('<')">&lt;</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('>')">&gt;</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('/')">/</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('{')">{</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('}')">}</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('(')">(</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar(')')">)</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar(';')">;</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('=')">=</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('\'')">'</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('&quot;')">"</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('[')">[</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar(']')">]</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar(':')">:</button>
-        <button class="tool-btn" onclick="Nexus.ui.injectChar('.')">.</button>
     </div>
 
     <aside id="panel-left" class="side-panel left-p">
@@ -214,26 +164,6 @@
             <button class="tool-btn" onclick="Nexus.sentinel.renderBranches()">4. BRANCHES TREE</button>
         </div>
         <div id="diag-out" class="p-body" style="background:#000; margin:15px; border-radius:10px; border:1px solid var(--border);">[SENTINEL READY]</div>
-    </div>
-
-    <div id="modal-help" class="modal-overlay">
-        <div class="modal-content">
-            <div class="p-head"><span>📖 NEXUS COMMAND GUIDE</span><button class="close-x" onclick="Nexus.ui.closeModal('help')">&times;</button></div>
-            <div class="modal-body">
-                <div class="section-label">Tactical Commands</div>
-                <p style="font-size:12px; line-height:1.6; opacity:0.8;">
-                    <strong>☢ FACTORY RESET:</strong> Nuclear data wipe.<br>
-                    <strong>✂️ CUT ALL:</strong> Clears editor and creates a Snippet.<br>
-                    <strong>📋 COPY ALL:</strong> Copies file to Vault as a Snippet.<br>
-                    <strong>🔄 REFRESH:</strong> Revert file to original state.<br>
-                    <strong>📍 JUMP (WIDGET):</strong> Instantly warp to any line number.
-                </p>
-                <div class="section-label">Diagnostics</div>
-                <p style="font-size:12px; line-height:1.6; opacity:0.8;">
-                    <strong>🩺 SENTINEL:</strong> Editor glows <span style="color:var(--danger)">RED</span> on errors. Use MEDIC to repair.
-                </p>
-            </div>
-        </div>
     </div>
 
     <div id="modal-vault" class="modal-overlay">
@@ -327,6 +257,8 @@
                 <div class="item-row"><span>VFS Payload:</span> <span id="metric-vfs">0 KB</span></div>
                 <div class="item-row"><span>Vault Payload:</span> <span id="metric-vault">0 KB</span></div>
                 <div class="item-row"><span>Snapshots Active:</span> <span id="metric-snaps">0</span></div>
+                <div class="section-label" style="color:var(--danger)">Nuclear Authorization</div>
+                <button class="tool-btn btn-danger" style="width:100%; padding:18px; font-weight:900;" onclick="Nexus.ui.nuke()">☢ DATA WIPE (FACTORY RESET)</button>
             </div>
         </div>
     </div>
@@ -341,10 +273,10 @@
 </div>
 
 <script>
-    /* ATTACH THE SECOND HALF (THE COMPLETE NEXUS OBJECT) BELOW THIS LINE */
+    /* ATTACH THE SECOND HALF (THE NEXUS OBJECT) BELOW THIS LINE */
 window.Nexus = {
     state: {
-        vfs: { "main.js": "// Nexus Core v31.0 Initialized.\nconsole.log('Sovereign Systems Online.');" },
+        vfs: { "main.js": "// Nexus Core v30.0 Initialized.\nconsole.log('Sovereign Systems Online.');" },
         originals: {}, vault: [], snapshots: [], activeFile: "main.js",
         prefs: { fontSize: 14, tabWidth: 2 }
     },
@@ -352,8 +284,8 @@ window.Nexus = {
     // --- VIRTUAL FILE SYSTEM ---
     vfs: {
         async boot() {
-            const vfs = await localforage.getItem('nexus_vfs_v31');
-            const orig = await localforage.getItem('nexus_originals_v31');
+            const vfs = await localforage.getItem('nexus_vfs_v30');
+            const orig = await localforage.getItem('nexus_originals_v30');
             if (vfs) Nexus.state.vfs = vfs;
             if (orig) Nexus.state.originals = orig;
             Object.keys(Nexus.state.vfs).forEach(fn => {
@@ -363,8 +295,8 @@ window.Nexus = {
             this.switchFile(Nexus.state.activeFile);
         },
         async save() {
-            await localforage.setItem('nexus_vfs_v31', Nexus.state.vfs);
-            await localforage.setItem('nexus_originals_v31', Nexus.state.originals);
+            await localforage.setItem('nexus_vfs_v30', Nexus.state.vfs);
+            await localforage.setItem('nexus_originals_v30', Nexus.state.originals);
             document.getElementById('foot-status').style.textShadow = "0 0 10px var(--success)";
         },
         switchFile(fn) {
@@ -404,35 +336,12 @@ window.Nexus = {
                 this.switchFile(fn); this.save();
             }
         },
-        // --- UPDATED SNIPPET LOGIC ---
-        cutToSnippet() {
-            const ed = document.getElementById('raw-terminal');
-            const code = ed.value; if (!code) return;
-            const name = prompt("Name for this Snippet (File will be cleared):");
-            if (name) {
-                Nexus.state.vault.push({ name, code });
-                Nexus.vault.save();
-                ed.value = ""; Nexus.state.vfs[Nexus.state.activeFile] = "";
-                Nexus.vfs.save(); Nexus.ui.updateGutter();
-                alert("Moved to Vault & Editor Cleared.");
-            }
-        },
-        copyToSnippet() {
-            const ed = document.getElementById('raw-terminal');
-            const code = ed.value; if (!code) return;
-            const name = prompt("Name for this Snippet (Copy only):");
-            if (name) {
-                Nexus.state.vault.push({ name, code, date: new Date().toLocaleDateString() });
-                Nexus.vault.save();
-                alert("Copy stored in Vault.");
-            }
-        },
         exportToTXT() {
             let b = `/* NEXUS FLAT BUNDLE | ${new Date().toLocaleString()} */\n\n`;
             Object.entries(Nexus.state.vfs).forEach(([n, c]) => b += `\n/* FILE: ${n} */\n${c}\n`);
             const blob = new Blob([b], { type: 'text/plain' });
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `Nexus_v31_Backup.txt`; a.click();
+            a.download = `Nexus_v30_Backup.txt`; a.click();
         },
         renderAccordion() {
             const root = document.getElementById('accordion-root'); if (!root) return;
@@ -463,11 +372,11 @@ window.Nexus = {
     // --- SNIPPET VAULT ---
     vault: {
         async boot() {
-            const saved = await localforage.getItem('nexus_vault_v31');
+            const saved = await localforage.getItem('nexus_vault_v30');
             if (saved) Nexus.state.vault = saved;
             this.render();
         },
-        save() { localforage.setItem('nexus_vault_v31', Nexus.state.vault); },
+        save() { localforage.setItem('nexus_vault_v30', Nexus.state.vault); },
         grab() {
             const ed = document.getElementById('raw-terminal');
             const code = ed.value.substring(ed.selectionStart, ed.selectionEnd) || ed.value;
@@ -482,41 +391,41 @@ window.Nexus = {
             Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
             Nexus.vfs.save(); Nexus.ui.closeModal('vault');
         },
-        cutAll() { if (confirm("✂ Clear ALL Vault data?")) { Nexus.state.vault = []; this.save(); this.render(); } },
+        cutAll() { if (confirm("✂ Clear Vault?")) { Nexus.state.vault = []; this.save(); this.render(); } },
         async copyAll() {
             let b = ""; Nexus.state.vault.forEach(s => b += `// ${s.name}\n${s.code}\n\n`);
-            await navigator.clipboard.writeText(b); alert("Full Vault Copied.");
+            await navigator.clipboard.writeText(b); alert("Vault Copied to Clipboard.");
         },
         render(q = "") {
             const c = document.getElementById('vault-content'); if (!c) return;
             const f = Nexus.state.vault.filter(s => s.name.toLowerCase().includes(q.toLowerCase()));
             c.innerHTML = f.map((s, i) => `
-                <div class="item-row" style="flex-direction:column; align-items:flex-start; gap:5px;">
+                <div class="item-row" style="flex-direction:column; align-items:flex-start;">
                     <div style="display:flex; justify-content:space-between; width:100%;">
                         <strong>${s.name}</strong>
                         <div style="display:flex; gap:8px;">
-                            <button class="tool-btn btn-accent" style="padding:4px 8px;" onclick="Nexus.vault.inject(${i})">INJECT</button>
-                            <button class="tool-btn btn-danger" style="padding:4px 8px;" onclick="Nexus.vault.deleteSnippet(${i})">&times;</button>
+                            <button class="tool-btn btn-accent" onclick="Nexus.vault.inject(${i})">INJECT</button>
+                            <button class="tool-btn btn-danger" onclick="Nexus.vault.deleteSnippet(${i})">&times;</button>
                         </div>
                     </div>
                 </div>
-            `).join('') || "Vault is Empty.";
+            `).join('') || "Vault Empty.";
         },
         deleteSnippet(i) { Nexus.state.vault.splice(i,1); this.save(); this.render(); }
     },
 
-    // --- SNAPSHOTS & MERGER ---
+    // --- MERGER & SNAPSHOTS ---
     snapshots: {
         async boot() {
-            const saved = await localforage.getItem('nexus_snapshots_v31');
+            const saved = await localforage.getItem('nexus_snapshots_v30');
             if (saved) Nexus.state.snapshots = saved;
             this.render();
         },
-        save() { localforage.setItem('nexus_snapshots_v31', Nexus.state.snapshots); },
+        save() { localforage.setItem('nexus_snapshots_v30', Nexus.state.snapshots); },
         create() {
             Nexus.state.snapshots.push({ time: new Date().toLocaleTimeString(), data: JSON.parse(JSON.stringify(Nexus.state.vfs)) });
             if (Nexus.state.snapshots.length > 10) Nexus.state.snapshots.shift();
-            this.save(); this.render(); alert("Snapshot Saved.");
+            this.save(); this.render(); alert("Snapshot Created.");
         },
         render() {
             const m = document.getElementById('merge-snapshot-list');
@@ -559,7 +468,7 @@ window.Nexus = {
         }
     },
 
-    // --- SENTINEL & INTEL ---
+    // --- SENTINEL DIAGNOSTICS ---
     sentinel: {
         runMedic() {
             let code = Nexus.state.vfs[Nexus.state.activeFile];
@@ -568,22 +477,22 @@ window.Nexus = {
             if (openB > closeB) { code += "\n" + "}".repeat(openB - closeB); fixes += (openB - closeB); }
             Nexus.state.vfs[Nexus.state.activeFile] = code;
             Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
-            this.log(`[MEDIC] Applied ${fixes} syntax repairs.`, "gold");
+            this.log(`[MEDIC] Applied ${fixes} closures.`, "gold");
         },
         runLint() {
             const code = Nexus.state.vfs[Nexus.state.activeFile];
             if (typeof JSHINT === 'undefined') return this.log("JSHint Missing.", "danger");
             JSHINT(code, { esversion: 11, asi: true });
             if (JSHINT.errors.length > 0) {
-                let h = `<div style="color:var(--danger); font-weight:bold;">${JSHINT.errors.length} ERRORS</div>`;
+                let h = `<div style="color:var(--danger); font-weight:bold;">${JSHINT.errors.length} ISSUES FOUND</div>`;
                 JSHINT.errors.forEach(e => { if(e) h += `<div class="item-row">LN ${e.line}: ${e.reason}</div>`; });
                 document.getElementById('diag-out').innerHTML = h;
-            } else this.log("LINT PASS: Systems Nominal.", "success");
+            } else this.log("LINT PASS: Logical Integrity High.", "success");
         },
         scanDeps() {
             const code = Nexus.state.vfs[Nexus.state.activeFile];
             const depRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:src=['"]([^'"]+)['"])/g;
-            let res = "<strong>DEP SCAN:</strong><br>";
+            let res = "<strong>VFS DEP SCAN:</strong><br>";
             let m; while ((m = depRegex.exec(code)) !== null) {
                 const p = (m[1] || m[2]).replace('./', '');
                 const ok = Nexus.state.vfs[p];
@@ -598,7 +507,7 @@ window.Nexus = {
                 if (!groups[ext]) groups[ext] = [];
                 groups[ext].push(fn);
             });
-            let h = "<strong>🌳 VFS BRANCHES:</strong><br>";
+            let h = "<strong>🌳 VFS BRANCHES TREE:</strong><br>";
             Object.entries(groups).forEach(([ext, files]) => {
                 h += `<div style="color:var(--gold); margin-top:10px;">.${ext} MODULES</div>`;
                 files.forEach(f => h += `<div style="padding-left:15px; font-size:11px; opacity:0.8;">↳ ${f}</div>`);
@@ -615,16 +524,24 @@ window.Nexus = {
         log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
     },
 
+    // --- NEURAL INTEL (HEURISTICS) ---
     intel: {
         scan() {
             const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
             const lines = code.split('\n').length;
             const funcs = (code.match(/function\s+|=>/g) || []).length;
             const branches = (code.match(/if\s*\(|else|for\s*\(|while\s*\(|switch\s*\(|&&|\|\|/g) || []).length;
+            const variables = (code.match(/const\s+|let\s+|var\s+/g) || []).length;
             
             const complexityIndex = branches > 0 ? (branches / lines).toFixed(2) : 0;
             const health = Math.max(0, Math.min(100, 100 - (complexityIndex * 150)));
             const healthColor = health > 80 ? 'var(--success)' : (health > 50 ? 'var(--warn)' : 'var(--danger)');
+
+            const patterns = [];
+            if (code.includes('simon') || code.includes('sequence')) patterns.push('MEM-CHAIN');
+            if (code.includes('skill') || code.includes('machine')) patterns.push('SKILL-DRIVE');
+            if (code.includes('localforage')) patterns.push('VFS-SYNC');
+            if (code.includes('canvas')) patterns.push('GHOST-GFX');
 
             document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
             document.getElementById('intel-health-display').innerText = Math.floor(health) + "%";
@@ -633,20 +550,30 @@ window.Nexus = {
             document.getElementById('intel-health-bar').style.background = healthColor;
 
             document.getElementById('intel-metrics-grid').innerHTML = `
-                <div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">LOGIC NODES</span><span style="font-size:16px; font-weight:bold;">${branches}</span></div>
-                <div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">MODULES</span><span style="font-size:16px; font-weight:bold;">${funcs}</span></div>
-                <div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">LINES</span><span style="font-size:16px; font-weight:bold;">${lines}</span></div>`;
+                <div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;">
+                    <span style="font-size:9px; opacity:0.5;">LOGIC NODES</span><span style="font-size:16px; font-weight:bold;">${branches}</span>
+                </div>
+                <div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;">
+                    <span style="font-size:9px; opacity:0.5;">MODULES</span><span style="font-size:16px; font-weight:bold;">${funcs}</span>
+                </div>
+                <div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;">
+                    <span style="font-size:9px; opacity:0.5;">REFS</span><span style="font-size:16px; font-weight:bold;">${variables}</span>
+                </div>
+                <div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;">
+                    <span style="font-size:9px; opacity:0.5;">LINES</span><span style="font-size:16px; font-weight:bold;">${lines}</span>
+                </div>`;
 
+            document.getElementById('intel-patterns').innerHTML = patterns.map(p => `<span style="padding:4px 10px; background:var(--gold); color:#000; border-radius:20px; font-size:9px; font-weight:900;">${p}</span>`).join('') || "NO SIGNATURES";
             Nexus.ui.openModal('intel');
         }
     },
 
-    // --- DREAMER & GRAPH ---
+    // --- DREAMER BLUEPRINTS ---
     dreamer: {
         templates: {
             'btn-tactical': (l, id) => `<button id="${id || 'btn-01'}" class="tool-btn btn-gold">${l || 'BTN'}</button>`,
             'card-gold': (l, id) => `<div id="${id || 'card-01'}" class="item-row" style="border:1px solid var(--gold); padding:10px;"><strong>${l || 'DATA'}</strong></div>`,
-            'grid-skill': (l, id) => `<div id="${id || 'grid-01'}" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button class="tool-btn" style="height:60px; justify-content:center;">${i+1}</button>`).join('')}</div>`
+            'grid-skill': (l, id) => `<div id="${id || 'grid-01'}" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button class="tool-btn" style="height:60px;">${i+1}</button>`).join('')}</div>`
         },
         updatePreview() {
             const t = document.getElementById('dreamer-type').value, l = document.getElementById('dreamer-label').value, p = document.getElementById('dreamer-preview');
@@ -663,6 +590,7 @@ window.Nexus = {
         }
     },
 
+    // --- CELESTIAL NAVIGATOR ---
     graph: {
         render() {
             const c = document.getElementById('graph-viewport'); if (!c) return;
@@ -681,13 +609,13 @@ window.Nexus = {
     // --- SETTINGS ---
     settings: {
         async boot() {
-            const saved = await localforage.getItem('nexus_prefs_v31');
+            const saved = await localforage.getItem('nexus_prefs_v30');
             if (saved) Nexus.state.prefs = saved;
             this.apply();
         },
         update(k, v) {
             Nexus.state.prefs[k] = parseInt(v);
-            localforage.setItem('nexus_prefs_v31', Nexus.state.prefs);
+            localforage.setItem('nexus_prefs_v30', Nexus.state.prefs);
             this.apply();
         },
         apply() {
@@ -703,43 +631,11 @@ window.Nexus = {
         }
     },
 
-    // --- UI CONTROLLER & KINETICS ---
+    // --- UI CONTROLLER ---
     ui: {
         boot() {
             Nexus.vfs.boot(); Nexus.vault.boot(); Nexus.snapshots.boot(); Nexus.settings.boot();
-            Nexus.dreamer.updatePreview(); this.initInfiniteRibbon(); this.initEdgeSwipes(); this.initDraggable();
-            this.updateGutter();
-        },
-        initDraggable() {
-            const el = document.getElementById('floating-tool');
-            const handle = document.getElementById('drag-handle');
-            let offsetX, offsetY;
-            handle.addEventListener('touchstart', (e) => {
-                offsetX = e.touches[0].clientX - el.offsetLeft;
-                offsetY = e.touches[0].clientY - el.offsetTop;
-            });
-            handle.addEventListener('touchmove', (e) => {
-                e.preventDefault();
-                el.style.left = (e.touches[0].clientX - offsetX) + 'px';
-                el.style.top = (e.touches[0].clientY - offsetY) + 'px';
-                el.style.right = 'auto';
-            });
-        },
-        jumpPrompt() {
-            const ln = prompt("Jump to Line:");
-            if (ln) {
-                const ed = document.getElementById('raw-terminal');
-                const lines = ed.value.split('\n');
-                let pos = 0;
-                for (let i = 0; i < Math.min(ln - 1, lines.length); i++) pos += lines[i].length + 1;
-                ed.focus(); ed.setSelectionRange(pos, pos);
-            }
-        },
-        openSearch() { document.getElementById('search-widget').style.display = 'block'; },
-        closeSearch() { document.getElementById('search-widget').style.display = 'none'; },
-        execReplace() {
-            const f = document.getElementById('find-input').value, r = document.getElementById('replace-input').value, ed = document.getElementById('raw-terminal');
-            if (f) { ed.value = ed.value.split(f).join(r); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); this.updateGutter(); }
+            Nexus.dreamer.updatePreview(); this.initInfiniteRibbon(); this.initEdgeSwipes();
         },
         initInfiniteRibbon() {
             const c = document.getElementById('ribbon-container'), t = document.getElementById('ribbon-track'); if (!c || !t) return;
@@ -781,20 +677,8 @@ window.Nexus = {
         closeModal(id) { document.getElementById('modal-'+id).classList.remove('active'); },
         toggleSun() { document.body.classList.toggle('outdoor-mode'); },
         updateGutter() {
-            const ed = document.getElementById('raw-terminal'), gutter = document.getElementById('gutter'), view = document.getElementById('editor-view');
-            if (!ed || !gutter) return;
-            const lines = ed.value.split('\n').length;
-            let lineHTML = '';
-            for (let i = 1; i <= lines; i++) lineHTML += i + '<br>';
-            gutter.innerHTML = lineHTML;
-            try { new Function(ed.value); view.classList.remove('error-state'); } catch (e) { view.classList.add('error-state'); }
-        },
-        injectChar(c) {
-            const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return;
-            const s = ed.selectionStart;
-            ed.value = ed.value.substring(0, s) + c + ed.value.substring(ed.selectionEnd);
-            ed.selectionStart = ed.selectionEnd = s + c.length;
-            ed.focus(); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); this.updateGutter();
+            const l = document.getElementById('raw-terminal').value.split('\n').length;
+            document.getElementById('gutter').innerHTML = Array.from({length: l}, (_, i) => i + 1).join('<br>');
         },
         runSandbox() {
             const f = document.getElementById('sandbox-frame'), c = document.getElementById('ghost-console'); if(!f || !c) return; c.innerHTML = "";
@@ -808,11 +692,11 @@ window.Nexus = {
                 Object.entries(Nexus.state.vfs).forEach(([f, c]) => folder.file(f, c));
                 const content = await zip.generateAsync({ type: "blob" });
                 const a = document.createElement('a'); a.href = URL.createObjectURL(content);
-                a.download = `Nexus_v31_Bundle.zip`; a.click();
-                status.innerText = "DONE"; setTimeout(() => { status.innerText = "READY"; }, 3000);
-            } catch (e) { alert("ZIP Failed"); }
+                a.download = `Nexus_v30_Bundle.zip`; a.click();
+                status.innerText = "EXPORTED"; setTimeout(() => { status.innerText = "READY"; }, 3000);
+            } catch (e) { alert("Export Fault"); status.innerText = "FAULT"; }
         },
-        nuke() { if (confirm("☢ FACTORY RESET: All data will be wiped!")) { localforage.clear().then(() => location.reload()); } }
+        nuke() { if (confirm("☢ FACTORY RESET: All data will be erased!")) { localforage.clear().then(() => location.reload()); } }
     }
 };
 
