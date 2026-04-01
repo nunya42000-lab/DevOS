@@ -4,607 +4,421 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0a0c10">
-    <title>Nexus Prime v32.5 // Ghost Medic</title>
+    <title>Nexus v34.0 // Sovereign Command</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
 
     <style>
         :root {
             --bg: #0a0c10; --panel: #12151a; --surface: #1c2128;
             --border: #252a31; --text: #8b949e; --accent: #388bfd;
-            --success: #3fb950; --warn: #d29922; --danger: #f85149;
-            --gold: #c69026; --font-ui: -apple-system, sans-serif;
-            --sidebar-w: 88vw;
+            --gold: #c69026; --danger: #f85149; --success: #3fb950;
         }
 
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: sans-serif; overflow: hidden; }
 
-        /* --- 1. SLIM RIBBON --- */
-        #ribbon-container { height: 42px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; white-space: nowrap; display: flex; align-items: center; z-index: 1000; }
-        #ribbon-container::-webkit-scrollbar { display: none; }
-        #ribbon-track { display: inline-flex; padding: 0 8px; gap: 6px; }
+        /* --- 1. SOVEREIGN WORKSPACE --- */
+        #ribbon { height: 42px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; align-items: center; padding: 0 8px; gap: 6px; z-index: 1000; }
+        #ribbon::-webkit-scrollbar { display: none; }
         
-        .tool-btn { padding: 6px 12px; border-radius: 6px; background: transparent; color: var(--text); border: 1px solid var(--border); font-size: 10px; font-weight: 800; cursor: pointer; letter-spacing: 0.5px; transition: 0.2s; }
-        .btn-gold { color: var(--gold); border-color: var(--gold); }
-        .btn-accent { color: var(--accent); border-color: var(--accent); }
-        .btn-danger { color: var(--danger); border-color: var(--danger); }
+        #editor-view { height: calc(100vh - 42px); display: flex; background: #000; position: relative; }
+        #gutter { width: 38px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; padding-top: 10px; text-align: right; padding-right: 6px; }
+        #raw-terminal { flex: 1; background: transparent; color: #e6edf3; border: none; padding: 10px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; tab-size: 2; }
 
-        /* --- 2. WORKSPACE & GUTTER --- */
-        #workspace { flex: 1; display: flex; position: relative; overflow: hidden; height: calc(100vh - 108px); }
-        #editor-view { flex: 1; display: flex; background: #000; transition: border 0.3s; }
-        #editor-view.error-state { border-left: 4px solid var(--danger); }
-
-        #gutter { 
-            width: 38px; background: var(--bg); border-right: 1px solid var(--border); 
-            color: #484f58; font-family: 'Courier New', monospace; font-size: 14px; 
-            line-height: 22px; padding-top: 15px; text-align: right; padding-right: 6px;
-            overflow: hidden; pointer-events: none;
+        /* --- 2. THE KINETIC WIDGETS --- */
+        .floating-widget {
+            position: fixed; background: rgba(18, 21, 26, 0.9); backdrop-filter: blur(12px);
+            border: 1px solid var(--border); border-radius: 10px; z-index: 8000;
+            box-shadow: 0 15px 45px rgba(0,0,0,0.6); display: none; flex-direction: column;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
         }
-        #raw-terminal { 
-            flex: 1; background: transparent; color: #e6edf3; border: none; padding: 15px; 
-            font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; 
-            outline: none; resize: none; white-space: pre; overflow: auto; tab-size: 2;
-        }
+        .floating-widget.active { display: flex; }
+        .drag-handle { height: 18px; background: rgba(255,255,255,0.05); cursor: move; border-radius: 9px 9px 0 0; display: flex; justify-content: center; align-items: center; }
+        .drag-handle::after { content: '...'; color: var(--border); font-weight: bold; letter-spacing: 2px; }
 
-        /* --- 3. KINETIC GHOST WIDGET --- */
-        #floating-tool { 
-            position: fixed; top: 120px; right: 10px; width: 38px; 
-            background: rgba(18, 21, 26, 0.7); backdrop-filter: blur(8px); 
-            border: 1px solid var(--gold); border-radius: 8px; z-index: 9000; 
-            opacity: 0.3; transition: opacity 0.3s; touch-action: none; 
-        }
-        #floating-tool:active { opacity: 1; }
-        #drag-handle { height: 16px; background: var(--gold); border-radius: 6px 6px 0 0; cursor: move; }
+        /* Snap Logic: Pops to edge, nearly off-screen */
+        .snapped-right { transform: translateX(calc(100% - 15px)) !important; opacity: 0.4; }
+        .snapped-bottom { transform: translateY(calc(100% - 15px)) !important; opacity: 0.4; }
 
-        /* --- 4. TACTICAL KEYBOARD & SEARCH --- */
-        #tactical-keys { height: 38px; background: var(--bg); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 5px; z-index: 1000; }
-        #key-scroll { display: flex; overflow-x: auto; gap: 4px; width: 100%; }
-        #key-scroll::-webkit-scrollbar { display: none; }
+        /* --- 3. THE TREB-KEYBOARD ENGINE --- */
+        #kb-monolith { bottom: 0; left: 0; width: 100vw; border-radius: 12px 12px 0 0; border-bottom: none; }
+        .kb-row-container { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+        .kb-scroll-row { display: flex; overflow-x: auto; gap: 5px; padding-bottom: 2px; }
+        .kb-scroll-row::-webkit-scrollbar { display: none; }
         
-        #mini-search { display: none; gap: 4px; background: var(--panel); padding: 4px; border-radius: 4px; border: 1px solid var(--border); }
-        #mini-search input { width: 70px; background: #000; border: 1px solid var(--border); color: #fff; font-size: 10px; padding: 2px 5px; }
+        .kb-key { 
+            padding: 8px 12px; background: var(--surface); color: #fff; 
+            border: 1px solid var(--border); border-radius: 6px; font-size: 12px; 
+            font-weight: bold; min-width: 45px; text-align: center; white-space: nowrap;
+        }
 
-        /* --- 5. SIDEBARS & MODALS --- */
-        .side-panel { position: fixed; inset: 0; right: auto; width: var(--sidebar-w); max-width: 450px; background: var(--panel); z-index: 2000; transform: translateX(-105%); transition: transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1); border-right: 1px solid var(--border); }
-        .side-panel.right-p { left: auto; right: 0; transform: translateX(105%); border-right: none; border-left: 1px solid var(--border); width: 100vw; max-width: 100vw; }
-        .side-panel.open { transform: translateX(0); }
+        /* --- 4. TACTICAL TOOLBARS --- */
+        .bar-content { padding: 8px; display: flex; gap: 6px; align-items: center; }
+        .tool-btn { padding: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; }
+        .btn-active { color: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px rgba(198, 144, 38, 0.3); }
 
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 5000; display: none !important; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
-        .modal-overlay.active { display: flex !important; }
-        .modal-content { width: 92%; height: 85%; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+        /* Magnifier Simulation Bubble */
+        #magnifier {
+            position: fixed; width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--gold);
+            background: #000; display: none; z-index: 10000; pointer-events: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden;
+        }
 
-        /* --- DASHBOARD STYLES --- */
-        .p-head { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 11px; color: var(--gold); letter-spacing: 1px; }
-        .p-body { flex: 1; padding: 12px; overflow-y: auto; }
-        .section-label { font-size: 9px; opacity: 0.4; margin: 15px 0 8px 0; text-transform: uppercase; font-weight: bold; }
-        
-        #footer { height: 28px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; font-size: 9px; opacity: 0.6; font-family: monospace; }
+        #footer { height: 28px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; font-size: 9px; opacity: 0.6; }
     </style>
 </head>
 <body>
 
-<div id="app-root" style="display: flex; flex-direction: column; height: 100vh;">
-    <nav id="ribbon-container">
-        <div id="ribbon-track">
-            <button id="edit-toggle" class="tool-btn" onclick="Nexus.ui.toggleEditMode()">🔒 LOCK</button>
-            <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ NUKE</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleSlide('diag')">🩺 SENTINEL</button>
-            <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ RUN</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
-            <button class="tool-btn btn-danger" onclick="Nexus.vfs.cutToSnippet()">✂️ CUT ALL</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.vfs.copyToSnippet()">📋 COPY ALL</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('merger')">📥 MERGE</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('graph')">🌌 MAP</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('help')">❓ HELP</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️ SUN</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️ SET</button>
-        </div>
+<div id="magnifier"></div>
+
+<div id="workspace">
+    <nav id="ribbon">
+        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('utility-bar')">🛠 UTIL</button>
+        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('search-bar')">🔍 FIND</button>
+        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar')">✍️ WRITE</button>
+        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith')">⌨ KEY</button>
+        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+        <button class="tool-btn" onclick="Nexus.ui.toggleEditMode()" id="lock-btn">🔒 LOCK</button>
+        <button class="tool-btn btn-active" onclick="Nexus.vfs.save()">💾 SAVE</button>
+        <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ NUKE</button>
     </nav>
 
-    <div id="floating-tool">
-        <div id="drag-handle"></div>
-        <button class="tool-btn" style="border:none; width:100%; padding:10px 0;" onclick="Nexus.ui.jumpPrompt()">📍</button>
-        <button class="tool-btn" style="border:none; width:100%; padding:10px 0;" onclick="document.execCommand('undo')">↩️</button>
-        <button class="tool-btn" style="border:none; width:100%; padding:10px 0;" onclick="document.execCommand('redo')">↪️</button>
+    <div id="editor-view">
+        <div id="gutter">1</div>
+        <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off"></textarea>
     </div>
 
-    <div id="workspace">
-        <div id="editor-view">
-            <div id="gutter">1</div>
-            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off"></textarea>
+    <div id="utility-bar" class="floating-widget active" style="top: 60px; right: 10px; width: 60px;">
+        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'utility-bar')"></div>
+        <div class="bar-content" style="flex-direction: column;">
+            <button class="tool-btn" onclick="Nexus.ui.snapWidget('utility-bar')">📂</button>
+            <button class="tool-btn" onclick="Nexus.ui.jumpPrompt()">📍</button>
+            <button class="tool-btn" onclick="document.execCommand('undo')">↩️</button>
+            <button class="tool-btn" onclick="document.execCommand('redo')">↪️</button>
+            <button class="tool-btn" onclick="Nexus.ui.injectChar('\t')">⇥</button>
         </div>
     </div>
 
-    <div id="tactical-keys">
-        <div id="key-scroll">
-            <button class="tool-btn" onclick="Nexus.ui.toggleSearch()" style="border-color:var(--gold)">🔍</button>
-            <div id="mini-search">
-                <input type="text" id="find-input" placeholder="Find">
-                <input type="text" id="replace-input" placeholder="With">
-                <button class="tool-btn btn-gold" style="padding:2px 6px;" onclick="Nexus.ui.execReplace()">OK</button>
+    <div id="search-bar" class="floating-widget" style="top: 60px; left: 50%; transform: translateX(-50%); width: 90%;">
+        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'search-bar')"></div>
+        <div class="bar-content" style="flex-direction: column; align-items: stretch;">
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="find-input" placeholder="Find..." style="flex:1; background:#000; border:1px solid var(--border); color:#fff; font-size:12px; padding:10px;">
+                <button class="tool-btn" id="case-btn" onclick="Nexus.ui.toggleSearchOpt('case')">Aa</button>
+                <button class="tool-btn" id="regex-btn" onclick="Nexus.ui.toggleSearchOpt('regex')">.*</button>
             </div>
-            <div style="width:1px; background:var(--border); margin:0 4px;"></div>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('{')">{</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('}')">}</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('(')">(</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar(')')">)</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar(';')">;</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('=')">=</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('>')">></button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('[')">[</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar(']')">]</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar(':')">:</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('.')">.</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('\'')">'</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('&quot;')">"</button>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="replace-input" placeholder="Replace with..." style="flex:1; background:#000; border:1px solid var(--border); color:#fff; font-size:12px; padding:10px;">
+                <button class="tool-btn btn-gold" style="width:80px;" onclick="Nexus.ui.execReplace()">REP ALL</button>
+            </div>
         </div>
+    </div>
+
+    <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 260px;">
+        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'writer-bar')"></div>
+        <div class="bar-content" style="flex-direction: column; align-items: stretch;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+                <span style="font-size:10px; color:var(--gold); font-weight:bold;">AUTO-WRITER</span>
+                <span id="writer-status" style="font-size:9px; opacity:0.5;">IDLE</span>
+            </div>
+            <div style="display:flex; gap:5px;">
+                <input type="number" id="write-count" value="50" style="width:60px; background:#000; border:1px solid var(--border); color:#fff; padding:8px;">
+                <select id="write-mode" style="flex:1; background:var(--surface); border:1px solid var(--border); color:#fff; font-size:11px;">
+                    <option value="code">Code Engine</option>
+                    <option value="story">Story Weaver</option>
+                    <option value="skill">Skill Pattern</option>
+                </select>
+                <button class="tool-btn btn-gold" onclick="Nexus.writer.go()">▶ GO</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="kb-monolith" class="floating-widget active">
+        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'kb-monolith')"></div>
+        <div class="kb-row-container">
+            <div class="kb-scroll-row" id="kb-r1"></div>
+            <div class="kb-scroll-row" id="kb-r2"></div>
+            <div class="kb-scroll-row" id="kb-r3"></div>
+        </div>
+        <button class="tool-btn" style="position:absolute; right:5px; top:5px; padding:2px 8px;" onclick="Nexus.ui.snapWidget('kb-monolith')">📂</button>
     </div>
 
     <footer id="footer">
         <div id="foot-file">FILE: main.js</div>
-        <div style="margin-left:auto; display:flex; gap:15px;">
-            <span id="foot-status">LOCKED</span>
-        </div>
+        <div style="margin-left:auto; display:flex; gap:15px;"><span id="foot-status">LOCKED</span></div>
     </footer>
-
-    <div id="diag-hub" class="side-panel" style="width:100%; transform:translateY(-105%); top:0; height:60vh; border-bottom:4px solid var(--danger);">
-        <div class="p-head">
-            <span>SENTINEL v3.5 DASHBOARD</span>
-            <button class="close-x" onclick="Nexus.ui.toggleSlide('diag')">&times;</button>
-        </div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; padding: 10px;">
-            <button class="tool-btn btn-danger" onclick="Nexus.sentinel.runLint()">☢ DEEP SCAN</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.sentinel.runMedic()">🩹 AUTO-REPAIR</button>
-        </div>
-        <div id="diag-out" class="p-body" style="background:#000; margin:10px; border-radius:8px; border:1px solid var(--border);">
-            [AWAITING SCAN]
-        </div>
-    </div>
-
-    <div id="modal-vault" class="modal-overlay">
-        <div class="modal-content">
-            <div class="p-head"><span>💾 VAULT</span><button class="close-x" onclick="Nexus.ui.closeModal('vault')">&times;</button></div>
-            <div class="modal-body">
-                <div style="display:flex; gap:8px; margin-bottom:15px;">
-                    <input type="text" id="vault-search" placeholder="Search..." style="flex:1; padding:10px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:6px;" oninput="Nexus.vault.render(this.value)">
-                    <button class="tool-btn btn-gold" onclick="Nexus.vault.grab()">GRAB</button>
-                </div>
-                <div id="vault-content"></div>
-            </div>
-        </div>
-    </div>
-
-    </div>
+</div>
 
 <script>
-    /* ATTACH THE SECOND HALF (NEXUS v32.5 LOGIC) BELOW THIS LINE */
+    /* ATTACH THE SECOND HALF (DYNAMICS & CURSOR LOGIC) BELOW */
+    
 window.Nexus = {
     state: {
-        vfs: { "main.js": "// Nexus Core v32.5\nconsole.log('Sentinel Systems Active.');" },
-        originals: {}, vault: [], snapshots: [], activeFile: "main.js",
-        prefs: { fontSize: 14, tabWidth: 2 }
+        vfs: { "main.js": "// Nexus Core v34.0\n// Welcome back, Gem.\nconsole.log('Sovereign Systems Online.');" },
+        activeFile: "main.js",
+        search: { case: false, regex: false },
+        widgets: { 'utility-bar': true, 'kb-monolith': true, 'search-bar': false, 'writer-bar': false },
+        // Keyboard Config: Use *# to place cursor after injection, *+ for a tab
+        kbRows: [
+            ['<div id="*#"></div>', '<a href="*#"></a>', '<img src="*#" />', '[class="*#"]', '[id="*#"]', 'html:snip'],
+            ['{ *# }', '( *# )', '="*#"', '<', '>', '</', '-', '', '#'],
+            ['const *# = ', 'let *# = ', 'function *#()', 'if (*#)', '=> { *# }', 'console.log(*#)']
+        ]
     },
 
     // --- VIRTUAL FILE SYSTEM ---
     vfs: {
         async boot() {
-            const vfs = await localforage.getItem('nexus_vfs_v32');
-            const orig = await localforage.getItem('nexus_originals_v32');
+            const vfs = await localforage.getItem('nexus_vfs_v34');
             if (vfs) Nexus.state.vfs = vfs;
-            if (orig) Nexus.state.originals = orig;
-            Object.keys(Nexus.state.vfs).forEach(fn => {
-                if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn];
-            });
-            this.renderAccordion();
             this.switchFile(Nexus.state.activeFile);
         },
         async save() {
-            await localforage.setItem('nexus_vfs_v32', Nexus.state.vfs);
-            await localforage.setItem('nexus_originals_v32', Nexus.state.originals);
+            await localforage.setItem('nexus_vfs_v34', Nexus.state.vfs);
+            const st = document.getElementById('foot-status');
+            st.innerText = "SNAPSHOT SAVED"; st.style.color = "var(--success)";
+            setTimeout(() => { Nexus.ui.updateStatus(); }, 2000);
         },
         switchFile(fn) {
             Nexus.state.activeFile = fn;
             const ed = document.getElementById('raw-terminal');
             ed.value = Nexus.state.vfs[fn] || "";
             document.getElementById('foot-file').innerText = "FILE: " + fn.toUpperCase();
-            this.renderAccordion();
             Nexus.ui.updateGutter();
-            Nexus.sentinel.pulse();
-        },
-        newFile() {
-            const n = prompt("Filename:");
-            if (n) { Nexus.state.vfs[n] = ""; Nexus.state.originals[n] = ""; this.switchFile(n); this.save(); }
-        },
-        deleteFile(fn) {
-            if (confirm(`☢ Delete ${fn}?`)) {
-                delete Nexus.state.vfs[fn]; delete Nexus.state.originals[fn];
-                this.switchFile(Object.keys(Nexus.state.vfs)[0] || "main.js"); this.save();
-            }
-        },
-        loadFiles(fileList) {
-            Array.from(fileList).forEach(file => {
-                const r = new FileReader();
-                r.onload = (e) => {
-                    Nexus.state.vfs[file.name] = e.target.result;
-                    Nexus.state.originals[file.name] = e.target.result;
-                    this.renderAccordion(); this.save();
-                };
-                r.readAsText(file);
-            });
-        },
-        refreshCurrent() {
-            const fn = Nexus.state.activeFile;
-            if (confirm(`🔄 Restore ${fn} to its original state?`)) {
-                Nexus.state.vfs[fn] = Nexus.state.originals[fn];
-                this.switchFile(fn); this.save();
-            }
-        },
-        // --- UPDATED SNIPPET LOGIC ---
-        cutToSnippet() {
-            const ed = document.getElementById('raw-terminal');
-            const code = ed.value; if (!code) return;
-            const name = prompt("Name for this Snippet (File will be cleared):");
-            if (name) {
-                Nexus.state.vault.push({ name, code });
-                Nexus.vault.save();
-                ed.value = ""; Nexus.state.vfs[Nexus.state.activeFile] = "";
-                Nexus.vfs.save(); Nexus.ui.updateGutter();
-                alert("Moved to Vault & Editor Cleared.");
-            }
-        },
-        copyToSnippet() {
-            const ed = document.getElementById('raw-terminal');
-            const code = ed.value; if (!code) return;
-            const name = prompt("Name for this Snippet (Copy only):");
-            if (name) {
-                Nexus.state.vault.push({ name, code, date: new Date().toLocaleDateString() });
-                Nexus.vault.save();
-                alert("Copy stored in Vault.");
-            }
-        },
-        exportToTXT() {
-            let b = `/* NEXUS FLAT BUNDLE */\n\n`;
-            Object.entries(Nexus.state.vfs).forEach(([n, c]) => b += `\n/* FILE: ${n} */\n${c}\n`);
-            const blob = new Blob([b], { type: 'text/plain' });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-            a.download = `Nexus_v32_Backup.txt`; a.click();
-        },
-        renderAccordion() {
-            const root = document.getElementById('accordion-root'); if (!root) return;
-            const groups = {};
-            Object.keys(Nexus.state.vfs).forEach(fn => {
-                const ext = fn.split('.').pop().toLowerCase();
-                if (!groups[ext]) groups[ext] = [];
-                groups[ext].push(fn);
-            });
-            root.innerHTML = Object.entries(groups).map(([ext, files]) => `
-                <div class="acc-section">
-                    <div class="acc-head" onclick="this.nextElementSibling.classList.toggle('open')">
-                        <span>.${ext.toUpperCase()}</span> <span>${files.length}</span>
-                    </div>
-                    <div class="acc-content open">
-                        ${files.map(fn => `
-                            <div class="item-row ${fn === Nexus.state.activeFile ? 'active-file' : ''}" onclick="Nexus.vfs.switchFile('${fn}')">
-                                <span>${fn}</span>
-                                <span style="color:var(--danger); font-size:18px;" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `).join('');
         }
     },
 
-    // --- SNIPPET VAULT ---
-    vault: {
-        async boot() {
-            const saved = await localforage.getItem('nexus_vault_v32');
-            if (saved) Nexus.state.vault = saved;
-            this.render();
-        },
-        save() { localforage.setItem('nexus_vault_v32', Nexus.state.vault); },
-        grab() {
-            const ed = document.getElementById('raw-terminal');
-            const code = ed.value.substring(ed.selectionStart, ed.selectionEnd) || ed.value;
-            const name = prompt("Snippet Name:");
-            if (name) { Nexus.state.vault.push({ name, code }); this.save(); this.render(); }
-        },
-        inject(i) {
-            const ed = document.getElementById('raw-terminal');
-            if (ed.hasAttribute('readonly')) return alert("LOCKED");
-            const pos = ed.selectionStart;
-            ed.value = ed.value.substring(0, pos) + Nexus.state.vault[i].code + ed.value.substring(ed.selectionEnd);
-            Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
-            Nexus.vfs.save(); Nexus.ui.closeModal('vault');
-        },
-        render(q = "") {
-            const c = document.getElementById('vault-content'); if (!c) return;
-            const f = Nexus.state.vault.filter(s => s.name.toLowerCase().includes(q.toLowerCase()));
-            c.innerHTML = f.map((s, i) => `
-                <div class="item-row" style="flex-direction:column; align-items:flex-start; gap:5px;">
-                    <div style="display:flex; justify-content:space-between; width:100%;">
-                        <strong>${s.name}</strong>
-                        <div style="display:flex; gap:8px;">
-                            <button class="tool-btn btn-accent" onclick="Nexus.vault.inject(${i})">INJECT</button>
-                            <button class="tool-btn btn-danger" onclick="Nexus.vault.deleteSnippet(${i})">&times;</button>
-                        </div>
-                    </div>
-                </div>
-            `).join('') || "Vault is Empty.";
-        },
-        deleteSnippet(i) { Nexus.state.vault.splice(i,1); this.save(); this.render(); }
-    },
-
-    // --- SNAPSHOTS & GHOST MERGER ---
-    snapshots: {
-        async boot() {
-            const saved = await localforage.getItem('nexus_snapshots_v32');
-            if (saved) Nexus.state.snapshots = saved;
-            this.render();
-        },
-        save() { localforage.setItem('nexus_snapshots_v32', Nexus.state.snapshots); },
-        create() {
-            Nexus.state.snapshots.push({ time: new Date().toLocaleTimeString(), data: JSON.parse(JSON.stringify(Nexus.state.vfs)) });
-            if (Nexus.state.snapshots.length > 10) Nexus.state.snapshots.shift();
-            this.save(); this.render(); alert("Snapshot Created.");
-        },
-        render() {
-            const m = document.getElementById('merge-snapshot-list');
-            if (m) m.innerHTML = Nexus.state.snapshots.map((s, i) => `
-                <div class="item-row" onclick="Nexus.merger.initiate(Nexus.state.snapshots[${i}].data['${Nexus.state.activeFile}'])">
-                    <span>${s.time}</span> <span style="color:var(--gold)">DIFF →</span>
-                </div>
-            `).reverse().join('') || "No Snapshots.";
-        }
-    },
-
-    merger: {
-        incomingData: "",
-        handleUpload(file) {
-            const r = new FileReader(); r.onload = (e) => this.initiate(e.target.result); r.readAsText(file);
-        },
-        initiate(incoming) {
-            this.incomingData = incoming;
-            const current = Nexus.state.vfs[Nexus.state.activeFile] || "";
-            const left = document.getElementById('diff-left'), right = document.getElementById('diff-right');
-            const iLines = incoming.split('\n'), cLines = current.split('\n');
-            const max = Math.max(iLines.length, cLines.length);
-            let iHtml = "", cHtml = "";
-            for (let i = 0; i < max; i++) {
-                const iL = (iLines[i] || "").replace(/</g, "&lt;"), cL = (cLines[i] || "").replace(/</g, "&lt;");
-                if (iL === cL) {
-                    iHtml += `<div style="opacity:0.4;">${i+1} ${iL}</div>`;
-                    cHtml += `<div style="opacity:0.4;">${i+1} ${cL}</div>`;
-                } else {
-                    iHtml += `<div style="background:rgba(63,185,80,0.2); color:var(--success);">${i+1} + ${iL}</div>`;
-                    cHtml += `<div style="background:rgba(248,81,73,0.2); color:var(--danger);">${i+1} - ${cL}</div>`;
-                }
-            }
-            left.innerHTML = iHtml; right.innerHTML = cHtml;
-            document.getElementById('merge-setup').style.display = 'none';
-            document.getElementById('merge-diff-workspace').style.display = 'flex';
-        },
-        apply() {
-            Nexus.state.vfs[Nexus.state.activeFile] = this.incomingData;
-            Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile); Nexus.ui.closeModal('merger');
-            setTimeout(() => { document.getElementById('merge-setup').style.display = 'flex'; document.getElementById('merge-diff-workspace').style.display = 'none'; }, 500);
-        }
-    },
-
-    // --- SENTINEL v3.5: AST SUPER-FIXER ---
-    sentinel: {
-        registry: [],
-        fixes: {
-            'INF_LOOP': (c, iss) => Nexus.sentinel.replaceLine(c, iss.line, "  if (/* safety */) break; // Sentinel Fixed"),
-            'ZOMBIE_CODE': (c, iss) => Nexus.sentinel.replaceLine(c, iss.line, `// ${Nexus.sentinel.getLine(c, iss.line)} // Unused`),
-            'LOGIC_FLIP': (c, iss) => Nexus.sentinel.replaceLine(c, iss.line, Nexus.sentinel.getLine(c, iss.line).replace(/!!(\w+)/g, 'Boolean($1)')),
-            'OFFLINE_FAIL': (c, iss) => {
-                const l = Nexus.sentinel.getLine(c, iss.line), indent = l.match(/^\s*/)[0];
-                return Nexus.sentinel.replaceLine(c, iss.line, `${indent}try {\n  ${l}\n${indent}} catch (err) {\n${indent}  console.error("Offline:", err);\n${indent}}`);
-            },
-            'SEC_LEAK': (c, iss) => Nexus.sentinel.replaceLine(c, iss.line, Nexus.sentinel.getLine(c, iss.line).replace(/'[^']+'|"[^"]+"/, "process.env.REPLACE_ME"))
-        },
-        boot() {
-            this.use((node) => {
-                if (['WhileStatement', 'ForStatement'].includes(node.type)) {
-                    if (node.test?.value === true && !this.findInNode(node.body, 'BreakStatement')) return { id: 'INF_LOOP', message: "Infinite Loop: No break found.", severity: 'CRITICAL' };
-                }
-            });
-            this.use((node) => {
-                if (node.type === 'CallExpression' && node.callee.name === 'fetch') {
-                    let tracer = node.parent, inTry = false;
-                    while (tracer) { if (tracer.type === 'TryStatement') { inTry = true; break; } tracer = tracer.parent; }
-                    if (!inTry) return { id: 'OFFLINE_FAIL', message: "PWA Risk: fetch lacks offline guard.", severity: 'HIGH' };
-                }
-            });
-        },
-        use(c) { this.registry.push(c); },
-        runLint() {
-            const code = Nexus.state.vfs[Nexus.state.activeFile];
-            let ast;
-            try { ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true }); } 
-            catch (e) { return this.renderIssues([{ message: `Syntax Error: ${e.message}`, line: e.loc?.line || 0, severity: 'FATAL' }]); }
-            const issues = [];
-            this.traverse(ast, (node, parent) => {
-                this.registry.forEach(check => {
-                    const res = check(node, parent);
-                    if (res) issues.push({ ...res, line: node.loc?.start.line });
-                });
-            });
-            this.renderIssues(issues);
-        },
-        renderIssues(issues) {
-            const out = document.getElementById('diag-out');
-            const colors = { 'CRITICAL': '#ff5555', 'HIGH': '#ffb86c', 'MEDIUM': '#f1fa8c', 'LOW': '#8be9fd', 'FATAL': '#ff0000' };
-            if (issues.length === 0) { out.innerHTML = `<div style="padding:20px; color:var(--success); text-align:center;">✓ CODE IS CLEAN</div>`; return; }
-            out.innerHTML = issues.map((iss) => `
-                <div class="item-row" style="font-size:11px; align-items:flex-start; gap:10px;">
-                    <span style="color:${colors[iss.severity]}; font-weight:bold;">[${iss.severity}]</span>
-                    <div style="flex:1;" onclick="Nexus.ui.jumpToLine(${iss.line})">
-                        <div style="color:#eee;">${iss.message}</div>
-                        <div style="font-size:9px; opacity:0.5;">LN ${iss.line}</div>
-                    </div>
-                    ${this.fixes[iss.id] ? `<button class="tool-btn btn-gold" style="padding:4px 8px;" onclick="Nexus.sentinel.dispatchFix('${iss.id}', ${iss.line})">FIX</button>` : ''}
-                </div>
-            `).join('');
-        },
-        dispatchFix(id, line) {
-            const code = Nexus.state.vfs[Nexus.state.activeFile];
-            const fixed = this.fixes[id](code, { id, line });
-            Nexus.state.vfs[Nexus.state.activeFile] = fixed;
-            Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile); this.runLint();
-        },
-        getLine(c, l) { return c.split('\n')[l-1]; },
-        replaceLine(c, l, t) { const lines = c.split('\n'); lines[l-1] = t; return lines.join('\n'); },
-        traverse(node, callback, parent = null) {
-            if (!node) return; node.parent = parent; callback(node, parent);
-            for (const key in node) {
-                const child = node[key];
-                if (child && typeof child === 'object') {
-                    if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node));
-                    else this.traverse(child, callback, node);
-                }
-            }
-        },
-        findInNode(node, type) { let found = false; this.traverse(node, (n) => { if (n.type === type) found = true; }); return found; },
-        pulse() {
-            try { acorn.parse(Nexus.state.vfs[Nexus.state.activeFile], { ecmaVersion: 2022 }); 
-                document.getElementById('editor-view').classList.remove('error-state');
-            } catch (e) { document.getElementById('editor-view').classList.add('error-state'); }
-        }
-    },
-
-    // --- INTEL, DREAMER, GRAPH ---
-    intel: {
-        scan() {
-            const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
-            const lines = code.split('\n').length, branches = (code.match(/if\s*\(|else|for|while/g) || []).length;
-            const health = Math.max(0, Math.min(100, 100 - ((branches / lines) * 150)));
-            document.getElementById('intel-health-display').innerText = Math.floor(health) + "%";
-            document.getElementById('intel-health-bar').style.width = health + "%";
-            Nexus.ui.openModal('intel');
-        }
-    },
-
-    dreamer: {
-        templates: {
-            'btn-tactical': (l, id) => `<button id="${id || 'btn'}" class="tool-btn btn-gold">${l || 'BTN'}</button>`,
-            'card-gold': (l, id) => `<div class="item-row" style="border:1px solid var(--gold); padding:10px;"><strong>${l}</strong></div>`,
-            'grid-skill': (l, id) => `<div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button class="tool-btn" style="height:60px;">${i+1}</button>`).join('')}</div>`
-        },
-        updatePreview() {
-            const t = document.getElementById('dreamer-type').value, l = document.getElementById('dreamer-label').value, p = document.getElementById('dreamer-preview');
-            if (p) p.innerHTML = this.templates[t](l, 'prev');
-        },
-        inject() {
-            const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return;
-            const t = document.getElementById('dreamer-type').value, l = document.getElementById('dreamer-label').value;
-            const code = `\n\n` + this.templates[t](l) + `\n`;
-            const pos = ed.selectionStart;
-            ed.value = ed.value.substring(0, pos) + code + ed.value.substring(ed.selectionEnd);
-            Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); Nexus.ui.closeModal('dreamer');
-        }
-    },
-
-    graph: {
-        render() {
-            const c = document.getElementById('graph-viewport'); if (!c) return;
-            const f = Object.keys(Nexus.state.vfs), w = c.clientWidth, h = c.clientHeight, cx = w/2, cy = h/2, r = Math.min(w, h) * 0.35;
-            let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="background:#000;">`;
-            svg += `<circle cx="${cx}" cy="${cy}" r="15" fill="none" stroke="var(--gold)" stroke-width="2"><animate attributeName="r" values="12;16;12" dur="3s" repeatCount="indefinite" /></circle>`;
-            f.forEach((fn, i) => {
-                const a = (i / f.length) * Math.PI * 2, x = cx + r * Math.cos(a), y = cy + r * Math.sin(a), act = (fn === Nexus.state.activeFile);
-                svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${act ? 'var(--accent)' : '#222'}" />`;
-                svg += `<g onclick="Nexus.vfs.switchFile('${fn}'); Nexus.ui.closeModal('graph');"><circle cx="${x}" cy="${y}" r="8" fill="${act ? 'var(--accent)' : '#111'}" /><text x="${x}" y="${y+20}" fill="#fff" font-size="9" text-anchor="middle">${fn}</text></g>`;
-            });
-            c.innerHTML = svg + `</svg>`;
-        }
-    },
-
-    settings: {
-        async boot() { const saved = await localforage.getItem('nexus_prefs_v32'); if (saved) Nexus.state.prefs = saved; this.apply(); },
-        update(k, v) { Nexus.state.prefs[k] = parseInt(v); localforage.setItem('nexus_prefs_v32', Nexus.state.prefs); this.apply(); },
-        apply() { const ed = document.getElementById('raw-terminal'); if (!ed) return; ed.style.fontSize = Nexus.state.prefs.fontSize + 'px'; ed.style.tabSize = Nexus.state.prefs.tabWidth; },
-        calcStorage() { document.getElementById('metric-vfs').innerText = (JSON.stringify(Nexus.state.vfs).length / 1024).toFixed(2) + " KB"; }
-    },
-
-    // --- UI CONTROLLER & KINETICS ---
+    // --- UI, KINETICS & MAGNIFIER ---
     ui: {
         boot() {
-            Nexus.vfs.boot(); Nexus.vault.boot(); Nexus.snapshots.boot(); Nexus.settings.boot(); Nexus.sentinel.boot();
-            this.initInfiniteRibbon(); this.initDraggable(); this.updateGutter();
+            Nexus.vfs.boot();
+            this.renderKeyboard();
+            this.initMagnifier();
+            this.updateGutter();
+            // Sync widget visibility
+            Object.entries(Nexus.state.widgets).forEach(([id, show]) => {
+                document.getElementById(id).style.display = show ? 'flex' : 'none';
+            });
         },
-        initDraggable() {
-            const el = document.getElementById('floating-tool'), handle = document.getElementById('drag-handle');
-            let ox, oy;
-            handle.addEventListener('touchstart', (e) => { ox = e.touches[0].clientX - el.offsetLeft; oy = e.touches[0].clientY - el.offsetTop; });
-            handle.addEventListener('touchmove', (e) => { e.preventDefault(); el.style.left = (e.touches[0].clientX - ox) + 'px'; el.style.top = (e.touches[0].clientY - oy) + 'px'; el.style.right = 'auto'; });
+
+        // --- THE MAGNIFIER ENGINE ---
+        initMagnifier() {
+            const ed = document.getElementById('raw-terminal');
+            const mag = document.getElementById('magnifier');
+            
+            ed.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) mag.style.display = 'block';
+            });
+
+            ed.addEventListener('touchmove', (e) => {
+                const t = e.touches[0];
+                mag.style.left = (t.clientX - 40) + 'px';
+                mag.style.top = (t.clientY - 120) + 'px';
+                // Note: In a full PWA, we'd draw the textarea's canvas slice here.
+                // For now, it acts as a tactical positioning guide.
+            });
+
+            ed.addEventListener('touchend', () => mag.style.display = 'none');
         },
-        jumpPrompt() { const ln = prompt("Jump:"); if (ln) this.jumpToLine(parseInt(ln)); },
-        jumpToLine(ln) {
-            const ed = document.getElementById('raw-terminal'), lines = ed.value.split('\n');
-            let p = 0; for (let i = 0; i < Math.min(ln-1, lines.length); i++) p += lines[i].length + 1;
-            ed.focus(); ed.setSelectionRange(p, p);
+
+        // --- DRAG & SNAP LOGIC ---
+        initDrag(e, id) {
+            const el = document.getElementById(id);
+            if (el.classList.contains('snapped-right') || el.classList.contains('snapped-bottom')) return;
+            const touch = e.touches[0];
+            let ox = touch.clientX - el.offsetLeft;
+            let oy = touch.clientY - el.offsetTop;
+
+            const move = (me) => {
+                const mt = me.touches[0];
+                el.style.left = (mt.clientX - ox) + 'px';
+                el.style.top = (mt.clientY - oy) + 'px';
+                el.style.right = 'auto'; el.style.bottom = 'auto';
+            };
+            const end = () => {
+                document.removeEventListener('touchmove', move);
+                document.removeEventListener('touchend', end);
+            };
+            document.addEventListener('touchmove', move, { passive: false });
+            document.addEventListener('touchend', end);
         },
-        toggleSearch() { const s = document.getElementById('mini-search'); s.style.display = (s.style.display === 'flex' ? 'none' : 'flex'); },
+
+        toggleWidget(id) {
+            const el = document.getElementById(id);
+            const isHidden = el.style.display === 'none';
+            el.style.display = isHidden ? 'flex' : 'none';
+            Nexus.state.widgets[id] = isHidden;
+        },
+
+        snapWidget(id) {
+            const el = document.getElementById(id);
+            if (id === 'kb-monolith') el.classList.toggle('snapped-bottom');
+            else el.classList.toggle('snapped-right');
+        },
+
+        // --- TREB-STYLE INJECTION ENGINE ---
+        injectChar(val) {
+            const ed = document.getElementById('raw-terminal');
+            if (ed.hasAttribute('readonly')) return;
+
+            const start = ed.selectionStart;
+            const end = ed.selectionEnd;
+            
+            // Process specialized markers
+            let processed = val.replace(/\*\+/g, '\t'); // *+ becomes Tab
+            let cursorOffset = processed.indexOf('*#'); // *# is cursor target
+            
+            if (cursorOffset !== -1) {
+                processed = processed.replace(/\*\#/g, '');
+            } else {
+                cursorOffset = processed.length;
+            }
+
+            ed.value = ed.value.substring(0, start) + processed + ed.value.substring(end);
+            
+            const newPos = start + cursorOffset;
+            ed.setSelectionRange(newPos, newPos);
+            ed.focus();
+            
+            Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+            this.updateGutter();
+        },
+
+        renderKeyboard() {
+            Nexus.state.kbRows.forEach((row, i) => {
+                const container = document.getElementById(`kb-r${i+1}`);
+                // Independent scroll clones
+                const keys = [...row, ...row]; 
+                container.innerHTML = keys.map(k => `
+                    <button class="kb-key" onclick="Nexus.ui.injectChar('${k.replace(/'/g, "\\'")}')">
+                        ${k.replace(/\*\#|\*\+/g, '').toUpperCase()}
+                    </button>
+                `).join('');
+            });
+        },
+
+        // --- SEARCH ENGINE ---
+        toggleSearchOpt(opt) {
+            Nexus.state.search[opt] = !Nexus.state.search[opt];
+            document.getElementById(`${opt}-btn`).classList.toggle('btn-active');
+        },
+
         execReplace() {
-            const f = document.getElementById('find-input').value, r = document.getElementById('replace-input').value, ed = document.getElementById('raw-terminal');
-            if (f) { ed.value = ed.value.split(f).join(r); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); this.updateGutter(); this.toggleSearch(); }
+            const find = document.getElementById('find-input').value;
+            const replace = document.getElementById('replace-input').value;
+            const ed = document.getElementById('raw-terminal');
+            if (!find) return;
+
+            let flags = "g";
+            if (!Nexus.state.search.case) flags += "i";
+
+            try {
+                const searchVal = Nexus.state.search.regex ? new RegExp(find, flags) : find;
+                ed.value = (typeof searchVal === 'string') 
+                    ? ed.value.split(find).join(replace) 
+                    : ed.value.replace(searchVal, replace);
+                
+                Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+                Nexus.vfs.save();
+                this.updateGutter();
+            } catch (e) { alert("Regex Syntax Error"); }
         },
-        initInfiniteRibbon() {
-            const c = document.getElementById('ribbon-container'), t = document.getElementById('ribbon-track');
-            t.innerHTML += t.innerHTML + t.innerHTML; c.scrollLeft = c.scrollWidth / 3;
-            c.onscroll = () => { const w = c.scrollWidth / 3; if (c.scrollLeft >= w * 2) c.scrollLeft = w; else if (c.scrollLeft <= 0) c.scrollLeft = w; };
-        },
+
         toggleEditMode() {
-            const ed = document.getElementById('raw-terminal'), btn = document.getElementById('edit-toggle'), st = document.getElementById('foot-status');
-            if (ed.hasAttribute('readonly')) { ed.removeAttribute('readonly'); btn.innerText = "🔓 UNLOCK"; st.innerText = "READY"; st.style.color = "var(--success)"; }
-            else { ed.setAttribute('readonly', true); btn.innerText = "🔒 LOCK"; st.innerText = "LOCKED"; st.style.color = "var(--warn)"; }
+            const ed = document.getElementById('raw-terminal');
+            const btn = document.getElementById('lock-btn');
+            const isLocked = ed.hasAttribute('readonly');
+            if (isLocked) {
+                ed.removeAttribute('readonly'); btn.innerText = "🔓 EDIT"; btn.classList.add('btn-active');
+            } else {
+                ed.setAttribute('readonly', true); btn.innerText = "🔒 LOCK"; btn.classList.remove('btn-active');
+            }
+            this.updateStatus();
         },
-        toggleSidebar(s) { document.getElementById(s==='left'?'panel-left':'panel-right').classList.toggle('open'); },
-        toggleSlide(t) { document.getElementById(t==='diag'?'diag-hub':'shell-slide').classList.toggle('open'); },
-        openModal(id) { if (id === 'graph') Nexus.graph.render(); if (id === 'settings') Nexus.settings.calcStorage(); document.getElementById('modal-'+id).classList.add('active'); },
-        closeModal(id) { document.getElementById('modal-'+id).classList.remove('active'); },
-        toggleSun() { document.body.classList.toggle('outdoor-mode'); },
+
         updateGutter() {
-            const ed = document.getElementById('raw-terminal'), gutter = document.getElementById('gutter');
-            const lines = ed.value.split('\n').length; let h = '';
-            for (let i = 1; i <= lines; i++) h += i + '<br>';
-            gutter.innerHTML = h;
+            const ed = document.getElementById('raw-terminal');
+            const gut = document.getElementById('gutter');
+            const lines = ed.value.split('\n').length;
+            let h = ''; for (let i = 1; i <= lines; i++) h += i + '<br>';
+            gut.innerHTML = h;
         },
-        injectChar(c) {
-            const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return;
-            const s = ed.selectionStart; ed.value = ed.value.substring(0, s) + c + ed.value.substring(ed.selectionEnd);
-            ed.selectionStart = ed.selectionEnd = s + c.length; ed.focus(); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); this.updateGutter();
+
+        updateStatus() {
+            const st = document.getElementById('foot-status');
+            const locked = document.getElementById('raw-terminal').hasAttribute('readonly');
+            st.innerText = locked ? "LOCKED" : "READY";
+            st.style.color = locked ? "var(--gold)" : "var(--success)";
         },
-        runSandbox() {
-            const f = document.getElementById('sandbox-frame'), c = document.getElementById('ghost-console'); c.innerHTML = "";
-            const inj = `<script>console.log = (...args) => { const d = document.createElement('div'); d.innerText = "> " + args.join(' '); window.parent.document.getElementById('ghost-console').appendChild(d); };<\/script>`;
-            f.srcdoc = inj + `<script type="module">${document.getElementById('raw-terminal').value}<\/script>`;
+
+        jumpPrompt() {
+            const ln = prompt("Jump to Line:");
+            if (ln) {
+                const ed = document.getElementById('raw-terminal');
+                const lines = ed.value.split('\n');
+                let pos = 0;
+                for (let i = 0; i < Math.min(ln - 1, lines.length); i++) pos += lines[i].length + 1;
+                ed.focus(); ed.setSelectionRange(pos, pos);
+            }
         },
-        async exportZIP() {
-            const zip = new JSZip(), f = zip.folder("Nexus_Project");
-            Object.entries(Nexus.state.vfs).forEach(([n, c]) => f.file(n, c));
-            const blob = await zip.generateAsync({ type: "blob" });
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = "Nexus_v32.zip"; a.click();
-        },
-        nuke() { if (confirm("☢ WIPE SYSTEM?")) { localforage.clear().then(() => location.reload()); } }
+
+        nuke() { if (confirm("☢ NUCLEAR WIPE?")) { localforage.clear().then(() => location.reload()); } }
+    },
+
+    // --- AUTO-WRITER (STORY WEAVER) ---
+    writer: {
+        go() {
+            const count = parseInt(document.getElementById('write-count').value);
+            const mode = document.getElementById('write-mode').value;
+            const status = document.getElementById('writer-status');
+            const ed = document.getElementById('raw-terminal');
+            
+            if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR");
+            
+            status.innerText = "STREAMING...";
+            let current = 0;
+
+            const interval = setInterval(() => {
+                if (current >= count) {
+                    clearInterval(interval);
+                    status.innerText = "FINISHED";
+                    Nexus.vfs.save();
+                    setTimeout(() => { status.innerText = "IDLE"; }, 2000);
+                    return;
+                }
+
+                let word = "";
+                if (mode === 'code') {
+                    const snips = ['const ', 'let ', 'async ', 'await ', 'fetch() ', 'if() ', 'return '];
+                    word = snips[Math.floor(Math.random() * snips.length)];
+                } else if (mode === 'skill') {
+                    const snips = ['pattern ', 'skill ', 'match ', 'sequence ', 'Simon ', 'tracker '];
+                    word = snips[Math.floor(Math.random() * snips.length)];
+                } else {
+                    const words = ['Beyond ', 'Nexus ', 'Sovereign ', 'Logic ', 'Crystal ', 'Code ', 'Digital '];
+                    word = words[Math.floor(Math.random() * words.length)] + " ";
+                }
+
+                Nexus.ui.injectChar(word);
+                current++;
+            }, 60);
+        }
     }
 };
 
-/* --- LISTENERS --- */
+/* --- GLOBAL LISTENERS --- */
 const editor = document.getElementById('raw-terminal');
 const gutter = document.getElementById('gutter');
-editor.oninput = () => { Nexus.state.vfs[Nexus.state.activeFile] = editor.value; Nexus.ui.updateGutter(); Nexus.vfs.save(); Nexus.sentinel.pulse(); };
+
+editor.oninput = () => { 
+    Nexus.state.vfs[Nexus.state.activeFile] = editor.value; 
+    Nexus.ui.updateGutter(); 
+};
 editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
-editor.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); Nexus.ui.injectChar('  '); } };
+
 window.addEventListener('DOMContentLoaded', () => { Nexus.ui.boot(); });
 </script>
 </body>
