@@ -3,184 +3,175 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0a0c10">
-    <title>Nexus v34.0 // Sovereign Command</title>
+    <meta name="theme-color" content="#0d1117">
+    <title>Nexus v30.0 // Solid State</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.8.2/acorn.min.js"></script>
 
     <style>
         :root {
-            --bg: #0a0c10; --panel: #12151a; --surface: #1c2128;
-            --border: #252a31; --text: #8b949e; --accent: #388bfd;
-            --gold: #c69026; --danger: #f85149; --success: #3fb950;
+            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+            --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
+            --gold: #d29922; --danger: #f85149; --success: #3fb950;
         }
+/* --- NEXUS v34 WIDGET CORE --- */
+:root {
+    --widget-bg: rgba(18, 21, 26, 0.9);
+    --widget-border: #252a31;
+    --widget-gold: #c69026;
+}
+
+.floating-widget {
+    position: fixed; background: var(--widget-bg); backdrop-filter: blur(12px);
+    border: 1px solid var(--widget-border); border-radius: 10px; z-index: 8000;
+    box-shadow: 0 15px 45px rgba(0,0,0,0.6); display: none; flex-direction: column;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+}
+
+.floating-widget.active { display: flex; }
+
+.drag-handle { 
+    height: 18px; background: rgba(255,255,255,0.05); 
+    cursor: move; border-radius: 9px 9px 0 0; 
+    display: flex; justify-content: center; align-items: center; 
+}
+.drag-handle::after { content: '...'; color: #484f58; letter-spacing: 2px; }
+
+/* Snap Logic: Pops nearly off-screen */
+.snapped-right { transform: translateX(calc(100% - 15px)) !important; opacity: 0.4; }
+.snapped-bottom { transform: translateY(calc(100% - 15px)) !important; opacity: 0.4; }
+
+/* Keyboard Row Styling */
+.kb-row-container { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+.kb-scroll-row { display: flex; overflow-x: auto; gap: 5px; padding-bottom: 2px; }
+.kb-scroll-row::-webkit-scrollbar { display: none; }
+
+.kb-key { 
+    padding: 8px 12px; background: #1c2128; color: #fff; 
+    border: 1px solid #30363d; border-radius: 6px; font-size: 12px; 
+    font-weight: bold; min-width: 45px; text-align: center; white-space: nowrap;
+}
 
         * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; }
         body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: sans-serif; overflow: hidden; }
 
-        /* --- 1. SOVEREIGN WORKSPACE --- */
-        #ribbon { height: 42px; background: var(--panel); border-bottom: 1px solid var(--border); display: flex; overflow-x: auto; align-items: center; padding: 0 8px; gap: 6px; z-index: 1000; }
-        #ribbon::-webkit-scrollbar { display: none; }
+        /* --- 1. THE INFINITE RIBBON (FIXED TOP) --- */
+        #ribbon-container { height: 48px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: auto; white-space: nowrap; display: flex; align-items: center; z-index: 1000; }
+        #ribbon-container::-webkit-scrollbar { display: none; }
+        #ribbon-track { display: inline-flex; padding: 0 10px; gap: 8px; }
         
-        #editor-view { height: calc(100vh - 42px); display: flex; background: #000; position: relative; }
-        #gutter { width: 38px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; padding-top: 10px; text-align: right; padding-right: 6px; }
-        #raw-terminal { flex: 1; background: transparent; color: #e6edf3; border: none; padding: 10px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; tab-size: 2; }
+        .tool-btn { padding: 10px 16px; border-radius: 10px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 11px; font-weight: 800; cursor: pointer; }
+        .btn-gold { color: var(--gold); border-color: var(--gold); }
+        .btn-accent { background: var(--accent); color: #fff; border: none; }
 
-        /* --- 2. THE KINETIC WIDGETS --- */
-        .floating-widget {
-            position: fixed; background: rgba(18, 21, 26, 0.9); backdrop-filter: blur(12px);
-            border: 1px solid var(--border); border-radius: 10px; z-index: 8000;
-            box-shadow: 0 15px 45px rgba(0,0,0,0.6); display: none; flex-direction: column;
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
-        }
-        .floating-widget.active { display: flex; }
-        .drag-handle { height: 18px; background: rgba(255,255,255,0.05); cursor: move; border-radius: 9px 9px 0 0; display: flex; justify-content: center; align-items: center; }
-        .drag-handle::after { content: '...'; color: var(--border); font-weight: bold; letter-spacing: 2px; }
-
-        /* Snap Logic: Pops to edge, nearly off-screen */
-        .snapped-right { transform: translateX(calc(100% - 15px)) !important; opacity: 0.4; }
-        .snapped-bottom { transform: translateY(calc(100% - 15px)) !important; opacity: 0.4; }
-
-        /* --- 3. THE TREB-KEYBOARD ENGINE --- */
-        #kb-monolith { bottom: 0; left: 0; width: 100vw; border-radius: 12px 12px 0 0; border-bottom: none; }
-        .kb-row-container { padding: 4px; display: flex; flex-direction: column; gap: 4px; }
-        .kb-scroll-row { display: flex; overflow-x: auto; gap: 5px; padding-bottom: 2px; }
-        .kb-scroll-row::-webkit-scrollbar { display: none; }
+        /* --- 2. WORKSPACE --- */
+        #workspace { height: calc(100vh - 48px - 45px - 28px); display: flex; position: relative; }
         
-        .kb-key { 
-            padding: 8px 12px; background: var(--surface); color: #fff; 
-            border: 1px solid var(--border); border-radius: 6px; font-size: 12px; 
-            font-weight: bold; min-width: 45px; text-align: center; white-space: nowrap;
-        }
+        #editor-view { flex: 1; display: flex; background: #000; position: relative; }
+        #gutter { width: 45px; background: #010409; border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; padding-top: 15px; text-align: right; padding-right: 10px; }
+        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; tab-size: 2; }
 
-        /* --- 4. TACTICAL TOOLBARS --- */
-        .bar-content { padding: 8px; display: flex; gap: 6px; align-items: center; }
-        .tool-btn { padding: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; font-size: 11px; }
-        .btn-active { color: var(--gold); border-color: var(--gold); box-shadow: 0 0 8px rgba(198, 144, 38, 0.3); }
+        /* --- 3. SIDEBAR DRAWERS --- */
+        .side-panel { position: fixed; top: 0; bottom: 0; width: 85vw; max-width: 350px; background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.4s cubic-bezier(0.1, 0.9, 0.2, 1); display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.8); }
+        .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
+        .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); }
+        .side-panel.open { transform: translateX(0); }
+        
+        .p-head { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 12px; color: var(--gold); letter-spacing: 1px; }
+        .p-body { flex: 1; padding: 10px; overflow-y: auto; }
+        .file-item { padding: 15px; border-bottom: 1px solid var(--border); font-size: 13px; cursor: pointer; }
+        .file-item.active { color: var(--accent); background: rgba(47, 129, 247, 0.1); }
 
-        /* Magnifier Simulation Bubble */
-        #magnifier {
-            position: fixed; width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--gold);
-            background: #000; display: none; z-index: 10000; pointer-events: none;
-            box-shadow: 0 0 20px rgba(0,0,0,0.8); overflow: hidden;
-        }
+        /* --- 4. TACTICAL KEYBOARD (FIXED BOTTOM) --- */
+        #tactical-keys { height: 45px; background: var(--panel); border-top: 1px solid var(--border); display: flex; overflow-x: auto; align-items: center; padding: 0 10px; gap: 6px; z-index: 1000; }
+        #tactical-keys::-webkit-scrollbar { display: none; }
 
         #footer { height: 28px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 12px; font-size: 9px; opacity: 0.6; }
     </style>
 </head>
 <body>
 
-<div id="magnifier"></div>
-
-<div id="workspace">
-    <nav id="ribbon">
-        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('utility-bar')">🛠 UTIL</button>
-        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('search-bar')">🔍 FIND</button>
-        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar')">✍️ WRITE</button>
-        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith')">⌨ KEY</button>
-        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
-        <button class="tool-btn" onclick="Nexus.ui.toggleEditMode()" id="lock-btn">🔒 LOCK</button>
-        <button class="tool-btn btn-active" onclick="Nexus.vfs.save()">💾 SAVE</button>
-        <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ NUKE</button>
+<div id="app-root" style="display: flex; flex-direction: column; height: 100vh;">
+    <nav id="ribbon-container">
+        <div id="ribbon-track">
+            <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ PROVE</button>
+            <button class="tool-btn" onclick="Nexus.ui.toggleEditMode()" id="lock-btn">🔒 LOCK</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.vfs.save()">💾 SAVE</button>
+            <button class="tool-btn" onclick="Nexus.vfs.newFile()">+ NEW FILE</button>
+            <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ NUKE</button>
+        </div>
     </nav>
 
-    <div id="editor-view">
-        <div id="gutter">1</div>
-        <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off"></textarea>
-    </div>
-
-    <div id="utility-bar" class="floating-widget active" style="top: 60px; right: 10px; width: 60px;">
-        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'utility-bar')"></div>
-        <div class="bar-content" style="flex-direction: column;">
-            <button class="tool-btn" onclick="Nexus.ui.snapWidget('utility-bar')">📂</button>
-            <button class="tool-btn" onclick="Nexus.ui.jumpPrompt()">📍</button>
-            <button class="tool-btn" onclick="document.execCommand('undo')">↩️</button>
-            <button class="tool-btn" onclick="document.execCommand('redo')">↪️</button>
-            <button class="tool-btn" onclick="Nexus.ui.injectChar('\t')">⇥</button>
+    <div id="workspace">
+        <div id="editor-view">
+            <div id="gutter">1</div>
+            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Solid State v30.0 Ready."></textarea>
         </div>
     </div>
 
-    <div id="search-bar" class="floating-widget" style="top: 60px; left: 50%; transform: translateX(-50%); width: 90%;">
-        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'search-bar')"></div>
-        <div class="bar-content" style="flex-direction: column; align-items: stretch;">
-            <div style="display:flex; gap:5px;">
-                <input type="text" id="find-input" placeholder="Find..." style="flex:1; background:#000; border:1px solid var(--border); color:#fff; font-size:12px; padding:10px;">
-                <button class="tool-btn" id="case-btn" onclick="Nexus.ui.toggleSearchOpt('case')">Aa</button>
-                <button class="tool-btn" id="regex-btn" onclick="Nexus.ui.toggleSearchOpt('regex')">.*</button>
-            </div>
-            <div style="display:flex; gap:5px;">
-                <input type="text" id="replace-input" placeholder="Replace with..." style="flex:1; background:#000; border:1px solid var(--border); color:#fff; font-size:12px; padding:10px;">
-                <button class="tool-btn btn-gold" style="width:80px;" onclick="Nexus.ui.execReplace()">REP ALL</button>
-            </div>
-        </div>
+    <div id="tactical-keys">
+        <button class="tool-btn" onclick="Nexus.ui.inject('\t')">TAB</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject('{')">{</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject('}')">}</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject('(')">(</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject(')')">)</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject(';')">;</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject('=')">=</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject('&quot;')">"</button>
+        <button class="tool-btn" onclick="Nexus.ui.inject('\'')">'</button>
     </div>
 
-    <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 260px;">
-        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'writer-bar')"></div>
-        <div class="bar-content" style="flex-direction: column; align-items: stretch;">
-            <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                <span style="font-size:10px; color:var(--gold); font-weight:bold;">AUTO-WRITER</span>
-                <span id="writer-status" style="font-size:9px; opacity:0.5;">IDLE</span>
-            </div>
-            <div style="display:flex; gap:5px;">
-                <input type="number" id="write-count" value="50" style="width:60px; background:#000; border:1px solid var(--border); color:#fff; padding:8px;">
-                <select id="write-mode" style="flex:1; background:var(--surface); border:1px solid var(--border); color:#fff; font-size:11px;">
-                    <option value="code">Code Engine</option>
-                    <option value="story">Story Weaver</option>
-                    <option value="skill">Skill Pattern</option>
-                </select>
-                <button class="tool-btn btn-gold" onclick="Nexus.writer.go()">▶ GO</button>
-            </div>
-        </div>
-    </div>
+    <aside id="panel-left" class="side-panel left-p">
+        <div class="p-head"><span>VORTEX EXPLORER</span><button onclick="Nexus.ui.toggleSidebar('left')" style="background:none; border:none; color:#fff; font-size:20px;">&times;</button></div>
+        <div class="p-body" id="file-list"></div>
+    </aside>
 
-    <div id="kb-monolith" class="floating-widget active">
-        <div class="drag-handle" ontouchstart="Nexus.ui.initDrag(event, 'kb-monolith')"></div>
-        <div class="kb-row-container">
-            <div class="kb-scroll-row" id="kb-r1"></div>
-            <div class="kb-scroll-row" id="kb-r2"></div>
-            <div class="kb-scroll-row" id="kb-r3"></div>
-        </div>
-        <button class="tool-btn" style="position:absolute; right:5px; top:5px; padding:2px 8px;" onclick="Nexus.ui.snapWidget('kb-monolith')">📂</button>
-    </div>
+    <aside id="panel-right" class="side-panel right-p">
+        <div class="p-head"><span>PROVING GROUNDS</span><button onclick="Nexus.ui.toggleSidebar('right')" style="background:none; border:none; color:#fff; font-size:20px;">&times;</button></div>
+        <iframe id="sandbox" style="flex:1; border:none; background:#fff;"></iframe>
+    </aside>
 
     <footer id="footer">
         <div id="foot-file">FILE: main.js</div>
-        <div style="margin-left:auto; display:flex; gap:15px;"><span id="foot-status">LOCKED</span></div>
+        <div style="margin-left:auto;"><span id="foot-status">LOCKED</span></div>
     </footer>
 </div>
+<div id="utility-bar" class="floating-widget active" style="top: 60px; right: 10px; width: 60px;">
+    <div class="drag-handle" ontouchstart="WidgetEngine.initDrag(event, 'utility-bar')"></div>
+    <div style="padding:8px; display:flex; flex-direction:column; gap:6px;">
+        <button class="tool-btn" onclick="WidgetEngine.snap('utility-bar')">📂</button>
+        <button class="tool-btn" onclick="WidgetEngine.undo()">↩️</button>
+        <button class="tool-btn" onclick="WidgetEngine.redo()">↪️</button>
+    </div>
+</div>
 
+<div id="kb-monolith" class="floating-widget active" style="bottom:0; left:0; width:100vw; border-radius:12px 12px 0 0;">
+    <div class="drag-handle" ontouchstart="WidgetEngine.initDrag(event, 'kb-monolith')"></div>
+    <div class="kb-row-container">
+        <div class="kb-scroll-row" id="kb-r1"></div>
+        <div class="kb-scroll-row" id="kb-r2"></div>
+        <div class="kb-scroll-row" id="kb-r3"></div>
+    </div>
+    <button style="position:absolute; right:5px; top:5px;" onclick="WidgetEngine.snap('kb-monolith')">📂</button>
+</div>
 <script>
-    /* ATTACH THE SECOND HALF (DYNAMICS & CURSOR LOGIC) BELOW */
-    
 window.Nexus = {
     state: {
-        vfs: { "main.js": "// Nexus Core v34.0\n// Welcome back, Gem.\nconsole.log('Sovereign Systems Online.');" },
-        activeFile: "main.js",
-        search: { case: false, regex: false },
-        widgets: { 'utility-bar': true, 'kb-monolith': true, 'search-bar': false, 'writer-bar': false },
-        // Keyboard Config: Use *# to place cursor after injection, *+ for a tab
-        kbRows: [
-            ['<div id="*#"></div>', '<a href="*#"></a>', '<img src="*#" />', '[class="*#"]', '[id="*#"]', 'html:snip'],
-            ['{ *# }', '( *# )', '="*#"', '<', '>', '</', '-', '', '#'],
-            ['const *# = ', 'let *# = ', 'function *#()', 'if (*#)', '=> { *# }', 'console.log(*#)']
-        ]
+        vfs: { "main.js": "// Nexus Core v30.0\nconsole.log('Solid State Active.');" },
+        activeFile: "main.js"
     },
 
-    // --- VIRTUAL FILE SYSTEM ---
     vfs: {
         async boot() {
-            const vfs = await localforage.getItem('nexus_vfs_v34');
-            if (vfs) Nexus.state.vfs = vfs;
+            const saved = await localforage.getItem('nexus_vfs_v30');
+            if (saved) Nexus.state.vfs = saved;
             this.switchFile(Nexus.state.activeFile);
         },
         async save() {
-            await localforage.setItem('nexus_vfs_v34', Nexus.state.vfs);
-            const st = document.getElementById('foot-status');
-            st.innerText = "SNAPSHOT SAVED"; st.style.color = "var(--success)";
-            setTimeout(() => { Nexus.ui.updateStatus(); }, 2000);
+            await localforage.setItem('nexus_vfs_v30', Nexus.state.vfs);
+            Nexus.ui.updateStatus("SNAPSHOT SAVED", "var(--success)");
+            setTimeout(() => Nexus.ui.updateStatus(), 2000);
         },
         switchFile(fn) {
             Nexus.state.activeFile = fn;
@@ -188,238 +179,162 @@ window.Nexus = {
             ed.value = Nexus.state.vfs[fn] || "";
             document.getElementById('foot-file').innerText = "FILE: " + fn.toUpperCase();
             Nexus.ui.updateGutter();
+            Nexus.ui.renderFiles();
+        },
+        newFile() {
+            const n = prompt("Filename:");
+            if (n) { Nexus.state.vfs[n] = ""; this.switchFile(n); this.save(); }
         }
     },
 
-    // --- UI, KINETICS & MAGNIFIER ---
     ui: {
         boot() {
             Nexus.vfs.boot();
-            this.renderKeyboard();
-            this.initMagnifier();
-            this.updateGutter();
-            // Sync widget visibility
-            Object.entries(Nexus.state.widgets).forEach(([id, show]) => {
-                document.getElementById(id).style.display = show ? 'flex' : 'none';
-            });
+            this.initInfiniteRibbon();
         },
-
-        // --- THE MAGNIFIER ENGINE ---
-        initMagnifier() {
-            const ed = document.getElementById('raw-terminal');
-            const mag = document.getElementById('magnifier');
-            
-            ed.addEventListener('touchstart', (e) => {
-                if (e.touches.length === 1) mag.style.display = 'block';
-            });
-
-            ed.addEventListener('touchmove', (e) => {
-                const t = e.touches[0];
-                mag.style.left = (t.clientX - 40) + 'px';
-                mag.style.top = (t.clientY - 120) + 'px';
-                // Note: In a full PWA, we'd draw the textarea's canvas slice here.
-                // For now, it acts as a tactical positioning guide.
-            });
-
-            ed.addEventListener('touchend', () => mag.style.display = 'none');
+        toggleSidebar(s) {
+            const el = document.getElementById(s === 'left' ? 'panel-left' : 'panel-right');
+            el.classList.toggle('open');
+            if (s === 'right' && el.classList.contains('open')) this.runSandbox();
         },
-
-        // --- DRAG & SNAP LOGIC ---
-        initDrag(e, id) {
-            const el = document.getElementById(id);
-            if (el.classList.contains('snapped-right') || el.classList.contains('snapped-bottom')) return;
-            const touch = e.touches[0];
-            let ox = touch.clientX - el.offsetLeft;
-            let oy = touch.clientY - el.offsetTop;
-
-            const move = (me) => {
-                const mt = me.touches[0];
-                el.style.left = (mt.clientX - ox) + 'px';
-                el.style.top = (mt.clientY - oy) + 'px';
-                el.style.right = 'auto'; el.style.bottom = 'auto';
-            };
-            const end = () => {
-                document.removeEventListener('touchmove', move);
-                document.removeEventListener('touchend', end);
-            };
-            document.addEventListener('touchmove', move, { passive: false });
-            document.addEventListener('touchend', end);
-        },
-
-        toggleWidget(id) {
-            const el = document.getElementById(id);
-            const isHidden = el.style.display === 'none';
-            el.style.display = isHidden ? 'flex' : 'none';
-            Nexus.state.widgets[id] = isHidden;
-        },
-
-        snapWidget(id) {
-            const el = document.getElementById(id);
-            if (id === 'kb-monolith') el.classList.toggle('snapped-bottom');
-            else el.classList.toggle('snapped-right');
-        },
-
-        // --- TREB-STYLE INJECTION ENGINE ---
-        injectChar(val) {
-            const ed = document.getElementById('raw-terminal');
-            if (ed.hasAttribute('readonly')) return;
-
-            const start = ed.selectionStart;
-            const end = ed.selectionEnd;
-            
-            // Process specialized markers
-            let processed = val.replace(/\*\+/g, '\t'); // *+ becomes Tab
-            let cursorOffset = processed.indexOf('*#'); // *# is cursor target
-            
-            if (cursorOffset !== -1) {
-                processed = processed.replace(/\*\#/g, '');
-            } else {
-                cursorOffset = processed.length;
-            }
-
-            ed.value = ed.value.substring(0, start) + processed + ed.value.substring(end);
-            
-            const newPos = start + cursorOffset;
-            ed.setSelectionRange(newPos, newPos);
-            ed.focus();
-            
-            Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
-            this.updateGutter();
-        },
-
-        renderKeyboard() {
-            Nexus.state.kbRows.forEach((row, i) => {
-                const container = document.getElementById(`kb-r${i+1}`);
-                // Independent scroll clones
-                const keys = [...row, ...row]; 
-                container.innerHTML = keys.map(k => `
-                    <button class="kb-key" onclick="Nexus.ui.injectChar('${k.replace(/'/g, "\\'")}')">
-                        ${k.replace(/\*\#|\*\+/g, '').toUpperCase()}
-                    </button>
-                `).join('');
-            });
-        },
-
-        // --- SEARCH ENGINE ---
-        toggleSearchOpt(opt) {
-            Nexus.state.search[opt] = !Nexus.state.search[opt];
-            document.getElementById(`${opt}-btn`).classList.toggle('btn-active');
-        },
-
-        execReplace() {
-            const find = document.getElementById('find-input').value;
-            const replace = document.getElementById('replace-input').value;
-            const ed = document.getElementById('raw-terminal');
-            if (!find) return;
-
-            let flags = "g";
-            if (!Nexus.state.search.case) flags += "i";
-
-            try {
-                const searchVal = Nexus.state.search.regex ? new RegExp(find, flags) : find;
-                ed.value = (typeof searchVal === 'string') 
-                    ? ed.value.split(find).join(replace) 
-                    : ed.value.replace(searchVal, replace);
-                
-                Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
-                Nexus.vfs.save();
-                this.updateGutter();
-            } catch (e) { alert("Regex Syntax Error"); }
-        },
-
         toggleEditMode() {
             const ed = document.getElementById('raw-terminal');
             const btn = document.getElementById('lock-btn');
-            const isLocked = ed.hasAttribute('readonly');
-            if (isLocked) {
-                ed.removeAttribute('readonly'); btn.innerText = "🔓 EDIT"; btn.classList.add('btn-active');
+            if (ed.hasAttribute('readonly')) {
+                ed.removeAttribute('readonly'); btn.innerText = "🔓 UNLOCK";
             } else {
-                ed.setAttribute('readonly', true); btn.innerText = "🔒 LOCK"; btn.classList.remove('btn-active');
+                ed.setAttribute('readonly', true); btn.innerText = "🔒 LOCK";
             }
             this.updateStatus();
         },
-
+        inject(val) {
+            const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return;
+            const s = ed.selectionStart; ed.value = ed.value.substring(0, s) + val + ed.value.substring(ed.selectionEnd);
+            ed.selectionStart = ed.selectionEnd = s + val.length; ed.focus();
+            Nexus.state.vfs[Nexus.state.activeFile] = ed.value; this.updateGutter();
+        },
         updateGutter() {
             const ed = document.getElementById('raw-terminal');
-            const gut = document.getElementById('gutter');
             const lines = ed.value.split('\n').length;
             let h = ''; for (let i = 1; i <= lines; i++) h += i + '<br>';
-            gut.innerHTML = h;
+            document.getElementById('gutter').innerHTML = h;
         },
-
-        updateStatus() {
+        updateStatus(txt, color) {
             const st = document.getElementById('foot-status');
             const locked = document.getElementById('raw-terminal').hasAttribute('readonly');
-            st.innerText = locked ? "LOCKED" : "READY";
-            st.style.color = locked ? "var(--gold)" : "var(--success)";
+            st.innerText = txt || (locked ? "LOCKED" : "READY");
+            st.style.color = color || (locked ? "var(--gold)" : "var(--success)");
         },
-
-        jumpPrompt() {
-            const ln = prompt("Jump to Line:");
-            if (ln) {
-                const ed = document.getElementById('raw-terminal');
-                const lines = ed.value.split('\n');
-                let pos = 0;
-                for (let i = 0; i < Math.min(ln - 1, lines.length); i++) pos += lines[i].length + 1;
-                ed.focus(); ed.setSelectionRange(pos, pos);
-            }
+        renderFiles() {
+            const list = document.getElementById('file-list');
+            list.innerHTML = Object.keys(Nexus.state.vfs).map(fn => `
+                <div class="file-item ${fn === Nexus.state.activeFile ? 'active' : ''}" onclick="Nexus.vfs.switchFile('${fn}')">${fn}</div>
+            `).join('');
         },
-
-        nuke() { if (confirm("☢ NUCLEAR WIPE?")) { localforage.clear().then(() => location.reload()); } }
-    },
-
-    // --- AUTO-WRITER (STORY WEAVER) ---
-    writer: {
-        go() {
-            const count = parseInt(document.getElementById('write-count').value);
-            const mode = document.getElementById('write-mode').value;
-            const status = document.getElementById('writer-status');
-            const ed = document.getElementById('raw-terminal');
-            
-            if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR");
-            
-            status.innerText = "STREAMING...";
-            let current = 0;
-
-            const interval = setInterval(() => {
-                if (current >= count) {
-                    clearInterval(interval);
-                    status.innerText = "FINISHED";
-                    Nexus.vfs.save();
-                    setTimeout(() => { status.innerText = "IDLE"; }, 2000);
-                    return;
-                }
-
-                let word = "";
-                if (mode === 'code') {
-                    const snips = ['const ', 'let ', 'async ', 'await ', 'fetch() ', 'if() ', 'return '];
-                    word = snips[Math.floor(Math.random() * snips.length)];
-                } else if (mode === 'skill') {
-                    const snips = ['pattern ', 'skill ', 'match ', 'sequence ', 'Simon ', 'tracker '];
-                    word = snips[Math.floor(Math.random() * snips.length)];
-                } else {
-                    const words = ['Beyond ', 'Nexus ', 'Sovereign ', 'Logic ', 'Crystal ', 'Code ', 'Digital '];
-                    word = words[Math.floor(Math.random() * words.length)] + " ";
-                }
-
-                Nexus.ui.injectChar(word);
-                current++;
-            }, 60);
-        }
+        runSandbox() {
+            const frame = document.getElementById('sandbox');
+            const code = document.getElementById('raw-terminal').value;
+            frame.srcdoc = `<html><head><style>body{font-family:sans-serif;padding:20px;}<\/style><\/head><body><script type="module">${code}<\/script><\/body></html>`;
+        },
+        initInfiniteRibbon() {
+            const c = document.getElementById('ribbon-container'), t = document.getElementById('ribbon-track');
+            t.innerHTML += t.innerHTML + t.innerHTML;
+            c.scrollLeft = c.scrollWidth / 3;
+            c.onscroll = () => {
+                if (c.scrollLeft >= (c.scrollWidth / 3) * 2) c.scrollLeft = c.scrollWidth / 3;
+                if (c.scrollLeft <= 0) c.scrollLeft = c.scrollWidth / 3;
+            };
+        },
+        nuke() { if (confirm("☢ FACTORY RESET?")) localforage.clear().then(() => location.reload()); }
     }
 };
 
-/* --- GLOBAL LISTENERS --- */
+const WidgetEngine = {
+    // Configuration Data
+    kbData: [
+        ['<script>*#<\/script>', '<style>*#<\/style>', '<div id="*#"><\/div>', '/* *# */'],
+        ['{ *# }', '( *# )', '[ *# ]', '="*#"', '=> { *# }', ';'],
+        ['const *# = ', 'let *# = ', 'function *#()', 'if (*#)', 'return ']
+    ],
+
+    init() {
+        this.renderKeyboard();
+    },
+
+    // Kinetic Dragging
+    initDrag(e, id) {
+        const el = document.getElementById(id);
+        if (el.classList.contains('snapped-right') || el.classList.contains('snapped-bottom')) return;
+        const touch = e.touches[0];
+        let ox = touch.clientX - el.offsetLeft;
+        let oy = touch.clientY - el.offsetTop;
+
+        const move = (me) => {
+            const mt = me.touches[0];
+            el.style.left = (mt.clientX - ox) + 'px';
+            el.style.top = (mt.clientY - oy) + 'px';
+            el.style.right = 'auto'; el.style.bottom = 'auto';
+        };
+        const end = () => {
+            document.removeEventListener('touchmove', move);
+            document.removeEventListener('touchend', end);
+        };
+        document.addEventListener('touchmove', move, { passive: false });
+        document.addEventListener('touchend', end);
+    },
+
+    // Edge Snapping
+    snap(id) {
+        const el = document.getElementById(id);
+        if (id === 'kb-monolith') el.classList.toggle('snapped-bottom');
+        else el.classList.toggle('snapped-right');
+    },
+
+    // The Shortcutter Engine
+    inject(val) {
+        const ed = document.getElementById('raw-terminal'); // Target Editor ID
+        if (!ed) return;
+        
+        const start = ed.selectionStart;
+        let processed = val.replace(/\*\+/g, '\t'); 
+        let cursorOffset = processed.indexOf('*#');
+        
+        if (cursorOffset !== -1) {
+            processed = processed.replace(/\*\#/g, '');
+        } else {
+            cursorOffset = processed.length;
+        }
+
+        ed.value = ed.value.substring(0, start) + processed + ed.value.substring(ed.selectionEnd);
+        const newPos = start + cursorOffset;
+        ed.setSelectionRange(newPos, newPos);
+        ed.focus();
+    },
+
+    renderKeyboard() {
+        this.kbData.forEach((row, i) => {
+            const container = document.getElementById(`kb-r${i+1}`);
+            if (!container) return;
+            const keys = [...row, ...row]; // Infinity clone
+            container.innerHTML = keys.map(k => {
+                const label = k.replace(/\*\#|\*\+/g, '').replace('<', '&lt;').replace('>', '&gt;');
+                return `<button class="kb-key" onclick="WidgetEngine.inject('${k.replace(/'/g, "\\'")}')">${label.toUpperCase()}</button>`;
+            }).join('');
+        });
+    },
+
+    undo() { document.execCommand('undo'); },
+    redo() { document.execCommand('redo'); }
+};
+
+// Auto-boot
+window.addEventListener('DOMContentLoaded', () => WidgetEngine.init());
+
 const editor = document.getElementById('raw-terminal');
 const gutter = document.getElementById('gutter');
-
-editor.oninput = () => { 
-    Nexus.state.vfs[Nexus.state.activeFile] = editor.value; 
-    Nexus.ui.updateGutter(); 
-};
+editor.oninput = () => { Nexus.state.vfs[Nexus.state.activeFile] = editor.value; Nexus.ui.updateGutter(); };
 editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
-
-window.addEventListener('DOMContentLoaded', () => { Nexus.ui.boot(); });
+window.addEventListener('DOMContentLoaded', () => Nexus.ui.boot());
 </script>
 </body>
 </html>
