@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0d1117">
+    <title>DevOS Nexus Prime v40.0 - Dual Engine</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+            --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
+            --success: #3fb950; --warn: #d29922; --danger: #f85149;
+            --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            --sidebar-w: 88vw; --sidebar-max: 450px;
+        }
+
+        body.outdoor-mode {
+            --bg: #ffffff; --panel: #f6f8fa; --surface: #ffffff;
+            --border: #d0d7de; --text: #24292f; --accent: #0969da;
+            --gold: #9a6700;
+        }
+
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
+
+        #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
+
+        /* --- 1. INFINITE RIBBON --- */
+        #ribbon-container { height: 55px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: scroll; white-space: nowrap; position: relative; z-index: 1000; display: flex; align-items: center; }
+        #ribbon-container::-webkit-scrollbar { display: none; }
+        #ribbon-track { display: inline-flex; padding: 0 10px; gap: 8px; }
+        .tool-btn { padding: 10px 18px; border-radius: 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; letter-spacing: 0.5px; transition: all 0.2s ease; }
+        
+        .btn-edit-lock { color: var(--text); opacity: 0.5; }
+        .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
+        .btn-gold { color: var(--gold); border-color: var(--gold); }
+        .btn-accent { background: var(--accent); color: #fff; border: none; }
+        .btn-danger { background: var(--danger); color: #fff; border: none; }
+
+        /* --- 2. MAIN WORKSPACE --- */
+        #workspace { flex: 1; display: flex; position: relative; overflow: hidden; }
+        #editor-view { flex: 1; display: flex; background: #000; position: relative; }
+        body.outdoor-mode #editor-view { background: #fff; }
+        #gutter { width: 45px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; text-align: right; padding: 15px 10px 15px 0; pointer-events: none; overflow: hidden; height: 100%; }
+        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; }
+        #raw-terminal[readonly] { opacity: 0.4; }
+
+        /* --- 3. SIDEBARS --- */
+        .side-panel { position: fixed; top: 0; bottom: 0; width: var(--sidebar-w); max-width: var(--sidebar-max); background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.9); }
+        .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
+        .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
+        .side-panel.open { transform: translateX(0); }
+        
+        .p-head { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 14px; color: var(--gold); letter-spacing: 1px; }
+        .p-body { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; }
+        .section-label { font-size: 10px; opacity: 0.5; margin: 25px 0 10px 0; text-transform: uppercase; font-weight: 800; letter-spacing: 2px; }
+
+        /* Accordion */
+        .acc-section { margin-bottom: 5px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+        .acc-head { padding: 12px; background: var(--surface); cursor: pointer; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--gold); }
+        .acc-content { display: none; background: var(--bg); }
+        .acc-content.open { display: block; }
+        .active-file { border-left: 3px solid var(--accent); background: rgba(47, 129, 247, 0.1); }
+
+        /* --- 4. SLIDE PANELS --- */
+        #diag-hub { position: fixed; top: 0; left: 0; right: 0; height: 60vh; background: var(--panel); border-bottom: 4px solid var(--danger); z-index: 3000; transform: translateY(-105%); transition: transform 0.4s ease; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
+        #diag-hub.open { transform: translateY(0); }
+
+        #shell-slide { position: fixed; bottom: 0; left: 0; right: 0; height: 100px; background: var(--surface); border-top: 4px solid var(--accent); z-index: 4000; transform: translateY(105%); transition: transform 0.3s ease; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); }
+        #shell-slide.open { transform: translateY(0); }
+        #shell-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; font-size: 18px; outline: none; }
+
+        /* --- 5. MODALS --- */
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 5000; display: none !important; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+        .modal-overlay.active { display: flex !important; }
+        .modal-content { width: 90%; height: 80%; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,1); }
+        .modal-body { flex: 1; padding: 25px; overflow-y: auto; }
+
+        /* --- SANDBOX & CONSOLE --- */
+        #sandbox-wrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
+        #sandbox-frame { flex: 1; border: none; }
+        #ghost-console { height: 35vh; background: #000; color: #3fb950; padding: 15px; font-family: monospace; font-size: 11px; overflow-y: auto; border-top: 3px solid var(--accent); line-height: 1.5; }
+
+        /* --- UI HELPERS --- */
+        .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+        .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; }
+        #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div id="app-root">
+    <nav id="ribbon-container">
+        <div id="ribbon-track">
+            <button class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
+            <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
+            <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
+            <button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ PROVING GROUNDS</button>
+            
+            <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
+            <button class="tool-btn" style="color:var(--danger)" onclick="Nexus.vault.cutAll()">✂️ CUT ALL</button>
+            <button class="tool-btn" style="color:var(--success)" onclick="Nexus.vault.copyAll()">📋 COPY VAULT</button>
+            
+            <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
+            <button class="tool-btn" onclick="Nexus.ui.openModal('merger')">📥 COMPARE & MERGE</button>
+            
+            <button class="tool-btn btn-gold" onclick="Nexus.intel.scan()">🧠 NEURAL INTEL</button>
+            <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
+            <button class="tool-btn" onclick="Nexus.ui.openModal('graph')">🌌 SYSTEM GRAPH</button>
+            
+            <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleSlide('shell')">⌨ SHELL</button>
+            <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️ SUN MODE</button>
+            <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️ SETTINGS</button>
+        </div>
+    </nav>
+
+    <div id="workspace">
+        <div id="editor-view">
+            <div id="gutter">1</div>
+            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.0 // Sovereign Monolith Ready."></textarea>
+        </div>
+    </div>
+
+    <aside id="panel-left" class="side-panel left-p">
+        <div class="p-head"><span>VORTEX EXPLORER</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('left')">&times;</button></div>
+        <div class="p-body">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+                <button class="tool-btn btn-accent" onclick="Nexus.vfs.newFile()">+ NEW FILE</button>
+                <button class="tool-btn btn-gold" onclick="document.getElementById('load-trigger').click()">📂 LOAD FILES</button>
+                <input type="file" id="load-trigger" multiple style="display:none;" onchange="Nexus.vfs.loadFiles(this.files)">
+            </div>
+            <div class="section-label">Virtual File System</div>
+            <div id="accordion-root"></div>
+            <div class="section-label">Project Export</div>
+            <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.vfs.exportToTXT()">📄 EXPORT TO TXT</button>
+            <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.ui.exportZIP()">📦 BUNDLE PROJECT (ZIP)</button>
+        </div>
+    </aside>
+
+    <aside id="panel-right" class="side-panel right-p">
+        <div class="p-head"><span>PROVING GROUNDS</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('right')">&times;</button></div>
+        <div id="sandbox-wrap">
+            <iframe id="sandbox-frame" sandbox="allow-scripts allow-modals"></iframe>
+            <div id="ghost-console"></div>
+        </div>
+        <div style="padding:15px; display:flex; gap:10px;">
+            <button class="tool-btn btn-accent" style="flex:1; padding:15px;" onclick="Nexus.ui.runSandbox()">▶ REFRESH PROCESS</button>
+        </div>
+    </aside>
+
+    <div id="diag-hub">
+        <div class="p-head"><span>SENTINEL DIAGNOSTICS</span><button class="close-x" onclick="Nexus.ui.toggleSlide('diag')">&times;</button></div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding: 0 15px;">
+            <button class="tool-btn btn-danger" onclick="Nexus.sentinel.runLint()">1. DEEP LINT (16+ RULES)</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.sentinel.runMedicString()">2. MEDIC: STRING PATCH</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.sentinel.runMedicAST()">3. MEDIC: AST REBUILD</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.sentinel.scanDeps()">4. SCAN IMPORTS</button>
+        </div>
+        <div id="diag-out" class="p-body" style="background:#000; margin:15px; border-radius:10px; border:1px solid var(--border);">[SENTINEL ENGINE OFFLINE]</div>
+    </div>
+
+    <div id="modal-vault" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>💾 SOVEREIGN VAULT</span><button class="close-x" onclick="Nexus.ui.closeModal('vault')">&times;</button></div>
+            <div class="modal-body">
+                <div style="display:flex; gap:10px; margin-bottom:20px;">
+                    <input type="text" id="vault-search" placeholder="Search..." style="flex:1; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;" oninput="Nexus.vault.render(this.value)">
+                    <button class="tool-btn btn-accent" onclick="Nexus.vault.grab()">+ GRAB</button>
+                </div>
+                <div id="vault-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-merger" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>📥 COMPARE & MERGE</span><button class="close-x" onclick="Nexus.ui.closeModal('merger')">&times;</button></div>
+            <div class="modal-body">
+                <div id="merge-setup">
+                    <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:20px;" onclick="document.getElementById('merge-upload').click()">📂 UPLOAD NEW VERSION</button>
+                    <input type="file" id="merge-upload" style="display:none;" onchange="Nexus.merger.handleUpload(this.files[0])">
+                    <div class="section-label">Internal Snapshots</div>
+                    <div id="merge-snapshot-list"></div>
+                </div>
+                <div id="merge-diff-workspace" style="display:none; height:100%; flex-direction:column; gap:10px;">
+                    <div style="display:flex; flex:1; gap:10px; overflow:hidden;">
+                        <div id="diff-left" style="flex:1; background:#000; overflow:auto; padding:10px; font-size:11px;"></div>
+                        <div id="diff-right" style="flex:1; background:#000; overflow:auto; padding:10px; font-size:11px;"></div>
+                    </div>
+                    <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.merger.apply()">✅ ACCEPT INCOMING</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-dreamer" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>🌙 DREAMER ARCHITECT</span><button class="close-x" onclick="Nexus.ui.closeModal('dreamer')">&times;</button></div>
+            <div class="modal-body">
+                <select id="dreamer-type" style="width:100%; padding:15px; background:var(--bg); border:1px solid var(--border); color:#fff; margin-bottom:10px;" onchange="Nexus.dreamer.updatePreview()">
+                    <option value="btn-tactical">Tactical Button</option>
+                    <option value="card-gold">Gold Data Card</option>
+                    <option value="grid-skill">3x3 Skill Grid</option>
+                </select>
+                <input type="text" id="dreamer-label" placeholder="Label" style="width:100%; padding:15px; margin-bottom:10px;" oninput="Nexus.dreamer.updatePreview()">
+                <input type="text" id="dreamer-id" placeholder="ID" style="width:100%; padding:15px; margin-bottom:20px;">
+                <div id="dreamer-preview" style="min-height:100px; border:1px dashed var(--border); margin-bottom:20px; display:flex; align-items:center; justify-content:center;"></div>
+                <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.dreamer.inject()">⚡ INJECT</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-intel" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>🧠 NEURAL HEURISTICS</span><button class="close-x" onclick="Nexus.ui.closeModal('intel')">&times;</button></div>
+            <div class="modal-body" id="intel-root">
+                <div style="text-align:center; padding:20px; background:rgba(0,0,0,0.2); border-radius:15px; margin-bottom:20px; border:1px solid var(--border);">
+                    <div style="font-size:10px; color:var(--gold); letter-spacing:2px; margin-bottom:10px;">STRUCTURAL INTEGRITY</div>
+                    <div id="intel-health-display" style="font-size:42px; font-weight:900; color:var(--success);">100%</div>
+                    <div style="height:4px; background:var(--surface); border-radius:2px; width:80%; margin:10px auto;">
+                        <div id="intel-health-bar" style="height:100%; width:100%; background:var(--success); border-radius:2px; transition:width 1s ease;"></div>
+                    </div>
+                </div>
+                <div class="section-label">Code Metrics</div>
+                <div id="intel-metrics-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px;"></div>
+                <div class="section-label">Neural Signatures Detected</div>
+                <div id="intel-patterns" style="display:flex; flex-wrap:wrap; gap:8px;"></div>
+            </div>
+            <div style="padding:15px; background:var(--panel); border-top:1px solid var(--border); font-size:10px; color:var(--gold); text-align:center;">
+                SCANNING ACTIVE FILE: <span id="intel-target-name">NONE</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-graph" class="modal-overlay">
+        <div class="modal-content" style="background:#000;">
+            <div class="p-head"><span>🌌 CELESTIAL NAVIGATOR</span><button class="close-x" onclick="Nexus.ui.closeModal('graph')">&times;</button></div>
+            <div id="graph-viewport" style="flex:1;"></div>
+            <div style="padding:10px; font-size:10px; color:var(--gold); text-align:center; background:var(--panel); border-top:1px solid var(--border);">TAP NODES TO WARP</div>
+        </div>
+    </div>
+
+    <div id="modal-settings" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>⚙️ SETTINGS & PERSISTENCE</span><button class="close-x" onclick="Nexus.ui.closeModal('settings')">&times;</button></div>
+            <div class="modal-body">
+                <div class="item-row"><span>Font Size (px)</span><input type="number" id="pref-font" onchange="Nexus.settings.update('fontSize', this.value)"></div>
+                <div class="item-row"><span>Tab Width (Spaces)</span><select id="pref-tabs" onchange="Nexus.settings.update('tabWidth', this.value)"><option value="2">2 Spaces</option><option value="4">4 Spaces</option></select></div>
+                <div class="section-label">Vortex Storage Metrics</div>
+                <div class="item-row"><span>VFS Payload:</span> <span id="metric-vfs">0 KB</span></div>
+                <div class="item-row"><span>Vault Payload:</span> <span id="metric-vault">0 KB</span></div>
+                <div class="item-row"><span>Snapshots Active:</span> <span id="metric-snaps">0</span></div>
+                <div class="section-label" style="color:var(--danger)">Nuclear Authorization</div>
+                <button class="tool-btn btn-danger" style="width:100%; padding:18px; font-weight:900;" onclick="Nexus.ui.nuke()">☢ DATA WIPE (FACTORY RESET)</button>
+            </div>
+        </div>
+    </div>
+
+    <footer id="footer">
+        <div id="foot-file">FILE: main.js</div>
+        <div style="margin-left:auto; display:flex; gap:25px;">
+            <span id="foot-pos">LN 1, COL 1</span>
+            <span id="foot-status" style="letter-spacing:1px;">LOCKED</span>
+        </div>
+    </footer>
+</div>
+
+<script>
+window.Nexus = {
+    state: {
+        vfs: { "main.js": "// Nexus Core v40.0 Initialized.\nconsole.log('Sovereign Systems Online.');" },
+        originals: {}, vault: [], snapshots: [], activeFile: "main.js",
+        prefs: { fontSize: 14, tabWidth: 2 }
+    },
+
+    vfs: {
+        async boot() {
+            const vfs = await localforage.getItem('nexus_vfs_v40');
+            const orig = await localforage.getItem('nexus_originals_v40');
+            if (vfs) Nexus.state.vfs = vfs;
+            if (orig) Nexus.state.originals = orig;
+            Object.keys(Nexus.state.vfs).forEach(fn => { if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn]; });
+            this.renderAccordion(); this.switchFile(Nexus.state.activeFile);
+        },
+        async save() {
+            await localforage.setItem('nexus_vfs_v40', Nexus.state.vfs);
+            await localforage.setItem('nexus_originals_v40', Nexus.state.originals);
+            document.getElementById('foot-status').style.textShadow = "0 0 10px var(--success)";
+        },
+        switchFile(fn) {
+            Nexus.state.activeFile = fn;
+            const ed = document.getElementById('raw-terminal');
+            ed.value = Nexus.state.vfs[fn] || "";
+            document.getElementById('foot-file').innerText = "FILE: " + fn.toUpperCase();
+            this.renderAccordion(); Nexus.ui.updateGutter();
+            if (Nexus.sentinel) Nexus.sentinel.pulse();
+        },
+        newFile() {
+            const n = prompt("Filename:");
+            if (n) { Nexus.state.vfs[n] = ""; Nexus.state.originals[n] = ""; this.switchFile(n); this.save(); }
+        },
+        deleteFile(fn) {
+            if (confirm(`☢ Delete ${fn}?`)) { delete Nexus.state.vfs[fn]; delete Nexus.state.originals[fn]; this.switchFile(Object.keys(Nexus.state.vfs)[0] || "main.js"); this.save(); }
+        },
+        loadFiles(fileList) {
+            Array.from(fileList).forEach(file => {
+                const r = new FileReader();
+                r.onload = (e) => { Nexus.state.vfs[file.name] = e.target.result; Nexus.state.originals[file.name] = e.target.result; this.renderAccordion(); this.save(); };
+                r.readAsText(file);
+            });
+        },
+        refreshCurrent() {
+            const fn = Nexus.state.activeFile;
+            if (confirm(`🔄 Restore ${fn} to its original state?`)) { Nexus.state.vfs[fn] = Nexus.state.originals[fn]; this.switchFile(fn); this.save(); }
+        },
+        exportToTXT() {
+            let b = `/* NEXUS FLAT BUNDLE | ${new Date().toLocaleString()} */\n\n`;
+            Object.entries(Nexus.state.vfs).forEach(([n, c]) => b += `\n/* FILE: ${n} */\n${c}\n`);
+            const blob = new Blob([b], { type: 'text/plain' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Nexus_v40_Backup.txt`; a.click();
+        },
+        renderAccordion() {
+            const root = document.getElementById('accordion-root'); if (!root) return; const groups = {};
+            Object.keys(Nexus.state.vfs).forEach(fn => { const ext = fn.split('.').pop().toLowerCase(); if (!groups[ext]) groups[ext] = []; groups[ext].push(fn); });
+            root.innerHTML = Object.entries(groups).map(([ext, files]) => `
+                <div class="acc-section">
+                    <div class="acc-head" onclick="this.nextElementSibling.classList.toggle('open')"><span>.${ext.toUpperCase()}</span> <span>${files.length}</span></div>
+                    <div class="acc-content open">${files.map(fn => `<div class="item-row ${fn === Nexus.state.activeFile ? 'active-file' : ''}" onclick="Nexus.vfs.switchFile('${fn}')"><span>${fn}</span><span style="color:var(--danger); font-size:18px;" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span></div>`).join('')}</div>
+                </div>
+            `).join('');
+        }
+    },
+
+    vault: {
+        async boot() { const saved = await localforage.getItem('nexus_vault_v40'); if (saved) Nexus.state.vault = saved; this.render(); },
+        save() { localforage.setItem('nexus_vault_v40', Nexus.state.vault); },
+        grab() { const ed = document.getElementById('raw-terminal'); const code = ed.value.substring(ed.selectionStart, ed.selectionEnd) || ed.value; const name = prompt("Snippet Name:"); if (name) { Nexus.state.vault.push({ name, code }); this.save(); this.render(); } },
+        inject(i) { const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return alert("LOCKED"); const pos = ed.selectionStart; ed.value = ed.value.substring(0, pos) + Nexus.state.vault[i].code + ed.value.substring(ed.selectionEnd); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); Nexus.ui.closeModal('vault'); },
+        cutAll() { if (confirm("✂ Clear Vault?")) { Nexus.state.vault = []; this.save(); this.render(); } },
+        async copyAll() { let b = ""; Nexus.state.vault.forEach(s => b += `// ${s.name}\n${s.code}\n\n`); await navigator.clipboard.writeText(b); alert("Vault Copied to Clipboard."); },
+        render(q = "") { const c = document.getElementById('vault-content'); if (!c) return; const f = Nexus.state.vault.filter(s => s.name.toLowerCase().includes(q.toLowerCase())); c.innerHTML = f.map((s, i) => `<div class="item-row" style="flex-direction:column; align-items:flex-start;"><div style="display:flex; justify-content:space-between; width:100%;"><strong>${s.name}</strong><div style="display:flex; gap:8px;"><button class="tool-btn btn-accent" onclick="Nexus.vault.inject(${i})">INJECT</button><button class="tool-btn btn-danger" onclick="Nexus.vault.deleteSnippet(${i})">&times;</button></div></div></div>`).join('') || "Vault Empty."; },
+        deleteSnippet(i) { Nexus.state.vault.splice(i,1); this.save(); this.render(); }
+    },
+
+    snapshots: {
+        async boot() { const saved = await localforage.getItem('nexus_snapshots_v40'); if (saved) Nexus.state.snapshots = saved; this.render(); },
+        save() { localforage.setItem('nexus_snapshots_v40', Nexus.state.snapshots); },
+        create() { Nexus.state.snapshots.push({ time: new Date().toLocaleTimeString(), data: JSON.parse(JSON.stringify(Nexus.state.vfs)) }); if (Nexus.state.snapshots.length > 10) Nexus.state.snapshots.shift(); this.save(); this.render(); alert("Snapshot Created."); },
+        render() { const m = document.getElementById('merge-snapshot-list'); if (m) m.innerHTML = Nexus.state.snapshots.map((s, i) => `<div class="item-row" onclick="Nexus.merger.initiate(Nexus.state.snapshots[${i}].data['${Nexus.state.activeFile}'])"><span>${s.time}</span> <span style="color:var(--gold)">DIFF →</span></div>`).reverse().join('') || "No Snapshots."; }
+    },
+
+    merger: {
+        incomingData: "",
+        handleUpload(file) { const r = new FileReader(); r.onload = (e) => this.initiate(e.target.result); r.readAsText(file); },
+        initiate(incoming) {
+            this.incomingData = incoming; const cur = Nexus.state.vfs[Nexus.state.activeFile] || ""; const left = document.getElementById('diff-left'), right = document.getElementById('diff-right'); const iL = incoming.split('\n'), cL = cur.split('\n'); const max = Math.max(iL.length, cL.length); let hL = "", hR = "";
+            for (let i = 0; i < max; i++) { const l = iL[i] || "", r = cL[i] || ""; if (l === r) { hL += `<div>${i+1} ${l.replace(/</g, "&lt;")}</div>`; hR += `<div>${i+1} ${r.replace(/</g, "&lt;")}</div>`; } else { hL += `<div style="background:rgba(63,185,80,0.2); color:var(--success);">${i+1} + ${l.replace(/</g, "&lt;")}</div>`; hR += `<div style="background:rgba(248,81,73,0.2); color:var(--danger);">${i+1} - ${r.replace(/</g, "&lt;")}</div>`; } }
+            left.innerHTML = hL; right.innerHTML = hR; document.getElementById('merge-setup').style.display = 'none'; document.getElementById('merge-diff-workspace').style.display = 'flex';
+        },
+        apply() { if (document.getElementById('raw-terminal').hasAttribute('readonly')) return alert("LOCKED"); Nexus.state.vfs[Nexus.state.activeFile] = this.incomingData; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile); Nexus.ui.closeModal('merger'); }
+    },
+
+    // --- SENTINEL DUAL ENGINE (COMPLETE UNABRIDGED SUPER-FIXER v3.5) ---
+    sentinel: {
+        engine: null,
+
+        initEngine() {
+            if (this.engine) return;
+            class DevOSSentinelDual {
+                constructor() { 
+                    this.registry = []; 
+                    this.declarations = new Map();
+                    this.references = new Set();
+                    this.magicNumbers = new Map();
+                    this.initDefaultCheckers(); 
+                }
+
+                initDefaultCheckers() {
+                    // --- 1. AUTO-FIXERS (Run by Medic & Lint) ---
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'UnaryExpression' && node.operator === '!' && node.argument?.type === 'UnaryExpression' && node.argument.operator === '!') {
+                                return { 
+                                    id: 'LOGIC_FLIP', message: "Clarity: '!!' is less readable than Boolean() cast.", severity: 'LOW', range: node.range,
+                                    replacement: `Boolean(${globalThis.codeContext.substring(node.argument.argument.range[0], node.argument.argument.range[1])})`,
+                                    mutate: () => { node.type = 'CallExpression'; node.callee = { type: 'Identifier', name: 'Boolean' }; node.arguments = [ node.argument.argument ]; delete node.operator; delete node.prefix; delete node.argument; }
+                                };
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'IfStatement' && node.test?.type === 'Literal' && node.test.value === false) {
+                                return { 
+                                    id: 'DEAD_CODE', message: "Dead Branch: Removed unreachable code.", severity: 'LOW', range: node.range,
+                                    replacement: `/* Dead Code Removed */`,
+                                    mutate: () => { node.type = 'EmptyStatement'; delete node.test; delete node.consequent; delete node.alternate; }
+                                };
+                            }
+                        }
+                    });
+
+                    // --- 2. DIAGNOSTICS ONLY (Run by Deep Lint) ---
+                    this.use({
+                        check: (node) => {
+                            if (['WhileStatement', 'ForStatement'].includes(node.type)) {
+                                if (node.test?.value === true && !this.findInNode(node.body, 'BreakStatement')) {
+                                    return { id: 'INF_LOOP', message: "Infinite Loop Risk: No break statement found.", severity: 'CRITICAL', range: node.range };
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node, parent, context) => {
+                            if (node.type === 'FunctionDeclaration' && node.id) context.currentFunctionName = node.id.name;
+                            if (node.type === 'CallExpression' && node.callee.name === context.currentFunctionName) {
+                                let isGuarded = false; let tracer = node.parent;
+                                while (tracer && tracer.type !== 'FunctionDeclaration') {
+                                    if (['IfStatement', 'SwitchStatement', 'ConditionalExpression'].includes(tracer.type)) { isGuarded = true; break; }
+                                    tracer = tracer.parent;
+                                }
+                                if (!isGuarded) return { id: 'STACK_OVERFLOW', message: `Recursion Risk: '${node.callee.name}' calls itself without an exit guard.`, severity: 'CRITICAL', range: node.range };
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
+                                const name = node.id.name.toLowerCase(); const val = node.init?.value;
+                                if ((name.includes('key') || name.includes('secret')) && typeof val === 'string' && val.length > 10) {
+                                    return { id: 'SEC_LEAK', message: `Security: Hardcoded secret '${node.id.name}'. Move to .env.`, severity: 'HIGH', range: node.range };
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'AssignmentExpression' && node.right.type === 'MemberExpression') {
+                                const sink = node.left.property?.name || node.left.name;
+                                if (['innerHTML', 'outerHTML', 'insertAdjacentHTML'].includes(sink)) {
+                                    return { id: 'TAINT_FLOW', message: `XSS Risk: Flow into '${sink}'. Use textContent or sanitize.`, severity: 'CRITICAL', range: node.range };
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'Literal' && typeof node.value === 'string') {
+                                if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/.test(node.value)) {
+                                    return { id: 'PII_LEAK', message: "Privacy Risk: Potential PII (Email) detected in string.", severity: 'HIGH', range: node.range };
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            const risky = ['eval', 'setTimeout', 'setInterval', 'Function'];
+                            if (node.type === 'CallExpression' && risky.includes(node.callee.name)) {
+                                if (node.arguments[0]?.type === 'Literal' && typeof node.arguments[0].value === 'string') {
+                                    return { id: 'EVAL_CODE', message: `Security Risk: '${node.callee.name}' using a string argument.`, severity: 'CRITICAL', range: node.range };
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node, parent, context) => {
+                            if ((node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression') && node.async) context.inAsync = true;
+                            if (context?.inAsync && ['WhileStatement', 'ForStatement'].includes(node.type)) {
+                                if (!this.findInNode(node.body, 'AwaitExpression')) {
+                                    return { id: 'ASYNC_FREEZE', message: "UI Thread Alert: Async loop missing 'await'. Tab will freeze.", severity: 'CRITICAL', range: node.range };
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            const triggers = ['offsetWidth', 'offsetHeight', 'getBoundingClientRect', 'getComputedStyle'];
+                            const prop = node.property?.name || node.callee?.property?.name;
+                            if (triggers.includes(prop)) {
+                                let tracer = node.parent;
+                                while (tracer) {
+                                    if (['ForStatement', 'WhileStatement'].includes(tracer.type)) return { id: 'LAYOUT_THRASH', message: "Performance: Layout read inside loop causing thrashing.", severity: 'HIGH', range: node.range };
+                                    tracer = tracer.parent;
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (['ForStatement', 'WhileStatement', 'ForOfStatement'].includes(node.type)) {
+                                if (this.findInNode(node.body, 'CallExpression', (n) => n.callee.name === 'fetch' || n.callee.property?.name === 'query')) {
+                                    return { id: 'N_PLUS_ONE', message: "Performance: Network call inside loop (N+1 Risk).", severity: 'HIGH', range: node.range };
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'CallExpression' && node.callee.name === 'fetch') {
+                                let tracer = node.parent; let inTry = false;
+                                while (tracer) { if (tracer.type === 'TryStatement') { inTry = true; break; } tracer = tracer.parent; }
+                                if (!inTry) return { id: 'OFFLINE_FAIL', message: "PWA Reliability: 'fetch' outside try/catch will crash offline.", severity: 'CRITICAL', range: node.range };
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'CallExpression' && node.callee.name === 'setInterval') {
+                                const delay = node.arguments[1]?.value;
+                                if (delay && delay < 100) return { id: 'BATTERY_DRAIN', message: "Efficiency: High-frequency interval drains battery.", severity: 'MEDIUM', range: node.range };
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node, parent) => {
+                            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') this.declarations.set(node.id.name, node);
+                            if (node.type === 'FunctionDeclaration' && node.id) this.declarations.set(node.id.name, node);
+                            
+                            if (node.type === 'Identifier') {
+                                const isUsage = parent && !['VariableDeclarator', 'FunctionDeclaration'].includes(parent.type) &&
+                                                !(parent.type === 'MemberExpression' && parent.property === node);
+                                if (isUsage) this.references.add(node.name);
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
+                                let tracer = node.parent;
+                                while (tracer) {
+                                    if (['FunctionDeclaration', 'Program'].includes(tracer.type)) {
+                                        if (this.findDeclarationsInScope(tracer, node.id.name, node)) {
+                                            return { id: 'SHADOW_VAR', message: `Ambiguity: '${node.id.name}' shadows an outer scope variable.`, severity: 'MEDIUM', range: node.range };
+                                        }
+                                    }
+                                    tracer = tracer.parent;
+                                }
+                            }
+                        }
+                    });
+
+                    this.use({
+                        check: (node) => {
+                            if (node.type === 'Literal' && typeof node.value === 'number' && ![0, 1, -1].includes(node.value)) {
+                                const count = (this.magicNumbers.get(node.value) || 0) + 1;
+                                this.magicNumbers.set(node.value, count);
+                                if (count > 2) return { id: 'MAGIC_NUMBER', message: `Magic Number: '${node.value}' used repeatedly. Define as a constant.`, severity: 'LOW', range: node.range };
+                            }
+                        }
+                    });
+                }
+
+                use(checkerObj) { this.registry.push(checkerObj); }
+
+                analyzeAndMutate(code, mode) {
+                    globalThis.codeContext = code; 
+                    const issues = [];
+                    this.declarations.clear(); this.references.clear(); this.magicNumbers.clear();
+                    if (typeof acorn === 'undefined') throw new Error("Acorn Parser Missing.");
+
+                    const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true, ranges: true });
+                    const context = { inAsync: false, currentFunctionName: null };
+                    
+                    this.traverse(ast, (node, parent) => {
+                        this.registry.forEach(rule => {
+                            const result = rule.check(node, parent, context);
+                            if (result) {
+                                issues.push({ ...result, line: node.loc?.start.line });
+                                if (mode === 'AST_REBUILD' && result.mutate) result.mutate();
+                            }
+                        });
+                    });
+
+                    if (mode === 'LINT_ONLY') {
+                        for (const [name, node] of this.declarations) {
+                            if (!this.references.has(name)) {
+                                issues.push({ id: 'ZOMBIE_CODE', message: `Unused declaration: '${name}' is never called.`, severity: 'LOW', line: node.loc?.start.line });
+                            }
+                        }
+                    }
+
+                    return { issues, ast };
+                }
+
+                traverse(node, callback, parent = null) {
+                    if (!node) return;
+                    node.parent = parent; callback(node, parent);
+                    for (const key in node) {
+                        const child = node[key];
+                        if (child && typeof child === 'object') {
+                            if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node));
+                            else this.traverse(child, callback, node);
+                        }
+                    }
+                }
+
+                findInNode(node, type, filter = () => true) {
+                    let found = false;
+                    this.traverse(node, (n) => { if (n.type === type && filter(n)) found = true; });
+                    return found;
+                }
+
+                findDeclarationsInScope(scopeNode, name, originalNode) {
+                    let found = false;
+                    this.traverse(scopeNode, (child) => {
+                        if (child === originalNode) return;
+                        if (child.type === 'VariableDeclarator' && child.id.name === name) found = true;
+                        if (child.type === 'FunctionDeclaration' && child.id?.name === name) found = true;
+                    });
+                    return found;
+                }
+            }
+            this.engine = new DevOSSentinelDual();
+        },
+
+        runMedicString() {
+            try {
+                this.initEngine();
+                let code = Nexus.state.vfs[Nexus.state.activeFile];
+                const { issues } = this.engine.analyzeAndMutate(code, 'STRING_PATCH');
+                
+                const fixableIssues = issues.filter(i => i.range && i.replacement !== undefined);
+                if (fixableIssues.length === 0) return this.log("[MEDIC] Structure secure. No auto-fixes needed.", "success");
+
+                fixableIssues.sort((a, b) => b.range[0] - a.range[0]);
+                fixableIssues.forEach(issue => { code = code.substring(0, issue.range[0]) + issue.replacement + code.substring(issue.range[1]); });
+
+                Nexus.state.vfs[Nexus.state.activeFile] = code; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
+                this.log(`[MEDIC STRING] Applied ${fixableIssues.length} surgical fixes.`, "gold");
+            } catch(e) { this.log(`[MEDIC] Error: ${e.message}`, "danger"); }
+        },
+
+        runMedicAST() {
+            try {
+                this.initEngine();
+                if (typeof astring === 'undefined') throw new Error("Astring Missing.");
+                
+                let code = Nexus.state.vfs[Nexus.state.activeFile];
+                const { issues, ast } = this.engine.analyzeAndMutate(code, 'AST_REBUILD');
+                
+                const fixableIssues = issues.filter(i => i.mutate !== undefined);
+                if (fixableIssues.length === 0) return this.log("[MEDIC] Structure secure. No auto-fixes needed.", "success");
+
+                const generatedCode = astring.generate(ast);
+                Nexus.state.vfs[Nexus.state.activeFile] = generatedCode; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
+                this.log(`[MEDIC AST] Rebuilt AST. Applied ${fixableIssues.length} logic fixes.`, "gold");
+            } catch(e) { this.log(`[MEDIC] Error: ${e.message}`, "danger"); }
+        },
+
+        runLint() {
+            this.initEngine();
+            try {
+                const code = Nexus.state.vfs[Nexus.state.activeFile];
+                const { issues } = this.engine.analyzeAndMutate(code, 'LINT_ONLY');
+                if (issues.length > 0) {
+                    let h = `<div style="color:var(--danger); font-weight:bold;">${issues.length} ISSUES FOUND</div>`;
+                    issues.forEach(e => { h += `<div class="item-row" style="align-items:flex-start; flex-direction:column;"><strong>LN ${e.line || '?'}: ${e.id}</strong><span style="opacity:0.7; margin-top:5px;">${e.message}</span></div>`; });
+                    document.getElementById('diag-out').innerHTML = h;
+                } else { this.log("DEEP LINT: Logic is clean.", "success"); }
+            } catch(e) { this.log(`[LINT] Error: ${e.message}`, "danger"); }
+        },
+
+        scanDeps() {
+            const code = Nexus.state.vfs[Nexus.state.activeFile]; const depRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:src=['"]([^'"]+)['"])/g;
+            let res = "<strong>VFS DEP SCAN:</strong><br>"; let m; while ((m = depRegex.exec(code)) !== null) { const p = (m[1] || m[2]).replace('./', ''); const ok = Nexus.state.vfs[p]; res += `<div class="item-row"><span>${p}</span><span style="color:var(--${ok?'success':'danger'})">${ok?'[RESOLVED]':'[BROKEN]'}</span></div>`; }
+            document.getElementById('diag-out').innerHTML = res;
+        },
+
+        renderBranches() {
+            const groups = {}; Object.keys(Nexus.state.vfs).forEach(fn => { const ext = fn.split('.').pop().toUpperCase(); if (!groups[ext]) groups[ext] = []; groups[ext].push(fn); });
+            let h = "<strong>🌳 VFS BRANCHES TREE:</strong><br>"; Object.entries(groups).forEach(([ext, files]) => { h += `<div style="color:var(--gold); margin-top:10px;">.${ext} MODULES</div>`; files.forEach(f => h += `<div style="padding-left:15px; font-size:11px; opacity:0.8;">↳ ${f}</div>`); });
+            document.getElementById('diag-out').innerHTML = h;
+        },
+
+        pulse() {
+            const ed = document.getElementById('raw-terminal'); const btn = document.querySelector('button[onclick*="runMedic"]'); if (!btn) return;
+            try { new Function(ed.value); document.querySelectorAll('button[onclick*="runMedic"]').forEach(b=>{b.style.boxShadow="none";b.style.color="var(--gold)";}); } 
+            catch (e) { document.querySelectorAll('button[onclick*="runMedic"]').forEach(b=>{b.style.boxShadow="0 0 15px var(--danger)";b.style.color="var(--danger)";}); }
+        },
+
+        log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
+    },
+
+    intel: {
+        scan() {
+            const code = Nexus.state.vfs[Nexus.state.activeFile] || ""; const lines = code.split('\n').length; const funcs = (code.match(/function\s+|=>/g) || []).length; const branches = (code.match(/if\s*\(|else|for\s*\(|while\s*\(|switch\s*\(|&&|\|\|/g) || []).length; const variables = (code.match(/const\s+|let\s+|var\s+/g) || []).length;
+            const complexityIndex = branches > 0 ? (branches / lines).toFixed(2) : 0; const health = Math.max(0, Math.min(100, 100 - (complexityIndex * 150))); const healthColor = health > 80 ? 'var(--success)' : (health > 50 ? 'var(--warn)' : 'var(--danger)');
+            const patterns = []; if (code.includes('simon') || code.includes('sequence')) patterns.push('MEM-CHAIN'); if (code.includes('skill') || code.includes('machine')) patterns.push('SKILL-DRIVE'); if (code.includes('localforage')) patterns.push('VFS-SYNC'); if (code.includes('canvas')) patterns.push('GHOST-GFX');
+            document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase(); document.getElementById('intel-health-display').innerText = Math.floor(health) + "%"; document.getElementById('intel-health-display').style.color = healthColor; document.getElementById('intel-health-bar').style.width = health + "%"; document.getElementById('intel-health-bar').style.background = healthColor;
+            document.getElementById('intel-metrics-grid').innerHTML = `<div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">LOGIC NODES</span><span style="font-size:16px; font-weight:bold;">${branches}</span></div><div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">MODULES</span><span style="font-size:16px; font-weight:bold;">${funcs}</span></div><div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">REFS</span><span style="font-size:16px; font-weight:bold;">${variables}</span></div><div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">LINES</span><span style="font-size:16px; font-weight:bold;">${lines}</span></div>`;
+            document.getElementById('intel-patterns').innerHTML = patterns.map(p => `<span style="padding:4px 10px; background:var(--gold); color:#000; border-radius:20px; font-size:9px; font-weight:900;">${p}</span>`).join('') || "NO SIGNATURES";
+            Nexus.ui.openModal('intel');
+        }
+    },
+
+    dreamer: {
+        templates: { 'btn-tactical': (l, id) => `<button id="${id || 'btn-01'}" class="tool-btn btn-gold">${l || 'BTN'}</button>`, 'card-gold': (l, id) => `<div id="${id || 'card-01'}" class="item-row" style="border:1px solid var(--gold); padding:10px;"><strong>${l || 'DATA'}</strong></div>`, 'grid-skill': (l, id) => `<div id="${id || 'grid-01'}" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button class="tool-btn" style="height:60px;">${i+1}</button>`).join('')}</div>` },
+        updatePreview() { const t = document.getElementById('dreamer-type').value, l = document.getElementById('dreamer-label').value, p = document.getElementById('dreamer-preview'); if (p) p.innerHTML = this.templates[t](l, 'preview-id'); },
+        inject() { const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return alert("LOCKED"); const t = document.getElementById('dreamer-type').value, l = document.getElementById('dreamer-label').value, id = document.getElementById('dreamer-id').value; const code = `\n\n` + this.templates[t](l, id) + `\n`; const pos = ed.selectionStart; ed.value = ed.value.substring(0, pos) + code + ed.value.substring(ed.selectionEnd); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); Nexus.ui.closeModal('dreamer'); Nexus.ui.updateGutter(); }
+    },
+
+    graph: {
+        render() {
+            const c = document.getElementById('graph-viewport'); if (!c) return; const f = Object.keys(Nexus.state.vfs), w = c.clientWidth || 300, h = c.clientHeight || 400, cx = w/2, cy = h/2, r = Math.min(w, h) * 0.35;
+            let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="background:#000;"><circle cx="${cx}" cy="${cy}" r="15" fill="none" stroke="var(--gold)" stroke-width="2"><animate attributeName="r" values="12;16;12" dur="3s" repeatCount="indefinite" /></circle>`;
+            f.forEach((fn, i) => { const a = (i / f.length) * Math.PI * 2, x = cx + r * Math.cos(a), y = cy + r * Math.sin(a), active = (fn === Nexus.state.activeFile); svg += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${active ? 'var(--accent)' : 'var(--border)'}" opacity="0.4" /><g onclick="Nexus.vfs.switchFile('${fn}'); Nexus.ui.closeModal('graph');" style="cursor:pointer;"><circle cx="${x}" cy="${y}" r="8" fill="${active ? 'var(--accent)' : 'var(--panel)'}" /><text x="${x}" y="${y+20}" fill="#fff" font-size="9" text-anchor="middle">${fn}</text></g>`; });
+            c.innerHTML = svg + `</svg>`;
+        }
+    },
+
+    settings: {
+        async boot() { const saved = await localforage.getItem('nexus_prefs_v40'); if (saved) Nexus.state.prefs = saved; this.apply(); },
+        update(k, v) { Nexus.state.prefs[k] = parseInt(v); localforage.setItem('nexus_prefs_v40', Nexus.state.prefs); this.apply(); },
+        apply() { const ed = document.getElementById('raw-terminal'); if (!ed) return; ed.style.fontSize = Nexus.state.prefs.fontSize + 'px'; ed.style.tabSize = Nexus.state.prefs.tabWidth; },
+        calcStorage() { const getK = (obj) => (JSON.stringify(obj).length / 1024).toFixed(2) + " KB"; document.getElementById('metric-vfs').innerText = getK(Nexus.state.vfs); document.getElementById('metric-vault').innerText = getK(Nexus.state.vault); document.getElementById('metric-snaps').innerText = Nexus.state.snapshots.length; }
+    },
+
+    ui: {
+        async boot() { await Nexus.vfs.boot(); await Nexus.vault.boot(); await Nexus.snapshots.boot(); await Nexus.settings.boot(); Nexus.dreamer.updatePreview(); this.initInfiniteRibbon(); this.initEdgeSwipes(); },
+        initInfiniteRibbon() { const c = document.getElementById('ribbon-container'), t = document.getElementById('ribbon-track'); if (!c || !t) return; t.innerHTML = t.innerHTML + t.innerHTML + t.innerHTML; c.scrollLeft = c.scrollWidth / 3; c.onscroll = () => { const w = c.scrollWidth / 3; if (c.scrollLeft >= w * 2) c.scrollLeft = w; else if (c.scrollLeft <= 0) c.scrollLeft = w; }; },
+        initEdgeSwipes() { let startX = 0; window.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }); window.addEventListener('touchend', (e) => { const d = e.changedTouches[0].clientX - startX; if (startX < 30 && d > 100) this.toggleSidebar('left'); if (startX > window.innerWidth - 30 && d < -100) this.toggleSidebar('right'); }); },
+        toggleEditMode() { const ed = document.getElementById('raw-terminal'); const st = document.getElementById('foot-status'); const btns = document.querySelectorAll('.edit-btn-trigger'); if (ed.hasAttribute('readonly')) { ed.removeAttribute('readonly'); st.innerText = "READY"; st.style.color = "var(--success)"; btns.forEach(btn => { btn.innerHTML = "🔓 EDIT MODE"; btn.classList.replace('btn-edit-lock', 'btn-edit-unlocked'); }); } else { ed.setAttribute('readonly', true); st.innerText = "LOCKED"; st.style.color = "var(--gold)"; btns.forEach(btn => { btn.innerHTML = "🔒 READ ONLY"; btn.classList.replace('btn-edit-unlocked', 'btn-edit-lock'); }); } },
+        toggleSidebar(s) { document.getElementById(s==='left'?'panel-left':'panel-right').classList.toggle('open'); },
+        toggleSlide(t) { document.getElementById(t==='diag'?'diag-hub':'shell-slide').classList.toggle('open'); },
+        openModal(id) { if (id === 'dreamer') Nexus.dreamer.updatePreview(); if (id === 'graph') Nexus.graph.render(); if (id === 'settings') Nexus.settings.calcStorage(); document.getElementById('modal-'+id).classList.add('active'); },
+        closeModal(id) { document.getElementById('modal-'+id).classList.remove('active'); },
+        toggleSun() { document.body.classList.toggle('outdoor-mode'); },
+        updateGutter() { const l = document.getElementById('raw-terminal').value.split('\n').length; document.getElementById('gutter').innerHTML = Array.from({length: l}, (_, i) => i + 1).join('<br>'); },
+        runSandbox() { const f = document.getElementById('sandbox-frame'), c = document.getElementById('ghost-console'); if(!f || !c) return; c.innerHTML = ""; const inj = `<script>console.log = function(){ const d = document.createElement('div'); d.innerText = "> " + Array.from(arguments).join(' '); window.parent.document.getElementById('ghost-console').appendChild(d); };<\/script>`; const safeCode = document.getElementById('raw-terminal').value.replace(/<\/script>/gi, '<\\/script>'); f.srcdoc = inj + `<script type="module">${safeCode}<\/script>`; },
+        async exportZIP() { const status = document.getElementById('foot-status'); status.innerText = "ARCHIVING..."; try { const zip = new JSZip(); const folder = zip.folder("Nexus_Project"); Object.entries(Nexus.state.vfs).forEach(([f, c]) => folder.file(f, c)); const content = await zip.generateAsync({ type: "blob" }); const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = `Nexus_v40_Bundle.zip`; a.click(); status.innerText = "EXPORTED"; setTimeout(() => { status.innerText = "READY"; }, 3000); } catch (e) { alert("Export Fault"); status.innerText = "FAULT"; } },
+        nuke() { if (confirm("☢ FACTORY RESET: All data will be erased!")) { localforage.clear().then(() => location.reload()); } }
+    }
+};
+
+/* --- GLOBAL LISTENERS --- */
+const editor = document.getElementById('raw-terminal');
+const gutter = document.getElementById('gutter');
+editor.oninput = () => { Nexus.state.vfs[Nexus.state.activeFile] = editor.value; Nexus.ui.updateGutter(); Nexus.vfs.save(); Nexus.sentinel.pulse(); };
+editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
+editor.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const s = editor.selectionStart; editor.value = editor.value.substring(0, s) + "  " + editor.value.substring(editor.selectionEnd); editor.selectionStart = editor.selectionEnd = s + 2; } };
+
+window.addEventListener('DOMContentLoaded', async () => { await Nexus.ui.boot(); });
+</script>
+</body>
+</html>
