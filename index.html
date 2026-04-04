@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#0d1117">
-    <title>DevOS Nexus Prime v40.8 - Ultimate Monolith</title>
+    <title>DevOS Nexus Prime v40.9 - Ultimate Monolith</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -189,7 +189,7 @@
     <div id="workspace">
         <div id="editor-view">
             <div id="gutter">1</div>
-            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.8 // Sovereign Monolith Ready."></textarea>
+            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.9 // Sovereign Monolith Ready."></textarea>
         </div>
     </div>
 
@@ -472,12 +472,11 @@ window.Nexus = {
     },
 
     state: {
-        vfs: { "main.js": "// Nexus Core v40.8 Initialized.\nconsole.log('Sovereign Systems Online.');" },
+        vfs: { "main.js": "// Nexus Core v40.9 Initialized.\nconsole.log('Sovereign Systems Online.');" },
         originals: {}, vault: [], snapshots: [], activeFile: "main.js",
         prefs: { 
             fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, 
             customVocab: "Your, custom, words, here",
-            // The structured Object Array replacing the old string arrays
             kbLayouts: {
                 html: [
                     {d: '<div>', i: '<div id="*#"></div>'},
@@ -874,6 +873,7 @@ window.Nexus = {
                     if (!node) return;
                     node.parent = parent; callback(node, parent);
                     for (const key in node) {
+                        if (key === 'parent') continue; // PREVENT CIRCULAR INFINITE RECURSION
                         const child = node[key];
                         if (child && typeof child === 'object') {
                             if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node));
@@ -1033,13 +1033,11 @@ window.Nexus = {
         calcStorage() { const getK = (obj) => (JSON.stringify(obj).length / 1024).toFixed(2) + " KB"; document.getElementById('metric-vfs').innerText = getK(Nexus.state.vfs); document.getElementById('metric-vault').innerText = getK(Nexus.state.vault); document.getElementById('metric-snaps').innerText = Nexus.state.snapshots.length; }
     },
 
-    // NEW KEYBOARD BUILDER ENGINE
     kbEditor: {
         currentLang: 'html',
         tempLayout: {},
         
         open() {
-            // Clone the current master layout so we don't save until user hits 'Save'
             this.tempLayout = JSON.parse(JSON.stringify(Nexus.state.prefs.kbLayouts));
             Nexus.ui.openModal('kb-builder');
             this.render();
@@ -1115,7 +1113,6 @@ window.Nexus = {
             const keys = Nexus.state.prefs.kbLayouts[lang] || [];
             const visibleRows = Nexus.state.prefs.kbRows;
             
-            // Mathematically distribute total keys across configured number of rows
             const chunkSize = Math.ceil(keys.length / visibleRows);
             const rowsData = [];
             for (let i = 0; i < visibleRows; i++) {
@@ -1208,7 +1205,6 @@ window.Nexus = {
                 Nexus.vfs.save();
                 Nexus.ui.updateGutter();
                 
-                // Re-run search to update results box
                 this.execute();
             } catch (e) { alert("Regex Syntax Error in Replace"); }
         }
