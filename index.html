@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.11 - Stable Matrix</title>
+    <title>DevOS Nexus Prime v40.12 - Diagnostics Patched</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -101,7 +101,6 @@
 
         .drag-handle { background: rgba(255,255,255,0.05); cursor: move; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
         
-        /* Utility Grips (Dynamic for Horizontal/Vertical) */
         .util-grip {
             display: flex; align-items: center; justify-content: center;
             background: #21252b; cursor: move; font-size: 14px; line-height: 0.8; letter-spacing: -2px; color: #5c6370;
@@ -120,7 +119,6 @@
         .util-vertical .util-lbl { display: block; font-size: 10px; margin-top: 4px; color: #5c6370; font-weight: bold; }
         .util-vertical .sleek-btn { flex-direction: column; padding: 10px 4px; width: 100%; text-align: center; }
 
-        /* Search Grip */
         .search-grip {
             width: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
             background: #21252b; border-right: 1px solid #181a1f; border-radius: 8px 0 0 8px;
@@ -128,7 +126,6 @@
         }
         .search-grip-x { font-family: sans-serif; font-size: 16px; cursor: pointer; color: #abb2bf; margin-bottom: 10px; }
 
-        /* Sleek Inputs & Buttons */
         .sleek-bar-content { display: flex; padding: 6px; gap: 8px; align-items: center; flex: 1; }
         .sleek-btn {
             background: transparent; border: none; color: #abb2bf; cursor: pointer;
@@ -143,7 +140,6 @@
         }
         .sleek-input::placeholder { color: #8b92a0; font-weight: bold; }
 
-        /* Keyboard Specifics */
         #kb-monolith { background: #21252b; width: 100vw; left: 0; border-radius: 0; border: none; border-top: 1px solid #181a1f; }
         .kb-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #181a1f; }
         .kb-tabs { display: flex; gap: 2px; }
@@ -211,7 +207,7 @@
     <div id="workspace">
         <div id="editor-view">
             <div id="gutter">1</div>
-            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.11 // Stable Matrix Online."></textarea>
+            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.12 // Diagnostics Patched."></textarea>
         </div>
     </div>
 
@@ -274,7 +270,6 @@
                 <span style="font-size:10px; color:var(--gold); font-weight:bold;">AUTO-WRITER</span>
                 <span id="writer-status" style="font-size:9px; opacity:0.5;">IDLE</span>
             </div>
-            
             <div style="display:flex; gap:8px; margin-bottom:8px;">
                 <select id="write-mode" class="sleek-input" style="padding:6px; font-size:11px;">
                     <option value="code">Syntax Elements</option>
@@ -285,7 +280,6 @@
                     <input type="checkbox" id="write-html"> Wrap HTML
                 </label>
             </div>
-            
             <div style="display:flex; gap:5px;">
                 <input type="number" id="write-count" value="10" class="sleek-input" style="width:60px; padding:6px; text-align:center;">
                 <select id="write-unit" class="sleek-input" style="flex:1; padding:6px; font-size:11px;">
@@ -546,7 +540,7 @@ window.Nexus = {
     },
 
     state: {
-        vfs: { "main.js": "// Nexus Core v40.11 Initialized.\nconsole.log('Stable Matrix Online.');" },
+        vfs: { "main.js": "// Nexus Core v40.12 Patched.\nconsole.log('Stable Matrix Online.');" },
         originals: {}, vault: [], snapshots: [], activeFile: "main.js",
         prefs: { 
             fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, utilDock: 'float',
@@ -1015,6 +1009,7 @@ window.Nexus = {
         },
 
         runMedicString() {
+            if (Nexus.state.activeFile.toLowerCase().endsWith('.html')) return this.log("[MEDIC] Auto-Fix blocked: Extract code to a .js file to prevent HTML corruption.", "warn");
             try {
                 this.initEngine();
                 let code = Nexus.state.vfs[Nexus.state.activeFile];
@@ -1045,6 +1040,7 @@ window.Nexus = {
         },
 
         runMedicAST() {
+            if (Nexus.state.activeFile.toLowerCase().endsWith('.html')) return this.log("[MEDIC] Auto-Fix blocked: Extract code to a .js file to prevent HTML corruption.", "warn");
             try {
                 this.initEngine();
                 if (typeof astring === 'undefined') throw new Error("Astring Missing.");
@@ -1064,26 +1060,76 @@ window.Nexus = {
         runLint() {
             this.initEngine();
             try {
-                const code = Nexus.state.vfs[Nexus.state.activeFile];
+                let code = Nexus.state.vfs[Nexus.state.activeFile];
+                let isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
+                let lineOffset = 0;
+                
+                if (isHtml) {
+                    const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+                    if (!match) return this.log("DEEP LINT: No inline JavaScript found to analyze.", "success");
+                    code = match[1];
+                    const codeBefore = Nexus.state.vfs[Nexus.state.activeFile].substring(0, match.index);
+                    lineOffset = codeBefore.split('\n').length - 1;
+                }
+
                 const { issues } = this.engine.analyzeAndMutate(code, 'LINT_ONLY');
                 if (issues.length > 0) {
                     let h = `<div style="color:var(--danger); font-weight:bold;">${issues.length} ISSUES FOUND</div>`;
-                    issues.forEach(e => { h += `<div class="item-row" style="align-items:flex-start; flex-direction:column;"><strong>LN ${e.line || '?'}: ${e.id}</strong><span style="opacity:0.7; margin-top:5px;">${e.message}</span></div>`; });
+                    issues.forEach(e => { 
+                        const displayLine = e.line ? (e.line + lineOffset) : '?';
+                        h += `<div class="item-row" style="align-items:flex-start; flex-direction:column;"><strong>LN ${displayLine}: ${e.id}</strong><span style="opacity:0.7; margin-top:5px;">${e.message}</span></div>`; 
+                    });
                     document.getElementById('diag-out').innerHTML = h;
                 } else { this.log("DEEP LINT: Logic is clean.", "success"); }
             } catch(e) { this.log(`[LINT] Error: ${e.message}`, "danger"); }
         },
 
         scanDeps() {
-            const code = Nexus.state.vfs[Nexus.state.activeFile]; const depRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:src=['"]([^'"]+)['"])/g;
-            let res = "<strong>VFS DEP SCAN:</strong><br>"; let m; while ((m = depRegex.exec(code)) !== null) { const p = (m[1] || m[2]).replace('./', ''); const ok = Nexus.state.vfs[p]; res += `<div class="item-row"><span>${p}</span><span style="color:var(--${ok?'success':'danger'})">${ok?'[RESOLVED]':'[BROKEN]'}</span></div>`; }
+            const code = Nexus.state.vfs[Nexus.state.activeFile]; 
+            const depRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g;
+            let res = "<strong>VFS DEP SCAN:</strong><br>"; 
+            let m; 
+            let found = false;
+            while ((m = depRegex.exec(code)) !== null) { 
+                found = true;
+                const p = (m[1] || m[2] || m[3]); 
+                if (!p) continue;
+                if (p.startsWith('http') || p.startsWith('//')) {
+                    res += `<div class="item-row"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;">${p}</span><span style="color:var(--accent); font-weight:bold;">[EXTERNAL]</span></div>`;
+                } else if (p.startsWith('data:')) {
+                    res += `<div class="item-row"><span>Data URI</span><span style="color:var(--gold); font-weight:bold;">[EMBEDDED]</span></div>`;
+                } else {
+                    const localP = p.replace('./', '');
+                    const ok = !!Nexus.state.vfs[localP]; 
+                    res += `<div class="item-row"><span>${localP}</span><span style="color:var(--${ok?'success':'danger'}); font-weight:bold;">${ok?'[RESOLVED]':'[BROKEN]'}</span></div>`; 
+                }
+            }
+            if (!found) res += "<div style='padding:15px; opacity:0.5;'>No imports or links detected.</div>";
             document.getElementById('diag-out').innerHTML = res;
         },
 
         pulse() {
-            const ed = document.getElementById('raw-terminal'); const btn = document.querySelector('button[onclick*="runMedic"]'); if (!btn) return;
-            try { new Function(ed.value); document.querySelectorAll('button[onclick*="runMedic"]').forEach(b=>{b.style.boxShadow="none";b.style.color="var(--gold)";}); } 
-            catch (e) { document.querySelectorAll('button[onclick*="runMedic"]').forEach(b=>{b.style.boxShadow="0 0 15px var(--danger)";b.style.color="var(--danger)";}); }
+            const ed = document.getElementById('raw-terminal'); 
+            const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
+            const btns = document.querySelectorAll('button[onclick*="runMedic"]');
+            if (btns.length === 0) return;
+            
+            let codeToTest = ed.value;
+            if (isHtml) {
+                const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+                if (match) codeToTest = match[1];
+                else {
+                    btns.forEach(b=>{b.style.boxShadow="none";b.style.color="var(--gold)";});
+                    return;
+                }
+            }
+
+            try { 
+                new Function(codeToTest); 
+                btns.forEach(b=>{b.style.boxShadow="none";b.style.color="var(--gold)";}); 
+            } catch (e) { 
+                btns.forEach(b=>{b.style.boxShadow="0 0 15px var(--danger)";b.style.color="var(--danger)";}); 
+            }
         },
 
         log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
