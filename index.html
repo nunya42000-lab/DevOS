@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.16 - Codex Matrix</title>
+    <title>DevOS Nexus Prime v40.17 - Codex Matrix</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -52,7 +52,6 @@
         /* --- 2. MAIN WORKSPACE & TABS --- */
         #workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
         
-        /* FILE TABS */
         #file-tabs-bar { display: flex; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--border); min-height: 38px; scroll-behavior: smooth; }
         #file-tabs-bar::-webkit-scrollbar { display: none; }
         .file-tab { padding: 8px 15px; font-size: 12px; font-family: monospace; cursor: pointer; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 10px; color: var(--text); white-space: nowrap; border-top: 2px solid transparent; background: var(--surface); }
@@ -115,21 +114,21 @@
         
         .util-grip {
             display: flex; align-items: center; justify-content: center;
-            background: #21252b; cursor: move; font-size: 14px; line-height: 0.8; letter-spacing: -2px; color: #5c6370;
+            background: #21252b; cursor: move; color: #5c6370;
         }
         .util-horizontal { flex-direction: row; }
-        .util-horizontal .util-grip { width: 24px; border-right: 1px solid #181a1f; border-radius: 8px 0 0 8px; flex-direction: column; }
+        .util-horizontal .util-grip { width: 24px; border-right: 1px solid #181a1f; border-radius: 8px 0 0 8px; flex-direction: column; font-size: 14px; line-height: 0.8; letter-spacing: -2px; }
         .util-horizontal .util-grip::before { content: '⋮\n⋮\n⋮'; white-space: pre; }
         .util-horizontal .sleek-bar-content { flex-direction: row; }
         .util-horizontal .util-lbl { display: none; }
         .util-horizontal .sleek-btn { flex-direction: row; gap: 8px; }
 
-        .util-vertical { flex-direction: column; width: 60px; }
-        .util-vertical .util-grip { height: 24px; width: 100%; border-bottom: 1px solid #181a1f; border-radius: 8px 8px 0 0; flex-direction: row; }
-        .util-vertical .util-grip::before { content: '⋯⋯'; letter-spacing: 2px; }
-        .util-vertical .sleek-bar-content { flex-direction: column; padding: 6px; gap: 6px; }
-        .util-vertical .util-lbl { display: block; font-size: 10px; margin-top: 4px; color: #5c6370; font-weight: bold; }
-        .util-vertical .sleek-btn { flex-direction: column; padding: 10px 4px; width: 100%; text-align: center; }
+        .util-vertical { flex-direction: column; width: 46px; }
+        .util-vertical .util-grip { height: 18px; width: 100%; border-bottom: 1px solid #181a1f; border-radius: 8px 8px 0 0; flex-direction: row; font-size: 14px; line-height: 0.8; letter-spacing: 2px; }
+        .util-vertical .util-grip::before { content: '⋯⋯'; }
+        .util-vertical .sleek-bar-content { flex-direction: column; padding: 4px; gap: 4px; }
+        .util-vertical .util-lbl { display: block; font-size: 8px; margin-top: 2px; color: #5c6370; font-weight: bold; }
+        .util-vertical .sleek-btn { flex-direction: column; padding: 6px 2px; width: 100%; text-align: center; }
 
         .search-grip {
             width: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -233,7 +232,7 @@
         </div>
     </div>
 
-    <div id="utility-bar" class="floating-widget util-horizontal" style="top: 80px; left: 10px;">
+    <div id="utility-bar" class="floating-widget util-vertical" style="top: 20%; right: 0px; left: auto;">
         <div class="util-grip" onmousedown="Nexus.ui.initDrag(event, 'utility-bar')" ontouchstart="Nexus.ui.initDrag(event, 'utility-bar')"></div>
         <div class="sleek-bar-content">
             <button class="sleek-btn" onclick="Nexus.ui.jumpPrompt()">
@@ -260,27 +259,27 @@
         <input type="color" id="color-picker-input" oninput="Nexus.ui.injectChar(this.value.toUpperCase())" style="position:absolute; opacity:0; width:0; pointer-events:none;">
     </div>
 
-    <div id="search-bar" class="floating-widget" style="top: 140px; left: 10px; flex-direction: row; width: 340px; border-radius: 8px;">
+    <div id="search-bar" class="floating-widget" style="top: 140px; left: 10px; flex-direction: row; width: 250px; border-radius: 8px;">
         <div class="search-grip" onmousedown="Nexus.ui.initDrag(event, 'search-bar')" ontouchstart="Nexus.ui.initDrag(event, 'search-bar')">
             <div class="search-grip-x" onclick="Nexus.ui.toggleWidget('search-bar')">&times;</div>
         </div>
-        <div style="display:flex; flex:1; padding:12px; gap:12px;">
-            <div style="display:flex; flex-direction:column; gap:10px; flex:1;">
-                <input type="text" id="find-input" class="sleek-input" placeholder="Find">
+        <div style="display:flex; flex:1; padding:10px; gap:8px;">
+            <div style="display:flex; flex-direction:column; gap:8px; flex:1;">
+                <input type="text" id="find-input" class="sleek-input" placeholder="Find" style="padding: 8px;">
                 <div style="position:relative; width:100%;">
-                    <input type="text" id="replace-input" class="sleek-input" placeholder="Replace" onkeydown="if(event.key==='Enter') Nexus.search.replace()">
-                    <span style="position:absolute; right:8px; top:8px; font-size:10px; font-weight:bold; color:var(--accent); cursor:pointer;" onclick="Nexus.search.replace()">REP</span>
+                    <input type="text" id="replace-input" class="sleek-input" placeholder="Replace" style="padding: 8px;" onkeydown="if(event.key==='Enter') Nexus.search.replace()">
+                    <span style="position:absolute; right:8px; top:6px; font-size:10px; font-weight:bold; color:var(--accent); cursor:pointer;" onclick="Nexus.search.replace()">REP</span>
                 </div>
             </div>
-            <div style="display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end;">
-                <div style="display:flex; gap:8px;">
-                    <button class="sleek-btn" id="case-btn" onclick="Nexus.search.toggleOpt('case')">Aa</button>
-                    <button class="sleek-btn" id="regex-btn" onclick="Nexus.search.toggleOpt('regex')">Regex</button>
-                    <button class="sleek-btn" id="global-btn" onclick="Nexus.search.toggleOpt('global')">Global</button>
+            <div style="display:flex; flex-direction:column; gap:4px; width: 48px; align-items:stretch;">
+                <div style="display:flex; gap:2px;">
+                    <button class="sleek-btn" id="case-btn" style="flex:1; padding:4px;" onclick="Nexus.search.toggleOpt('case')">Aa</button>
+                    <button class="sleek-btn" id="regex-btn" style="flex:1; padding:4px;" onclick="Nexus.search.toggleOpt('regex')">.*</button>
                 </div>
-                <div style="display:flex; gap:8px;">
-                    <button class="sleek-btn" style="font-size:16px; font-weight:bold;" onclick="Nexus.search.findNext(-1)">↑</button>
-                    <button class="sleek-btn" style="font-size:16px; font-weight:bold;" onclick="Nexus.search.findNext(1)">↓</button>
+                <button class="sleek-btn" id="global-btn" style="padding:4px;" onclick="Nexus.search.toggleOpt('global')">/g</button>
+                <div style="display:flex; gap:2px; margin-top:auto;">
+                    <button class="sleek-btn" style="flex:1; padding:4px;" onclick="Nexus.search.findNext(-1)">↑</button>
+                    <button class="sleek-btn" style="flex:1; padding:4px;" onclick="Nexus.search.findNext(1)">↓</button>
                 </div>
             </div>
         </div>
@@ -421,7 +420,7 @@
                 <div class="man-p">Automatically reformats the current HTML, CSS, or JS file according to your tab-width preference.</div>
 
                 <div class="man-h2">🌙 DREAMER</div>
-                <div class="man-p">Quickly injects pre-built HTML components (like buttons or grids) directly into your code.</div>
+                <div class="man-p">Quickly injects pre-built standard mobile and PWA UI components (like nav bars, modals, lists, or grids) directly into your code.</div>
                 
                 <div class="man-h2">🌌 SYSTEM GRAPH</div>
                 <div class="man-p">A visual, animated node-map of all the files currently inside your Vortex system. Tap a node to warp to that file.</div>
@@ -482,15 +481,21 @@
         <div class="modal-content">
             <div class="p-head"><span>🌙 DREAMER ARCHITECT</span><button class="close-x" onclick="Nexus.ui.closeModal('dreamer')">&times;</button></div>
             <div class="modal-body">
-                <select id="dreamer-type" style="width:100%; padding:15px; background:var(--bg); border:1px solid var(--border); color:#fff; margin-bottom:10px;" onchange="Nexus.dreamer.updatePreview()">
+                <select id="dreamer-type" style="width:100%; padding:15px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:#fff; margin-bottom:10px; font-size:14px;" onchange="Nexus.dreamer.updatePreview()">
                     <option value="btn-tactical">Tactical Button</option>
                     <option value="card-gold">Gold Data Card</option>
                     <option value="grid-skill">3x3 Skill Grid</option>
+                    <option value="nav-bottom">Bottom Nav Bar</option>
+                    <option value="modal-box">Standard Modal</option>
+                    <option value="list-view">Data List View</option>
+                    <option value="input-group">Sleek Input Field</option>
+                    <option value="toggle-switch">CSS Toggle Switch</option>
+                    <option value="loader-spinner">Orbit Spinner</option>
                 </select>
-                <input type="text" id="dreamer-label" placeholder="Label" style="width:100%; padding:15px; margin-bottom:10px;" oninput="Nexus.dreamer.updatePreview()">
-                <input type="text" id="dreamer-id" placeholder="ID" style="width:100%; padding:15px; margin-bottom:20px;">
-                <div id="dreamer-preview" style="min-height:100px; border:1px dashed var(--border); margin-bottom:20px; display:flex; align-items:center; justify-content:center;"></div>
-                <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.dreamer.inject()">⚡ INJECT</button>
+                <input type="text" id="dreamer-label" placeholder="Label / Data" style="width:100%; padding:15px; margin-bottom:10px; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px;" oninput="Nexus.dreamer.updatePreview()">
+                <input type="text" id="dreamer-id" placeholder="Element ID (Optional)" style="width:100%; padding:15px; margin-bottom:20px; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px;">
+                <div id="dreamer-preview" style="min-height:100px; border:1px dashed var(--border); border-radius:8px; margin-bottom:20px; display:flex; align-items:center; justify-content:center; background:#0d1117; padding:20px; position:relative; overflow:hidden;"></div>
+                <button class="tool-btn btn-accent" style="width:100%; padding:15px; justify-content:center;" onclick="Nexus.dreamer.inject()">⚡ INJECT TO FILE</button>
             </div>
         </div>
     </div>
@@ -619,7 +624,7 @@ window.Nexus = {
         vfs: {}, 
         originals: {}, vault: [], snapshots: [], activeFile: "",
         prefs: { 
-            fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, utilDock: 'float',
+            fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, utilDock: 'dock-right', // Updated default to right
             customVocab: "Your, custom, words, here",
             kbLayouts: {
                 html: [
@@ -709,7 +714,7 @@ window.Nexus = {
             const ed = document.getElementById('raw-terminal');
             
             if (document.querySelector('.edit-btn-trigger').innerText.includes('READ ONLY') && !document.querySelector('.edit-btn-trigger').classList.contains('btn-edit-lock')) {
-                 Nexus.ui.toggleEditMode(); // Sync visual toggle if they unlocked while empty
+                 Nexus.ui.toggleEditMode();
             } else if (ed.hasAttribute('readonly') && document.querySelector('.edit-btn-trigger').classList.contains('btn-edit-unlocked')){
                  ed.removeAttribute('readonly');
                  document.getElementById('foot-status').innerText = "READY";
@@ -885,9 +890,12 @@ window.Nexus = {
                 }
             });
             
+            // BUG FIX: Ensure we do not delete the newly created file if it shares a name with a selected file
             selected.forEach(f => {
-                delete Nexus.state.vfs[f]; 
-                delete Nexus.state.originals[f];
+                if(f !== newName) {
+                    delete Nexus.state.vfs[f]; 
+                    delete Nexus.state.originals[f];
+                }
             });
             
             this.save();
@@ -1027,18 +1035,48 @@ window.Nexus = {
         log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
     },
 
-    intel: {
-        scan() {
-            if(!Nexus.state.activeFile) return alert("No active file to scan.");
-            document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
-            Nexus.ui.openModal('intel');
-        }
-    },
-
     dreamer: {
-        templates: { 'btn-tactical': (l, id) => `<button id="${id || 'btn-01'}" class="tool-btn btn-gold">${l || 'BTN'}</button>`, 'card-gold': (l, id) => `<div id="${id || 'card-01'}" class="item-row" style="border:1px solid var(--gold); padding:10px;"><strong>${l || 'DATA'}</strong></div>`, 'grid-skill': (l, id) => `<div id="${id || 'grid-01'}" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button class="tool-btn" style="height:60px;">${i+1}</button>`).join('')}</div>` },
-        updatePreview() { const t = document.getElementById('dreamer-type').value, l = document.getElementById('dreamer-label').value, p = document.getElementById('dreamer-preview'); if (p) p.innerHTML = this.templates[t](l, 'preview-id'); },
-        inject() { const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return alert("LOCKED"); const t = document.getElementById('dreamer-type').value, l = document.getElementById('dreamer-label').value, id = document.getElementById('dreamer-id').value; const code = `\n\n` + this.templates[t](l, id) + `\n`; const pos = ed.selectionStart; ed.value = ed.value.substring(0, pos) + code + ed.value.substring(ed.selectionEnd); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); Nexus.ui.closeModal('dreamer'); Nexus.ui.updateGutter(); }
+        templates: { 
+            'btn-tactical': (l, id) => `<button id="${id || 'btn-01'}" style="padding:12px 24px; background:var(--gold, #d29922); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 15px rgba(210,153,34,0.3); transition:all 0.2s;">${l || 'TACTICAL ACTION'}</button>`, 
+            
+            'card-gold': (l, id) => `<div id="${id || 'card-01'}" style="border:1px solid var(--gold, #d29922); background:rgba(210,153,34,0.05); padding:20px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5);"><h3 style="color:var(--gold, #d29922); margin-top:0;">${l || 'DATA MODULE'}</h3><p style="color:var(--text, #c9d1d9); font-size:14px;">Telemetry synced and stable.</p></div>`, 
+            
+            'grid-skill': (l, id) => `<div id="${id || 'grid-01'}" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button style="height:80px; background:var(--surface, #21262d); color:var(--text, #c9d1d9); border:1px solid var(--border, #30363d); border-radius:12px; font-size:24px; font-weight:bold;">${i+1}</button>`).join('')}</div>`,
+            
+            'nav-bottom': (l, id) => `<nav id="${id || 'nav-01'}" style="position:fixed; bottom:0; left:0; width:100%; background:var(--panel, #161b22); display:flex; justify-content:space-around; align-items:center; padding:15px; border-top:1px solid var(--border, #30363d); z-index:100;"><button style="border:none; background:transparent; color:var(--text, #c9d1d9); display:flex; flex-direction:column; align-items:center; gap:5px;"><span style="font-size:20px;">🏠</span><span style="font-size:10px;">${l || 'Home'}</span></button><button style="border:none; background:var(--accent, #2f81f7); color:#fff; border-radius:50%; width:55px; height:55px; display:flex; justify-content:center; align-items:center; font-size:24px; box-shadow:0 0 20px rgba(47,129,247,0.4); transform:translateY(-15px);">+</button><button style="border:none; background:transparent; color:var(--text, #c9d1d9); display:flex; flex-direction:column; align-items:center; gap:5px;"><span style="font-size:20px;">👤</span><span style="font-size:10px;">Profile</span></button></nav>`,
+            
+            'modal-box': (l, id) => `<div id="${id || 'modal-01'}" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:1000;"><div style="background:var(--panel, #161b22); width:85%; max-width:400px; padding:25px; border-radius:20px; border:1px solid var(--border, #30363d); box-shadow:0 25px 50px rgba(0,0,0,1);"><h3 style="color:var(--gold, #d29922); margin-top:0; border-bottom:1px solid var(--border, #30363d); padding-bottom:10px;">${l || 'SYSTEM ALERT'}</h3><p style="font-size:14px; color:var(--text, #c9d1d9); line-height:1.5; margin-bottom:25px;">Operation successfully initialized. Awaiting user input.</p><button style="width:100%; padding:15px; background:var(--accent, #2f81f7); color:#fff; border:none; border-radius:10px; font-weight:bold; cursor:pointer;" onclick="this.parentElement.parentElement.style.display='none'">ACKNOWLEDGE</button></div></div>`,
+            
+            'list-view': (l, id) => `<div id="${id || 'list-01'}" style="display:flex; flex-direction:column; gap:8px;">${Array(4).fill().map((_, i) => `<div style="background:var(--surface, #21262d); border:1px solid var(--border, #30363d); padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; gap:15px;"><div style="width:40px; height:40px; background:var(--bg, #0d1117); border-radius:50%; display:flex; justify-content:center; align-items:center; font-weight:bold; color:var(--gold, #d29922);">${i+1}</div><div style="display:flex; flex-direction:column;"><strong style="color:var(--text, #c9d1d9);">${l || 'Data Matrix'} ${i+1}</strong><span style="font-size:10px; color:var(--text, #c9d1d9); opacity:0.5;">Status: Online</span></div></div><span style="color:var(--accent, #2f81f7); font-size:20px;">→</span></div>`).join('')}</div>`,
+            
+            'input-group': (l, id) => `<div id="${id || 'input-wrap'}" style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;"><label style="font-size:11px; color:var(--gold, #d29922); font-weight:900; letter-spacing:1px; text-transform:uppercase;">${l || 'AUTHORIZATION CODE'}</label><input type="text" placeholder="Enter secure payload..." style="padding:15px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:10px; color:#fff; font-family:monospace; font-size:14px; outline:none; transition:border-color 0.3s;" onfocus="this.style.borderColor='var(--accent, #2f81f7)'" onblur="this.style.borderColor='var(--border, #30363d)'"></div>`,
+            
+            'toggle-switch': (l, id) => `<label id="${id || 'toggle-01'}" style="display:flex; align-items:center; gap:15px; cursor:pointer; padding:10px 0;"><div style="position:relative; width:50px; height:26px; background:var(--border, #30363d); border-radius:13px; overflow:hidden; transition:background 0.3s;"><input type="checkbox" style="opacity:0; width:0; height:0; position:absolute;" onchange="this.nextElementSibling.style.transform = this.checked ? 'translateX(24px)' : 'translateX(0)'; this.parentElement.style.background = this.checked ? 'var(--success, #3fb950)' : 'var(--border, #30363d)';"><div style="position:absolute; top:2px; left:2px; width:22px; height:22px; background:#fff; border-radius:50%; transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);"></div></div><span style="font-size:14px; color:var(--text, #c9d1d9); font-weight:bold;">${l || 'Override Protocol'}</span></label>`,
+            
+            'loader-spinner': (l, id) => `<div id="${id || 'spinner-01'}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:30px;"><div style="width:40px; height:40px; border:4px solid var(--border, #30363d); border-top-color:var(--accent, #2f81f7); border-radius:50%; animation:nexusSpin 1s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;"></div><style>@keyframes nexusSpin { to { transform: rotate(360deg); } }</style><span style="font-size:11px; color:var(--gold, #d29922); font-weight:900; letter-spacing:2px;">${l || 'SYNTHESIZING...'}</span></div>`
+        },
+        updatePreview() { 
+            const t = document.getElementById('dreamer-type').value;
+            const l = document.getElementById('dreamer-label').value; 
+            const p = document.getElementById('dreamer-preview'); 
+            if (p && this.templates[t]) {
+                p.innerHTML = this.templates[t](l, 'preview-id');
+            }
+        },
+        inject() { 
+            const ed = document.getElementById('raw-terminal'); 
+            if (ed.hasAttribute('readonly')) return alert("LOCKED"); 
+            const t = document.getElementById('dreamer-type').value; 
+            const l = document.getElementById('dreamer-label').value; 
+            const id = document.getElementById('dreamer-id').value; 
+            const code = `\n\n` + this.templates[t](l, id) + `\n`; 
+            const pos = ed.selectionStart; 
+            ed.value = ed.value.substring(0, pos) + code + ed.value.substring(ed.selectionEnd); 
+            Nexus.state.vfs[Nexus.state.activeFile] = ed.value; 
+            Nexus.vfs.save(); 
+            Nexus.ui.closeModal('dreamer'); 
+            Nexus.ui.updateGutter(); 
+        }
     },
 
     graph: {
@@ -1073,7 +1111,7 @@ window.Nexus = {
             if(document.getElementById('pref-tabs')) document.getElementById('pref-tabs').value = Nexus.state.prefs.tabWidth;
             if(document.getElementById('pref-kb-pos')) document.getElementById('pref-kb-pos').value = Nexus.state.prefs.kbPos;
             if(document.getElementById('pref-kb-rows')) document.getElementById('pref-kb-rows').value = Nexus.state.prefs.kbRows;
-            if(document.getElementById('pref-util-mode')) document.getElementById('pref-util-mode').value = Nexus.state.prefs.utilDock || 'float';
+            if(document.getElementById('pref-util-mode')) document.getElementById('pref-util-mode').value = Nexus.state.prefs.utilDock || 'dock-right';
             if(document.getElementById('pref-writer-custom')) document.getElementById('pref-writer-custom').value = Nexus.state.prefs.customVocab || "Your, custom, words, here";
 
             const util = document.getElementById('utility-bar');
