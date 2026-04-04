@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.17 - Codex Matrix</title>
+    <title>DevOS Nexus Prime v40.18 - Codex Matrix</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -134,13 +134,14 @@
             width: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
             background: #21252b; border-right: 1px solid #181a1f; border-radius: 8px 0 0 8px;
             cursor: move; font-size: 14px; line-height: 0.8; letter-spacing: -2px; color: #5c6370;
+            flex-shrink: 0;
         }
         .search-grip-x { font-family: sans-serif; font-size: 16px; cursor: pointer; color: #abb2bf; margin-bottom: 10px; }
 
         .sleek-bar-content { display: flex; padding: 6px; gap: 8px; align-items: center; flex: 1; }
         .sleek-btn {
             background: transparent; border: none; color: #abb2bf; cursor: pointer;
-            border-radius: 4px; padding: 6px 10px; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 4px;
+            border-radius: 4px; padding: 6px 10px; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: bold;
         }
         .sleek-btn:hover { background: #3e4451; color: #fff; }
         .sleek-btn.active { background: #e5e9f0; color: #282c34; }
@@ -259,27 +260,27 @@
         <input type="color" id="color-picker-input" oninput="Nexus.ui.injectChar(this.value.toUpperCase())" style="position:absolute; opacity:0; width:0; pointer-events:none;">
     </div>
 
-    <div id="search-bar" class="floating-widget" style="top: 140px; left: 10px; flex-direction: row; width: 250px; border-radius: 8px;">
+    <div id="search-bar" class="floating-widget" style="top: 140px; left: 10px; flex-direction: row; width: 320px; border-radius: 8px;">
         <div class="search-grip" onmousedown="Nexus.ui.initDrag(event, 'search-bar')" ontouchstart="Nexus.ui.initDrag(event, 'search-bar')">
             <div class="search-grip-x" onclick="Nexus.ui.toggleWidget('search-bar')">&times;</div>
         </div>
-        <div style="display:flex; flex:1; padding:10px; gap:8px;">
-            <div style="display:flex; flex-direction:column; gap:8px; flex:1;">
-                <input type="text" id="find-input" class="sleek-input" placeholder="Find" style="padding: 8px;">
-                <div style="position:relative; width:100%;">
-                    <input type="text" id="replace-input" class="sleek-input" placeholder="Replace" style="padding: 8px;" onkeydown="if(event.key==='Enter') Nexus.search.replace()">
-                    <span style="position:absolute; right:8px; top:6px; font-size:10px; font-weight:bold; color:var(--accent); cursor:pointer;" onclick="Nexus.search.replace()">REP</span>
-                </div>
+        <div style="display:flex; flex-direction:column; flex:1; padding:12px; gap:10px;">
+            <div style="display:flex; gap:8px;">
+                <button class="sleek-btn" id="case-btn" onclick="Nexus.search.toggleOpt('case')" style="flex:1; padding:6px;">Aa Case</button>
+                <button class="sleek-btn" id="regex-btn" onclick="Nexus.search.toggleOpt('regex')" style="flex:1; padding:6px;">.* Regex</button>
+                <button class="sleek-btn" id="global-btn" onclick="Nexus.search.toggleOpt('global')" style="flex:1; padding:6px;">/g Global</button>
             </div>
-            <div style="display:flex; flex-direction:column; gap:4px; width: 48px; align-items:stretch;">
-                <div style="display:flex; gap:2px;">
-                    <button class="sleek-btn" id="case-btn" style="flex:1; padding:4px;" onclick="Nexus.search.toggleOpt('case')">Aa</button>
-                    <button class="sleek-btn" id="regex-btn" style="flex:1; padding:4px;" onclick="Nexus.search.toggleOpt('regex')">.*</button>
+            <div style="display:flex; gap:10px;">
+                <div style="display:flex; flex-direction:column; gap:8px; flex:1;">
+                    <input type="text" id="find-input" class="sleek-input" placeholder="Find..." style="padding: 10px;">
+                    <div style="position:relative; width:100%;">
+                        <input type="text" id="replace-input" class="sleek-input" placeholder="Replace..." style="padding: 10px; width:100%;" onkeydown="if(event.key==='Enter') Nexus.search.replace()">
+                        <span style="position:absolute; right:10px; top:10px; font-size:11px; font-weight:bold; color:var(--accent); cursor:pointer;" onclick="Nexus.search.replace()">REP</span>
+                    </div>
                 </div>
-                <button class="sleek-btn" id="global-btn" style="padding:4px;" onclick="Nexus.search.toggleOpt('global')">/g</button>
-                <div style="display:flex; gap:2px; margin-top:auto;">
-                    <button class="sleek-btn" style="flex:1; padding:4px;" onclick="Nexus.search.findNext(-1)">↑</button>
-                    <button class="sleek-btn" style="flex:1; padding:4px;" onclick="Nexus.search.findNext(1)">↓</button>
+                <div style="display:flex; flex-direction:column; gap:8px; width:45px;">
+                    <button class="sleek-btn" style="flex:1; font-size:18px; padding:0;" onclick="Nexus.search.findNext(-1)">↑</button>
+                    <button class="sleek-btn" style="flex:1; font-size:18px; padding:0;" onclick="Nexus.search.findNext(1)">↓</button>
                 </div>
             </div>
         </div>
@@ -624,7 +625,7 @@ window.Nexus = {
         vfs: {}, 
         originals: {}, vault: [], snapshots: [], activeFile: "",
         prefs: { 
-            fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, utilDock: 'dock-right', // Updated default to right
+            fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, utilDock: 'dock-right',
             customVocab: "Your, custom, words, here",
             kbLayouts: {
                 html: [
@@ -890,7 +891,6 @@ window.Nexus = {
                 }
             });
             
-            // BUG FIX: Ensure we do not delete the newly created file if it shares a name with a selected file
             selected.forEach(f => {
                 if(f !== newName) {
                     delete Nexus.state.vfs[f]; 
