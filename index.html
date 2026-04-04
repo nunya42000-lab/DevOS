@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.12 - Diagnostics Patched</title>
+    <title>DevOS Nexus Prime v40.14 - Codex Matrix</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -168,6 +168,11 @@
         .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
         .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; }
         #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
+        
+        /* Manual Styling */
+        .man-h1 { color: var(--accent); font-size: 18px; margin: 20px 0 10px 0; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
+        .man-h2 { color: var(--gold); font-size: 14px; margin: 15px 0 5px 0; }
+        .man-p { font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 10px; opacity: 0.9; }
     </style>
 </head>
 <body>
@@ -175,6 +180,9 @@
 <div id="app-root">
     <nav id="ribbon-container">
         <div id="ribbon-track">
+            <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('manual')">📖 MANUAL</button>
+            <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+            
             <button class="tool-btn" onclick="Nexus.ui.toggleWidget('utility-bar')">🛠 UTIL</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleWidget('search-bar')">🔍 FIND & REP</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar')">✍️ WRITE</button>
@@ -207,7 +215,7 @@
     <div id="workspace">
         <div id="editor-view">
             <div id="gutter">1</div>
-            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.12 // Diagnostics Patched."></textarea>
+            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.14 // Codex Matrix."></textarea>
         </div>
     </div>
 
@@ -353,17 +361,64 @@
         <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="margin-left:15px; color:#fff;">&times;</button>
     </div>
 
+    <div id="modal-manual" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>📖 NEXUS CODEX (MANUAL)</span><button class="close-x" onclick="Nexus.ui.closeModal('manual')">&times;</button></div>
+            <div class="modal-body" style="padding: 20px 30px;">
+                <div class="man-h1">Welcome to Nexus Prime</div>
+                <div class="man-p">Nexus Prime is an entirely offline, AST-aware Integrated Development Environment (IDE) built specifically for mobile/PWA environments. Below is a guide to its core functions.</div>
+
+                <div class="man-h1">The Kinetic Widgets</div>
+                <div class="man-h2">🛠 UTIL (Utility Bar)</div>
+                <div class="man-p">A floating bar containing common quick actions: <b>Line Jump</b>, <b>Color Picker</b> (injects hex codes), <b>Undo/Redo</b>, and a <b>Tab Injector</b> to fix formatting on mobile keyboards. Dock it to the right side of the screen in the Settings menu.</div>
+                
+                <div class="man-h2">🔍 FIND & REP (Search Bar)</div>
+                <div class="man-p">A draggable search widget. Supports <b>Aa</b> (Case Sensitive) and <b>Regex</b> matching. Navigate through matches with the Up/Down arrows and tap the REP text to execute a replacement.</div>
+                
+                <div class="man-h2">✍️ WRITE (Auto-Writer)</div>
+                <div class="man-p">Generates filler or mock data. Choose "Syntax" to generate mock code elements, "Story" for Lorem Ipsum text, or "Custom" to use your own array of words (configurable in Settings).</div>
+
+                <div class="man-h2">⌨ KEY (Keyboard Monolith)</div>
+                <div class="man-p">A custom infinite-scroll coding keyboard designed to bypass mobile keyboard limitations. Click the <b>✏️ Pencil</b> icon to open the builder and design your own buttons. Use <code>*#</code> to tell the editor where to place your cursor after insertion.</div>
+
+                <div class="man-h1">Vortex System (File Management)</div>
+                <div class="man-h2">📁 VORTEX (Left Panel)</div>
+                <div class="man-p">Your Virtual File System. Create, delete, and switch between files here. Files are automatically grouped by extension. Export your whole project as a flat TXT file or a structured ZIP archive.</div>
+
+                <div class="man-h2">🔗 COMBINE FILES</div>
+                <div class="man-p">Select multiple files to merge them into a single file. The engine will scan all other files in your Vortex and automatically rewrite their <code>import</code>, <code>src=</code>, and <code>href=</code> paths so they point to the new combined file.</div>
+
+                <div class="man-h2">💾 VAULT</div>
+                <div class="man-p">A persistent code snippet library. Tap <b>"Cut File"</b> or <b>"Copy File"</b> on the ribbon to immediately send your active file's contents into the vault for later use.</div>
+
+                <div class="man-h1">Diagnostics & Testing</div>
+                <div class="man-h2">🩺 DIAGNOSTICS (Sentinel)</div>
+                <div class="man-p">The Sentinel is a static code analyzer (AST). <b>Deep Lint</b> scans for 16+ logic, security, and performance flaws. <b>String Patch</b> fixes minor errors safely. <b>AST Rebuild</b> deconstructs and reconstructs your code to fix structural logic. <i>(Note: In HTML files, Medics will target the first inline script tag).</i></div>
+
+                <div class="man-h2">▶ PROVING GROUNDS (Sandbox)</div>
+                <div class="man-p">A live execution environment (Right Panel). It injects your active code into an iframe. It comes with a "Ghost Console" overlay that intercepts <code>console.log()</code> and errors so you can debug directly on your phone. If you are viewing an HTML file, it renders the raw HTML. If viewing JS, it wraps it in a script tag.</div>
+
+                <div class="man-h1">Other Utilities</div>
+                <div class="man-h2">🌙 DREAMER</div>
+                <div class="man-p">Quickly injects pre-built HTML components (like buttons or grids) directly into your code.</div>
+                
+                <div class="man-h2">🌌 SYSTEM GRAPH</div>
+                <div class="man-p">A visual, animated node-map of all the files currently inside your Vortex system. Tap a node to warp to that file.</div>
+                
+                <div class="man-h2">☀️ SUN MODE</div>
+                <div class="man-p">Inverts the dark theme to a high-contrast white mode for outdoor coding visibility.</div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-combine" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🔗 COMBINE & REFACTOR</span><button class="close-x" onclick="Nexus.ui.closeModal('combine')">&times;</button></div>
+            <div class="p-head"><span>🔗 COMBINE FILES</span><button class="close-x" onclick="Nexus.ui.closeModal('combine')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
-                <span style="font-size:11px; color:var(--text);">Select two files to merge. All imports across the VFS project will be automatically updated.</span>
-                <select id="combine-f1" class="sleek-input" style="padding:15px; font-size:14px; background:var(--bg); border:1px solid var(--border);"></select>
-                <div style="text-align:center; color:var(--gold); font-weight:bold; font-size:24px;">+</div>
-                <select id="combine-f2" class="sleek-input" style="padding:15px; font-size:14px; background:var(--bg); border:1px solid var(--border);"></select>
-                <div style="text-align:center; color:var(--gold); font-weight:bold; font-size:24px;">=</div>
+                <span style="font-size:11px; color:var(--text);">Select multiple files to merge. All imports across the VFS project will be updated.</span>
+                <div id="combine-list" style="max-height: 200px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:10px; border-radius:8px; display:flex; flex-direction:column; gap:8px;"></div>
                 <input type="text" id="combine-name" class="sleek-input" placeholder="New Filename (e.g., bundle.js)" style="padding:15px; font-size:14px; background:var(--bg); border:1px solid var(--border);">
-                <button class="tool-btn btn-accent" style="padding:15px; width:100%; justify-content:center;" onclick="Nexus.vfs.combineFiles()">⚡ COMBINE & REFACTOR</button>
+                <button class="tool-btn btn-accent" style="padding:15px; width:100%; justify-content:center;" onclick="Nexus.vfs.combineFiles()">⚡ MERGE & RE-ROUTE</button>
             </div>
         </div>
     </div>
@@ -540,7 +595,7 @@ window.Nexus = {
     },
 
     state: {
-        vfs: { "main.js": "// Nexus Core v40.12 Patched.\nconsole.log('Stable Matrix Online.');" },
+        vfs: { "main.js": "// Nexus Core v40.14 Fully Restored.\nconsole.log('Codex Matrix Online.');" },
         originals: {}, vault: [], snapshots: [], activeFile: "main.js",
         prefs: { 
             fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, utilDock: 'float',
@@ -629,17 +684,19 @@ window.Nexus = {
         },
         
         combineFiles() {
-            const f1 = document.getElementById('combine-f1').value;
-            const f2 = document.getElementById('combine-f2').value;
+            const selected = Array.from(document.querySelectorAll('.combine-cb:checked')).map(cb => cb.value);
             const newName = document.getElementById('combine-name').value;
             
-            if(!f1 || !f2 || !newName) return alert("Invalid inputs.");
-            if(f1 === f2) return alert("Select different files to merge.");
+            if(selected.length < 2) return alert("Select at least 2 files to merge.");
+            if(!newName) return alert("Please enter a new filename (e.g., bundle.js).");
             
-            const c1 = Nexus.state.vfs[f1] || "";
-            const c2 = Nexus.state.vfs[f2] || "";
-            Nexus.state.vfs[newName] = `// Combined Matrix: ${f1} & ${f2}\n\n${c1}\n\n${c2}`;
-            Nexus.state.originals[newName] = Nexus.state.vfs[newName];
+            let combinedCode = `// Combined Matrix: ${selected.join(', ')}\n\n`;
+            selected.forEach(f => {
+                combinedCode += `// --- ${f} ---\n${Nexus.state.vfs[f] || ''}\n\n`;
+            });
+
+            Nexus.state.vfs[newName] = combinedCode;
+            Nexus.state.originals[newName] = combinedCode;
             
             const escapeRegex = (str) => {
                 let res = '';
@@ -650,17 +707,16 @@ window.Nexus = {
                 return res;
             };
 
-            const r1 = escapeRegex(f1.replace('./', ''));
-            const r2 = escapeRegex(f2.replace('./', ''));
+            const escapedNames = selected.map(f => escapeRegex(f.replace('./', ''))).join('|');
             
             const regexes = [
-                new RegExp(`((?:import|export)\\s+.*?from\\s+['"])(\\.\\/)?(?:${r1}|${r2})(['"])`, 'g'),
-                new RegExp(`(src=['"])(\\.\\/)?(?:${r1}|${r2})(['"])`, 'g'),
-                new RegExp(`(href=['"])(\\.\\/)?(?:${r1}|${r2})(['"])`, 'g')
+                new RegExp(`((?:import|export)\\s+.*?from\\s+['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+                new RegExp(`(src=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+                new RegExp(`(href=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g')
             ];
             
             Object.keys(Nexus.state.vfs).forEach(file => {
-                if (file === f1 || file === f2) return; 
+                if (selected.includes(file)) return; 
                 let code = Nexus.state.vfs[file];
                 let changed = false;
                 
@@ -677,8 +733,10 @@ window.Nexus = {
                 }
             });
             
-            delete Nexus.state.vfs[f1]; delete Nexus.state.originals[f1];
-            delete Nexus.state.vfs[f2]; delete Nexus.state.originals[f2];
+            selected.forEach(f => {
+                delete Nexus.state.vfs[f]; 
+                delete Nexus.state.originals[f];
+            });
             
             this.save();
             this.renderAccordion();
@@ -1009,12 +1067,20 @@ window.Nexus = {
         },
 
         runMedicString() {
-            if (Nexus.state.activeFile.toLowerCase().endsWith('.html')) return this.log("[MEDIC] Auto-Fix blocked: Extract code to a .js file to prevent HTML corruption.", "warn");
             try {
                 this.initEngine();
                 let code = Nexus.state.vfs[Nexus.state.activeFile];
-                const { issues } = this.engine.analyzeAndMutate(code, 'STRING_PATCH');
+                const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
+                let jsCode = code;
+                let scriptMatch = null;
                 
+                if (isHtml) {
+                    scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+                    if (!scriptMatch) return this.log("[MEDIC] No inline script found to fix.", "success");
+                    jsCode = scriptMatch[1];
+                }
+
+                const { issues } = this.engine.analyzeAndMutate(jsCode, 'STRING_PATCH');
                 let fixableIssues = issues.filter(i => i.range && i.replacement !== undefined);
                 if (fixableIssues.length === 0) return this.log("[MEDIC] Structure secure. No auto-fixes needed.", "success");
 
@@ -1031,8 +1097,15 @@ window.Nexus = {
                 }
 
                 safeFixes.forEach(issue => { 
-                    code = code.substring(0, issue.range[0]) + issue.replacement + code.substring(issue.range[1]); 
+                    jsCode = jsCode.substring(0, issue.range[0]) + issue.replacement + jsCode.substring(issue.range[1]); 
                 });
+
+                if (isHtml) {
+                    const newScript = '<scr' + 'ipt>\n' + jsCode + '\n</scr' + 'ipt>';
+                    code = code.substring(0, scriptMatch.index) + newScript + code.substring(scriptMatch.index + scriptMatch[0].length);
+                } else {
+                    code = jsCode;
+                }
 
                 Nexus.state.vfs[Nexus.state.activeFile] = code; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
                 this.log(`[MEDIC STRING] Applied ${safeFixes.length} surgical fixes safely.`, "gold");
@@ -1040,19 +1113,35 @@ window.Nexus = {
         },
 
         runMedicAST() {
-            if (Nexus.state.activeFile.toLowerCase().endsWith('.html')) return this.log("[MEDIC] Auto-Fix blocked: Extract code to a .js file to prevent HTML corruption.", "warn");
             try {
                 this.initEngine();
                 if (typeof astring === 'undefined') throw new Error("Astring Missing.");
                 
                 let code = Nexus.state.vfs[Nexus.state.activeFile];
-                const { issues, ast } = this.engine.analyzeAndMutate(code, 'AST_REBUILD');
+                const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
+                let jsCode = code;
+                let scriptMatch = null;
                 
+                if (isHtml) {
+                    scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+                    if (!scriptMatch) return this.log("[MEDIC] No inline script found to fix.", "success");
+                    jsCode = scriptMatch[1];
+                }
+                
+                const { issues, ast } = this.engine.analyzeAndMutate(jsCode, 'AST_REBUILD');
                 const fixableIssues = issues.filter(i => i.mutate !== undefined);
                 if (fixableIssues.length === 0) return this.log("[MEDIC] Structure secure. No auto-fixes needed.", "success");
 
-                const generatedCode = astring.generate(ast);
-                Nexus.state.vfs[Nexus.state.activeFile] = generatedCode; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
+                let generatedCode = astring.generate(ast);
+                
+                if (isHtml) {
+                    const newScript = '<scr' + 'ipt>\n' + generatedCode + '\n</scr' + 'ipt>';
+                    code = code.substring(0, scriptMatch.index) + newScript + code.substring(scriptMatch.index + scriptMatch[0].length);
+                } else {
+                    code = generatedCode;
+                }
+
+                Nexus.state.vfs[Nexus.state.activeFile] = code; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
                 this.log(`[MEDIC AST] Rebuilt AST. Applied ${fixableIssues.length} logic fixes.`, "gold");
             } catch(e) { this.log(`[MEDIC] Error: ${e.message}`, "danger"); }
         },
@@ -1566,16 +1655,25 @@ window.Nexus = {
         toggleEditMode() { const ed = document.getElementById('raw-terminal'); const st = document.getElementById('foot-status'); const btns = document.querySelectorAll('.edit-btn-trigger'); if (ed.hasAttribute('readonly')) { ed.removeAttribute('readonly'); st.innerText = "READY"; st.style.color = "var(--success)"; btns.forEach(btn => { btn.innerHTML = "🔓 EDIT MODE"; btn.classList.replace('btn-edit-lock', 'btn-edit-unlocked'); }); } else { ed.setAttribute('readonly', true); st.innerText = "LOCKED"; st.style.color = "var(--gold)"; btns.forEach(btn => { btn.innerHTML = "🔒 READ ONLY"; btn.classList.replace('btn-edit-unlocked', 'btn-edit-lock'); }); } },
         toggleSidebar(s) { document.getElementById(s==='left'?'panel-left':'panel-right').classList.toggle('open'); },
         toggleSlide(t) { document.getElementById(t==='diag'?'diag-hub':'shell-slide').classList.toggle('open'); },
-        openModal(id) { if (id === 'dreamer') Nexus.dreamer.updatePreview(); if (id === 'graph') Nexus.graph.render(); if (id === 'settings') Nexus.settings.calcStorage(); document.getElementById('modal-'+id).classList.add('active'); },
+        openModal(id) { 
+            if (id === 'dreamer') Nexus.dreamer.updatePreview(); 
+            if (id === 'graph') Nexus.graph.render(); 
+            if (id === 'settings') Nexus.settings.calcStorage(); 
+            if (id === 'combine') {
+                const list = document.getElementById('combine-list');
+                list.innerHTML = Object.keys(Nexus.state.vfs).map(f => 
+                    `<label style="display:flex; align-items:center; gap:10px; padding:8px; color:#fff; cursor:pointer; background:var(--surface); border-radius:4px;"><input type="checkbox" value="${f}" class="combine-cb" style="width:16px; height:16px;"> <span style="font-family:monospace; font-size:12px;">${f}</span></label>`
+                ).join('');
+            }
+            document.getElementById('modal-'+id).classList.add('active'); 
+        },
         openCombineModal() {
-            const opts = Object.keys(Nexus.state.vfs).map(f => `<option value="${f}">${f}</option>`).join('');
-            document.getElementById('combine-f1').innerHTML = opts;
-            document.getElementById('combine-f2').innerHTML = opts;
             this.openModal('combine');
         },
         closeModal(id) { document.getElementById('modal-'+id).classList.remove('active'); },
         toggleSun() { document.body.classList.toggle('outdoor-mode'); },
         updateGutter() { const l = document.getElementById('raw-terminal').value.split('\n').length; document.getElementById('gutter').innerHTML = Array.from({length: l}, (_, i) => i + 1).join('<br>'); },
+        
         runSandbox() { 
             const f = document.getElementById('sandbox-frame'), c = document.getElementById('ghost-console'); 
             if(!f || !c) return; 
@@ -1596,11 +1694,25 @@ window.Nexus = {
                     "send('Crash at line ' + line + ': ' + msg, '#f85149');\n" +
                     "return false;\n" +
                 "};\n" +
-            "</scr" + "ipt>"; 
+            "</scr" + "ipt>\n"; 
             
-            const safeCode = document.getElementById('raw-terminal').value.replace(/<\/script>/gi, '<\\/script>'); 
-            f.srcdoc = inj + '<scr'+'ipt type="module">' + safeCode + '</scr'+'ipt>'; 
+            const rawCode = document.getElementById('raw-terminal').value;
+            const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
+            
+            if (isHtml) {
+                let htmlCode = rawCode;
+                if (htmlCode.includes('<head>')) {
+                    htmlCode = htmlCode.replace('<head>', '<head>\n' + inj);
+                } else {
+                    htmlCode = inj + htmlCode;
+                }
+                f.srcdoc = htmlCode;
+            } else {
+                const safeCode = rawCode.replace(/<\/script>/gi, '<\\/script>'); 
+                f.srcdoc = inj + '<scr'+'ipt type="module">\n' + safeCode + '\n</scr'+'ipt>'; 
+            }
         },
+
         async exportZIP() { const status = document.getElementById('foot-status'); status.innerText = "ARCHIVING..."; try { const zip = new JSZip(); const folder = zip.folder("Nexus_Project"); Object.entries(Nexus.state.vfs).forEach(([f, c]) => folder.file(f, c)); const content = await zip.generateAsync({ type: "blob" }); const a = document.createElement('a'); a.href = URL.createObjectURL(content); a.download = `Nexus_v40_Bundle.zip`; a.click(); status.innerText = "EXPORTED"; setTimeout(() => { status.innerText = "READY"; }, 3000); } catch (e) { alert("Export Fault"); status.innerText = "FAULT"; } },
         nuke() { if (confirm("☢ FACTORY RESET: All data will be erased!")) { localforage.clear().then(() => location.reload()); } }
     }
