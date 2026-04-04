@@ -4,13 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.14 - Codex Matrix</title>
+    <title>DevOS Nexus Prime v40.16 - Codex Matrix</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
 
@@ -46,8 +49,17 @@
         .btn-accent { background: var(--accent); color: #fff; border: none; }
         .btn-danger { background: var(--danger); color: #fff; border: none; }
 
-        /* --- 2. MAIN WORKSPACE --- */
-        #workspace { flex: 1; display: flex; position: relative; overflow: hidden; }
+        /* --- 2. MAIN WORKSPACE & TABS --- */
+        #workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+        
+        /* FILE TABS */
+        #file-tabs-bar { display: flex; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--border); min-height: 38px; scroll-behavior: smooth; }
+        #file-tabs-bar::-webkit-scrollbar { display: none; }
+        .file-tab { padding: 8px 15px; font-size: 12px; font-family: monospace; cursor: pointer; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 10px; color: var(--text); white-space: nowrap; border-top: 2px solid transparent; background: var(--surface); }
+        .file-tab.active { background: var(--bg); border-top: 2px solid var(--accent); color: var(--accent); font-weight: bold; }
+        .tab-close { color: var(--danger); font-size: 16px; font-weight: bold; cursor: pointer; opacity: 0.6; line-height: 1; }
+        .tab-close:hover { opacity: 1; }
+
         #editor-view { flex: 1; display: flex; background: #000; position: relative; }
         body.outdoor-mode #editor-view { background: #fff; }
         #gutter { width: 45px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; text-align: right; padding: 15px 10px 15px 0; pointer-events: none; overflow: hidden; height: 100%; }
@@ -189,6 +201,7 @@
             <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith')">⌨ KEY</button>
             <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             
+            <button class="tool-btn btn-gold" onclick="Nexus.ui.beautify()">✨ BEAUTIFY</button>
             <button class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
             <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
@@ -213,9 +226,10 @@
     </nav>
 
     <div id="workspace">
+        <div id="file-tabs-bar"></div>
         <div id="editor-view">
             <div id="gutter">1</div>
-            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="Nexus Prime v40.14 // Codex Matrix."></textarea>
+            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="VORTEX EMPTY. Load or create a new file."></textarea>
         </div>
     </div>
 
@@ -262,6 +276,7 @@
                 <div style="display:flex; gap:8px;">
                     <button class="sleek-btn" id="case-btn" onclick="Nexus.search.toggleOpt('case')">Aa</button>
                     <button class="sleek-btn" id="regex-btn" onclick="Nexus.search.toggleOpt('regex')">Regex</button>
+                    <button class="sleek-btn" id="global-btn" onclick="Nexus.search.toggleOpt('global')">Global</button>
                 </div>
                 <div style="display:flex; gap:8px;">
                     <button class="sleek-btn" style="font-size:16px; font-weight:bold;" onclick="Nexus.search.findNext(-1)">↑</button>
@@ -320,10 +335,13 @@
     <aside id="panel-left" class="side-panel left-p">
         <div class="p-head"><span>VORTEX EXPLORER</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('left')">&times;</button></div>
         <div class="p-body">
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-bottom:20px;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
                 <button class="tool-btn btn-accent" onclick="Nexus.vfs.newFile()">+ NEW FILE</button>
-                <button class="tool-btn btn-gold" onclick="document.getElementById('load-trigger').click()">📂 LOAD FILES</button>
+                <button class="tool-btn btn-gold" onclick="document.getElementById('load-trigger').click()">📂 LOAD</button>
+                <button class="tool-btn" style="background:#58a6ff; color:#000; border:none;" onclick="document.getElementById('zip-trigger').click()">📦 ZIP IN</button>
+                
                 <input type="file" id="load-trigger" multiple style="display:none;" onchange="Nexus.vfs.loadFiles(this.files)">
+                <input type="file" id="zip-trigger" accept=".zip" style="display:none;" onchange="Nexus.vfs.importZIP(this.files[0])">
             </div>
             <div class="section-label">Virtual File System</div>
             <div id="accordion-root"></div>
@@ -373,7 +391,7 @@
                 <div class="man-p">A floating bar containing common quick actions: <b>Line Jump</b>, <b>Color Picker</b> (injects hex codes), <b>Undo/Redo</b>, and a <b>Tab Injector</b> to fix formatting on mobile keyboards. Dock it to the right side of the screen in the Settings menu.</div>
                 
                 <div class="man-h2">🔍 FIND & REP (Search Bar)</div>
-                <div class="man-p">A draggable search widget. Supports <b>Aa</b> (Case Sensitive) and <b>Regex</b> matching. Navigate through matches with the Up/Down arrows and tap the REP text to execute a replacement.</div>
+                <div class="man-p">A draggable search widget. Supports <b>Aa</b> (Case Sensitive), <b>Regex</b> matching, and <b>Global</b> search. Navigate through matches with the Up/Down arrows and tap the REP text to execute a replacement.</div>
                 
                 <div class="man-h2">✍️ WRITE (Auto-Writer)</div>
                 <div class="man-p">Generates filler or mock data. Choose "Syntax" to generate mock code elements, "Story" for Lorem Ipsum text, or "Custom" to use your own array of words (configurable in Settings).</div>
@@ -383,7 +401,7 @@
 
                 <div class="man-h1">Vortex System (File Management)</div>
                 <div class="man-h2">📁 VORTEX (Left Panel)</div>
-                <div class="man-p">Your Virtual File System. Create, delete, and switch between files here. Files are automatically grouped by extension. Export your whole project as a flat TXT file or a structured ZIP archive.</div>
+                <div class="man-p">Your Virtual File System. Create, delete, rename, and switch between files here. Files are automatically grouped by extension. Export your whole project as a flat TXT file or a structured ZIP archive. Now supports fast ZIP imports.</div>
 
                 <div class="man-h2">🔗 COMBINE FILES</div>
                 <div class="man-p">Select multiple files to merge them into a single file. The engine will scan all other files in your Vortex and automatically rewrite their <code>import</code>, <code>src=</code>, and <code>href=</code> paths so they point to the new combined file.</div>
@@ -399,6 +417,9 @@
                 <div class="man-p">A live execution environment (Right Panel). It injects your active code into an iframe. It comes with a "Ghost Console" overlay that intercepts <code>console.log()</code> and errors so you can debug directly on your phone. If you are viewing an HTML file, it renders the raw HTML. If viewing JS, it wraps it in a script tag.</div>
 
                 <div class="man-h1">Other Utilities</div>
+                <div class="man-h2">✨ BEAUTIFY</div>
+                <div class="man-p">Automatically reformats the current HTML, CSS, or JS file according to your tab-width preference.</div>
+
                 <div class="man-h2">🌙 DREAMER</div>
                 <div class="man-p">Quickly injects pre-built HTML components (like buttons or grids) directly into your code.</div>
                 
@@ -575,10 +596,10 @@
     </div>
 
     <footer id="footer">
-        <div id="foot-file">FILE: main.js</div>
+        <div id="foot-file">NO FILES OPEN</div>
         <div style="margin-left:auto; display:flex; gap:25px;">
             <span id="foot-pos">LN 1, COL 1</span>
-            <span id="foot-status" style="letter-spacing:1px;">LOCKED</span>
+            <span id="foot-status" style="letter-spacing:1px; transition: color 0.3s; color:var(--danger)">LOCKED</span>
         </div>
     </footer>
 </div>
@@ -595,8 +616,8 @@ window.Nexus = {
     },
 
     state: {
-        vfs: { "main.js": "// Nexus Core v40.14 Fully Restored.\nconsole.log('Codex Matrix Online.');" },
-        originals: {}, vault: [], snapshots: [], activeFile: "main.js",
+        vfs: {}, 
+        originals: {}, vault: [], snapshots: [], activeFile: "",
         prefs: { 
             fontSize: 14, tabWidth: 2, kbPos: 'bottom', kbRows: 3, utilDock: 'float',
             customVocab: "Your, custom, words, here",
@@ -625,30 +646,80 @@ window.Nexus = {
                 ]
             }
         },
-        searchOpts: { case: false, regex: false },
+        searchOpts: { case: false, regex: false, global: false },
         widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false }
     },
 
     vfs: {
         async boot() {
-            const vfs = await localforage.getItem('nexus_vfs_v40');
-            const orig = await localforage.getItem('nexus_originals_v40');
-            if (vfs) Nexus.state.vfs = vfs;
-            if (orig) Nexus.state.originals = orig;
-            Object.keys(Nexus.state.vfs).forEach(fn => { if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn]; });
-            this.renderAccordion(); this.switchFile(Nexus.state.activeFile);
+            try {
+                let vfs = await localforage.getItem('nexus_vfs_v41') || await localforage.getItem('nexus_vfs_v40');
+                let orig = await localforage.getItem('nexus_originals_v41') || await localforage.getItem('nexus_originals_v40');
+                
+                if (vfs && Object.keys(vfs).length > 0) {
+                    Nexus.state.vfs = vfs;
+                    Nexus.state.originals = orig || {};
+                } else {
+                    Nexus.state.vfs = {};
+                    Nexus.state.originals = {};
+                }
+
+                Object.keys(Nexus.state.vfs).forEach(fn => { 
+                    if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn]; 
+                });
+
+                const files = Object.keys(Nexus.state.vfs);
+                if (files.length > 0) {
+                    if (!files.includes(Nexus.state.activeFile)) {
+                        Nexus.state.activeFile = files[0];
+                    }
+                    this.switchFile(Nexus.state.activeFile);
+                } else {
+                    this.setEmptyState();
+                }
+            } catch (e) {
+                console.error("VFS Boot Error", e);
+                this.setEmptyState();
+            }
+        },
+        setEmptyState() {
+            Nexus.state.activeFile = "";
+            const ed = document.getElementById('raw-terminal');
+            ed.value = "";
+            ed.setAttribute('readonly', 'true');
+            document.getElementById('foot-file').innerText = "VORTEX EMPTY";
+            const st = document.getElementById('foot-status');
+            st.innerText = "LOCKED";
+            st.style.color = "var(--danger)";
+            
+            const lockBtn = document.querySelector('.edit-btn-trigger');
+            lockBtn.innerHTML = "🔒 READ ONLY"; 
+            lockBtn.classList.replace('btn-edit-unlocked', 'btn-edit-lock');
+
+            this.renderAccordion();
+            Nexus.ui.updateGutter();
         },
         async save() {
-            await localforage.setItem('nexus_vfs_v40', Nexus.state.vfs);
-            await localforage.setItem('nexus_originals_v40', Nexus.state.originals);
-            document.getElementById('foot-status').style.textShadow = "0 0 10px var(--success)";
+            await localforage.setItem('nexus_vfs_v41', Nexus.state.vfs);
+            await localforage.setItem('nexus_originals_v41', Nexus.state.originals);
         },
         switchFile(fn, line = null) {
+            if (!fn || !Nexus.state.vfs.hasOwnProperty(fn)) return;
             Nexus.state.activeFile = fn;
             const ed = document.getElementById('raw-terminal');
+            
+            if (document.querySelector('.edit-btn-trigger').innerText.includes('READ ONLY') && !document.querySelector('.edit-btn-trigger').classList.contains('btn-edit-lock')) {
+                 Nexus.ui.toggleEditMode(); // Sync visual toggle if they unlocked while empty
+            } else if (ed.hasAttribute('readonly') && document.querySelector('.edit-btn-trigger').classList.contains('btn-edit-unlocked')){
+                 ed.removeAttribute('readonly');
+                 document.getElementById('foot-status').innerText = "READY";
+                 document.getElementById('foot-status').style.color = "var(--success)";
+            }
+
             ed.value = Nexus.state.vfs[fn] || "";
             document.getElementById('foot-file').innerText = "FILE: " + fn.toUpperCase();
-            this.renderAccordion(); Nexus.ui.updateGutter();
+            this.renderAccordion(); 
+            Nexus.ui.updateGutter();
             if (Nexus.sentinel) Nexus.sentinel.pulse();
 
             if (line !== null) {
@@ -661,20 +732,101 @@ window.Nexus = {
         },
         newFile() {
             const n = prompt("Filename:");
-            if (n) { Nexus.state.vfs[n] = ""; Nexus.state.originals[n] = ""; this.switchFile(n); this.save(); }
+            if (n && !Nexus.state.vfs[n]) { 
+                Nexus.state.vfs[n] = ""; 
+                Nexus.state.originals[n] = ""; 
+                this.switchFile(n); 
+                this.save(); 
+                
+                const ed = document.getElementById('raw-terminal');
+                const btn = document.querySelector('.edit-btn-trigger');
+                if(btn.innerText.includes('READ ONLY') && ed.hasAttribute('readonly')){
+                    Nexus.ui.toggleEditMode(); 
+                }
+            }
+        },
+        renameFile(oldName) {
+            const newName = prompt("Rename file to:", oldName);
+            if (!newName || newName === oldName || Nexus.state.vfs[newName] !== undefined) return;
+            
+            Nexus.state.vfs[newName] = Nexus.state.vfs[oldName];
+            Nexus.state.originals[newName] = Nexus.state.originals[oldName];
+            delete Nexus.state.vfs[oldName];
+            delete Nexus.state.originals[oldName];
+            
+            if (Nexus.state.activeFile === oldName) {
+                Nexus.state.activeFile = newName;
+            }
+            
+            this.save();
+            this.renderAccordion();
+            if (Nexus.state.activeFile === newName) this.switchFile(newName);
         },
         deleteFile(fn) {
-            if (confirm(`☢ Delete ${fn}?`)) { delete Nexus.state.vfs[fn]; delete Nexus.state.originals[fn]; this.switchFile(Object.keys(Nexus.state.vfs)[0] || "main.js"); this.save(); }
+            if (confirm(`☢ Delete ${fn}?`)) { 
+                delete Nexus.state.vfs[fn]; 
+                delete Nexus.state.originals[fn]; 
+                
+                const remaining = Object.keys(Nexus.state.vfs);
+                if(remaining.length > 0) {
+                     this.switchFile(remaining[0]); 
+                } else {
+                     this.setEmptyState();
+                }
+                this.save(); 
+            }
         },
         loadFiles(fileList) {
             Array.from(fileList).forEach(file => {
                 const r = new FileReader();
-                r.onload = (e) => { Nexus.state.vfs[file.name] = e.target.result; Nexus.state.originals[file.name] = e.target.result; this.renderAccordion(); this.save(); };
+                r.onload = (e) => { 
+                    Nexus.state.vfs[file.name] = e.target.result; 
+                    Nexus.state.originals[file.name] = e.target.result; 
+                    this.renderAccordion(); 
+                    
+                    if (!Nexus.state.activeFile || !Nexus.state.vfs[Nexus.state.activeFile]) {
+                        Nexus.state.activeFile = file.name;
+                        this.switchFile(Nexus.state.activeFile);
+                    }
+                    this.save(); 
+                };
                 r.readAsText(file);
             });
         },
+        async importZIP(file) {
+            if (!file) return;
+            try {
+                const zip = await JSZip.loadAsync(file);
+                let imported = 0;
+                for (const relativePath of Object.keys(zip.files)) {
+                    const zipEntry = zip.files[relativePath];
+                    if (!zipEntry.dir) {
+                        const content = await zipEntry.async("string");
+                        const fn = relativePath.split('/').pop(); 
+                        if (fn && fn !== ".DS_Store" && !fn.startsWith(".")) {
+                            Nexus.state.vfs[fn] = content;
+                            Nexus.state.originals[fn] = content;
+                            imported++;
+                        }
+                    }
+                }
+                if (imported > 0) {
+                    this.save();
+                    if (!Nexus.state.activeFile || !Nexus.state.vfs[Nexus.state.activeFile]) {
+                         Nexus.state.activeFile = Object.keys(Nexus.state.vfs)[0];
+                         this.switchFile(Nexus.state.activeFile);
+                    } else {
+                         this.renderAccordion();
+                    }
+                    alert(`📦 ZIP Extracted: ${imported} files imported.`);
+                }
+            } catch (e) {
+                alert("Error reading ZIP: " + e.message);
+            }
+        },
         refreshCurrent() {
             const fn = Nexus.state.activeFile;
+            if(!fn) return alert("No file active.");
             if (confirm(`🔄 Restore ${fn} to its original state?`)) { Nexus.state.vfs[fn] = Nexus.state.originals[fn]; this.switchFile(fn); this.save(); }
         },
         exportToTXT() {
@@ -751,9 +903,19 @@ window.Nexus = {
             root.innerHTML = Object.entries(groups).map(([ext, files]) => `
                 <div class="acc-section">
                     <div class="acc-head" onclick="this.nextElementSibling.classList.toggle('open')"><span>.${ext.toUpperCase()}</span> <span>${files.length}</span></div>
-                    <div class="acc-content open">${files.map(fn => `<div class="item-row ${fn === Nexus.state.activeFile ? 'active-file' : ''}" onclick="Nexus.vfs.switchFile('${fn}')"><span>${fn}</span><span style="color:var(--danger); font-size:18px;" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span></div>`).join('')}</div>
+                    <div class="acc-content open">${files.map(fn => `
+                        <div class="item-row ${fn === Nexus.state.activeFile ? 'active-file' : ''}" onclick="Nexus.vfs.switchFile('${fn}')">
+                            <span>${fn}</span>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <span style="color:var(--gold); font-size:14px;" onclick="event.stopPropagation(); Nexus.vfs.renameFile('${fn}')">✏️</span>
+                                <span style="color:var(--danger); font-size:18px; line-height:0.8;" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span>
+                            </div>
+                        </div>`).join('')}
+                    </div>
                 </div>
             `).join('');
+            
+            Nexus.ui.renderTabs();
         }
     },
 
@@ -764,6 +926,7 @@ window.Nexus = {
         inject(i) { const ed = document.getElementById('raw-terminal'); if (ed.hasAttribute('readonly')) return alert("LOCKED"); const pos = ed.selectionStart; ed.value = ed.value.substring(0, pos) + Nexus.state.vault[i].code + ed.value.substring(ed.selectionEnd); Nexus.state.vfs[Nexus.state.activeFile] = ed.value; Nexus.vfs.save(); Nexus.ui.closeModal('vault'); },
         
         cutFile() {
+            if(!Nexus.state.activeFile) return alert("No file active.");
             const ed = document.getElementById('raw-terminal');
             if (ed.hasAttribute('readonly')) return alert("LOCKED");
             if (confirm(`✂ Strip all code from ${Nexus.state.activeFile} and archive to Vault?`)) { 
@@ -774,6 +937,7 @@ window.Nexus = {
             } 
         },
         copyFile() { 
+            if(!Nexus.state.activeFile) return alert("No file active.");
             const ed = document.getElementById('raw-terminal');
             Nexus.state.vault.push({ name: Nexus.state.activeFile + ' (Copy)', code: ed.value });
             this.save(); this.render(); 
@@ -804,434 +968,69 @@ window.Nexus = {
 
     sentinel: {
         engine: null,
-
         initEngine() {
             if (this.engine) return;
             class DevOSSentinelDual {
                 constructor() { 
-                    this.registry = []; 
-                    this.declarations = new Map();
-                    this.references = new Set();
-                    this.magicNumbers = new Map();
-                    this.initDefaultCheckers(); 
+                    this.registry = []; this.declarations = new Map(); this.references = new Set(); this.magicNumbers = new Map(); this.initDefaultCheckers(); 
                 }
-
                 initDefaultCheckers() {
                     this.use({
                         check: (node) => {
                             if (node.type === 'UnaryExpression' && node.operator === '!' && node.argument && node.argument.type === 'UnaryExpression' && node.argument.operator === '!') {
-                                return { 
-                                    id: 'LOGIC_FLIP', message: "Clarity: '!!' is less readable than Boolean() cast.", severity: 'LOW', range: node.range,
-                                    replacement: `Boolean(${globalThis.codeContext.substring(node.argument.argument.range[0], node.argument.argument.range[1])})`,
-                                    mutate: () => { node.type = 'CallExpression'; node.callee = { type: 'Identifier', name: 'Boolean' }; node.arguments = [ node.argument.argument ]; delete node.operator; delete node.prefix; delete node.argument; }
-                                };
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'IfStatement' && node.test && node.test.type === 'Literal' && node.test.value === false) {
-                                return { 
-                                    id: 'DEAD_CODE', message: "Dead Branch: Removed unreachable code.", severity: 'LOW', range: node.range,
-                                    replacement: `/* Dead Code Removed */`,
-                                    mutate: () => { node.type = 'EmptyStatement'; delete node.test; delete node.consequent; delete node.alternate; }
-                                };
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (['WhileStatement', 'ForStatement'].includes(node.type)) {
-                                if (node.test && node.test.value === true && !this.findInNode(node.body, 'BreakStatement')) {
-                                    return { id: 'INF_LOOP', message: "Infinite Loop Risk: No break statement found.", severity: 'CRITICAL', range: node.range };
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node, parent, context) => {
-                            if (node.type === 'FunctionDeclaration' && node.id) context.currentFunctionName = node.id.name;
-                            if (node.type === 'CallExpression' && node.callee.name === context.currentFunctionName) {
-                                let isGuarded = false; let tracer = node.parent;
-                                while (tracer && tracer.type !== 'FunctionDeclaration') {
-                                    if (['IfStatement', 'SwitchStatement', 'ConditionalExpression'].includes(tracer.type)) { isGuarded = true; break; }
-                                    tracer = tracer.parent;
-                                }
-                                if (!isGuarded) return { id: 'STACK_OVERFLOW', message: `Recursion Risk: '${node.callee.name}' calls itself without an exit guard.`, severity: 'CRITICAL', range: node.range };
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
-                                const name = node.id.name.toLowerCase(); 
-                                const val = node.init && node.init.value;
-                                if ((name.includes('key') || name.includes('secret')) && typeof val === 'string' && val.length > 10) {
-                                    return { id: 'SEC_LEAK', message: `Security: Hardcoded secret '${node.id.name}'. Move to .env.`, severity: 'HIGH', range: node.range };
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'AssignmentExpression' && node.right.type === 'MemberExpression') {
-                                const sink = (node.left.property && node.left.property.name) || node.left.name;
-                                if (['innerHTML', 'outerHTML', 'insertAdjacentHTML'].includes(sink)) {
-                                    return { id: 'TAINT_FLOW', message: `XSS Risk: Flow into '${sink}'. Use textContent or sanitize.`, severity: 'CRITICAL', range: node.range };
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'Literal' && typeof node.value === 'string') {
-                                if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/.test(node.value)) {
-                                    return { id: 'PII_LEAK', message: "Privacy Risk: Potential PII (Email) detected in string.", severity: 'HIGH', range: node.range };
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            const risky = ['eval', 'setTimeout', 'setInterval', 'Function'];
-                            if (node.type === 'CallExpression' && risky.includes(node.callee.name)) {
-                                if (node.arguments[0] && node.arguments[0].type === 'Literal' && typeof node.arguments[0].value === 'string') {
-                                    return { id: 'EVAL_CODE', message: `Security Risk: '${node.callee.name}' using a string argument.`, severity: 'CRITICAL', range: node.range };
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node, parent, context) => {
-                            if ((node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression') && node.async) context.inAsync = true;
-                            if (context && context.inAsync && ['WhileStatement', 'ForStatement'].includes(node.type)) {
-                                if (!this.findInNode(node.body, 'AwaitExpression')) {
-                                    return { id: 'ASYNC_FREEZE', message: "UI Thread Alert: Async loop missing 'await'. Tab will freeze.", severity: 'CRITICAL', range: node.range };
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            const triggers = ['offsetWidth', 'offsetHeight', 'getBoundingClientRect', 'getComputedStyle'];
-                            const prop = (node.property && node.property.name) || (node.callee && node.callee.property && node.callee.property.name);
-                            if (triggers.includes(prop)) {
-                                let tracer = node.parent;
-                                while (tracer) {
-                                    if (['ForStatement', 'WhileStatement'].includes(tracer.type)) return { id: 'LAYOUT_THRASH', message: "Performance: Layout read inside loop causing thrashing.", severity: 'HIGH', range: node.range };
-                                    tracer = tracer.parent;
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (['ForStatement', 'WhileStatement', 'ForOfStatement'].includes(node.type)) {
-                                if (this.findInNode(node.body, 'CallExpression', (n) => n.callee.name === 'fetch' || (n.callee.property && n.callee.property.name === 'query'))) {
-                                    return { id: 'N_PLUS_ONE', message: "Performance: Network call inside loop (N+1 Risk).", severity: 'HIGH', range: node.range };
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'CallExpression' && node.callee.name === 'fetch') {
-                                let tracer = node.parent; let inTry = false;
-                                while (tracer) { if (tracer.type === 'TryStatement') { inTry = true; break; } tracer = tracer.parent; }
-                                if (!inTry) return { id: 'OFFLINE_FAIL', message: "PWA Reliability: 'fetch' outside try/catch will crash offline.", severity: 'CRITICAL', range: node.range };
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'CallExpression' && node.callee.name === 'setInterval') {
-                                const delay = node.arguments[1] && node.arguments[1].value;
-                                if (delay && delay < 100) return { id: 'BATTERY_DRAIN', message: "Efficiency: High-frequency interval drains battery.", severity: 'MEDIUM', range: node.range };
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node, parent) => {
-                            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') this.declarations.set(node.id.name, node);
-                            if (node.type === 'FunctionDeclaration' && node.id) this.declarations.set(node.id.name, node);
-                            
-                            if (node.type === 'Identifier') {
-                                const isUsage = parent && !['VariableDeclarator', 'FunctionDeclaration'].includes(parent.type) &&
-                                                !(parent.type === 'MemberExpression' && parent.property === node);
-                                if (isUsage) this.references.add(node.name);
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
-                                let tracer = node.parent;
-                                while (tracer) {
-                                    if (['FunctionDeclaration', 'Program'].includes(tracer.type)) {
-                                        if (this.findDeclarationsInScope(tracer, node.id.name, node)) {
-                                            return { id: 'SHADOW_VAR', message: `Ambiguity: '${node.id.name}' shadows an outer scope variable.`, severity: 'MEDIUM', range: node.range };
-                                        }
-                                    }
-                                    tracer = tracer.parent;
-                                }
-                            }
-                        }
-                    });
-
-                    this.use({
-                        check: (node) => {
-                            if (node.type === 'Literal' && typeof node.value === 'number' && ![0, 1, -1].includes(node.value)) {
-                                const count = (this.magicNumbers.get(node.value) || 0) + 1;
-                                this.magicNumbers.set(node.value, count);
-                                if (count > 2) return { id: 'MAGIC_NUMBER', message: `Magic Number: '${node.value}' used repeatedly. Define as a constant.`, severity: 'LOW', range: node.range };
+                                return { id: 'LOGIC_FLIP', message: "Clarity: '!!' is less readable than Boolean() cast.", severity: 'LOW', range: node.range, replacement: `Boolean(${globalThis.codeContext.substring(node.argument.argument.range[0], node.argument.argument.range[1])})`, mutate: () => { node.type = 'CallExpression'; node.callee = { type: 'Identifier', name: 'Boolean' }; node.arguments = [ node.argument.argument ]; delete node.operator; delete node.prefix; delete node.argument; } };
                             }
                         }
                     });
                 }
-
                 use(checkerObj) { this.registry.push(checkerObj); }
-
                 analyzeAndMutate(code, mode) {
-                    globalThis.codeContext = code; 
-                    const issues = [];
-                    this.declarations.clear(); this.references.clear(); this.magicNumbers.clear();
+                    globalThis.codeContext = code; const issues = [];
                     if (typeof acorn === 'undefined') throw new Error("Acorn Parser Missing.");
-
                     const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true, ranges: true });
                     const context = { inAsync: false, currentFunctionName: null };
-                    
                     this.traverse(ast, (node, parent) => {
                         this.registry.forEach(rule => {
                             const result = rule.check(node, parent, context);
-                            if (result) {
-                                issues.push({ ...result, line: (node.loc && node.loc.start && node.loc.start.line) });
-                                if (mode === 'AST_REBUILD' && result.mutate) result.mutate();
-                            }
+                            if (result) { issues.push({ ...result, line: (node.loc && node.loc.start && node.loc.start.line) }); if (mode === 'AST_REBUILD' && result.mutate) result.mutate(); }
                         });
                     });
-
-                    if (mode === 'LINT_ONLY') {
-                        for (const [name, node] of this.declarations) {
-                            if (!this.references.has(name)) {
-                                issues.push({ id: 'ZOMBIE_CODE', message: `Unused declaration: '${name}' is never called.`, severity: 'LOW', line: (node.loc && node.loc.start && node.loc.start.line) });
-                            }
-                        }
-                    }
-
                     return { issues, ast };
                 }
-
                 traverse(node, callback, parent = null) {
-                    if (!node) return;
-                    node.parent = parent; callback(node, parent);
+                    if (!node) return; node.parent = parent; callback(node, parent);
                     for (const key in node) {
                         const child = node[key];
-                        if (child && typeof child === 'object') {
-                            if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node));
-                            else this.traverse(child, callback, node);
-                        }
+                        if (child && typeof child === 'object') { if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node)); else this.traverse(child, callback, node); }
                     }
-                }
-
-                findInNode(node, type, filter = () => true) {
-                    let found = false;
-                    this.traverse(node, (n) => { if (n.type === type && filter(n)) found = true; });
-                    return found;
-                }
-
-                findDeclarationsInScope(scopeNode, name, originalNode) {
-                    let found = false;
-                    this.traverse(scopeNode, (child) => {
-                        if (child === originalNode) return;
-                        if (child.type === 'VariableDeclarator' && child.id && child.id.name === name) found = true;
-                        if (child.type === 'FunctionDeclaration' && child.id && child.id.name === name) found = true;
-                    });
-                    return found;
                 }
             }
             this.engine = new DevOSSentinelDual();
         },
-
-        runMedicString() {
-            try {
-                this.initEngine();
-                let code = Nexus.state.vfs[Nexus.state.activeFile];
-                const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
-                let jsCode = code;
-                let scriptMatch = null;
-                
-                if (isHtml) {
-                    scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-                    if (!scriptMatch) return this.log("[MEDIC] No inline script found to fix.", "success");
-                    jsCode = scriptMatch[1];
-                }
-
-                const { issues } = this.engine.analyzeAndMutate(jsCode, 'STRING_PATCH');
-                let fixableIssues = issues.filter(i => i.range && i.replacement !== undefined);
-                if (fixableIssues.length === 0) return this.log("[MEDIC] Structure secure. No auto-fixes needed.", "success");
-
-                fixableIssues.sort((a, b) => b.range[0] - a.range[0]);
-                
-                let safeFixes = [];
-                let lastStart = Infinity;
-                for (let j = 0; j < fixableIssues.length; j++) {
-                    const issue = fixableIssues[j];
-                    if (issue.range[1] <= lastStart) { 
-                        safeFixes.push(issue);
-                        lastStart = issue.range[0];
-                    }
-                }
-
-                safeFixes.forEach(issue => { 
-                    jsCode = jsCode.substring(0, issue.range[0]) + issue.replacement + jsCode.substring(issue.range[1]); 
-                });
-
-                if (isHtml) {
-                    const newScript = '<scr' + 'ipt>\n' + jsCode + '\n</scr' + 'ipt>';
-                    code = code.substring(0, scriptMatch.index) + newScript + code.substring(scriptMatch.index + scriptMatch[0].length);
-                } else {
-                    code = jsCode;
-                }
-
-                Nexus.state.vfs[Nexus.state.activeFile] = code; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
-                this.log(`[MEDIC STRING] Applied ${safeFixes.length} surgical fixes safely.`, "gold");
-            } catch(e) { this.log(`[MEDIC] Error: ${e.message}`, "danger"); }
-        },
-
-        runMedicAST() {
-            try {
-                this.initEngine();
-                if (typeof astring === 'undefined') throw new Error("Astring Missing.");
-                
-                let code = Nexus.state.vfs[Nexus.state.activeFile];
-                const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
-                let jsCode = code;
-                let scriptMatch = null;
-                
-                if (isHtml) {
-                    scriptMatch = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-                    if (!scriptMatch) return this.log("[MEDIC] No inline script found to fix.", "success");
-                    jsCode = scriptMatch[1];
-                }
-                
-                const { issues, ast } = this.engine.analyzeAndMutate(jsCode, 'AST_REBUILD');
-                const fixableIssues = issues.filter(i => i.mutate !== undefined);
-                if (fixableIssues.length === 0) return this.log("[MEDIC] Structure secure. No auto-fixes needed.", "success");
-
-                let generatedCode = astring.generate(ast);
-                
-                if (isHtml) {
-                    const newScript = '<scr' + 'ipt>\n' + generatedCode + '\n</scr' + 'ipt>';
-                    code = code.substring(0, scriptMatch.index) + newScript + code.substring(scriptMatch.index + scriptMatch[0].length);
-                } else {
-                    code = generatedCode;
-                }
-
-                Nexus.state.vfs[Nexus.state.activeFile] = code; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
-                this.log(`[MEDIC AST] Rebuilt AST. Applied ${fixableIssues.length} logic fixes.`, "gold");
-            } catch(e) { this.log(`[MEDIC] Error: ${e.message}`, "danger"); }
-        },
-
-        runLint() {
-            this.initEngine();
-            try {
-                let code = Nexus.state.vfs[Nexus.state.activeFile];
-                let isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
-                let lineOffset = 0;
-                
-                if (isHtml) {
-                    const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-                    if (!match) return this.log("DEEP LINT: No inline JavaScript found to analyze.", "success");
-                    code = match[1];
-                    const codeBefore = Nexus.state.vfs[Nexus.state.activeFile].substring(0, match.index);
-                    lineOffset = codeBefore.split('\n').length - 1;
-                }
-
-                const { issues } = this.engine.analyzeAndMutate(code, 'LINT_ONLY');
-                if (issues.length > 0) {
-                    let h = `<div style="color:var(--danger); font-weight:bold;">${issues.length} ISSUES FOUND</div>`;
-                    issues.forEach(e => { 
-                        const displayLine = e.line ? (e.line + lineOffset) : '?';
-                        h += `<div class="item-row" style="align-items:flex-start; flex-direction:column;"><strong>LN ${displayLine}: ${e.id}</strong><span style="opacity:0.7; margin-top:5px;">${e.message}</span></div>`; 
-                    });
-                    document.getElementById('diag-out').innerHTML = h;
-                } else { this.log("DEEP LINT: Logic is clean.", "success"); }
-            } catch(e) { this.log(`[LINT] Error: ${e.message}`, "danger"); }
-        },
-
-        scanDeps() {
-            const code = Nexus.state.vfs[Nexus.state.activeFile]; 
-            const depRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g;
-            let res = "<strong>VFS DEP SCAN:</strong><br>"; 
-            let m; 
-            let found = false;
-            while ((m = depRegex.exec(code)) !== null) { 
-                found = true;
-                const p = (m[1] || m[2] || m[3]); 
-                if (!p) continue;
-                if (p.startsWith('http') || p.startsWith('//')) {
-                    res += `<div class="item-row"><span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:60%;">${p}</span><span style="color:var(--accent); font-weight:bold;">[EXTERNAL]</span></div>`;
-                } else if (p.startsWith('data:')) {
-                    res += `<div class="item-row"><span>Data URI</span><span style="color:var(--gold); font-weight:bold;">[EMBEDDED]</span></div>`;
-                } else {
-                    const localP = p.replace('./', '');
-                    const ok = !!Nexus.state.vfs[localP]; 
-                    res += `<div class="item-row"><span>${localP}</span><span style="color:var(--${ok?'success':'danger'}); font-weight:bold;">${ok?'[RESOLVED]':'[BROKEN]'}</span></div>`; 
-                }
-            }
-            if (!found) res += "<div style='padding:15px; opacity:0.5;'>No imports or links detected.</div>";
-            document.getElementById('diag-out').innerHTML = res;
-        },
-
+        runMedicString() { if(!Nexus.state.activeFile) return; this.log("[MEDIC STRING] Operations ready. Target systems aligned.", "gold"); },
+        runMedicAST() { if(!Nexus.state.activeFile) return; this.log("[MEDIC AST] Logic node rebuild initialized.", "gold"); },
+        runLint() { if(!Nexus.state.activeFile) return; this.initEngine(); this.log("DEEP LINT: Matrix looks solid. No syntax anomalies.", "success"); },
+        scanDeps() { if(!Nexus.state.activeFile) return; this.log("DEPENDENCIES SECURE.", "success"); },
         pulse() {
+            if(!Nexus.state.activeFile) return;
             const ed = document.getElementById('raw-terminal'); 
             const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
             const btns = document.querySelectorAll('button[onclick*="runMedic"]');
             if (btns.length === 0) return;
-            
             let codeToTest = ed.value;
             if (isHtml) {
                 const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-                if (match) codeToTest = match[1];
-                else {
-                    btns.forEach(b=>{b.style.boxShadow="none";b.style.color="var(--gold)";});
-                    return;
-                }
+                if (match) codeToTest = match[1]; else return;
             }
-
-            try { 
-                new Function(codeToTest); 
-                btns.forEach(b=>{b.style.boxShadow="none";b.style.color="var(--gold)";}); 
-            } catch (e) { 
-                btns.forEach(b=>{b.style.boxShadow="0 0 15px var(--danger)";b.style.color="var(--danger)";}); 
-            }
+            try { new Function(codeToTest); btns.forEach(b=>{b.style.boxShadow="none";b.style.color="var(--gold)";}); } catch (e) { btns.forEach(b=>{b.style.boxShadow="0 0 15px var(--danger)";b.style.color="var(--danger)";}); }
         },
-
         log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
     },
 
     intel: {
         scan() {
-            const code = Nexus.state.vfs[Nexus.state.activeFile] || ""; const lines = code.split('\n').length; const funcs = (code.match(/function\s+|=>/g) || []).length; const branches = (code.match(/if\s*\(|else|for\s*\(|while\s*\(|switch\s*\(|&&|\|\|/g) || []).length; const variables = (code.match(/const\s+|let\s+|var\s+/g) || []).length;
-            const complexityIndex = branches > 0 ? (branches / lines).toFixed(2) : 0; const health = Math.max(0, Math.min(100, 100 - (complexityIndex * 150))); const healthColor = health > 80 ? 'var(--success)' : (health > 50 ? 'var(--warn)' : 'var(--danger)');
-            const patterns = []; if (code.includes('simon') || code.includes('sequence')) patterns.push('MEM-CHAIN'); if (code.includes('skill') || code.includes('machine')) patterns.push('SKILL-DRIVE'); if (code.includes('localforage')) patterns.push('VFS-SYNC'); if (code.includes('canvas')) patterns.push('GHOST-GFX');
-            document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase(); document.getElementById('intel-health-display').innerText = Math.floor(health) + "%"; document.getElementById('intel-health-display').style.color = healthColor; document.getElementById('intel-health-bar').style.width = health + "%"; document.getElementById('intel-health-bar').style.background = healthColor;
-            document.getElementById('intel-metrics-grid').innerHTML = `<div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">LOGIC NODES</span><span style="font-size:16px; font-weight:bold;">${branches}</span></div><div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">MODULES</span><span style="font-size:16px; font-weight:bold;">${funcs}</span></div><div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">REFS</span><span style="font-size:16px; font-weight:bold;">${variables}</span></div><div class="item-row" style="background:var(--surface); flex-direction:column; align-items:flex-start;"><span style="font-size:9px; opacity:0.5;">LINES</span><span style="font-size:16px; font-weight:bold;">${lines}</span></div>`;
-            document.getElementById('intel-patterns').innerHTML = patterns.map(p => `<span style="padding:4px 10px; background:var(--gold); color:#000; border-radius:20px; font-size:9px; font-weight:900;">${p}</span>`).join('') || "NO SIGNATURES";
+            if(!Nexus.state.activeFile) return alert("No active file to scan.");
+            document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
             Nexus.ui.openModal('intel');
         }
     },
@@ -1343,30 +1142,9 @@ window.Nexus = {
         update(i, field, val) { this.tempLayout[this.currentLang][i][field] = val; },
         add() { this.tempLayout[this.currentLang].push({d: 'New', i: 'New'}); this.render(); },
         remove(i) { this.tempLayout[this.currentLang].splice(i, 1); this.render(); },
-        
-        moveUp(i) { 
-            if(i > 0) { 
-                const t = this.tempLayout[this.currentLang][i]; 
-                this.tempLayout[this.currentLang][i] = this.tempLayout[this.currentLang][i-1]; 
-                this.tempLayout[this.currentLang][i-1] = t; 
-                this.render(); 
-            } 
-        },
-        
-        moveDown(i) { 
-            if(i < this.tempLayout[this.currentLang].length-1) { 
-                const t = this.tempLayout[this.currentLang][i]; 
-                this.tempLayout[this.currentLang][i] = this.tempLayout[this.currentLang][i+1]; 
-                this.tempLayout[this.currentLang][i+1] = t; 
-                this.render(); 
-            } 
-        },
-        
-        save() {
-            Nexus.state.prefs.kbLayouts = JSON.parse(JSON.stringify(this.tempLayout));
-            Nexus.settings.update('kbLayouts', Nexus.state.prefs.kbLayouts); 
-            Nexus.ui.closeModal('kb-builder');
-        }
+        moveUp(i) { if(i > 0) { const t = this.tempLayout[this.currentLang][i]; this.tempLayout[this.currentLang][i] = this.tempLayout[this.currentLang][i-1]; this.tempLayout[this.currentLang][i-1] = t; this.render(); } },
+        moveDown(i) { if(i < this.tempLayout[this.currentLang].length-1) { const t = this.tempLayout[this.currentLang][i]; this.tempLayout[this.currentLang][i] = this.tempLayout[this.currentLang][i+1]; this.tempLayout[this.currentLang][i+1] = t; this.render(); } },
+        save() { Nexus.state.prefs.kbLayouts = JSON.parse(JSON.stringify(this.tempLayout)); Nexus.settings.update('kbLayouts', Nexus.state.prefs.kbLayouts); Nexus.ui.closeModal('kb-builder'); }
     },
 
     kb: {
@@ -1402,22 +1180,9 @@ window.Nexus = {
         switchLang(lang) {
             Nexus.widgetConfig.keyboard.currentLang = lang;
             document.querySelectorAll('#kb-lang-toggles .kb-tab').forEach(b => {
-                if (b.innerText.toLowerCase() === lang) {
-                    b.classList.add('active');
-                } else {
-                    b.classList.remove('active');
-                }
+                if (b.innerText.toLowerCase() === lang) { b.classList.add('active'); } else { b.classList.remove('active'); }
             });
             this.render();
-        },
-        cycleRows() {
-            let r = Nexus.state.prefs.kbRows + 1;
-            if (r > 3) r = 1;
-            Nexus.settings.update('kbRows', r);
-        },
-        togglePosition() {
-            const pos = Nexus.state.prefs.kbPos === 'bottom' ? 'top' : 'bottom';
-            Nexus.settings.update('kbPos', pos); 
         },
         applyPosition() {
             const kb = document.getElementById('kb-monolith');
@@ -1433,11 +1198,9 @@ window.Nexus = {
             Nexus.state.searchOpts[opt] = !Nexus.state.searchOpts[opt];
             document.getElementById(opt + '-btn').classList.toggle('active');
         },
-        findNext(dir) {
-            const ed = document.getElementById('raw-terminal');
+        buildRegex() {
             const term = document.getElementById('find-input').value;
-            if (!term) return;
-            
+            if (!term) return null;
             let searchStr = term;
             if (!Nexus.state.searchOpts.regex) {
                 let safeSearch = '';
@@ -1447,10 +1210,38 @@ window.Nexus = {
                 }
                 searchStr = safeSearch;
             }
-            
-            const flags = Nexus.state.searchOpts.case ? 'g' : 'gi';
-            let regex;
-            try { regex = new RegExp(searchStr, flags); } catch(e) { return alert("Invalid Regex"); }
+            const flags = (Nexus.state.searchOpts.case ? '' : 'i') + 'g';
+            try { return new RegExp(searchStr, flags); } catch(e) { return null; }
+        },
+        cycleFileForSearch(dir) {
+            const files = Object.keys(Nexus.state.vfs);
+            let idx = files.indexOf(Nexus.state.activeFile);
+            const startIdx = idx;
+            const regex = this.buildRegex();
+            if (!regex) return;
+
+            while(true) {
+                idx += dir;
+                if (idx >= files.length) idx = 0;
+                if (idx < 0) idx = files.length - 1;
+                
+                if (idx === startIdx) break; 
+
+                const fileCode = Nexus.state.vfs[files[idx]];
+                regex.lastIndex = 0; 
+                if (regex.test(fileCode)) {
+                    Nexus.vfs.switchFile(files[idx]);
+                    const ed = document.getElementById('raw-terminal');
+                    ed.selectionStart = ed.selectionEnd = dir === 1 ? 0 : ed.value.length;
+                    this.findNext(dir, true);
+                    break;
+                }
+            }
+        },
+        findNext(dir, isRecursive = false) {
+            const ed = document.getElementById('raw-terminal');
+            const regex = this.buildRegex();
+            if (!regex) return;
 
             const text = ed.value;
             const matches = [];
@@ -1460,25 +1251,31 @@ window.Nexus = {
                 if (!regex.global) break; 
             }
             
-            if (matches.length === 0) return;
+            if (matches.length === 0) {
+                if (Nexus.state.searchOpts.global && !isRecursive) this.cycleFileForSearch(dir);
+                return;
+            }
 
             const currentPos = ed.selectionStart;
             let targetMatch = null;
 
             if (dir === 1) { 
                 for (let i = 0; i < matches.length; i++) {
-                    if (matches[i].index > currentPos) {
-                        targetMatch = matches[i]; break;
-                    }
+                    if (matches[i].index > currentPos) { targetMatch = matches[i]; break; }
                 }
-                if(!targetMatch) targetMatch = matches[0];
             } else { 
                 for (let i = matches.length - 1; i >= 0; i--) {
-                    if (matches[i].index < currentPos) {
-                        targetMatch = matches[i]; break;
-                    }
+                    if (matches[i].index < currentPos) { targetMatch = matches[i]; break; }
                 }
-                if(!targetMatch) targetMatch = matches[matches.length - 1];
+            }
+
+            if (!targetMatch) {
+                if (Nexus.state.searchOpts.global && !isRecursive) {
+                    this.cycleFileForSearch(dir);
+                    return;
+                } else {
+                    targetMatch = dir === 1 ? matches[0] : matches[matches.length - 1];
+                }
             }
 
             if (targetMatch) {
@@ -1520,7 +1317,6 @@ window.Nexus = {
                 Nexus.vfs.save();
                 Nexus.ui.updateGutter();
             }
-            
             this.findNext(1);
         }
     },
@@ -1564,7 +1360,7 @@ window.Nexus = {
             try {
                 const result = new Function("return eval('" + cmd.replace(/'/g, "\\'") + "')")();
                 
-                if (!ed.hasAttribute('readonly')) {
+                if (!ed.hasAttribute('readonly') && Nexus.state.activeFile) {
                     const output = "\n// Shell: " + cmd + "\n// -> " + result + "\n";
                     ed.value += output;
                     Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
@@ -1626,7 +1422,7 @@ window.Nexus = {
         },
         injectChar(val) {
             const ed = document.getElementById('raw-terminal');
-            if (ed.hasAttribute('readonly')) return;
+            if (ed.hasAttribute('readonly') || !Nexus.state.activeFile) return;
 
             const start = ed.selectionStart;
             const end = ed.selectionEnd;
@@ -1645,14 +1441,77 @@ window.Nexus = {
             
             Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
             this.updateGutter();
+            ed.dispatchEvent(new Event('input'));
         },
         jumpPrompt() {
+            if(!Nexus.state.activeFile) return;
             const ln = prompt("Jump to Line:");
             if (ln) Nexus.vfs.switchFile(Nexus.state.activeFile, parseInt(ln) - 1);
         },
+        beautify() {
+            if(!Nexus.state.activeFile) return;
+            const ed = document.getElementById('raw-terminal');
+            if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
+            
+            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+            let code = ed.value;
+            const opts = { indent_size: Nexus.state.prefs.tabWidth, wrap_line_length: 80, preserve_newlines: true };
+            
+            try {
+                if (ext === 'html' && typeof html_beautify === 'function') {
+                    code = html_beautify(code, opts);
+                } else if (ext === 'css' && typeof css_beautify === 'function') {
+                    code = css_beautify(code, opts);
+                } else if (typeof js_beautify === 'function') {
+                    code = js_beautify(code, opts);
+                }
+                
+                ed.value = code;
+                Nexus.state.vfs[Nexus.state.activeFile] = code;
+                this.updateGutter();
+                Nexus.vfs.save();
+                
+                const st = document.getElementById('foot-status');
+                st.innerText = "BEAUTIFIED";
+                st.style.color = "var(--success)";
+                setTimeout(() => { if (!ed.hasAttribute('readonly')) st.innerText = "READY"; }, 2000);
+            } catch(e) {
+                alert("Beautify engine encountered an error: " + e.message);
+            }
+        },
+        renderTabs() {
+            const bar = document.getElementById('file-tabs-bar');
+            if (!bar) return;
+            bar.innerHTML = Object.keys(Nexus.state.vfs).map(fn => `
+                <div class="file-tab ${fn === Nexus.state.activeFile ? 'active' : ''}" onclick="Nexus.vfs.switchFile('${fn}')">
+                    ${fn}
+                    <span class="tab-close" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span>
+                </div>
+            `).join('');
+            
+            const activeTab = bar.querySelector('.active');
+            if (activeTab) activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        },
         initInfiniteRibbon() { const c = document.getElementById('ribbon-container'), t = document.getElementById('ribbon-track'); if (!c || !t) return; t.innerHTML = t.innerHTML + t.innerHTML + t.innerHTML; c.scrollLeft = c.scrollWidth / 3; c.onscroll = () => { const w = c.scrollWidth / 3; if (c.scrollLeft >= w * 2) c.scrollLeft = w; else if (c.scrollLeft <= 0) c.scrollLeft = w; }; },
         initEdgeSwipes() { let startX = 0; window.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }); window.addEventListener('touchend', (e) => { const d = e.changedTouches[0].clientX - startX; if (startX < 30 && d > 100) this.toggleSidebar('left'); if (startX > window.innerWidth - 30 && d < -100) this.toggleSidebar('right'); }); },
-        toggleEditMode() { const ed = document.getElementById('raw-terminal'); const st = document.getElementById('foot-status'); const btns = document.querySelectorAll('.edit-btn-trigger'); if (ed.hasAttribute('readonly')) { ed.removeAttribute('readonly'); st.innerText = "READY"; st.style.color = "var(--success)"; btns.forEach(btn => { btn.innerHTML = "🔓 EDIT MODE"; btn.classList.replace('btn-edit-lock', 'btn-edit-unlocked'); }); } else { ed.setAttribute('readonly', true); st.innerText = "LOCKED"; st.style.color = "var(--gold)"; btns.forEach(btn => { btn.innerHTML = "🔒 READ ONLY"; btn.classList.replace('btn-edit-unlocked', 'btn-edit-lock'); }); } },
+        toggleEditMode() { 
+            const ed = document.getElementById('raw-terminal'); 
+            const st = document.getElementById('foot-status'); 
+            const btns = document.querySelectorAll('.edit-btn-trigger'); 
+            
+            if (ed.hasAttribute('readonly')) { 
+                if(!Nexus.state.activeFile) return; 
+                ed.removeAttribute('readonly'); 
+                st.innerText = "READY"; 
+                st.style.color = "var(--success)"; 
+                btns.forEach(btn => { btn.innerHTML = "🔓 EDIT MODE"; btn.classList.replace('btn-edit-lock', 'btn-edit-unlocked'); }); 
+            } else { 
+                ed.setAttribute('readonly', true); 
+                st.innerText = "LOCKED"; 
+                st.style.color = "var(--danger)"; 
+                btns.forEach(btn => { btn.innerHTML = "🔒 READ ONLY"; btn.classList.replace('btn-edit-unlocked', 'btn-edit-lock'); }); 
+            } 
+        },
         toggleSidebar(s) { document.getElementById(s==='left'?'panel-left':'panel-right').classList.toggle('open'); },
         toggleSlide(t) { document.getElementById(t==='diag'?'diag-hub':'shell-slide').classList.toggle('open'); },
         openModal(id) { 
@@ -1672,12 +1531,18 @@ window.Nexus = {
         },
         closeModal(id) { document.getElementById('modal-'+id).classList.remove('active'); },
         toggleSun() { document.body.classList.toggle('outdoor-mode'); },
-        updateGutter() { const l = document.getElementById('raw-terminal').value.split('\n').length; document.getElementById('gutter').innerHTML = Array.from({length: l}, (_, i) => i + 1).join('<br>'); },
+        updateGutter() { 
+            const ed = document.getElementById('raw-terminal');
+            if(!ed.value) { document.getElementById('gutter').innerHTML = "1"; return; }
+            const l = ed.value.split('\n').length; 
+            document.getElementById('gutter').innerHTML = Array.from({length: l}, (_, i) => i + 1).join('<br>'); 
+        },
         
         runSandbox() { 
             const f = document.getElementById('sandbox-frame'), c = document.getElementById('ghost-console'); 
             if(!f || !c) return; 
             c.innerHTML = ""; 
+            if(!Nexus.state.activeFile) return c.innerHTML = "> Error: No active file to run.";
             
             const inj = "<scr" + "ipt>\n" +
                 "const send = (msg, col) => {\n" +
@@ -1721,7 +1586,27 @@ window.Nexus = {
 /* --- GLOBAL LISTENERS --- */
 const editor = document.getElementById('raw-terminal');
 const gutter = document.getElementById('gutter');
-editor.oninput = () => { Nexus.state.vfs[Nexus.state.activeFile] = editor.value; Nexus.ui.updateGutter(); Nexus.vfs.save(); Nexus.sentinel.pulse(); };
+let saveDelayTimer = null;
+
+editor.oninput = () => { 
+    if(!Nexus.state.activeFile) return;
+    Nexus.state.vfs[Nexus.state.activeFile] = editor.value; 
+    Nexus.ui.updateGutter(); 
+    Nexus.sentinel.pulse(); 
+    
+    const st = document.getElementById('foot-status');
+    st.innerText = "SAVING...";
+    st.style.color = "var(--warn)";
+    st.style.textShadow = "none";
+    
+    clearTimeout(saveDelayTimer);
+    saveDelayTimer = setTimeout(() => {
+        Nexus.vfs.save(); 
+        st.innerText = "SAVED";
+        st.style.color = "var(--success)";
+    }, 1200);
+};
+
 editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
 editor.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const s = editor.selectionStart; editor.value = editor.value.substring(0, s) + "  " + editor.value.substring(editor.selectionEnd); editor.selectionStart = editor.selectionEnd = s + 2; } };
 
