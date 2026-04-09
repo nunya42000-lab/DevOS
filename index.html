@@ -17,193 +17,233 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
 
-    <style>
-        :root {
-            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
-            --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
-            --success: #3fb950; --warn: #d29922; --danger: #f85149;
-            --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            --sidebar-w: 88vw; --sidebar-max: 450px;
-        }
 
-        body.outdoor-mode {
-            --bg: #ffffff; --panel: #f6f8fa; --surface: #ffffff;
-            --border: #d0d7de; --text: #24292f; --accent: #0969da;
-            --gold: #9a6700;
-        }
+<style>
+    :root {
+        --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+        --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
+        --success: #3fb950; --warn: #d29922; --danger: #f85149;
+        --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --sidebar-w: 88vw; --sidebar-max: 450px;
+    }
 
-        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
+    body.outdoor-mode {
+        --bg: #ffffff; --panel: #f6f8fa; --surface: #ffffff;
+        --border: #d0d7de; --text: #24292f; --accent: #0969da;
+        --gold: #9a6700;
+    }
 
-        #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
+    * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+    
+    body, html { 
+        margin: 0; padding: 0; width: 100vw; height: 100vh; 
+        background: var(--bg); color: var(--text); 
+        font-family: var(--font-ui); overflow: hidden; 
+        touch-action: none; /* Prevents whole-page bouncing on mobile */
+    }
 
-        /* --- 1. INFINITE RIBBON --- */
-        #ribbon-container { height: 55px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: scroll; white-space: nowrap; position: relative; z-index: 1000; display: flex; align-items: center; }
-        #ribbon-container::-webkit-scrollbar { display: none; }
-        #ribbon-track { display: inline-flex; padding: 0 10px; gap: 8px; }
-        .tool-btn { padding: 10px 18px; border-radius: 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; letter-spacing: 0.5px; transition: all 0.2s ease; flex-shrink: 0; }
-        
-        .btn-edit-lock { color: var(--text); opacity: 0.5; }
-        .btn-edit-util { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(47, 129, 247, 0.3); }
-        .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
-        
-        .btn-gold { color: var(--gold); border-color: var(--gold); }
-        .btn-accent { background: var(--accent); color: #fff; border: none; }
-        .btn-danger { background: var(--danger); color: #fff; border: none; }
+    #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
 
-        /* --- 2. MAIN WORKSPACE & TABS --- */
-        #workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-        
-        #file-tabs-bar { display: flex; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--border); min-height: 38px; scroll-behavior: smooth; }
-        #file-tabs-bar::-webkit-scrollbar { display: none; }
-        .file-tab { padding: 8px 15px; font-size: 12px; font-family: monospace; cursor: pointer; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 10px; color: var(--text); white-space: nowrap; border-top: 2px solid transparent; background: var(--surface); }
-        .file-tab.active { background: var(--bg); border-top: 2px solid var(--accent); color: var(--accent); font-weight: bold; }
-        .tab-close { color: var(--danger); font-size: 16px; font-weight: bold; cursor: pointer; opacity: 0.6; line-height: 1; }
-        .tab-close:hover { opacity: 1; }
+    /* --- 1. INFINITE RIBBON --- */
+    #ribbon-container { 
+        height: 55px; background: var(--panel); border-bottom: 1px solid var(--border); 
+        overflow-x: scroll; white-space: nowrap; position: relative; z-index: 1000; 
+        display: flex; align-items: center; -webkit-overflow-scrolling: touch;
+    }
+    #ribbon-container::-webkit-scrollbar { display: none; }
+    #ribbon-track { display: inline-flex; padding: 0 10px; gap: 8px; }
+    
+    .tool-btn { 
+        padding: 10px 18px; border-radius: 14px; background: var(--surface); 
+        color: var(--text); border: 1px solid var(--border); font-size: 11px; 
+        font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; 
+        gap: 8px; letter-spacing: 0.5px; transition: all 0.2s ease; flex-shrink: 0; 
+    }
+    
+    .btn-edit-lock { color: var(--text); opacity: 0.5; }
+    .btn-edit-util { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(47, 129, 247, 0.3); }
+    .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
+    
+    .btn-gold { color: var(--gold); border-color: var(--gold); }
+    .btn-accent { background: var(--accent); color: #fff; border: none; }
+    .btn-danger { background: var(--danger); color: #fff; border: none; }
 
-        #editor-view { flex: 1; display: flex; background: #000; position: relative; }
-        body.outdoor-mode #editor-view { background: #fff; }
-        
-        #gutter { width: 45px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; text-align: right; padding: 15px 10px 50vh 0; pointer-events: none; overflow: hidden; height: 100%; touch-action: none; }
-        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; padding-bottom: 50vh; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; touch-action: pan-y pan-x; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
-        #raw-terminal[readonly] { opacity: 0.4; }
+    /* --- 2. MAIN WORKSPACE & TABS --- */
+    #workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    
+    #file-tabs-bar { 
+        display: flex; overflow-x: auto; background: var(--panel); 
+        border-bottom: 1px solid var(--border); min-height: 38px; 
+        scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
+    }
+    #file-tabs-bar::-webkit-scrollbar { display: none; }
+    
+    .file-tab { 
+        padding: 8px 15px; font-size: 12px; font-family: monospace; cursor: pointer; 
+        border-right: 1px solid var(--border); display: flex; align-items: center; 
+        gap: 10px; color: var(--text); white-space: nowrap; border-top: 2px solid transparent; 
+        background: var(--surface); transition: background 0.2s;
+    }
+    .file-tab.active { background: var(--bg); border-top: 2px solid var(--accent); color: var(--accent); font-weight: bold; }
+    
+    .tab-close { color: var(--danger); font-size: 16px; font-weight: bold; cursor: pointer; opacity: 0.6; line-height: 1; }
+    .tab-close:hover { opacity: 1; }
 
-        /* --- 3. SIDEBARS --- */
-        .side-panel { position: fixed; top: 0; bottom: 0; width: var(--sidebar-w); max-width: var(--sidebar-max); background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.9); }
-        .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
-        .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
-        .side-panel.open { transform: translateX(0); }
-        
-        .p-head { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 14px; color: var(--gold); letter-spacing: 1px; }
-        .p-body { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; }
-        .section-label { font-size: 10px; opacity: 0.5; margin: 25px 0 10px 0; text-transform: uppercase; font-weight: 800; letter-spacing: 2px; }
+    #editor-view { flex: 1; display: flex; background: #000; position: relative; }
+    body.outdoor-mode #editor-view { background: #fff; }
+    
+    #gutter { 
+        width: 45px; background: var(--bg); border-right: 1px solid var(--border); 
+        color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; 
+        text-align: right; padding: 15px 10px 50vh 0; pointer-events: none; 
+        overflow: hidden; height: 100%; touch-action: none; 
+    }
+    
+    #raw-terminal { 
+        flex: 1; background: transparent; color: inherit; border: none; padding: 15px; 
+        padding-bottom: 50vh; font-family: 'Courier New', monospace; font-size: 14px; 
+        line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; 
+        touch-action: pan-y pan-x; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    }
+    #raw-terminal[readonly] { opacity: 0.4; }
 
-        /* Accordion */
-        .acc-section { margin-bottom: 5px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-        .acc-head { padding: 12px; background: var(--surface); cursor: pointer; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--gold); }
-        .acc-content { display: none; background: var(--bg); }
-        .acc-content.open { display: block; }
-        .active-file { border-left: 3px solid var(--accent); background: rgba(47, 129, 247, 0.1); }
+    /* --- 3. SIDEBARS --- */
+    .side-panel { 
+        position: fixed; top: 0; bottom: 0; width: var(--sidebar-w); max-width: var(--sidebar-max); 
+        background: var(--panel); border: 1px solid var(--border); z-index: 9000; 
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); display: flex; 
+        flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.9); 
+    }
+    .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
+    .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
+    .side-panel.open { transform: translateX(0); }
+    
+    .p-head { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 14px; color: var(--gold); letter-spacing: 1px; }
+    .p-body { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; -webkit-overflow-scrolling: touch; }
+    .section-label { font-size: 10px; opacity: 0.5; margin: 25px 0 10px 0; text-transform: uppercase; font-weight: 800; letter-spacing: 2px; }
 
-        /* --- 4. SLIDE PANELS --- */
-        #diag-hub { position: fixed; top: 0; left: 0; right: 0; height: 60vh; background: var(--panel); border-bottom: 4px solid var(--danger); z-index: 3000; transform: translateY(-105%); transition: transform 0.4s ease; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
-        #diag-hub.open { transform: translateY(0); }
+    /* Accordion */
+    .acc-section { margin-bottom: 5px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .acc-head { padding: 12px; background: var(--surface); cursor: pointer; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--gold); }
+    .acc-content { display: none; background: var(--bg); }
+    .acc-content.open { display: block; }
+    .active-file { border-left: 3px solid var(--accent); background: rgba(47, 129, 247, 0.1); }
 
-        #shell-slide { position: fixed; bottom: 0; left: 0; right: 0; height: 100px; background: var(--surface); border-top: 4px solid var(--accent); z-index: 4000; transform: translateY(105%); transition: transform 0.3s ease; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); }
-        #shell-slide.open { transform: translateY(0); }
-        #shell-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; font-size: 18px; outline: none; }
+    /* --- 4. SLIDE PANELS --- */
+    #diag-hub { position: fixed; top: 0; left: 0; right: 0; height: 60vh; background: var(--panel); border-bottom: 4px solid var(--danger); z-index: 3000; transform: translateY(-105%); transition: transform 0.4s ease; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
+    #diag-hub.open { transform: translateY(0); }
 
-        /* --- 5. MODALS --- */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 5000; display: none !important; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
-        .modal-overlay.active { display: flex !important; }
-        .modal-content { width: 90%; height: 80%; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,1); }
-        .modal-body { flex: 1; padding: 25px; overflow-y: auto; }
+    #shell-slide { position: fixed; bottom: 0; left: 0; right: 0; height: 100px; background: var(--surface); border-top: 4px solid var(--accent); z-index: 4000; transform: translateY(105%); transition: transform 0.3s ease; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); }
+    #shell-slide.open { transform: translateY(0); }
+    #shell-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; font-size: 18px; outline: none; }
 
-        /* --- 6. SANDBOX & CONSOLE --- */
-        #sandbox-wrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
-        #sandbox-frame { flex: 1; border: none; }
-        #ghost-console { height: 35vh; background: #000; color: #3fb950; padding: 15px; font-family: monospace; font-size: 11px; overflow-y: auto; border-top: 3px solid var(--accent); line-height: 1.5; scroll-behavior: smooth; }
+    /* --- 5. MODALS --- */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: none !important; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+    .modal-overlay.active { display: flex !important; }
+    .modal-content { width: 90%; height: 80%; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,1); }
+    .modal-body { flex: 1; padding: 25px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-          /* --- 7. SVS-WIDGET STYLING (PATCHED v40.27) --- */
-        .floating-widget {
-            position: fixed; background: rgba(40, 44, 52, 0.95); backdrop-filter: blur(12px);
-            border: 1px solid #181a1f; border-radius: 12px; z-index: 8000;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.6); display: none; flex-direction: column;
-            color: #abb2bf; 
-            /* Kinetic Transition for Snapping */
-            transition: opacity 0.3s, transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), top 0.4s cubic-bezier(0.19, 1, 0.22, 1), left 0.4s cubic-bezier(0.19, 1, 0.22, 1);
-        }
-        .floating-widget.active { display: flex; }
+    /* --- 6. SANDBOX & CONSOLE --- */
+    #sandbox-wrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
+    #sandbox-frame { flex: 1; border: none; }
+    #ghost-console { height: 35vh; background: #000; color: #3fb950; padding: 15px; font-family: monospace; font-size: 11px; overflow-y: auto; border-top: 3px solid var(--accent); line-height: 1.5; scroll-behavior: smooth; }
 
-        /* Global Drag Handle Architecture */
-        .util-grip, .search-grip, .kb-drag-handle {
-            background: #21252b; cursor: move; color: #5c6370;
-            display: flex; align-items: center; justify-content: center;
-            flex-shrink: 0; font-family: monospace; font-weight: bold;
-        }
-        
-        /* Utility Bar: Vertical Docking Support */
-        .util-vertical { flex-direction: column; width: 46px; border-radius: 12px; }
-        .util-vertical .util-grip { 
-            height: 22px; width: 100%; border-bottom: 1px solid #181a1f; 
-            border-radius: 12px 12px 0 0; font-size: 14px; letter-spacing: 2px;
-        }
-        .util-vertical .util-grip::before { content: '⋯⋯'; }
-        .util-vertical .sleek-bar-content { flex-direction: column; padding: 4px; gap: 6px; }
-        .util-vertical .util-lbl { display: block; font-size: 8px; margin-top: 2px; color: #5c6370; font-weight: 800; text-transform: uppercase; }
-        .util-vertical .sleek-btn { flex-direction: column; padding: 8px 2px; width: 100%; }
+    /* --- 7. SVS-WIDGET STYLING (FINAL PATCH v40.27) --- */
+    .floating-widget {
+        position: fixed; background: rgba(40, 44, 52, 0.95); backdrop-filter: blur(12px);
+        border: 1px solid #181a1f; border-radius: 12px; z-index: 8000;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.6); display: none; flex-direction: column;
+        color: #abb2bf; overflow: hidden;
+        /* Kinetic Transition for Snapping */
+        transition: opacity 0.3s, transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), top 0.4s cubic-bezier(0.19, 1, 0.22, 1), left 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+    .floating-widget.active { display: flex; }
 
-        /* Search Bar: Horizontal Grip Support */
-        .search-grip {
-            width: 28px; border-right: 1px solid #181a1f; border-radius: 12px 0 0 12px;
-            flex-direction: column; font-size: 14px; line-height: 0.8; letter-spacing: -2px;
-        }
-        .search-grip::before { content: '⋮\n⋮\n⋮'; white-space: pre; }
-        .search-grip-x { font-family: sans-serif; font-size: 18px; cursor: pointer; color: var(--danger); margin-top: 12px; font-weight: 900; }
+    /* Global Drag Handle Architecture */
+    .util-grip, .search-grip, .kb-drag-handle, .drag-handle {
+        background: #21252b; cursor: move; color: #5c6370;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; font-family: monospace; font-weight: bold;
+        touch-action: none; /* Crucial for clean dragging */
+    }
+    
+    /* Utility Bar: Vertical Docking Support */
+    .util-vertical { flex-direction: column; width: 46px; border-radius: 12px; }
+    .util-vertical .util-grip { 
+        height: 24px; width: 100%; border-bottom: 1px solid #181a1f; 
+        border-radius: 12px 12px 0 0; font-size: 14px; letter-spacing: 2px;
+    }
+    .util-vertical .util-grip::before { content: '⋯⋯'; }
+    .util-vertical .sleek-bar-content { flex-direction: column; padding: 4px; gap: 6px; }
+    .util-vertical .util-lbl { display: block; font-size: 8px; margin-top: 2px; color: #5c6370; font-weight: 800; text-transform: uppercase; text-align: center; }
+    .util-vertical .sleek-btn { flex-direction: column; padding: 8px 2px; width: 100%; }
 
-        /* Internal Component Styling */
-        .sleek-bar-content { display: flex; padding: 6px; gap: 8px; align-items: center; flex: 1; }
-        .sleek-btn {
-            background: transparent; border: none; color: #abb2bf; cursor: pointer;
-            border-radius: 6px; padding: 8px 10px; font-size: 12px; display: flex; 
-            align-items: center; justify-content: center; gap: 4px; font-weight: bold;
-            transition: background 0.2s;
-        }
-        .sleek-btn:hover { background: #3e4451; color: #fff; }
-        .sleek-btn.active { background: #e5e9f0; color: #282c34; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
-        
-        .sleek-input {
-            background: #1e2227; border: 1px solid #3e4451; border-radius: 8px; color: #fff;
-            padding: 10px 12px; font-size: 13px; outline: none; width: 100%;
-            font-family: 'Courier New', monospace;
-        }
-        .sleek-input:focus { border-color: var(--accent); background: #000; }
+    /* Search Bar: Horizontal Grip Support */
+    .search-grip {
+        width: 28px; border-right: 1px solid #181a1f; border-radius: 12px 0 0 12px;
+        flex-direction: column; font-size: 14px; line-height: 0.8; letter-spacing: -2px;
+    }
+    .search-grip::before { content: '⋮\n⋮\n⋮'; white-space: pre; }
+    .search-grip-x { font-family: sans-serif; font-size: 18px; cursor: pointer; color: var(--danger); margin-top: 12px; font-weight: 900; }
 
-        /* Keyboard Monolith: Sovereign Patch */
-        #kb-monolith { 
-            background: #181a1f; width: 100vw; left: 0; border-radius: 0; border: none; 
-            border-top: 2px solid #30363d; touch-action: none;
-        }
-        .kb-drag-handle { height: 18px; width: 100%; border-bottom: 1px solid #000; letter-spacing: 4px; }
-        .kb-drag-handle::before { content: '⋯⋯⋯⋯'; }
-        
-        .kb-header { display: flex; justify-content: space-between; align-items: center; padding: 0 15px; height: 40px; }
-        .kb-tabs { display: flex; gap: 4px; height: 100%; align-items: flex-end; }
-        .kb-tab { 
-            background: #21252b; color: #5c6370; padding: 6px 14px; border-radius: 8px 8px 0 0;
-            font-size: 11px; font-weight: 900; border: none; cursor: pointer; transition: all 0.2s;
-        }
-        .kb-tab.active { background: #e5e9f0; color: #282c34; }
-        .kb-tab.active::after { content: ' •'; color: var(--danger); } 
+    /* Internal Component Styling */
+    .sleek-bar-content { display: flex; padding: 6px; gap: 8px; align-items: center; flex: 1; }
+    .sleek-btn {
+        background: transparent; border: none; color: #abb2bf; cursor: pointer;
+        border-radius: 6px; padding: 8px 10px; font-size: 12px; display: flex; 
+        align-items: center; justify-content: center; gap: 4px; font-weight: bold;
+        transition: background 0.2s;
+    }
+    .sleek-btn:hover { background: #3e4451; color: #fff; }
+    .sleek-btn.active { background: #e5e9f0; color: #282c34; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+    
+    .sleek-input {
+        background: #1e2227; border: 1px solid #3e4451; border-radius: 8px; color: #fff;
+        padding: 10px 12px; font-size: 13px; outline: none; width: 100%;
+        font-family: 'Courier New', monospace;
+    }
+    .sleek-input:focus { border-color: var(--accent); background: #000; }
 
-        .kb-row-container { padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #282c34; }
-        .kb-scroll-row { 
-            display: flex; overflow-x: auto; gap: 8px; padding-bottom: 5px;
-            -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
-        }
-        .kb-scroll-row::-webkit-scrollbar { display: none; }
+    /* Keyboard Monolith: Sovereign Patch */
+    #kb-monolith { 
+        background: #181a1f; width: 100vw; left: 0; border-radius: 0; border: none; 
+        border-top: 2px solid #30363d; touch-action: none;
+    }
+    .kb-drag-handle { height: 20px; width: 100%; border-bottom: 1px solid #000; letter-spacing: 4px; }
+    .kb-drag-handle::before { content: '⋯⋯⋯⋯'; }
+    
+    .kb-header { display: flex; justify-content: space-between; align-items: center; padding: 0 15px; height: 40px; }
+    .kb-tabs { display: flex; gap: 4px; height: 100%; align-items: flex-end; }
+    .kb-tab { 
+        background: #21252b; color: #5c6370; padding: 6px 14px; border-radius: 8px 8px 0 0;
+        font-size: 11px; font-weight: 900; border: none; cursor: pointer; transition: all 0.2s;
+    }
+    .kb-tab.active { background: #e5e9f0; color: #282c34; }
+    .kb-tab.active::after { content: ' •'; color: var(--danger); } 
 
-        .kb-key {
-            background: #d0d3d8; color: #282c34; border: none; border-radius: 6px;
-            padding: 12px 16px; font-size: 14px; font-family: monospace; font-weight: bold;
-            box-shadow: 0 3px 0 #8b92a0; cursor: pointer; flex-shrink: 0; white-space: nowrap;
-        }
-        .kb-key:active { transform: translateY(2px); box-shadow: 0 1px 0 #8b92a0; background: #fff; }
-        
-        /* Positioning Snap-Points */
-        .kb-pos-bottom { bottom: 0; top: auto; }
-        .kb-pos-top { top: 55px; bottom: auto; border-top: none; border-bottom: 2px solid #30363d; }
+    .kb-row-container { padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #282c34; }
+    .kb-scroll-row { 
+        display: flex; overflow-x: auto; gap: 8px; padding-bottom: 5px;
+        -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    }
+    .kb-scroll-row::-webkit-scrollbar { display: none; }
 
-        /* --- 8. UI HELPERS --- */
-        .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; }
-        #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
-        
-        /* Manual Styling */
-        .man-h1 { color: var(--accent); font-size: 18px; margin: 20px 0 10px 0; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
-        .man-h2 { color: var(--gold); font-size: 14px; margin: 15px 0 5px 0; }
-        .man-p { font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 10px; opacity: 0.9; }
-    </style>
+    .kb-key {
+        background: #d0d3d8; color: #282c34; border: none; border-radius: 6px;
+        padding: 12px 16px; font-size: 14px; font-family: monospace; font-weight: bold;
+        box-shadow: 0 3px 0 #8b92a0; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+    }
+    .kb-key:active { transform: translateY(2px); box-shadow: 0 1px 0 #8b92a0; background: #fff; }
+    
+    .kb-pos-bottom { bottom: 0; top: auto; }
+    .kb-pos-top { top: 55px; bottom: auto; border-top: none; border-bottom: 2px solid #30363d; }
+
+    /* --- 8. UI HELPERS --- */
+    .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; }
+    #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
+</style>
+
 </head>
 <body>
 
