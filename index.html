@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.19 - Codex Matrix</title>
+    <title>DevOS Nexus Prime v40.20 - Codex Matrix</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -63,8 +63,9 @@
 
         #editor-view { flex: 1; display: flex; background: #000; position: relative; }
         body.outdoor-mode #editor-view { background: #fff; }
-        #gutter { width: 45px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; text-align: right; padding: 15px 10px 15px 0; pointer-events: none; overflow: hidden; height: 100%; }
-        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; }
+        
+        #gutter { width: 45px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; text-align: right; padding: 15px 10px 50vh 0; pointer-events: none; overflow: hidden; height: 100%; touch-action: none; }
+        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; padding-bottom: 50vh; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; touch-action: pan-y pan-x; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
         #raw-terminal[readonly] { opacity: 0.4; }
 
         /* --- 3. SIDEBARS --- */
@@ -218,6 +219,7 @@
             <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
             
             <button class="tool-btn btn-gold" onclick="Nexus.intel.scan()">🧠 NEURAL INTEL</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('graph')">🌌 SYSTEM GRAPH</button>
             
@@ -429,6 +431,9 @@
                 
                 <div class="man-h2">🌌 SYSTEM GRAPH</div>
                 <div class="man-p">A visual, animated node-map of all the files currently inside your Vortex system. Tap a node to warp to that file.</div>
+
+                <div class="man-h2">🗺️ OUTLINE (Symbol Map)</div>
+                <div class="man-p">An instant AST-lite scanner that maps all functions, classes, and IDs in your code. Tap a node to warp instantly to its location in the editor.</div>
                 
                 <div class="man-h2">☀️ SUN MODE</div>
                 <div class="man-p">Inverts the dark theme to a high-contrast white mode for outdoor coding visibility.</div>
@@ -532,6 +537,16 @@
             </div>
             <div style="padding:15px; background:var(--panel); border-top:1px solid var(--border); font-size:10px; color:var(--gold); text-align:center;">
                 SCANNING ACTIVE FILE: <span id="intel-target-name">NONE</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-outline" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>🗺️ CODE OUTLINE (SYMBOL MAP)</span><button class="close-x" onclick="Nexus.ui.closeModal('outline')">&times;</button></div>
+            <div class="modal-body">
+                <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px;">Tap a node to instantly warp to that line.</div>
+                <div id="outline-list" style="display:flex; flex-direction:column; gap:8px;"></div>
             </div>
         </div>
     </div>
@@ -1129,6 +1144,71 @@ window.Nexus = {
             Nexus.ui.openModal('intel');
         }
     },
+    outline: {
+        scan() {
+            if(!Nexus.state.activeFile) return alert("No active file.");
+            const ed = document.getElementById('raw-terminal');
+            const lines = ed.value.split('\n');
+            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+            let out = [];
+            
+            lines.forEach((line, i) => {
+                const text = line.trim();
+                if (text.length === 0) return;
+                
+                let match = false;
+                let display = text.substring(0, 50).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                if (ext === 'js' || ext === 'json') {
+                    if (/^(?:export\s+|default\s+)?(?:async\s+)?function\s+\w+/.test(text) || 
+                        /^(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>/.test(text) ||
+                        /^(?:class|struct)\s+\w+/.test(text) ||
+                        /^\w+\s*\([^)]*\)\s*\{/.test(text) && !text.includes('if') && !text.includes('for') && !text.includes('while')) {
+                        match = true;
+                    }
+                } else if (ext === 'html') {
+                    if (/<[^>]+id="[^"]+"|<h[1-6]|<section|<nav|<footer|<header/.test(text)) {
+                        match = true;
+                    }
+                } else if (ext === 'css') {
+                    if (/^[.#a-zA-Z][^{]*\{/.test(text)) {
+                        match = true;
+                    }
+                }
+
+                if (match) out.push({ line: i + 1, text: display });
+            });
+
+            const list = document.getElementById('outline-list');
+            if (out.length > 0) {
+                list.innerHTML = out.map(item => `
+                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px;" onclick="Nexus.outline.jump(${item.line})">
+                        <span style="color:var(--gold); font-size:10px; font-weight:bold; width:40px; flex-shrink:0;">LN ${item.line}</span>
+                        <span style="font-family:monospace; font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.text}</span>
+                    </div>
+                `).join('');
+            } else {
+                list.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text); opacity:0.5;">No structural nodes detected.</div>`;
+            }
+            
+            Nexus.ui.openModal('outline');
+        },
+        jump(ln) {
+            Nexus.ui.closeModal('outline');
+            const ed = document.getElementById('raw-terminal');
+            const lines = ed.value.split('\n');
+            let pos = 0;
+            for (let i = 0; i < Math.min(ln - 1, lines.length); i++) pos += lines[i].length + 1;
+            
+            ed.focus(); 
+            ed.setSelectionRange(pos, pos);
+            
+            setTimeout(() => {
+                const targetScroll = ((ln - 1) * 22) - (ed.clientHeight / 2) + 11;
+                ed.scrollTop = Math.max(0, targetScroll);
+            }, 50);
+        }
+    },
 
     dreamer: {
         templates: { 
@@ -1626,7 +1706,21 @@ window.Nexus = {
         jumpPrompt() {
             if(!Nexus.state.activeFile) return;
             const ln = prompt("Jump to Line:");
-            if (ln) Nexus.vfs.switchFile(Nexus.state.activeFile, parseInt(ln) - 1);
+            if (ln) {
+                const line = parseInt(ln) - 1;
+                const ed = document.getElementById('raw-terminal');
+                const lines = ed.value.split('\n');
+                let pos = 0;
+                for (let i = 0; i < Math.min(line, lines.length); i++) pos += lines[i].length + 1;
+                
+                ed.focus(); 
+                ed.setSelectionRange(pos, pos);
+                
+                setTimeout(() => {
+                    const targetScroll = (line * 22) - (ed.clientHeight / 2) + 11;
+                    ed.scrollTop = Math.max(0, targetScroll);
+                }, 50);
+            }
         },
         beautify() {
             if(!Nexus.state.activeFile) return;
