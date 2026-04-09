@@ -253,7 +253,7 @@
     </div>
 
     <div id="utility-bar" class="floating-widget util-vertical" style="top: 20%; right: 0px; left: auto;">
-        <div class="util-grip" onmousedown="Nexus.ui.initDrag(event, 'utility-bar')" ontouchstart="Nexus.ui.initDrag(event, 'utility-bar')"></div>
+        <div class="util-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'utility-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'utility-bar')"></div>
         <div class="sleek-bar-content">
             <button class="sleek-btn" onclick="Nexus.ui.jumpPrompt()">
                 <span style="font-size:16px;">|→</span>
@@ -280,8 +280,8 @@
     </div>
 
     <div id="search-bar" class="floating-widget" style="top: 140px; left: 10px; flex-direction: row; width: 320px; border-radius: 8px;">
-        <div class="search-grip" onmousedown="Nexus.ui.initDrag(event, 'search-bar')" ontouchstart="Nexus.ui.initDrag(event, 'search-bar')">
-            <div class="search-grip-x" onclick="Nexus.ui.toggleWidget('search-bar')">&times;</div>
+       <div class="search-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'search-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'search-bar')">
+           <div class="search-grip-x" onclick="Nexus.ui.toggleWidget('search-bar')">&times;</div>
         </div>
         <div style="display:flex; flex-direction:column; flex:1; padding:12px; gap:10px;">
             <div style="display:flex; gap:8px;">
@@ -306,7 +306,7 @@
     </div>
 
     <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 280px;">
-        <div class="drag-handle" style="height: 18px; width:100%; border-bottom:1px solid #181a1f;" onmousedown="Nexus.ui.initDrag(event, 'writer-bar')" ontouchstart="Nexus.ui.initDrag(event, 'writer-bar')">⋯</div>
+    <div class="drag-handle" ... onmousedown="Nexus.ui.handleHandleTap(event, 'writer-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'writer-bar')">⋯</div>
         <div class="sleek-bar-content" style="flex-direction: column; align-items: stretch; padding:10px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                 <span style="font-size:10px; color:var(--gold); font-weight:bold;">AUTO-WRITER</span>
@@ -334,7 +334,7 @@
     </div>
 
     <div id="kb-monolith" class="floating-widget kb-pos-bottom">
-        <div class="drag-handle" style="background:transparent; height:12px; cursor:move;" onmousedown="Nexus.ui.initDrag(event, 'kb-monolith')" ontouchstart="Nexus.ui.initDrag(event, 'kb-monolith')"></div>
+        <div class="drag-handle" ... onmousedown="Nexus.ui.handleHandleTap(event, 'kb-monolith')" ontouchstart="Nexus.ui.handleHandleTap(event, 'kb-monolith')"></div>
         <div class="kb-header">
             <div class="kb-tabs" id="kb-lang-toggles">
                 <button class="kb-tab active" onclick="Nexus.kb.switchLang('html')">HTML</button>
