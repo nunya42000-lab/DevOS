@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.18 - Codex Matrix</title>
+    <title>DevOS Nexus Prime v40.19 - Codex Matrix</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -44,7 +44,9 @@
         .tool-btn { padding: 10px 18px; border-radius: 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; letter-spacing: 0.5px; transition: all 0.2s ease; flex-shrink: 0; }
         
         .btn-edit-lock { color: var(--text); opacity: 0.5; }
+        .btn-edit-util { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(47, 129, 247, 0.3); }
         .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
+        
         .btn-gold { color: var(--gold); border-color: var(--gold); }
         .btn-accent { background: var(--accent); color: #fff; border: none; }
         .btn-danger { background: var(--danger); color: #fff; border: none; }
@@ -202,7 +204,7 @@
             <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             
             <button class="tool-btn btn-gold" onclick="Nexus.ui.beautify()">✨ BEAUTIFY</button>
-            <button class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
+            <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
             <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE FILES</button>
@@ -323,6 +325,8 @@
                 <button class="kb-tab" onclick="Nexus.kb.switchLang('css')">CSS</button>
                 <div style="color:#5c6370; align-self:center;">|</div>
                 <button class="kb-tab" onclick="Nexus.kb.switchLang('js')">JS</button>
+                <div style="color:#5c6370; align-self:center;">|</div>
+                <button class="kb-tab" onclick="Nexus.kb.switchLang('qwerty')">QWERTY</button>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <button class="sleek-btn" style="background:#282c34; border-radius:4px;" onclick="Nexus.kbEditor.open()">✏️</button>
@@ -492,6 +496,15 @@
                     <option value="input-group">Sleek Input Field</option>
                     <option value="toggle-switch">CSS Toggle Switch</option>
                     <option value="loader-spinner">Orbit Spinner</option>
+                    <option value="hero-section">Hero Section</option>
+                    <option value="auth-matrix">Login / Auth Matrix</option>
+                    <option value="toast-alert">Toast Notification</option>
+                    <option value="chat-bubble">Chat Bubble Interface</option>
+                    <option value="settings-panel">Settings Panel List</option>
+                    <option value="pricing-card">Pricing / Data Tier Card</option>
+                    <option value="progress-bar">CSS Progress Bar</option>
+                    <option value="accordion-menu">Accordion Details / Summary</option>
+                    <option value="profile-header">Profile Avatar Header</option>
                 </select>
                 <input type="text" id="dreamer-label" placeholder="Label / Data" style="width:100%; padding:15px; margin-bottom:10px; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px;" oninput="Nexus.dreamer.updatePreview()">
                 <input type="text" id="dreamer-id" placeholder="Element ID (Optional)" style="width:100%; padding:15px; margin-bottom:20px; background:var(--bg); border:1px solid var(--border); color:#fff; border-radius:8px;">
@@ -587,12 +600,14 @@
             <div class="modal-body" style="display:flex; flex-direction:column; padding:15px;">
                 <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px; line-height:1.5;">
                     Configure custom keys. Use <strong style="color:var(--accent)">*#</strong> for cursor placement.<br>
-                    Use <strong style="color:var(--accent)">*+</strong> for tab insertion.
+                    Use <strong style="color:var(--accent)">*+</strong> for tab insertion.<br>
+                    Use <strong style="color:var(--accent)">BACKSPACE</strong> as a Display name to delete characters.
                 </div>
                 <div style="display:flex; gap:5px; margin-bottom:15px;">
                     <button class="tool-btn kb-builder-tab btn-active" onclick="Nexus.kbEditor.switchLang('html')" style="flex:1;">HTML</button>
                     <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('css')" style="flex:1;">CSS</button>
                     <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('js')" style="flex:1;">JS</button>
+                    <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('qwerty')" style="flex:1;">QWERTY</button>
                 </div>
                 <div id="kb-builder-list" style="flex:1; overflow-y:auto; margin-bottom:15px; padding-right:5px;"></div>
                 <button class="tool-btn btn-accent" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.kbEditor.add()">+ ADD NEW KEY</button>
@@ -609,7 +624,6 @@
         </div>
     </footer>
 </div>
-
 <script>
 window.Nexus = {
     widgetConfig: {
@@ -649,6 +663,14 @@ window.Nexus = {
                     {d: 'rem', i: 'rem'}, {d: '%', i: '%'}, {d: 'var()', i: 'var(--*#)'}, {d: '!important', i: '!important'},
                     {d: 'margin', i: 'margin: *#;'}, {d: 'padding', i: 'padding: *#;'}, {d: 'display: flex', i: 'display: flex;'},
                     {d: 'color', i: 'color: *#;'}, {d: 'background', i: 'background: *#;'}, {d: 'border', i: 'border: *#;'}
+                ],
+                qwerty: [
+                    {d: '1', i: '1'}, {d: '2', i: '2'}, {d: '3', i: '3'}, {d: '4', i: '4'}, {d: '5', i: '5'}, {d: '6', i: '6'}, {d: '7', i: '7'}, {d: '8', i: '8'}, {d: '9', i: '9'}, {d: '0', i: '0'},
+                    {d: 'q', i: 'q'}, {d: 'w', i: 'w'}, {d: 'e', i: 'e'}, {d: 'r', i: 'r'}, {d: 't', i: 't'}, {d: 'y', i: 'y'}, {d: 'u', i: 'u'}, {d: 'i', i: 'i'}, {d: 'o', i: 'o'}, {d: 'p', i: 'p'},
+                    {d: 'a', i: 'a'}, {d: 's', i: 's'}, {d: 'd', i: 'd'}, {d: 'f', i: 'f'}, {d: 'g', i: 'g'}, {d: 'h', i: 'h'}, {d: 'j', i: 'j'}, {d: 'k', i: 'k'}, {d: 'l', i: 'l'},
+                    {d: 'z', i: 'z'}, {d: 'x', i: 'x'}, {d: 'c', i: 'c'}, {d: 'v', i: 'v'}, {d: 'b', i: 'b'}, {d: 'n', i: 'n'}, {d: 'm', i: 'm'},
+                    {d: ',', i: ','}, {d: '.', i: '.'}, {d: '?', i: '?'}, {d: '!', i: '!'}, {d: '@', i: '@'}, {d: '"', i: '"'}, {d: "'", i: "'"},
+                    {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
                 ]
             }
         },
@@ -659,8 +681,8 @@ window.Nexus = {
     vfs: {
         async boot() {
             try {
-                let vfs = await localforage.getItem('nexus_vfs_v41') || await localforage.getItem('nexus_vfs_v40');
-                let orig = await localforage.getItem('nexus_originals_v41') || await localforage.getItem('nexus_originals_v40');
+                let vfs = await localforage.getItem('nexus_vfs_v42') || await localforage.getItem('nexus_vfs_v41');
+                let orig = await localforage.getItem('nexus_originals_v42') || await localforage.getItem('nexus_originals_v41');
                 
                 if (vfs && Object.keys(vfs).length > 0) {
                     Nexus.state.vfs = vfs;
@@ -693,33 +715,36 @@ window.Nexus = {
             const ed = document.getElementById('raw-terminal');
             ed.value = "";
             ed.setAttribute('readonly', 'true');
+            ed.removeAttribute('inputmode');
             document.getElementById('foot-file').innerText = "VORTEX EMPTY";
             const st = document.getElementById('foot-status');
             st.innerText = "LOCKED";
             st.style.color = "var(--danger)";
             
-            const lockBtn = document.querySelector('.edit-btn-trigger');
-            lockBtn.innerHTML = "🔒 READ ONLY"; 
-            lockBtn.classList.replace('btn-edit-unlocked', 'btn-edit-lock');
+            const lockBtns = document.querySelectorAll('.edit-btn-trigger');
+            lockBtns.forEach(btn => {
+                btn.innerHTML = "🔒 READ ONLY"; 
+                btn.className = "tool-btn edit-btn-trigger btn-edit-lock";
+            });
 
             this.renderAccordion();
             Nexus.ui.updateGutter();
         },
         async save() {
-            await localforage.setItem('nexus_vfs_v41', Nexus.state.vfs);
-            await localforage.setItem('nexus_originals_v41', Nexus.state.originals);
+            await localforage.setItem('nexus_vfs_v42', Nexus.state.vfs);
+            await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
         },
         switchFile(fn, line = null) {
             if (!fn || !Nexus.state.vfs.hasOwnProperty(fn)) return;
             Nexus.state.activeFile = fn;
             const ed = document.getElementById('raw-terminal');
             
-            if (document.querySelector('.edit-btn-trigger').innerText.includes('READ ONLY') && !document.querySelector('.edit-btn-trigger').classList.contains('btn-edit-lock')) {
-                 Nexus.ui.toggleEditMode();
-            } else if (ed.hasAttribute('readonly') && document.querySelector('.edit-btn-trigger').classList.contains('btn-edit-unlocked')){
-                 ed.removeAttribute('readonly');
-                 document.getElementById('foot-status').innerText = "READY";
-                 document.getElementById('foot-status').style.color = "var(--success)";
+            const st = document.getElementById('foot-status');
+            const isLocked = ed.hasAttribute('readonly');
+            
+            if (isLocked) {
+                st.innerText = "LOCKED";
+                st.style.color = "var(--danger)";
             }
 
             ed.value = Nexus.state.vfs[fn] || "";
@@ -745,8 +770,7 @@ window.Nexus = {
                 this.save(); 
                 
                 const ed = document.getElementById('raw-terminal');
-                const btn = document.querySelector('.edit-btn-trigger');
-                if(btn.innerText.includes('READ ONLY') && ed.hasAttribute('readonly')){
+                if(ed.hasAttribute('readonly')){
                     Nexus.ui.toggleEditMode(); 
                 }
             }
@@ -840,7 +864,6 @@ window.Nexus = {
             Object.entries(Nexus.state.vfs).forEach(([n, c]) => b += `\n/* FILE: ${n} */\n${c}\n`);
             const blob = new Blob([b], { type: 'text/plain' }); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Nexus_v40_Backup.txt`; a.click();
         },
-        
         combineFiles() {
             const selected = Array.from(document.querySelectorAll('.combine-cb:checked')).map(cb => cb.value);
             const newName = document.getElementById('combine-name').value;
@@ -904,7 +927,6 @@ window.Nexus = {
             Nexus.ui.closeModal('combine');
             alert(`Sovereign Merge Complete: Project imports actively re-routed to ${newName}.`);
         },
-        
         renderAccordion() {
             const root = document.getElementById('accordion-root'); if (!root) return; const groups = {};
             Object.keys(Nexus.state.vfs).forEach(fn => { const ext = fn.split('.').pop().toLowerCase(); if (!groups[ext]) groups[ext] = []; groups[ext].push(fn); });
@@ -1035,6 +1057,79 @@ window.Nexus = {
         log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
     },
 
+    intel: {
+        scan() {
+            if(!Nexus.state.activeFile) return alert("No active file to scan.");
+            const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+            
+            const loc = code.split('\n').length;
+            const size = new Blob([code]).size;
+            
+            // Regex Heuristics
+            const vars = (code.match(/(?:const|let|var)\s+\w+/g) || []).length;
+            const funcs = (code.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
+            
+            let patterns = [];
+            if(/document\.(getElementById|querySelector)/.test(code)) patterns.push('DOM Manipulator');
+            if(/async|await|Promise/.test(code)) patterns.push('Async Flow');
+            if(/fetch\(|XMLHttpRequest/.test(code)) patterns.push('Network Protocol');
+            if(/for\s*\(|while\s*\(/.test(code)) patterns.push('Loop Construct');
+            if(/localStorage|localforage/.test(code)) patterns.push('Persistent Storage');
+            if(/import|export/.test(code)) patterns.push('Module Export');
+            
+            let health = 100;
+            if(size > 50000) health -= 10;
+            if(/eval\(/.test(code)) health -= 25; 
+            if(/console\.log/.test(code)) health -= 5;
+            if(loc > 1500) health -= 10;
+            if(patterns.length === 0 && loc > 50) health -= 5;
+            health = Math.max(0, Math.min(100, health));
+            
+            document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
+            
+            const healthDisp = document.getElementById('intel-health-display');
+            const healthBar = document.getElementById('intel-health-bar');
+            
+            healthDisp.innerText = health + '%';
+            healthBar.style.width = health + '%';
+            
+            let color = 'var(--success)';
+            if (health < 80) color = 'var(--warn)';
+            if (health < 50) color = 'var(--danger)';
+            
+            healthDisp.style.color = color;
+            healthBar.style.background = color;
+            
+            document.getElementById('intel-metrics-grid').innerHTML = `
+                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">LINES OF CODE</div>
+                    <div style="font-size:24px; font-weight:900; color:#fff;">${loc}</div>
+                </div>
+                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">PAYLOAD SIZE</div>
+                    <div style="font-size:24px; font-weight:900; color:#fff;">${(size/1024).toFixed(2)} KB</div>
+                </div>
+                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">DECLARATIONS</div>
+                    <div style="font-size:24px; font-weight:900; color:#fff;">${vars}</div>
+                </div>
+                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">FUNCTIONS</div>
+                    <div style="font-size:24px; font-weight:900; color:#fff;">${funcs}</div>
+                </div>
+            `;
+            
+            const pContainer = document.getElementById('intel-patterns');
+            if (patterns.length > 0) {
+                pContainer.innerHTML = patterns.map(p => `<span style="background:rgba(47,129,247,0.15); border:1px solid var(--accent); color:var(--accent); padding:6px 12px; border-radius:6px; font-size:11px; font-weight:bold; letter-spacing:0.5px;">${p}</span>`).join('');
+            } else {
+                pContainer.innerHTML = '<span style="font-size:12px; color:var(--text); opacity:0.5; font-style:italic;">No active neural patterns detected.</span>';
+            }
+            
+            Nexus.ui.openModal('intel');
+        }
+    },
+
     dreamer: {
         templates: { 
             'btn-tactical': (l, id) => `<button id="${id || 'btn-01'}" style="padding:12px 24px; background:var(--gold, #d29922); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 15px rgba(210,153,34,0.3); transition:all 0.2s;">${l || 'TACTICAL ACTION'}</button>`, 
@@ -1053,7 +1148,25 @@ window.Nexus = {
             
             'toggle-switch': (l, id) => `<label id="${id || 'toggle-01'}" style="display:flex; align-items:center; gap:15px; cursor:pointer; padding:10px 0;"><div style="position:relative; width:50px; height:26px; background:var(--border, #30363d); border-radius:13px; overflow:hidden; transition:background 0.3s;"><input type="checkbox" style="opacity:0; width:0; height:0; position:absolute;" onchange="this.nextElementSibling.style.transform = this.checked ? 'translateX(24px)' : 'translateX(0)'; this.parentElement.style.background = this.checked ? 'var(--success, #3fb950)' : 'var(--border, #30363d)';"><div style="position:absolute; top:2px; left:2px; width:22px; height:22px; background:#fff; border-radius:50%; transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);"></div></div><span style="font-size:14px; color:var(--text, #c9d1d9); font-weight:bold;">${l || 'Override Protocol'}</span></label>`,
             
-            'loader-spinner': (l, id) => `<div id="${id || 'spinner-01'}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:30px;"><div style="width:40px; height:40px; border:4px solid var(--border, #30363d); border-top-color:var(--accent, #2f81f7); border-radius:50%; animation:nexusSpin 1s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;"></div><style>@keyframes nexusSpin { to { transform: rotate(360deg); } }</style><span style="font-size:11px; color:var(--gold, #d29922); font-weight:900; letter-spacing:2px;">${l || 'SYNTHESIZING...'}</span></div>`
+            'loader-spinner': (l, id) => `<div id="${id || 'spinner-01'}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:30px;"><div style="width:40px; height:40px; border:4px solid var(--border, #30363d); border-top-color:var(--accent, #2f81f7); border-radius:50%; animation:nexusSpin 1s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;"></div><style>@keyframes nexusSpin { to { transform: rotate(360deg); } }</style><span style="font-size:11px; color:var(--gold, #d29922); font-weight:900; letter-spacing:2px;">${l || 'SYNTHESIZING...'}</span></div>`,
+            
+            'hero-section': (l, id) => `<header id="${id || 'hero-01'}" style="text-align:center; padding:50px 20px; background:linear-gradient(135deg, var(--panel, #161b22), var(--bg, #0d1117)); border-bottom:1px solid var(--border, #30363d);"><h1 style="color:var(--accent, #2f81f7); font-size:36px; margin:0 0 15px 0;">${l || 'Next Gen Platform'}</h1><p style="color:var(--text, #c9d1d9); font-size:16px; margin-bottom:30px; opacity:0.8;">Empowering developers with limitless tools.</p><div style="display:flex; justify-content:center; gap:15px;"><button style="padding:12px 24px; background:var(--accent, #2f81f7); color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">GET STARTED</button><button style="padding:12px 24px; background:transparent; color:var(--text, #c9d1d9); border:1px solid var(--border, #30363d); border-radius:8px; font-weight:bold; cursor:pointer;">LEARN MORE</button></div></header>`,
+            
+            'auth-matrix': (l, id) => `<div id="${id || 'auth-01'}" style="max-width:350px; margin:40px auto; padding:30px; background:var(--surface, #21262d); border:1px solid var(--border, #30363d); border-radius:16px; box-shadow:0 15px 35px rgba(0,0,0,0.5);"><h2 style="text-align:center; color:var(--gold, #d29922); margin-top:0;">${l || 'SECURE LOGIN'}</h2><div style="display:flex; flex-direction:column; gap:15px; margin-top:20px;"><input type="text" placeholder="Username / ID" style="padding:14px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:8px; color:#fff; outline:none;"><input type="password" placeholder="Passcode" style="padding:14px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:8px; color:#fff; outline:none;"><button style="margin-top:10px; padding:15px; background:var(--accent, #2f81f7); color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">AUTHENTICATE</button></div></div>`,
+            
+            'toast-alert': (l, id) => `<div id="${id || 'toast-01'}" style="position:fixed; top:20px; right:20px; background:var(--success, #3fb950); color:#fff; padding:15px 25px; border-radius:8px; font-weight:bold; box-shadow:0 10px 20px rgba(63,185,80,0.3); z-index:9999; animation:slideIn 0.3s ease-out;">${l || 'Operation Successful'}</div><style>@keyframes slideIn { from{transform:translateX(100%); opacity:0;} to{transform:translateX(0); opacity:1;} }</style>`,
+            
+            'chat-bubble': (l, id) => `<div id="${id || 'chat-wrap'}" style="display:flex; flex-direction:column; gap:15px; padding:20px;"><div style="align-self:flex-start; max-width:75%; background:var(--surface, #21262d); border:1px solid var(--border, #30363d); padding:12px 18px; border-radius:18px 18px 18px 0; color:var(--text, #c9d1d9);">${l || 'System: Awaiting your command.'}</div><div style="align-self:flex-end; max-width:75%; background:var(--accent, #2f81f7); padding:12px 18px; border-radius:18px 18px 0 18px; color:#fff; box-shadow:0 5px 15px rgba(47,129,247,0.2);">Acknowledged. Initiating sequence.</div></div>`,
+            
+            'settings-panel': (l, id) => `<div id="${id || 'settings-01'}" style="background:var(--surface, #21262d); border:1px solid var(--border, #30363d); border-radius:12px; overflow:hidden;"><div style="padding:15px 20px; background:var(--bg, #0d1117); font-weight:bold; color:var(--gold, #d29922); border-bottom:1px solid var(--border, #30363d);">${l || 'SYSTEM PREFERENCES'}</div><div style="padding:15px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border, #30363d);"><span style="color:var(--text, #c9d1d9);">Telemetry Tracking</span><label style="position:relative; width:44px; height:24px; background:var(--success, #3fb950); border-radius:12px;"><input type="checkbox" checked style="opacity:0; width:0; height:0;"><div style="position:absolute; top:2px; left:22px; width:20px; height:20px; background:#fff; border-radius:50%; transition:left 0.2s;"></div></label></div><div style="padding:15px 20px; display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--text, #c9d1d9);">Dark Protocol</span><label style="position:relative; width:44px; height:24px; background:var(--border, #30363d); border-radius:12px;"><input type="checkbox" style="opacity:0; width:0; height:0;"><div style="position:absolute; top:2px; left:2px; width:20px; height:20px; background:#fff; border-radius:50%; transition:left 0.2s;"></div></label></div></div>`,
+            
+            'pricing-card': (l, id) => `<div id="${id || 'price-01'}" style="width:280px; background:linear-gradient(180deg, var(--surface, #21262d), var(--bg, #0d1117)); border:2px solid var(--gold, #d29922); border-radius:16px; padding:30px 20px; text-align:center; position:relative; overflow:hidden; margin:0 auto;"><div style="position:absolute; top:15px; right:-35px; background:var(--gold, #d29922); color:#000; padding:5px 40px; font-size:10px; font-weight:900; transform:rotate(45deg);">PRO</div><h3 style="color:var(--text, #c9d1d9); margin:0;">${l || 'NEXUS TIER'}</h3><div style="font-size:42px; font-weight:900; color:#fff; margin:15px 0;">$29<span style="font-size:16px; color:var(--text, #c9d1d9); opacity:0.6;">/mo</span></div><ul style="list-style:none; padding:0; margin:20px 0; color:var(--text, #c9d1d9); font-size:14px; text-align:left;"><li style="margin-bottom:10px;">✓ Infinite Vault Storage</li><li style="margin-bottom:10px;">✓ Deep AST Linting</li><li style="margin-bottom:10px;">✓ Quantum Combine</li></ul><button style="width:100%; padding:15px; background:var(--gold, #d29922); color:#000; border:none; border-radius:8px; font-weight:900; cursor:pointer;">UPGRADE SECURELY</button></div>`,
+            
+            'progress-bar': (l, id) => `<div id="${id || 'prog-01'}" style="width:100%; padding:10px 0;"><div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px; font-weight:bold;"><span style="color:var(--text, #c9d1d9);">${l || 'Extracting Payload...'}</span><span style="color:var(--accent, #2f81f7);">78%</span></div><div style="width:100%; height:8px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:4px; overflow:hidden;"><div style="width:78%; height:100%; background:var(--accent, #2f81f7); border-radius:4px; box-shadow:0 0 10px rgba(47,129,247,0.5);"></div></div></div>`,
+            
+            'accordion-menu': (l, id) => `<details id="${id || 'acc-01'}" style="background:var(--surface, #21262d); border:1px solid var(--border, #30363d); border-radius:8px; margin-bottom:10px;"><summary style="padding:15px; color:var(--gold, #d29922); font-weight:bold; cursor:pointer; outline:none;">${l || 'Encrypted File Metadata'}</summary><div style="padding:15px; border-top:1px solid var(--border, #30363d); color:var(--text, #c9d1d9); font-size:14px; line-height:1.6; background:var(--bg, #0d1117);">File size is 42MB. Signature verified. Awaiting manual extraction protocol to proceed.</div></details>`,
+            
+            'profile-header': (l, id) => `<div id="${id || 'prof-01'}" style="display:flex; align-items:center; gap:20px; padding:20px; background:var(--surface, #21262d); border-radius:16px; border:1px solid var(--border, #30363d);"><div style="width:70px; height:70px; border-radius:50%; background:var(--accent, #2f81f7); display:flex; justify-content:center; align-items:center; font-size:28px; color:#fff; font-weight:bold; box-shadow:0 0 20px rgba(47,129,247,0.4);">A</div><div style="flex:1;"><h2 style="margin:0 0 5px 0; color:#fff; font-size:20px;">${l || 'Commander Amanda'}</h2><p style="margin:0 0 10px 0; color:var(--text, #c9d1d9); font-size:12px; opacity:0.7;">Systems Architect</p><div style="display:flex; gap:15px;"><div style="font-size:11px; color:var(--text, #c9d1d9);"><strong style="color:#fff;">142</strong> Commits</div><div style="font-size:11px; color:var(--text, #c9d1d9);"><strong style="color:var(--gold, #d29922);">Top 5%</strong> Rank</div></div></div></div>`
         },
         updatePreview() { 
             const t = document.getElementById('dreamer-type').value;
@@ -1090,14 +1203,25 @@ window.Nexus = {
 
     settings: {
         async boot() { 
-            const saved = await localforage.getItem('nexus_prefs_v40'); 
+            const saved = await localforage.getItem('nexus_prefs_v42'); 
             if (saved) Nexus.state.prefs = saved; 
+            
+            if(!Nexus.state.prefs.kbLayouts.qwerty) {
+                Nexus.state.prefs.kbLayouts.qwerty = Nexus.widgetConfig.writerVocab.qwerty || [
+                    {d: '1', i: '1'}, {d: '2', i: '2'}, {d: '3', i: '3'}, {d: '4', i: '4'}, {d: '5', i: '5'}, {d: '6', i: '6'}, {d: '7', i: '7'}, {d: '8', i: '8'}, {d: '9', i: '9'}, {d: '0', i: '0'},
+                    {d: 'q', i: 'q'}, {d: 'w', i: 'w'}, {d: 'e', i: 'e'}, {d: 'r', i: 'r'}, {d: 't', i: 't'}, {d: 'y', i: 'y'}, {d: 'u', i: 'u'}, {d: 'i', i: 'i'}, {d: 'o', i: 'o'}, {d: 'p', i: 'p'},
+                    {d: 'a', i: 'a'}, {d: 's', i: 's'}, {d: 'd', i: 'd'}, {d: 'f', i: 'f'}, {d: 'g', i: 'g'}, {d: 'h', i: 'h'}, {d: 'j', i: 'j'}, {d: 'k', i: 'k'}, {d: 'l', i: 'l'},
+                    {d: 'z', i: 'z'}, {d: 'x', i: 'x'}, {d: 'c', i: 'c'}, {d: 'v', i: 'v'}, {d: 'b', i: 'b'}, {d: 'n', i: 'n'}, {d: 'm', i: 'm'},
+                    {d: ',', i: ','}, {d: '.', i: '.'}, {d: '?', i: '?'}, {d: '!', i: '!'}, {d: '@', i: '@'}, {d: '"', i: '"'}, {d: "'", i: "'"},
+                    {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
+                ];
+            }
             this.apply(); 
         },
         update(k, v) { 
             if (k === 'kbRows') v = parseInt(v);
             Nexus.state.prefs[k] = v; 
-            localforage.setItem('nexus_prefs_v40', Nexus.state.prefs); 
+            localforage.setItem('nexus_prefs_v42', Nexus.state.prefs); 
             this.apply(); 
         },
         apply() { 
@@ -1199,7 +1323,15 @@ window.Nexus = {
             }
             
             wrap.innerHTML = rowsData.map((row, i) => {
-                const baseHTML = row.map(k => `<button class="kb-key" onclick="Nexus.ui.injectChar('${k.i.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')">${k.d.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</button>`).join('');
+                const baseHTML = row.map(k => {
+                    let dSafe = k.d.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    let iSafe = k.i.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                    let specialClass = (k.d === 'BACKSPACE' || k.d === 'ENTER') ? 'style="background:var(--accent); color:#fff;"' : '';
+                    if(k.d === 'SPACE') specialClass = 'style="width: 80px;"';
+                    
+                    return `<button class="kb-key" ${specialClass} onclick="Nexus.ui.injectChar('${iSafe}')">${dSafe}</button>`;
+                }).join('');
+                
                 const infiniteHTML = Array(15).fill(baseHTML).join('');
                 return `<div class="kb-scroll-row" id="kb-r${i}">${infiniteHTML}</div>`;
             }).join('');
@@ -1465,18 +1597,28 @@ window.Nexus = {
             const start = ed.selectionStart;
             const end = ed.selectionEnd;
             
-            let processed = val.replace(/\*\+/g, '\t'); 
-            let cursorOffset = processed.indexOf('*#'); 
-            
-            if (cursorOffset !== -1) processed = processed.replace(/\*\#/g, '');
-            else cursorOffset = processed.length;
+            if (val === 'BACKSPACE') {
+                if (start === end && start > 0) {
+                    ed.value = ed.value.substring(0, start - 1) + ed.value.substring(end);
+                    ed.setSelectionRange(start - 1, start - 1);
+                } else if (start !== end) {
+                    ed.value = ed.value.substring(0, start) + ed.value.substring(end);
+                    ed.setSelectionRange(start, start);
+                }
+            } else {
+                let processed = val.replace(/\*\+/g, '\t'); 
+                let cursorOffset = processed.indexOf('*#'); 
+                
+                if (cursorOffset !== -1) processed = processed.replace(/\*\#/g, '');
+                else cursorOffset = processed.length;
 
-            ed.value = ed.value.substring(0, start) + processed + ed.value.substring(end);
+                ed.value = ed.value.substring(0, start) + processed + ed.value.substring(end);
+                
+                const newPos = start + cursorOffset;
+                ed.setSelectionRange(newPos, newPos);
+            }
             
-            const newPos = start + cursorOffset;
-            ed.setSelectionRange(newPos, newPos);
             ed.focus();
-            
             Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
             this.updateGutter();
             ed.dispatchEvent(new Event('input'));
@@ -1512,7 +1654,7 @@ window.Nexus = {
                 const st = document.getElementById('foot-status');
                 st.innerText = "BEAUTIFIED";
                 st.style.color = "var(--success)";
-                setTimeout(() => { if (!ed.hasAttribute('readonly')) st.innerText = "READY"; }, 2000);
+                setTimeout(() => { if (!ed.hasAttribute('readonly')) st.innerText = ed.getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)"; }, 2000);
             } catch(e) {
                 alert("Beautify engine encountered an error: " + e.message);
             }
@@ -1532,23 +1674,41 @@ window.Nexus = {
         },
         initInfiniteRibbon() { const c = document.getElementById('ribbon-container'), t = document.getElementById('ribbon-track'); if (!c || !t) return; t.innerHTML = t.innerHTML + t.innerHTML + t.innerHTML; c.scrollLeft = c.scrollWidth / 3; c.onscroll = () => { const w = c.scrollWidth / 3; if (c.scrollLeft >= w * 2) c.scrollLeft = w; else if (c.scrollLeft <= 0) c.scrollLeft = w; }; },
         initEdgeSwipes() { let startX = 0; window.addEventListener('touchstart', (e) => { startX = e.touches[0].clientX; }); window.addEventListener('touchend', (e) => { const d = e.changedTouches[0].clientX - startX; if (startX < 30 && d > 100) this.toggleSidebar('left'); if (startX > window.innerWidth - 30 && d < -100) this.toggleSidebar('right'); }); },
+        
         toggleEditMode() { 
             const ed = document.getElementById('raw-terminal'); 
             const st = document.getElementById('foot-status'); 
             const btns = document.querySelectorAll('.edit-btn-trigger'); 
             
+            if(!Nexus.state.activeFile) return; 
+
             if (ed.hasAttribute('readonly')) { 
-                if(!Nexus.state.activeFile) return; 
                 ed.removeAttribute('readonly'); 
-                st.innerText = "READY"; 
+                ed.setAttribute('inputmode', 'none'); 
+                st.innerText = "UTIL MODE"; 
+                st.style.color = "var(--accent)"; 
+                btns.forEach(btn => { 
+                    btn.innerHTML = "🛠️ UTIL MODE"; 
+                    btn.className = "tool-btn edit-btn-trigger btn-edit-util"; 
+                }); 
+            } else if (ed.getAttribute('inputmode') === 'none') { 
+                ed.removeAttribute('inputmode'); 
+                st.innerText = "READY (FULL)"; 
                 st.style.color = "var(--success)"; 
-                btns.forEach(btn => { btn.innerHTML = "🔓 EDIT MODE"; btn.classList.replace('btn-edit-lock', 'btn-edit-unlocked'); }); 
-            } else { 
-                ed.setAttribute('readonly', true); 
+                btns.forEach(btn => { 
+                    btn.innerHTML = "🔓 FULL EDIT"; 
+                    btn.className = "tool-btn edit-btn-trigger btn-edit-unlocked"; 
+                }); 
+            } else {
+                ed.setAttribute('readonly', 'true'); 
+                ed.removeAttribute('inputmode');
                 st.innerText = "LOCKED"; 
                 st.style.color = "var(--danger)"; 
-                btns.forEach(btn => { btn.innerHTML = "🔒 READ ONLY"; btn.classList.replace('btn-edit-unlocked', 'btn-edit-lock'); }); 
-            } 
+                btns.forEach(btn => { 
+                    btn.innerHTML = "🔒 READ ONLY"; 
+                    btn.className = "tool-btn edit-btn-trigger btn-edit-lock"; 
+                }); 
+            }
         },
         toggleSidebar(s) { document.getElementById(s==='left'?'panel-left':'panel-right').classList.toggle('open'); },
         toggleSlide(t) { document.getElementById(t==='diag'?'diag-hub':'shell-slide').classList.toggle('open'); },
@@ -1642,6 +1802,14 @@ editor.oninput = () => {
         Nexus.vfs.save(); 
         st.innerText = "SAVED";
         st.style.color = "var(--success)";
+        setTimeout(() => {
+            if(!editor.hasAttribute('readonly')) {
+                st.innerText = editor.getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)";
+            } else {
+                st.innerText = "LOCKED";
+                st.style.color = "var(--danger)";
+            }
+        }, 1000);
     }, 1200);
 };
 
