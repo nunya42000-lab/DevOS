@@ -39,7 +39,7 @@
         margin: 0; padding: 0; width: 100vw; height: 100vh; 
         background: var(--bg); color: var(--text); 
         font-family: var(--font-ui); overflow: hidden; 
-        touch-action: none; /* Prevents whole-page bouncing on mobile */
+        overscroll-behavior: none; /* Prevents whole-page bouncing on mobile */
     }
 
     #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
@@ -626,6 +626,12 @@
                 <div class="item-row"><span>Tab Width (Spaces)</span><select id="pref-tabs" onchange="Nexus.settings.update('tabWidth', this.value)" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;"><option value="2">2 Spaces</option><option value="4">4 Spaces</option></select></div>
                 
                 <div class="section-label">Kinetic Widgets Config</div>
+               <div class="item-row" style="flex-direction:column; align-items:flex-start;">
+    <span style="margin-bottom:10px;">Utility Tools (Comma separated)</span>
+    <input type="text" id="pref-util-layout" onchange="Nexus.settings.update('utilLayout', this.value)" style="width:100%; background:var(--bg); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-size:11px;">
+    <span style="font-size:9px; color:var(--gold); margin-top:5px;">Available: jump, up20, down20, color, undo, redo, tab</span>
+</div>
+
                 <div class="item-row">
                     <span>Utility Bar Docking</span>
                     <select id="pref-util-mode" onchange="Nexus.settings.update('utilDock', this.value)" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
@@ -961,12 +967,20 @@ window.Nexus = {
             const escapedNames = selected.map(f => escapeRegex(f.replace('./', ''))).join('|');
             
             const regexes = [
-                new RegExp(`((?:import|export)\\s+.*?from\\s+['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
-                new RegExp(`(src=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
-                new RegExp(`(href=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g')
-            ];
-            
-            Object.keys(Nexus.state.vfs).forEach(file => {
+    // Matches: import x from '...', export x from '...', import '...'
+    new RegExp(`((?:import|export)\\s+(?:.*?from\\s+)?['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+    // Matches: import('./...')
+    new RegExp(`(import\\(['"])(\\.\\/)?(?:${escapedNames})(['"]\\))`, 'g'),
+    // Matches: require('./...')
+    new RegExp(`(require\\(['"])(\\.\\/)?(?:${escapedNames})(['"]\\))`, 'g'),
+    // Matches: src="..."
+    new RegExp(`(src=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+    // Matches: href="..."
+    new RegExp(`(href=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+    // Matches CSS: url('...')
+    new RegExp(`(url\\(['"]?)(\\.\\/)?(?:${escapedNames})(['"]?\\))`, 'g')
+];
+             Object.keys(Nexus.state.vfs).forEach(file => {
                 if (selected.includes(file)) return; 
                 let code = Nexus.state.vfs[file];
                 let changed = false;
@@ -1313,9 +1327,11 @@ window.Nexus = {
             ed.setSelectionRange(pos, pos);
             
             setTimeout(() => {
-                const targetScroll = ((ln - 1) * 22) - (ed.clientHeight / 2) + 11;
-                ed.scrollTop = Math.max(0, targetScroll);
-            }, 50);
+    // Added 15px to account for editor top padding
+    const targetScroll = 15 + ((ln - 1) * 22) - (ed.clientHeight / 2) + 11;
+    ed.scrollTop = Math.max(0, targetScroll);
+}, 50);
+
         }
     },
 
@@ -1426,7 +1442,7 @@ window.Nexus = {
             if(document.getElementById('pref-kb-rows')) document.getElementById('pref-kb-rows').value = Nexus.state.prefs.kbRows;
             if(document.getElementById('pref-util-mode')) document.getElementById('pref-util-mode').value = Nexus.state.prefs.utilDock || 'dock-right';
             if(document.getElementById('pref-writer-custom')) document.getElementById('pref-writer-custom').value = Nexus.state.prefs.customVocab || "Your, custom, words, here";
-
+  if(document.getElementById('pref-util-layout')) document.getElementById('pref-util-layout').value = Nexus.state.prefs.utilLayout || 'jump, up20, down20, color, undo, redo, tab';
             const util = document.getElementById('utility-bar');
             if(Nexus.state.prefs.utilDock === 'dock-right') {
                 util.classList.remove('util-horizontal'); util.classList.add('util-vertical');
@@ -1442,7 +1458,8 @@ window.Nexus = {
 
             Nexus.kb.render();
             Nexus.kb.applyPosition();
-        },
+      Nexus.ui.renderUtilBar(); 
+          },
         calcStorage() { const getK = (obj) => (JSON.stringify(obj).length / 1024).toFixed(2) + " KB"; document.getElementById('metric-vfs').innerText = getK(Nexus.state.vfs); document.getElementById('metric-vault').innerText = getK(Nexus.state.vault); document.getElementById('metric-snaps').innerText = Nexus.state.snapshots.length; }
     },
 
@@ -1738,7 +1755,7 @@ window.Nexus = {
         async boot() { 
             await Nexus.vfs.boot(); await Nexus.vault.boot(); await Nexus.snapshots.boot(); await Nexus.settings.boot(); 
             Nexus.dreamer.updatePreview(); 
-            this.initInfiniteRibbon(); this.initEdgeSwipes(); 
+           this.renderUtilBar();  this.initInfiniteRibbon(); this.initEdgeSwipes(); 
             
             Object.keys(Nexus.state.widgets).forEach(id => {
                 const el = document.getElementById(id);
@@ -1878,12 +1895,53 @@ window.Nexus = {
                 ed.setSelectionRange(pos, pos);
                 
                 setTimeout(() => {
-                    const targetScroll = (line * 22) - (ed.clientHeight / 2) + 11;
-                    ed.scrollTop = Math.max(0, targetScroll);
-                }, 50);
+    // Added 15px to account for editor top padding
+    const targetScroll = 15 + (line * 22) - (ed.clientHeight / 2) + 11;
+    ed.scrollTop = Math.max(0, targetScroll);
+}, 50);
+
             }
         },
-   
+   jumpRelative(offset) {
+    if(!Nexus.state.activeFile) return;
+    const ed = document.getElementById('raw-terminal');
+    const lines = ed.value.split('\n');
+    const currentPos = ed.selectionStart;
+    
+    let currentLine = 0, chars = 0;
+    for(let i=0; i<lines.length; i++) {
+        chars += lines[i].length + 1;
+        if(chars > currentPos) { currentLine = i; break; }
+    }
+    
+    const targetLine = Math.max(0, Math.min(lines.length - 1, currentLine + offset));
+    let pos = 0;
+    for (let i = 0; i < targetLine; i++) pos += lines[i].length + 1;
+    
+    ed.focus();
+    ed.setSelectionRange(pos, pos);
+    setTimeout(() => {
+        const targetScroll = 15 + (targetLine * 22) - (ed.clientHeight / 2) + 11;
+        ed.scrollTop = Math.max(0, targetScroll);
+    }, 50);
+},
+
+       renderUtilBar() {
+    const layout = (Nexus.state.prefs.utilLayout || 'jump, up20, down20, color, undo, redo, tab').split(',').map(s=>s.trim());
+    const tools = {
+        'jump': `<button class="sleek-btn" onclick="Nexus.ui.jumpPrompt()"><span style="font-size:16px;">|→</span><span class="util-lbl">Line</span></button>`,
+        'up20': `<button class="sleek-btn" onclick="Nexus.ui.jumpRelative(-20)"><span style="font-size:16px;">↑↑</span><span class="util-lbl">Up 20</span></button>`,
+        'down20': `<button class="sleek-btn" onclick="Nexus.ui.jumpRelative(20)"><span style="font-size:16px;">↓↓</span><span class="util-lbl">Dn 20</span></button>`,
+        'color': `<button class="sleek-btn" onclick="document.getElementById('color-picker-input').click()"><img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Color_circle_%28hue_sat%29.png" style="width:20px; border-radius:50%;"><span class="util-lbl">Picker</span></button>`,
+        'undo': `<button class="sleek-btn" onclick="document.execCommand('undo')"><span style="font-size:18px;">↶</span><span class="util-lbl">Undo</span></button>`,
+        'redo': `<button class="sleek-btn" onclick="document.execCommand('redo')"><span style="font-size:18px;">↷</span><span class="util-lbl">Redo</span></button>`,
+        'tab': `<button class="sleek-btn" onclick="Nexus.ui.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`
+    };
+    
+    const container = document.querySelector('#utility-bar .sleek-bar-content');
+    if(container) container.innerHTML = layout.map(k => tools[k] || '').join('');
+},
+
         beautify() {
             if(!Nexus.state.activeFile) return;
             const ed = document.getElementById('raw-terminal');
