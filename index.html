@@ -1226,7 +1226,34 @@ window.Nexus = {
                 this.log(`[AST PARSE ERROR] Code structure invalid. Cannot build tree.<br><br><span style="font-size:10px;">${e.message}</span>`, "danger");
             }
         },
-        scanDeps() { if(!Nexus.state.activeFile) return; this.log("DEPENDENCIES SECURE.", "success"); },
+                scanDeps() { 
+            if(!Nexus.state.activeFile) return; 
+            const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+            
+            // Regex to catch imports, requires, scripts, links, and image sources
+            const deps = code.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g);
+            
+            if (!deps || deps.length === 0) {
+                this.log("SCAN IMPORTS: No external dependencies or routing links detected.", "success");
+                return;
+            }
+
+            // Clean up the raw matches for a clean UI printout
+            const cleanDeps = deps.map(d => {
+                const match = d.match(/['"]([^'"]+)['"]/);
+                return match ? match[1] : d;
+            });
+
+            // Remove duplicates
+            const uniqueDeps = [...new Set(cleanDeps)];
+
+            let htmlOut = `<div style="color:var(--accent); margin-bottom:10px; font-weight:bold;">DETECTED ${uniqueDeps.length} DEPENDENCIES:</div>`;
+            uniqueDeps.forEach(dep => {
+                htmlOut += `<div style="color:var(--text); font-size:11px; margin-bottom:4px; padding-left:10px; border-left:2px solid var(--border);">🔗 ${dep}</div>`;
+            });
+
+            document.getElementById('diag-out').innerHTML = htmlOut;
+        },
         pulse() {
             if(!Nexus.state.activeFile) return;
             const ed = document.getElementById('raw-terminal'); 
@@ -1745,16 +1772,22 @@ window.Nexus = {
         }
     },
 
-    writer: {
+        writer: {
         go() {
+            const ed = document.getElementById('raw-terminal');
+            if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR");
+            
+            // UI Flash
+            const statusEl = document.getElementById('writer-status');
+            statusEl.innerText = "WRITING...";
+            statusEl.style.color = "var(--success)";
+            statusEl.style.opacity = "1";
+
             const count = parseInt(document.getElementById('write-count').value);
             const mode = document.getElementById('write-mode').value;
             const unit = document.getElementById('write-unit').value;
             const wrapHtml = document.getElementById('write-html').checked;
             const vocab = Nexus.widgetConfig.writerVocab[mode];
-            const ed = document.getElementById('raw-terminal');
-            
-            if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR");
             
             let result = "";
             const generatePhrase = (len) => {
@@ -1775,8 +1808,16 @@ window.Nexus = {
             }
 
             Nexus.ui.injectChar(result.trim());
+
+            // Reset UI
+            setTimeout(() => {
+                statusEl.innerText = "IDLE";
+                statusEl.style.color = "";
+                statusEl.style.opacity = "0.5";
+            }, 800);
         }
     },
+
 
     shell: {
         exec(cmd) {
@@ -2176,7 +2217,38 @@ editor.oninput = () => {
 };
 
 editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
-editor.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const s = editor.selectionStart; editor.value = editor.value.substring(0, s) + "  " + editor.value.substring(editor.selectionEnd); editor.selectionStart = editor.selectionEnd = s + 2; } };
+editor.onkeydown = (e) => { 
+    if (e.key === 'Tab') { 
+        e.preventDefault(); 
+        if (editor.hasAttribute('readonly')) return;
+        const s = editor.selectionStart; 
+        
+        // Dynamically grab the tab width setting
+        const tabSpaces = " ".repeat(Nexus.state.prefs.tabWidth || 2);
+        
+        editor.value = editor.value.substring(0, s) + tabSpaces + editor.value.substring(editor.selectionEnd); 
+        editor.selectionStart = editor.selectionEnd = s + tabSpaces.length; 
+        
+        // Ensure the VFS state updates immediately
+        Nexus.state.vfs[Nexus.state.activeFile] = editor.value;
+        Nexus.ui.updateGutter();
+    } 
+};
+
+// --- CURSOR TRACKING ---
+const updateCursorPos = () => {
+    if(!Nexus.state.activeFile) return;
+    const pos = editor.selectionStart;
+    const textBefore = editor.value.substring(0, pos);
+    const lines = textBefore.split('\n');
+    const currentLine = lines.length;
+    const currentCol = lines[lines.length - 1].length + 1;
+    document.getElementById('foot-pos').innerText = `LN ${currentLine}, COL ${currentCol}`;
+};
+
+editor.addEventListener('keyup', updateCursorPos);
+editor.addEventListener('click', updateCursorPos);
+editor.addEventListener('input', updateCursorPos);
 
 window.addEventListener('DOMContentLoaded', async () => { await Nexus.ui.boot(); });
 </script>
