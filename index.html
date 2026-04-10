@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.19 - Codex Matrix</title>
+    <title>DevOS Nexus Prime v40.20 - Codex Matrix</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -17,177 +17,233 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
 
-    <style>
-        :root {
-            --bg: #0d1117; --panel: #161b22; --surface: #21262d;
-            --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
-            --success: #3fb950; --warn: #d29922; --danger: #f85149;
-            --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            --sidebar-w: 88vw; --sidebar-max: 450px;
-        }
 
-        body.outdoor-mode {
-            --bg: #ffffff; --panel: #f6f8fa; --surface: #ffffff;
-            --border: #d0d7de; --text: #24292f; --accent: #0969da;
-            --gold: #9a6700;
-        }
+<style>
+    :root {
+        --bg: #0d1117; --panel: #161b22; --surface: #21262d;
+        --border: #30363d; --text: #c9d1d9; --accent: #2f81f7;
+        --success: #3fb950; --warn: #d29922; --danger: #f85149;
+        --gold: #d29922; --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --sidebar-w: 88vw; --sidebar-max: 450px;
+    }
 
-        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
-        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font-ui); overflow: hidden; touch-action: none; }
+    body.outdoor-mode {
+        --bg: #ffffff; --panel: #f6f8fa; --surface: #ffffff;
+        --border: #d0d7de; --text: #24292f; --accent: #0969da;
+        --gold: #9a6700;
+    }
 
-        #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
+    * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+    
+    body, html { 
+        margin: 0; padding: 0; width: 100vw; height: 100vh; 
+        background: var(--bg); color: var(--text); 
+        font-family: var(--font-ui); overflow: hidden; 
+        touch-action: none; /* Prevents whole-page bouncing on mobile */
+    }
 
-        /* --- 1. INFINITE RIBBON --- */
-        #ribbon-container { height: 55px; background: var(--panel); border-bottom: 1px solid var(--border); overflow-x: scroll; white-space: nowrap; position: relative; z-index: 1000; display: flex; align-items: center; }
-        #ribbon-container::-webkit-scrollbar { display: none; }
-        #ribbon-track { display: inline-flex; padding: 0 10px; gap: 8px; }
-        .tool-btn { padding: 10px 18px; border-radius: 14px; background: var(--surface); color: var(--text); border: 1px solid var(--border); font-size: 11px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; letter-spacing: 0.5px; transition: all 0.2s ease; flex-shrink: 0; }
-        
-        .btn-edit-lock { color: var(--text); opacity: 0.5; }
-        .btn-edit-util { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(47, 129, 247, 0.3); }
-        .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
-        
-        .btn-gold { color: var(--gold); border-color: var(--gold); }
-        .btn-accent { background: var(--accent); color: #fff; border: none; }
-        .btn-danger { background: var(--danger); color: #fff; border: none; }
+    #app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; position: relative; }
 
-        /* --- 2. MAIN WORKSPACE & TABS --- */
-        #workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
-        
-        #file-tabs-bar { display: flex; overflow-x: auto; background: var(--panel); border-bottom: 1px solid var(--border); min-height: 38px; scroll-behavior: smooth; }
-        #file-tabs-bar::-webkit-scrollbar { display: none; }
-        .file-tab { padding: 8px 15px; font-size: 12px; font-family: monospace; cursor: pointer; border-right: 1px solid var(--border); display: flex; align-items: center; gap: 10px; color: var(--text); white-space: nowrap; border-top: 2px solid transparent; background: var(--surface); }
-        .file-tab.active { background: var(--bg); border-top: 2px solid var(--accent); color: var(--accent); font-weight: bold; }
-        .tab-close { color: var(--danger); font-size: 16px; font-weight: bold; cursor: pointer; opacity: 0.6; line-height: 1; }
-        .tab-close:hover { opacity: 1; }
+    /* --- 1. INFINITE RIBBON --- */
+    #ribbon-container { 
+        height: 55px; background: var(--panel); border-bottom: 1px solid var(--border); 
+        overflow-x: scroll; white-space: nowrap; position: relative; z-index: 1000; 
+        display: flex; align-items: center; -webkit-overflow-scrolling: touch;
+    }
+    #ribbon-container::-webkit-scrollbar { display: none; }
+    #ribbon-track { display: inline-flex; padding: 0 10px; gap: 8px; }
+    
+    .tool-btn { 
+        padding: 10px 18px; border-radius: 14px; background: var(--surface); 
+        color: var(--text); border: 1px solid var(--border); font-size: 11px; 
+        font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; 
+        gap: 8px; letter-spacing: 0.5px; transition: all 0.2s ease; flex-shrink: 0; 
+    }
+    
+    .btn-edit-lock { color: var(--text); opacity: 0.5; }
+    .btn-edit-util { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(47, 129, 247, 0.3); }
+    .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
+    
+    .btn-gold { color: var(--gold); border-color: var(--gold); }
+    .btn-accent { background: var(--accent); color: #fff; border: none; }
+    .btn-danger { background: var(--danger); color: #fff; border: none; }
 
-        #editor-view { flex: 1; display: flex; background: #000; position: relative; }
-        body.outdoor-mode #editor-view { background: #fff; }
-        #gutter { width: 45px; background: var(--bg); border-right: 1px solid var(--border); color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; text-align: right; padding: 15px 10px 15px 0; pointer-events: none; overflow: hidden; height: 100%; }
-        #raw-terminal { flex: 1; background: transparent; color: inherit; border: none; padding: 15px; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; }
-        #raw-terminal[readonly] { opacity: 0.4; }
+    /* --- 2. MAIN WORKSPACE & TABS --- */
+    #workspace { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    
+    #file-tabs-bar { 
+        display: flex; overflow-x: auto; background: var(--panel); 
+        border-bottom: 1px solid var(--border); min-height: 38px; 
+        scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
+    }
+    #file-tabs-bar::-webkit-scrollbar { display: none; }
+    
+    .file-tab { 
+        padding: 8px 15px; font-size: 12px; font-family: monospace; cursor: pointer; 
+        border-right: 1px solid var(--border); display: flex; align-items: center; 
+        gap: 10px; color: var(--text); white-space: nowrap; border-top: 2px solid transparent; 
+        background: var(--surface); transition: background 0.2s;
+    }
+    .file-tab.active { background: var(--bg); border-top: 2px solid var(--accent); color: var(--accent); font-weight: bold; }
+    
+    .tab-close { color: var(--danger); font-size: 16px; font-weight: bold; cursor: pointer; opacity: 0.6; line-height: 1; }
+    .tab-close:hover { opacity: 1; }
 
-        /* --- 3. SIDEBARS --- */
-        .side-panel { position: fixed; top: 0; bottom: 0; width: var(--sidebar-w); max-width: var(--sidebar-max); background: var(--panel); border: 1px solid var(--border); z-index: 2000; transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); display: flex; flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.9); }
-        .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
-        .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
-        .side-panel.open { transform: translateX(0); }
-        
-        .p-head { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 14px; color: var(--gold); letter-spacing: 1px; }
-        .p-body { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; }
-        .section-label { font-size: 10px; opacity: 0.5; margin: 25px 0 10px 0; text-transform: uppercase; font-weight: 800; letter-spacing: 2px; }
+    #editor-view { flex: 1; display: flex; background: #000; position: relative; }
+    body.outdoor-mode #editor-view { background: #fff; }
+    
+    #gutter { 
+        width: 45px; background: var(--bg); border-right: 1px solid var(--border); 
+        color: #484f58; font-family: monospace; font-size: 14px; line-height: 22px; 
+        text-align: right; padding: 15px 10px 50vh 0; pointer-events: none; 
+        overflow: hidden; height: 100%; touch-action: none; 
+    }
+    
+    #raw-terminal { 
+        flex: 1; background: transparent; color: inherit; border: none; padding: 15px; 
+        padding-bottom: 50vh; font-family: 'Courier New', monospace; font-size: 14px; 
+        line-height: 22px; outline: none; resize: none; white-space: pre; overflow: auto; 
+        touch-action: pan-y pan-x; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+    }
+    #raw-terminal[readonly] { opacity: 0.4; }
 
-        /* Accordion */
-        .acc-section { margin-bottom: 5px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-        .acc-head { padding: 12px; background: var(--surface); cursor: pointer; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--gold); }
-        .acc-content { display: none; background: var(--bg); }
-        .acc-content.open { display: block; }
-        .active-file { border-left: 3px solid var(--accent); background: rgba(47, 129, 247, 0.1); }
+    /* --- 3. SIDEBARS --- */
+    .side-panel { 
+        position: fixed; top: 0; bottom: 0; width: var(--sidebar-w); max-width: var(--sidebar-max); 
+        background: var(--panel); border: 1px solid var(--border); z-index: 9000; 
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); display: flex; 
+        flex-direction: column; box-shadow: 0 0 50px rgba(0,0,0,0.9); 
+    }
+    .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
+    .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
+    .side-panel.open { transform: translateX(0); }
+    
+    .p-head { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-weight: 900; font-size: 14px; color: var(--gold); letter-spacing: 1px; }
+    .p-body { flex: 1; padding: 15px; overflow-y: auto; font-family: monospace; -webkit-overflow-scrolling: touch; }
+    .section-label { font-size: 10px; opacity: 0.5; margin: 25px 0 10px 0; text-transform: uppercase; font-weight: 800; letter-spacing: 2px; }
 
-        /* --- 4. SLIDE PANELS --- */
-        #diag-hub { position: fixed; top: 0; left: 0; right: 0; height: 60vh; background: var(--panel); border-bottom: 4px solid var(--danger); z-index: 3000; transform: translateY(-105%); transition: transform 0.4s ease; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
-        #diag-hub.open { transform: translateY(0); }
+    /* Accordion */
+    .acc-section { margin-bottom: 5px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .acc-head { padding: 12px; background: var(--surface); cursor: pointer; display: flex; justify-content: space-between; font-size: 11px; font-weight: 800; color: var(--gold); }
+    .acc-content { display: none; background: var(--bg); }
+    .acc-content.open { display: block; }
+    .active-file { border-left: 3px solid var(--accent); background: rgba(47, 129, 247, 0.1); }
 
-        #shell-slide { position: fixed; bottom: 0; left: 0; right: 0; height: 100px; background: var(--surface); border-top: 4px solid var(--accent); z-index: 4000; transform: translateY(105%); transition: transform 0.3s ease; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); }
-        #shell-slide.open { transform: translateY(0); }
-        #shell-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; font-size: 18px; outline: none; }
+    /* --- 4. SLIDE PANELS --- */
+    #diag-hub { position: fixed; top: 0; left: 0; right: 0; height: 60vh; background: var(--panel); border-bottom: 4px solid var(--danger); z-index: 3000; transform: translateY(-105%); transition: transform 0.4s ease; padding: 10px; box-shadow: 0 10px 40px rgba(0,0,0,0.8); display: flex; flex-direction: column; }
+    #diag-hub.open { transform: translateY(0); }
 
-        /* --- 5. MODALS --- */
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 5000; display: none !important; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
-        .modal-overlay.active { display: flex !important; }
-        .modal-content { width: 90%; height: 80%; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,1); }
-        .modal-body { flex: 1; padding: 25px; overflow-y: auto; }
+    #shell-slide { position: fixed; bottom: 0; left: 0; right: 0; height: 100px; background: var(--surface); border-top: 4px solid var(--accent); z-index: 4000; transform: translateY(105%); transition: transform 0.3s ease; display: flex; align-items: center; padding: 0 20px; box-shadow: 0 -10px 40px rgba(0,0,0,0.8); }
+    #shell-slide.open { transform: translateY(0); }
+    #shell-input { flex: 1; background: transparent; border: none; color: #fff; font-family: monospace; font-size: 18px; outline: none; }
 
-        /* --- 6. SANDBOX & CONSOLE --- */
-        #sandbox-wrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
-        #sandbox-frame { flex: 1; border: none; }
-        #ghost-console { height: 35vh; background: #000; color: #3fb950; padding: 15px; font-family: monospace; font-size: 11px; overflow-y: auto; border-top: 3px solid var(--accent); line-height: 1.5; scroll-behavior: smooth; }
+    /* --- 5. MODALS --- */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; display: none !important; align-items: center; justify-content: center; backdrop-filter: blur(10px); }
+    .modal-overlay.active { display: flex !important; }
+    .modal-content { width: 90%; height: 80%; background: var(--panel); border: 1px solid var(--border); border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 80px rgba(0,0,0,1); }
+    .modal-body { flex: 1; padding: 25px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-        /* --- 7. SVS-WIDGET STYLING --- */
-        .floating-widget {
-            position: fixed; background: #282c34; backdrop-filter: blur(12px);
-            border: 1px solid #181a1f; border-radius: 8px; z-index: 8000;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5); display: none; flex-direction: column;
-            color: #abb2bf; transition: opacity 0.3s, transform 0.3s;
-        }
-        .floating-widget.active { display: flex; }
+    /* --- 6. SANDBOX & CONSOLE --- */
+    #sandbox-wrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
+    #sandbox-frame { flex: 1; border: none; }
+    #ghost-console { height: 35vh; background: #000; color: #3fb950; padding: 15px; font-family: monospace; font-size: 11px; overflow-y: auto; border-top: 3px solid var(--accent); line-height: 1.5; scroll-behavior: smooth; }
 
-        .drag-handle { background: rgba(255,255,255,0.05); cursor: move; display: flex; justify-content: center; align-items: center; flex-shrink: 0; }
-        
-        .util-grip {
-            display: flex; align-items: center; justify-content: center;
-            background: #21252b; cursor: move; color: #5c6370;
-        }
-        .util-horizontal { flex-direction: row; }
-        .util-horizontal .util-grip { width: 24px; border-right: 1px solid #181a1f; border-radius: 8px 0 0 8px; flex-direction: column; font-size: 14px; line-height: 0.8; letter-spacing: -2px; }
-        .util-horizontal .util-grip::before { content: '⋮\n⋮\n⋮'; white-space: pre; }
-        .util-horizontal .sleek-bar-content { flex-direction: row; }
-        .util-horizontal .util-lbl { display: none; }
-        .util-horizontal .sleek-btn { flex-direction: row; gap: 8px; }
+    /* --- 7. SVS-WIDGET STYLING (FINAL PATCH v40.27) --- */
+    .floating-widget {
+        position: fixed; background: rgba(40, 44, 52, 0.95); backdrop-filter: blur(12px);
+        border: 1px solid #181a1f; border-radius: 12px; z-index: 8000;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.6); display: none; flex-direction: column;
+        color: #abb2bf; overflow: hidden;
+        /* Kinetic Transition for Snapping */
+        transition: opacity 0.3s, transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), top 0.4s cubic-bezier(0.19, 1, 0.22, 1), left 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+    .floating-widget.active { display: flex; }
 
-        .util-vertical { flex-direction: column; width: 46px; }
-        .util-vertical .util-grip { height: 18px; width: 100%; border-bottom: 1px solid #181a1f; border-radius: 8px 8px 0 0; flex-direction: row; font-size: 14px; line-height: 0.8; letter-spacing: 2px; }
-        .util-vertical .util-grip::before { content: '⋯⋯'; }
-        .util-vertical .sleek-bar-content { flex-direction: column; padding: 4px; gap: 4px; }
-        .util-vertical .util-lbl { display: block; font-size: 8px; margin-top: 2px; color: #5c6370; font-weight: bold; }
-        .util-vertical .sleek-btn { flex-direction: column; padding: 6px 2px; width: 100%; text-align: center; }
+    /* Global Drag Handle Architecture */
+    .util-grip, .search-grip, .kb-drag-handle, .drag-handle {
+        background: #21252b; cursor: move; color: #5c6370;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; font-family: monospace; font-weight: bold;
+        touch-action: none; /* Crucial for clean dragging */
+    }
+    
+    /* Utility Bar: Vertical Docking Support */
+    .util-vertical { flex-direction: column; width: 46px; border-radius: 12px; }
+    .util-vertical .util-grip { 
+        height: 24px; width: 100%; border-bottom: 1px solid #181a1f; 
+        border-radius: 12px 12px 0 0; font-size: 14px; letter-spacing: 2px;
+    }
+    .util-vertical .util-grip::before { content: '⋯⋯'; }
+    .util-vertical .sleek-bar-content { flex-direction: column; padding: 4px; gap: 6px; }
+    .util-vertical .util-lbl { display: block; font-size: 8px; margin-top: 2px; color: #5c6370; font-weight: 800; text-transform: uppercase; text-align: center; }
+    .util-vertical .sleek-btn { flex-direction: column; padding: 8px 2px; width: 100%; }
 
-        .search-grip {
-            width: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center;
-            background: #21252b; border-right: 1px solid #181a1f; border-radius: 8px 0 0 8px;
-            cursor: move; font-size: 14px; line-height: 0.8; letter-spacing: -2px; color: #5c6370;
-            flex-shrink: 0;
-        }
-        .search-grip-x { font-family: sans-serif; font-size: 16px; cursor: pointer; color: #abb2bf; margin-bottom: 10px; }
+    /* Search Bar: Horizontal Grip Support */
+    .search-grip {
+        width: 28px; border-right: 1px solid #181a1f; border-radius: 12px 0 0 12px;
+        flex-direction: column; font-size: 14px; line-height: 0.8; letter-spacing: -2px;
+    }
+    .search-grip::before { content: '⋮\n⋮\n⋮'; white-space: pre; }
+    .search-grip-x { font-family: sans-serif; font-size: 18px; cursor: pointer; color: var(--danger); margin-top: 12px; font-weight: 900; }
 
-        .sleek-bar-content { display: flex; padding: 6px; gap: 8px; align-items: center; flex: 1; }
-        .sleek-btn {
-            background: transparent; border: none; color: #abb2bf; cursor: pointer;
-            border-radius: 4px; padding: 6px 10px; font-size: 12px; display: flex; align-items: center; justify-content: center; gap: 4px; font-weight: bold;
-        }
-        .sleek-btn:hover { background: #3e4451; color: #fff; }
-        .sleek-btn.active { background: #e5e9f0; color: #282c34; }
-        
-        .sleek-input {
-            background: #3e4451; border: none; border-radius: 6px; color: #fff;
-            padding: 10px 12px; font-size: 13px; outline: none; width: 100%;
-        }
-        .sleek-input::placeholder { color: #8b92a0; font-weight: bold; }
+    /* Internal Component Styling */
+    .sleek-bar-content { display: flex; padding: 6px; gap: 8px; align-items: center; flex: 1; }
+    .sleek-btn {
+        background: transparent; border: none; color: #abb2bf; cursor: pointer;
+        border-radius: 6px; padding: 8px 10px; font-size: 12px; display: flex; 
+        align-items: center; justify-content: center; gap: 4px; font-weight: bold;
+        transition: background 0.2s;
+    }
+    .sleek-btn:hover { background: #3e4451; color: #fff; }
+    .sleek-btn.active { background: #e5e9f0; color: #282c34; box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+    
+    .sleek-input {
+        background: #1e2227; border: 1px solid #3e4451; border-radius: 8px; color: #fff;
+        padding: 10px 12px; font-size: 13px; outline: none; width: 100%;
+        font-family: 'Courier New', monospace;
+    }
+    .sleek-input:focus { border-color: var(--accent); background: #000; }
 
-        #kb-monolith { background: #21252b; width: 100vw; left: 0; border-radius: 0; border: none; border-top: 1px solid #181a1f; }
-        .kb-header { display: flex; justify-content: space-between; align-items: flex-end; padding: 0 10px; border-bottom: 1px solid #181a1f; }
-        .kb-tabs { display: flex; gap: 2px; }
-        .kb-tab { 
-            background: #21252b; color: #abb2bf; padding: 8px 16px; border-radius: 6px 6px 0 0;
-            font-size: 12px; font-weight: bold; border: none; cursor: pointer; border: 1px solid transparent; border-bottom: none;
-        }
-        .kb-tab.active { background: #e5e9f0; color: #282c34; border-color: #181a1f; }
-        .kb-tab.active::after { content: ' •'; color: #f85149; } 
+    /* Keyboard Monolith: Sovereign Patch */
+    #kb-monolith { 
+        background: #181a1f; width: 100vw; left: 0; border-radius: 0; border: none; 
+        border-top: 2px solid #30363d; touch-action: none;
+    }
+    .kb-drag-handle { height: 20px; width: 100%; border-bottom: 1px solid #000; letter-spacing: 4px; }
+    .kb-drag-handle::before { content: '⋯⋯⋯⋯'; }
+    
+    .kb-header { display: flex; justify-content: space-between; align-items: center; padding: 0 15px; height: 40px; }
+    .kb-tabs { display: flex; gap: 4px; height: 100%; align-items: flex-end; }
+    .kb-tab { 
+        background: #21252b; color: #5c6370; padding: 6px 14px; border-radius: 8px 8px 0 0;
+        font-size: 11px; font-weight: 900; border: none; cursor: pointer; transition: all 0.2s;
+    }
+    .kb-tab.active { background: #e5e9f0; color: #282c34; }
+    .kb-tab.active::after { content: ' •'; color: var(--danger); } 
 
-        .kb-row-container { padding: 8px; display: flex; flex-direction: column; gap: 6px; overflow: hidden; background: #282c34; }
-        .kb-scroll-row { display: flex; overflow-x: auto; gap: 6px; scroll-behavior: auto; padding-bottom: 4px; }
-        .kb-scroll-row::-webkit-scrollbar { display: none; }
+    .kb-row-container { padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #282c34; }
+    .kb-scroll-row { 
+        display: flex; overflow-x: auto; gap: 8px; padding-bottom: 5px;
+        -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+    }
+    .kb-scroll-row::-webkit-scrollbar { display: none; }
 
-        .kb-key {
-            background: #d0d3d8; color: #282c34; border: none; border-radius: 4px;
-            padding: 10px 14px; font-size: 13px; font-family: monospace; font-weight: bold;
-            box-shadow: 0 2px 0 #abb2bf; cursor: pointer; flex-shrink: 0; white-space: nowrap;
-        }
-        .kb-key:active { transform: translateY(2px); box-shadow: 0 0 0 transparent; }
-        
-        .kb-pos-bottom { bottom: 0; top: auto; }
-        .kb-pos-top { top: 55px; bottom: auto; border-top: none; border-bottom: 1px solid #181a1f; }
+    .kb-key {
+        background: #d0d3d8; color: #282c34; border: none; border-radius: 6px;
+        padding: 12px 16px; font-size: 14px; font-family: monospace; font-weight: bold;
+        box-shadow: 0 3px 0 #8b92a0; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+    }
+    .kb-key:active { transform: translateY(2px); box-shadow: 0 1px 0 #8b92a0; background: #fff; }
+    
+    .kb-pos-bottom { bottom: 0; top: auto; }
+    .kb-pos-top { top: 55px; bottom: auto; border-top: none; border-bottom: 2px solid #30363d; }
 
-        /* --- 8. UI HELPERS --- */
-        .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
-        .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; }
-        #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
-        
-        /* Manual Styling */
-        .man-h1 { color: var(--accent); font-size: 18px; margin: 20px 0 10px 0; border-bottom: 1px solid var(--border); padding-bottom: 5px; }
-        .man-h2 { color: var(--gold); font-size: 14px; margin: 15px 0 5px 0; }
-        .man-p { font-size: 12px; color: var(--text); line-height: 1.5; margin-bottom: 10px; opacity: 0.9; }
-    </style>
+    /* --- 8. UI HELPERS --- */
+    .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; }
+    #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
+</style>
+
 </head>
 <body>
 
@@ -218,6 +274,7 @@
             <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
             
             <button class="tool-btn btn-gold" onclick="Nexus.intel.scan()">🧠 NEURAL INTEL</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('graph')">🌌 SYSTEM GRAPH</button>
             
@@ -236,7 +293,7 @@
     </div>
 
     <div id="utility-bar" class="floating-widget util-vertical" style="top: 20%; right: 0px; left: auto;">
-        <div class="util-grip" onmousedown="Nexus.ui.initDrag(event, 'utility-bar')" ontouchstart="Nexus.ui.initDrag(event, 'utility-bar')"></div>
+        <div class="util-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'utility-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'utility-bar')"></div>
         <div class="sleek-bar-content">
             <button class="sleek-btn" onclick="Nexus.ui.jumpPrompt()">
                 <span style="font-size:16px;">|→</span>
@@ -263,8 +320,8 @@
     </div>
 
     <div id="search-bar" class="floating-widget" style="top: 140px; left: 10px; flex-direction: row; width: 320px; border-radius: 8px;">
-        <div class="search-grip" onmousedown="Nexus.ui.initDrag(event, 'search-bar')" ontouchstart="Nexus.ui.initDrag(event, 'search-bar')">
-            <div class="search-grip-x" onclick="Nexus.ui.toggleWidget('search-bar')">&times;</div>
+       <div class="search-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'search-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'search-bar')">
+           <div class="search-grip-x" onclick="Nexus.ui.toggleWidget('search-bar')">&times;</div>
         </div>
         <div style="display:flex; flex-direction:column; flex:1; padding:12px; gap:10px;">
             <div style="display:flex; gap:8px;">
@@ -289,7 +346,7 @@
     </div>
 
     <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 280px;">
-        <div class="drag-handle" style="height: 18px; width:100%; border-bottom:1px solid #181a1f;" onmousedown="Nexus.ui.initDrag(event, 'writer-bar')" ontouchstart="Nexus.ui.initDrag(event, 'writer-bar')">⋯</div>
+    <div class="drag-handle" ... onmousedown="Nexus.ui.handleHandleTap(event, 'writer-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'writer-bar')">⋯</div>
         <div class="sleek-bar-content" style="flex-direction: column; align-items: stretch; padding:10px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
                 <span style="font-size:10px; color:var(--gold); font-weight:bold;">AUTO-WRITER</span>
@@ -317,7 +374,7 @@
     </div>
 
     <div id="kb-monolith" class="floating-widget kb-pos-bottom">
-        <div class="drag-handle" style="background:transparent; height:12px; cursor:move;" onmousedown="Nexus.ui.initDrag(event, 'kb-monolith')" ontouchstart="Nexus.ui.initDrag(event, 'kb-monolith')"></div>
+        <div class="drag-handle" ... onmousedown="Nexus.ui.handleHandleTap(event, 'kb-monolith')" ontouchstart="Nexus.ui.handleHandleTap(event, 'kb-monolith')"></div>
         <div class="kb-header">
             <div class="kb-tabs" id="kb-lang-toggles">
                 <button class="kb-tab active" onclick="Nexus.kb.switchLang('html')">HTML</button>
@@ -429,6 +486,9 @@
                 
                 <div class="man-h2">🌌 SYSTEM GRAPH</div>
                 <div class="man-p">A visual, animated node-map of all the files currently inside your Vortex system. Tap a node to warp to that file.</div>
+
+                <div class="man-h2">🗺️ OUTLINE (Symbol Map)</div>
+                <div class="man-p">An instant AST-lite scanner that maps all functions, classes, and IDs in your code. Tap a node to warp instantly to its location in the editor.</div>
                 
                 <div class="man-h2">☀️ SUN MODE</div>
                 <div class="man-p">Inverts the dark theme to a high-contrast white mode for outdoor coding visibility.</div>
@@ -532,6 +592,16 @@
             </div>
             <div style="padding:15px; background:var(--panel); border-top:1px solid var(--border); font-size:10px; color:var(--gold); text-align:center;">
                 SCANNING ACTIVE FILE: <span id="intel-target-name">NONE</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-outline" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>🗺️ CODE OUTLINE (SYMBOL MAP)</span><button class="close-x" onclick="Nexus.ui.closeModal('outline')">&times;</button></div>
+            <div class="modal-body">
+                <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px;">Tap a node to instantly warp to that line.</div>
+                <div id="outline-list" style="display:flex; flex-direction:column; gap:8px;"></div>
             </div>
         </div>
     </div>
@@ -948,6 +1018,60 @@ window.Nexus = {
             Nexus.ui.renderTabs();
         }
     },
+    pwa: {
+        forge() {
+            if (!Nexus.state.activeFile.endsWith('.html')) return alert("HTML Required.");
+            const name = prompt("PWA Name:", "Nexus Tool");
+            const color = prompt("Theme Color:", "#0d1117");
+            if (!name || !color) return;
+            const manifest = { name, short_name: name, start_url: ".", display: "standalone", background_color: color, theme_color: color };
+            const mURI = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest));
+            const sw = "self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request).catch(() => new Response('Offline'))); });";
+            const inject = `\n<link rel="manifest" href="${mURI}">\n<meta name="theme-color" content="${color}">\n<script>\nif ('serviceWorker' in navigator) { window.addEventListener('load', () => {\n  const blob = new Blob([\`${sw}\`], { type: 'application/javascript' });\n  navigator.serviceWorker.register(URL.createObjectURL(blob));\n}); }\n<\/script>\n`;
+            
+            let code = Nexus.state.vfs[Nexus.state.activeFile];
+            code = code.includes('</head>') ? code.replace('</head>', inject + '</head>') : inject + code;
+            Nexus.state.vfs[Nexus.state.activeFile] = code; Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile); alert("FORGED.");
+        }
+    },
+
+    assetMatrix: {
+        encode(file) {
+            if (!file || file.size > 2 * 1024 * 1024) return alert("File missing or too large (>2MB).");
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const name = prompt("Asset Name (Vault Key):", file.name);
+                if (name) { Nexus.state.vault.push({ name, code: e.target.result }); Nexus.vault.save(); Nexus.vault.render(); alert("Secured in Vault."); }
+            };
+            reader.readAsDataURL(file);
+        }
+    },
+    defrag: {
+        runJS() {
+            if (!Nexus.state.activeFile.endsWith('.js')) return alert("Select .js file.");
+            try {
+                const ast = acorn.parse(Nexus.state.vfs[Nexus.state.activeFile], { ecmaVersion: 2022, sourceType: 'module' });
+                const b = { imp: [], var: [], cls: [], fun: [], exe: [] };
+                ast.body.forEach(n => {
+                    if (n.type === 'ImportDeclaration') b.imp.push(n);
+                    else if (n.type === 'VariableDeclaration') b.var.push(n);
+                    else if (n.type === 'ClassDeclaration') b.cls.push(n);
+                    else if (n.type === 'FunctionDeclaration') b.fun.push(n);
+                    else b.exe.push(n);
+                });
+                ast.body = [...b.imp, ...b.var, ...b.cls, ...b.fun, ...b.exe];
+                Nexus.state.vfs[Nexus.state.activeFile] = js_beautify(astring.generate(ast), { indent_size: Nexus.state.prefs.tabWidth });
+                Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
+            } catch (e) { alert("AST Syntax Fault: " + e.message); }
+        },
+        sequenceHTML() {
+            const doc = new DOMParser().parseFromString(Nexus.state.vfs[Nexus.state.activeFile], 'text/html');
+            doc.querySelectorAll('style').forEach(s => doc.head.appendChild(s));
+            doc.querySelectorAll('script').forEach(s => doc.body.appendChild(s));
+            Nexus.state.vfs[Nexus.state.activeFile] = html_beautify(doc.documentElement.outerHTML, { indent_size: Nexus.state.prefs.tabWidth });
+            Nexus.vfs.save(); Nexus.vfs.switchFile(Nexus.state.activeFile);
+        }
+    },
 
     vault: {
         async boot() { const saved = await localforage.getItem('nexus_vault_v40'); if (saved) Nexus.state.vault = saved; this.render(); },
@@ -1127,6 +1251,71 @@ window.Nexus = {
             }
             
             Nexus.ui.openModal('intel');
+        }
+    },
+    outline: {
+        scan() {
+            if(!Nexus.state.activeFile) return alert("No active file.");
+            const ed = document.getElementById('raw-terminal');
+            const lines = ed.value.split('\n');
+            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+            let out = [];
+            
+            lines.forEach((line, i) => {
+                const text = line.trim();
+                if (text.length === 0) return;
+                
+                let match = false;
+                let display = text.substring(0, 50).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+                if (ext === 'js' || ext === 'json') {
+                    if (/^(?:export\s+|default\s+)?(?:async\s+)?function\s+\w+/.test(text) || 
+                        /^(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>/.test(text) ||
+                        /^(?:class|struct)\s+\w+/.test(text) ||
+                        /^\w+\s*\([^)]*\)\s*\{/.test(text) && !text.includes('if') && !text.includes('for') && !text.includes('while')) {
+                        match = true;
+                    }
+                } else if (ext === 'html') {
+                    if (/<[^>]+id="[^"]+"|<h[1-6]|<section|<nav|<footer|<header/.test(text)) {
+                        match = true;
+                    }
+                } else if (ext === 'css') {
+                    if (/^[.#a-zA-Z][^{]*\{/.test(text)) {
+                        match = true;
+                    }
+                }
+
+                if (match) out.push({ line: i + 1, text: display });
+            });
+
+            const list = document.getElementById('outline-list');
+            if (out.length > 0) {
+                list.innerHTML = out.map(item => `
+                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px;" onclick="Nexus.outline.jump(${item.line})">
+                        <span style="color:var(--gold); font-size:10px; font-weight:bold; width:40px; flex-shrink:0;">LN ${item.line}</span>
+                        <span style="font-family:monospace; font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.text}</span>
+                    </div>
+                `).join('');
+            } else {
+                list.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text); opacity:0.5;">No structural nodes detected.</div>`;
+            }
+            
+            Nexus.ui.openModal('outline');
+        },
+        jump(ln) {
+            Nexus.ui.closeModal('outline');
+            const ed = document.getElementById('raw-terminal');
+            const lines = ed.value.split('\n');
+            let pos = 0;
+            for (let i = 0; i < Math.min(ln - 1, lines.length); i++) pos += lines[i].length + 1;
+            
+            ed.focus(); 
+            ed.setSelectionRange(pos, pos);
+            
+            setTimeout(() => {
+                const targetScroll = ((ln - 1) * 22) - (ed.clientHeight / 2) + 11;
+                ed.scrollTop = Math.max(0, targetScroll);
+            }, 50);
         }
     },
 
@@ -1545,7 +1734,7 @@ window.Nexus = {
         }
     },
 
-    ui: {
+     ui: {
         async boot() { 
             await Nexus.vfs.boot(); await Nexus.vault.boot(); await Nexus.snapshots.boot(); await Nexus.settings.boot(); 
             Nexus.dreamer.updatePreview(); 
@@ -1556,9 +1745,58 @@ window.Nexus = {
                 if (el) el.style.display = Nexus.state.widgets[id] ? 'flex' : 'none';
             });
         },
+        
+        /* --- KINETIC PATCH START --- */
+        handleHandleTap(e, id) {
+            const now = Date.now();
+            // Double-tap logic (300ms window) for edge snapping
+            if (this.lastTap && (now - this.lastTap < 300) && this.lastId === id) { 
+                this.toggleSnap(id); 
+                e.preventDefault(); 
+                return; 
+            }
+            this.lastTap = now; this.lastId = id;
+            
+            const el = document.getElementById(id);
+            if (el.dataset.snapped === 'true') { 
+                this.toggleSnap(id); 
+                return; 
+            }
+            this.initDrag(e, id);
+        },
+
+        toggleSnap(id) {
+            const el = document.getElementById(id); 
+            const snapped = el.dataset.snapped === 'true';
+            
+            el.style.transition = 'all 0.4s cubic-bezier(0.19, 1, 0.22, 1)';
+            
+            if (snapped) {
+                // Return to previous float position
+                el.style.left = el.dataset.lx || '20px'; 
+                el.style.top = el.dataset.ty || '140px';
+                el.dataset.snapped = 'false';
+                el.style.opacity = '1';
+            } else {
+                // Store current coordinates before docking
+                el.dataset.lx = el.style.left; 
+                el.dataset.ty = el.style.top;
+                
+                if (id === 'kb-monolith') {
+                    if (Nexus.widgetConfig.keyboard.position === 'top') el.style.top = '-140px';
+                    else el.style.bottom = '-140px', el.style.top = 'auto';
+                } else {
+                    // Dock to right edge (leaving 24px handle)
+                    el.style.left = (window.innerWidth - 24) + 'px';
+                }
+                el.dataset.snapped = 'true';
+                el.style.opacity = '0.7'; 
+            }
+        },
+
         initDrag(e, id) {
             const el = document.getElementById(id);
-            if (el.className.includes('snapped-')) return;
+            if (el.dataset.snapped === 'true') return;
             
             const isTouch = e.type && e.type.indexOf('touch') === 0;
             const clientX = isTouch ? e.touches[0].clientX : e.clientX;
@@ -1568,10 +1806,11 @@ window.Nexus = {
             let oy = clientY - el.offsetTop;
 
             const move = (me) => {
-                const mClientX = isTouch ? me.touches[0].clientX : me.clientX;
-                const mClientY = isTouch ? me.touches[0].clientY : me.clientY;
-                el.style.left = (mClientX - ox) + 'px';
-                el.style.top = (mClientY - oy) + 'px';
+                const mX = isTouch ? me.touches[0].clientX : me.clientX;
+                const mY = isTouch ? me.touches[0].clientY : me.clientY;
+                
+                el.style.left = (mX - ox) + 'px';
+                el.style.top = (mY - oy) + 'px';
                 el.style.right = 'auto'; el.style.bottom = 'auto';
             };
 
@@ -1580,9 +1819,11 @@ window.Nexus = {
                 document.removeEventListener(isTouch ? 'touchend' : 'mouseup', end);
             };
 
-            document.addEventListener(isTouch ? 'touchmove' : 'mousemove', move, { passive: !isTouch });
+            document.addEventListener(isTouch ? 'touchmove' : 'mousemove', move, { passive: false });
             document.addEventListener(isTouch ? 'touchend' : 'mouseup', end);
         },
+        /* --- KINETIC PATCH END --- */
+
         toggleWidget(id) {
             const el = document.getElementById(id);
             if (!el) return;
@@ -1626,8 +1867,23 @@ window.Nexus = {
         jumpPrompt() {
             if(!Nexus.state.activeFile) return;
             const ln = prompt("Jump to Line:");
-            if (ln) Nexus.vfs.switchFile(Nexus.state.activeFile, parseInt(ln) - 1);
+            if (ln) {
+                const line = parseInt(ln) - 1;
+                const ed = document.getElementById('raw-terminal');
+                const lines = ed.value.split('\n');
+                let pos = 0;
+                for (let i = 0; i < Math.min(line, lines.length); i++) pos += lines[i].length + 1;
+                
+                ed.focus(); 
+                ed.setSelectionRange(pos, pos);
+                
+                setTimeout(() => {
+                    const targetScroll = (line * 22) - (ed.clientHeight / 2) + 11;
+                    ed.scrollTop = Math.max(0, targetScroll);
+                }, 50);
+            }
         },
+   
         beautify() {
             if(!Nexus.state.activeFile) return;
             const ed = document.getElementById('raw-terminal');
