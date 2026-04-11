@@ -481,6 +481,7 @@
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
             <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
+          <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE FILES</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
             <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ PROVING GROUNDS</button>
@@ -731,7 +732,30 @@
             </div>
         </div>
     </div>
+    <div id="modal-compressor" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>🗜️ CODE COMPRESSOR</span><button class="close-x" onclick="Nexus.ui.closeModal('compressor')">&times;</button></div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
+                <p style="font-size:12px; opacity:0.7;">Select aggression level for <b>${Nexus.state.activeFile}</b>:</p>
+                
+                <button class="tool-btn" style="padding:20px; text-align:left; display:flex; flex-direction:column; align-items:flex-start;" onclick="Nexus.compressor.run('lean')">
+                    <span style="color:var(--success); font-weight:900;">LEVEL 1: LEAN</span>
+                    <span style="font-size:10px; opacity:0.6;">Strips comments and empty lines. Keeps standard formatting.</span>
+                </button>
 
+                <button class="tool-btn" style="padding:20px; text-align:left; display:flex; flex-direction:column; align-items:flex-start;" onclick="Nexus.compressor.run('functional')">
+                    <span style="color:var(--gold); font-weight:900;">LEVEL 2: FUNCTIONAL</span>
+                    <span style="font-size:10px; opacity:0.6;">One line per function/variable. High density, still readable.</span>
+                </button>
+
+                <button class="tool-btn btn-danger" style="padding:20px; text-align:left; display:flex; flex-direction:column; align-items:flex-start;" onclick="Nexus.compressor.run('nuclear')">
+                    <span style="color:#fff; font-weight:900;">LEVEL 3: NUCLEAR</span>
+                    <span style="font-size:10px; opacity:0.9;">Total minification. The entire file becomes a single line.</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <div id="modal-merger" class="modal-overlay">
         <div class="modal-content">
             <div class="p-head"><span>COMMANDER DECK (MERGE RESOLUTION)</span><button class="close-x" onclick="Nexus.ui.closeModal('merger')">&times;</button></div>
@@ -953,7 +977,48 @@ window.Nexus = {
         view: null,
         modules: {}
     },
+    compressor: {
+        async run(level) {
+            const ed = document.getElementById('raw-terminal');
+            if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("LOCKED");
 
+            const code = ed.value;
+            try {
+                // Parse with Acorn to ensure valid JS
+                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+                let compressed = "";
+
+                if (level === 'lean') {
+                    // Level 1: Standard Beauty but NO comments or extra whitespace
+                    compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
+                } 
+                else if (level === 'functional') {
+                    // Level 2: One line per top-level declaration (Function, Class, Const)
+                    compressed = ast.body.map(node => {
+                        return astring.generate(node, { indent: '', lineEnd: '' });
+                    }).join('\n');
+                } 
+                else if (level === 'nuclear') {
+                    // Level 3: The whole file is a single line
+                    compressed = astring.generate(ast, { indent: '', lineEnd: '' });
+                }
+
+                // Update VFS and UI
+                ed.value = compressed;
+                Nexus.state.vfs[Nexus.state.activeFile] = compressed;
+                Nexus.ui.updateGutter();
+                Nexus.vfs.save();
+                Nexus.ui.closeModal('compressor');
+                
+                const st = document.getElementById('foot-status');
+                st.innerText = `COMPRESSED: ${level.toUpperCase()}`;
+                st.style.color = "var(--success)";
+            } catch (e) {
+                alert("Compression Error: AST Parse failed. Check for syntax errors first.\n\n" + e.message);
+            }
+        }
+    },
+    
     async toggleEditor() {
         const rawTerm = document.getElementById('raw-terminal');
         const gutter = document.getElementById('gutter');
@@ -1313,17 +1378,7 @@ window.Nexus = {
     state: {
         vfs: {}, 
         history: { past: [], future: [], isLocked: false },
-        newFile() {
-    const name = prompt("Enter filename (e.g., app.js or index.html):");
-    if (!name) return;
-    if (Nexus.state.vfs[name]) return alert("File already exists in the Vortex.");
-    
-    Nexus.state.vfs[name] = ""; 
-    Nexus.state.originals[name] = "";
-    this.renderAccordion();
-    this.switchFile(name);
-    this.save();
-},
+        
 
         originals: {}, 
         vault: [], 
@@ -1467,6 +1522,26 @@ window.Nexus = {
             await localforage.setItem('Nexus.state.vfs_v42', Nexus.state.vfs);
             await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
         },
+               newFile() {
+            const name = prompt("Enter filename (e.g., index.html or script.js):");
+            if (!name) return;
+            if (Nexus.state.vfs[name]) return alert("File already exists in the Vortex.");
+            
+            // Create empty entry
+            Nexus.state.vfs[name] = ""; 
+            Nexus.state.originals[name] = "";
+            
+            // Refresh UI
+            this.renderAccordion();
+            this.switchFile(name);
+            this.save();
+            
+            // Unlock editor for the new file
+            const ed = document.getElementById('raw-terminal');
+            ed.removeAttribute('readonly');
+            document.getElementById('foot-status').innerText = "READY (NEW)";
+        },
+        
         switchFile(fn) {
             // 1. VALIDATION: Prevent reading from undefined if the file doesn't exist
             if (!fn || (Nexus.state.vfs[fn] === undefined)) {
