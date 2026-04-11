@@ -1,6 +1,4 @@
-
-        
-        <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1315,6 +1313,18 @@ window.Nexus = {
     state: {
         vfs: {}, 
         history: { past: [], future: [], isLocked: false },
+        newFile() {
+    const name = prompt("Enter filename (e.g., app.js or index.html):");
+    if (!name) return;
+    if (Nexus.state.vfs[name]) return alert("File already exists in the Vortex.");
+    
+    Nexus.state.vfs[name] = ""; 
+    Nexus.state.originals[name] = "";
+    this.renderAccordion();
+    this.switchFile(name);
+    this.save();
+},
+
         originals: {}, 
         vault: [], 
         snapshots: [], 
@@ -2346,7 +2356,9 @@ window.Nexus = {
             if(/console\.log/.test(code)) health -= 5;
             if(loc > 1500) health -= 10;
             if(patterns.length === 0 && loc > 50) health -= 5;
-            health = Math.max(0, 100); // Failsafe
+            health = Math.max(0, Math.min(100, health));
+
+ // Failsafe
             
             document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
             
@@ -2727,7 +2739,7 @@ graph: {
                     el.scrollLeft = el.scrollWidth / 3;
                     el.onscroll = () => {
                         const threshold = el.scrollWidth / 4;
-                        if (el.scrollLeft < 50) {
+                        if (el.scrollLeft < 100) {
                             el.scrollLeft = el.scrollWidth / 3;
                         } else if (el.scrollLeft > el.scrollWidth - el.clientWidth - 50) {
                             el.scrollLeft = el.scrollWidth / 3;
@@ -3062,11 +3074,13 @@ ui: {
             const isExploded = document.body.classList.toggle('vortex-active');
             const root = document.getElementById('app-root');
             
+
+
             if (isExploded) {
                 // Perspective is required for Z-axis translation to work
                 root.style.perspective = "1000px";
                 root.style.overflow = "visible";
-                
+        root.style.transformStyle = "preserve-3d";        
                 document.querySelectorAll('#app-root *').forEach(el => {
                     const z = window.getComputedStyle(el).zIndex;
                     if (z !== 'auto' && z !== '0') {
@@ -3145,8 +3159,9 @@ ui: {
                 ed.setSelectionRange(pos, pos);
                 
                 setTimeout(() => {
-                    // Calculate dynamic line height based on font size
-                    const lineHeight = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
+                    // Calculate dynamic line height based on font size const lh = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
+ed.scrollTop = 15 + ((linesBefore - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
+
                     const targetScroll = 15 + (line * lineHeight) - (ed.clientHeight / 2) + (lineHeight / 2);
                     ed.scrollTop = Math.max(0, targetScroll);
                 }, 50);
@@ -3175,7 +3190,9 @@ ui: {
             ed.focus();
             ed.setSelectionRange(pos, pos);
             setTimeout(() => {
-                const lineHeight = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
+                 const lh = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
+ed.scrollTop = 15 + ((linesBefore - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
+
                 const targetScroll = 15 + (targetLine * lineHeight) - (ed.clientHeight / 2) + (lineHeight / 2);
                 ed.scrollTop = Math.max(0, targetScroll);
             }, 50);
