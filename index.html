@@ -11,8 +11,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script> 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js"></script>
+  
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
@@ -2934,35 +2933,29 @@ graph: {
             }
         },
         replace() {
-            const ed = document.getElementById('raw-terminal');
-            const find = document.getElementById('find-input').value;
-            const rep = document.getElementById('replace-input').value;
-            
-            if (!find || ed.hasAttribute('readonly')) return;
+    const ed = document.getElementById('raw-terminal');
+    const find = document.getElementById('find-input').value;
+    const rep = document.getElementById('replace-input').value;
+    
+    if (!find || ed.hasAttribute('readonly')) return;
 
-            const selStart = ed.selectionStart;
-            const selEnd = ed.selectionEnd;
-            const currentSelection = ed.value.substring(selStart, selEnd);
-            
-            let searchStr = find;
-            if (!Nexus.state.searchOpts.regex) {
-                searchStr = searchStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            }
-            
-            const flags = Nexus.state.searchOpts.case ? '' : 'i';
-            const matcher = new RegExp('^' + searchStr + '$', flags);
-           if (currentSelection && matcher.test(currentSelection)) {
-            ed.value = ed.value.substring(0, selStart) + rep + ed.value.substring(selEnd);
-            ed.setSelectionRange(selStart, selStart + rep.length);
-            Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
-            
-            // Logic Routing Fix: Call logic module, not state object
-            Nexus.vfs.save();
-            Nexus.ui.updateGutter();
-        }
-        this.findNext(1);
+    const selStart = ed.selectionStart;
+    const selEnd = ed.selectionEnd;
+    const currentSelection = ed.value.substring(selStart, selEnd);
+    
+    let searchStr = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flags = Nexus.state.searchOpts.case ? '' : 'i';
+    const matcher = new RegExp('^' + searchStr + '$', flags);
+
+    if (currentSelection && matcher.test(currentSelection)) {
+        ed.value = ed.value.substring(0, selStart) + rep + ed.value.substring(selEnd);
+        ed.setSelectionRange(selStart, selStart + rep.length);
+        Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+        Nexus.vfs.save();
+        Nexus.ui.updateGutter();
     }
-},
+    this.findNext(1);
+}
 
 writer: {
     go() {
@@ -3055,15 +3048,14 @@ ui: {
     },
     
     handleHandleTap(e, id) {
-        const now = Date.now();
-        // Double-tap logic (300ms window) for edge snapping
-        if (this.lastTap && (now - this.lastTap < 300) && this.lastId === id) { 
-            this.toggleSnap(id); 
-            e.preventDefault(); 
-            return; 
-        }
-        this.lastTap = now; 
-        this.lastId = id;
+    const now = Date.now();
+    if (Nexus.ui.lastTap && (now - Nexus.ui.lastTap < 300) && Nexus.ui.lastId === id) { 
+        Nexus.ui.toggleSnap(id); 
+        e.preventDefault(); 
+        return; 
+    }
+    Nexus.ui.lastTap = now; 
+    Nexus.ui.lastId = id;
         
         const el = document.getElementById(id);
         if (el.dataset.snapped === 'true') { 
@@ -3221,29 +3213,26 @@ ui: {
         },
 
         jumpPrompt() {
-            if(!Nexus.state.activeFile) return;
-            const ln = prompt("Jump to Line:");
-            if (ln) {
-                const line = parseInt(ln) - 1;
-                const ed = document.getElementById('raw-terminal');
-                const lines = ed.value.split('\n');
-                let pos = 0;
-                for (let i = 0; i < Math.min(line, lines.length); i++) pos += lines[i].length + 1;
-                
-                ed.focus(); 
-                ed.setSelectionRange(pos, pos);
-                
-                setTimeout(() => {
-                    // Calculate dynamic line height based on font size const lh = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
-ed.scrollTop = 15 + ((linesBefore - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
-
-                    const targetScroll = 15 + (line * lineHeight) - (ed.clientHeight / 2) + (lineHeight / 2);
-                    ed.scrollTop = Math.max(0, targetScroll);
-                }, 50);
-            }
-        },
-
-        jumpRelative(offset) {
+    if(!Nexus.state.activeFile) return;
+    const ln = prompt("Jump to Line:");
+    if (ln) {
+        const line = parseInt(ln);
+        const ed = document.getElementById('raw-terminal');
+        const lines = ed.value.split('\n');
+        let pos = 0;
+        for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
+        
+        ed.focus(); 
+        ed.setSelectionRange(pos, pos);
+        
+        setTimeout(() => {
+            const lh = 22; // Match your CSS line-height
+            const targetScroll = 15 + ((line - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
+            ed.scrollTop = Math.max(0, targetScroll);
+        }, 50);
+    }
+},
+ jumpRelative(offset) {
             if(!Nexus.state.activeFile) return;
             const ed = document.getElementById('raw-terminal');
             const lines = ed.value.split('\n');
