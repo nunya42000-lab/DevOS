@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1269,12 +1269,59 @@ window.Nexus = {
         }
     },
 
-    dreamer: {
+        dreamer: {
+        // --- 1. UI ARCHITECT TEMPLATES ---
+        templates: { 
+            'btn-tactical': (l, id) => `<button id="${id || 'btn-01'}" style="padding:12px 24px; background:var(--gold, #d29922); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 15px rgba(210,153,34,0.3); transition:all 0.2s;">${l || 'TACTICAL ACTION'}</button>`, 
+            'card-gold': (l, id) => `<div id="${id || 'card-01'}" style="border:1px solid var(--gold, #d29922); background:rgba(210,153,34,0.05); padding:20px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5);"><h3 style="color:var(--gold, #d29922); margin-top:0;">${l || 'DATA MODULE'}</h3><p style="color:var(--text, #c9d1d9); font-size:14px;">Telemetry synced and stable.</p></div>`, 
+            'grid-skill': (l, id) => `<div id="${id || 'grid-01'}" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button style="height:80px; background:var(--surface, #21262d); color:var(--text, #c9d1d9); border:1px solid var(--border, #30363d); border-radius:12px; font-size:24px; font-weight:bold;">${i+1}</button>`).join('')}</div>`,
+            'nav-bottom': (l, id) => `<nav id="${id || 'nav-01'}" style="position:fixed; bottom:0; left:0; width:100%; background:var(--panel, #161b22); display:flex; justify-content:space-around; align-items:center; padding:15px; border-top:1px solid var(--border, #30363d); z-index:100;"><button style="border:none; background:transparent; color:var(--text, #c9d1d9); display:flex; flex-direction:column; align-items:center; gap:5px;"><span style="font-size:20px;">🏠</span><span style="font-size:10px;">${l || 'Home'}</span></button><button style="border:none; background:var(--accent, #2f81f7); color:#fff; border-radius:50%; width:55px; height:55px; display:flex; justify-content:center; align-items:center; font-size:24px; box-shadow:0 0 20px rgba(47,129,247,0.4); transform:translateY(-15px);">+</button><button style="border:none; background:transparent; color:var(--text, #c9d1d9); display:flex; flex-direction:column; align-items:center; gap:5px;"><span style="font-size:20px;">👤</span><span style="font-size:10px;">Profile</span></button></nav>`,
+            'modal-box': (l, id) => `<div id="${id || 'modal-01'}" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:1000;"><div style="background:var(--panel, #161b22); width:85%; max-width:400px; padding:25px; border-radius:20px; border:1px solid var(--border, #30363d); box-shadow:0 25px 50px rgba(0,0,0,1);"><h3 style="color:var(--gold, #d29922); margin-top:0; border-bottom:1px solid var(--border, #30363d); padding-bottom:10px;">${l || 'SYSTEM ALERT'}</h3><p style="font-size:14px; color:var(--text, #c9d1d9); line-height:1.5; margin-bottom:25px;">Operation successfully initialized.</p><button style="width:100%; padding:15px; background:var(--accent, #2f81f7); color:#fff; border:none; border-radius:10px; font-weight:bold; cursor:pointer;" onclick="this.closest('#${id || 'modal-01'}').style.display='none'">ACKNOWLEDGE</button></div></div>`,
+            'list-view': (l, id) => `<div id="${id || 'list-01'}" style="display:flex; flex-direction:column; gap:8px;">${Array(4).fill().map((_, i) => `<div style="background:var(--surface, #21262d); border:1px solid var(--border, #30363d); padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; gap:15px;"><div style="width:40px; height:40px; background:var(--bg, #0d1117); border-radius:50%; display:flex; justify-content:center; align-items:center; font-weight:bold; color:var(--gold, #d29922);">${i+1}</div><div style="display:flex; flex-direction:column;"><strong style="color:var(--text, #c9d1d9);">${l || 'Data Matrix'} ${i+1}</strong><span style="font-size:10px; color:var(--text, #c9d1d9); opacity:0.5;">Status: Online</span></div></div><span style="color:var(--accent, #2f81f7); font-size:20px;">→</span></div>`).join('')}</div>`,
+            'input-group': (l, id) => `<div id="${id || 'input-wrap'}" style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;"><label style="font-size:11px; color:var(--gold, #d29922); font-weight:900; letter-spacing:1px; text-transform:uppercase;">${l || 'AUTHORIZATION CODE'}</label><input type="text" placeholder="Enter secure payload..." style="padding:15px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:10px; color:#fff; font-family:monospace; font-size:14px; outline:none;"></div>`,
+            'toggle-switch': (l, id) => `<label id="${id || 'toggle-01'}" style="display:flex; align-items:center; gap:15px; cursor:pointer; padding:10px 0;"><div style="position:relative; width:50px; height:26px; background:var(--border, #30363d); border-radius:13px; overflow:hidden;"><input type="checkbox" style="opacity:0; width:0; height:0; position:absolute;" onchange="this.nextElementSibling.style.transform = this.checked ? 'translateX(24px)' : 'translateX(0)'; this.parentElement.style.background = this.checked ? 'var(--success, #3fb950)' : 'var(--border, #30363d)';"><div style="position:absolute; top:2px; left:2px; width:22px; height:22px; background:#fff; border-radius:50%; transition:transform 0.3s;"></div></div><span style="font-size:14px; color:var(--text, #c9d1d9); font-weight:bold;">${l || 'Override Protocol'}</span></label>`,
+            'loader-spinner': (l, id) => `<div id="${id || 'spinner-01'}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:30px;"><div class="nexus-spinner"></div><style>.nexus-spinner { width:40px; height:40px; border:4px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:nexusSpin 1s infinite; } @keyframes nexusSpin { to { transform: rotate(360deg); } }</style><span style="font-size:11px; color:var(--gold); font-weight:900; letter-spacing:2px;">${l || 'SYNTHESIZING...'}</span></div>`,
+            'hero-section': (l, id) => `<header id="${id || 'hero-01'}" style="text-align:center; padding:50px 20px; background:linear-gradient(135deg, var(--panel), var(--bg)); border-bottom:1px solid var(--border);"><h1 style="color:var(--accent); font-size:36px; margin:0 0 15px 0;">${l || 'Next Gen Platform'}</h1><p style="color:var(--text); font-size:16px; margin-bottom:30px; opacity:0.8;">Empowering developers with limitless tools.</p></header>`,
+            'auth-matrix': (l, id) => `<div id="${id || 'auth-01'}" style="max-width:350px; margin:40px auto; padding:30px; background:var(--surface); border:1px solid var(--border); border-radius:16px;"><h2 style="text-align:center; color:var(--gold); margin-top:0;">${l || 'SECURE LOGIN'}</h2><div style="display:flex; flex-direction:column; gap:15px; margin-top:20px;"><input type="text" placeholder="Username" style="padding:14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:#fff;"><input type="password" placeholder="Passcode" style="padding:14px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:#fff;"><button style="margin-top:10px; padding:15px; background:var(--accent); color:#fff; border:none; border-radius:8px; font-weight:bold;">AUTHENTICATE</button></div></div>`,
+            'toast-alert': (l, id) => `<div id="${id || 'toast-01'}" style="position:fixed; top:20px; right:20px; background:var(--success); color:#fff; padding:15px 25px; border-radius:8px; font-weight:bold; z-index:9999; animation:slideIn 0.3s ease-out;">${l || 'Operation Successful'}</div><style>@keyframes slideIn { from{transform:translateX(100%); opacity:0;} to{transform:translateX(0); opacity:1;} }</style>`,
+            'chat-bubble': (l, id) => `<div id="${id || 'chat-wrap'}" style="display:flex; flex-direction:column; gap:15px; padding:20px;"><div style="align-self:flex-start; max-width:75%; background:var(--surface); border:1px solid var(--border); padding:12px 18px; border-radius:18px 18px 18px 0; color:var(--text);">${l || 'System: Awaiting command.'}</div></div>`,
+            'settings-panel': (l, id) => `<div id="${id || 'settings-01'}" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden;"><div style="padding:15px 20px; background:var(--bg); font-weight:bold; color:var(--gold); border-bottom:1px solid var(--border);">${l || 'SYSTEM PREFERENCES'}</div><div style="padding:15px 20px; display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--text);">Telemetry Tracking</span><label style="position:relative; width:44px; height:24px; background:var(--success); border-radius:12px;"><input type="checkbox" checked style="opacity:0; width:0; height:0;"><div style="position:absolute; top:2px; left:22px; width:20px; height:20px; background:#fff; border-radius:50%;"></div></label></div></div>`,
+            'pricing-card': (l, id) => `<div id="${id || 'price-01'}" style="width:280px; background:linear-gradient(180deg, var(--surface), var(--bg)); border:2px solid var(--gold); border-radius:16px; padding:30px 20px; text-align:center; margin:0 auto;"><h3 style="color:var(--text); margin:0;">${l || 'NEXUS TIER'}</h3><div style="font-size:42px; font-weight:900; color:#fff; margin:15px 0;">$29</div><button style="width:100%; padding:15px; background:var(--gold); color:#000; border:none; border-radius:8px; font-weight:900;">UPGRADE</button></div>`,
+            'progress-bar': (l, id) => `<div id="${id || 'prog-01'}" style="width:100%; padding:10px 0;"><div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px; font-weight:bold;"><span style="color:var(--text);">${l || 'Extracting...'}</span><span style="color:var(--accent);">78%</span></div><div style="width:100%; height:8px; background:var(--bg); border:1px solid var(--border); border-radius:4px; overflow:hidden;"><div style="width:78%; height:100%; background:var(--accent);"></div></div></div>`,
+            'accordion-menu': (l, id) => `<details id="${id || 'acc-01'}" style="background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:10px;"><summary style="padding:15px; color:var(--gold); font-weight:bold; cursor:pointer;">${l || 'File Metadata'}</summary><div style="padding:15px; border-top:1px solid var(--border); color:var(--text); font-size:14px; background:var(--bg);">Signature verified.</div></details>`,
+            'profile-header': (l, id) => `<div id="${id || 'prof-01'}" style="display:flex; align-items:center; gap:20px; padding:20px; background:var(--surface); border-radius:16px; border:1px solid var(--border);"><div style="width:70px; height:70px; border-radius:50%; background:var(--accent); display:flex; justify-content:center; align-items:center; font-size:28px; color:#fff; font-weight:bold;">A</div><div style="flex:1;"><h2 style="margin:0 0 5px 0; color:#fff; font-size:20px;">${l || 'Amanda'}</h2><p style="margin:0 0 10px 0; color:var(--text); font-size:12px; opacity:0.7;">Systems Architect</p></div></div>`
+        },
+
+        // --- 2. UI PREVIEW & INJECTION ---
+        updatePreview() { 
+            const t = document.getElementById('dreamer-type').value;
+            const l = document.getElementById('dreamer-label').value; 
+            const p = document.getElementById('dreamer-preview'); 
+            if (p && this.templates[t]) {
+                p.innerHTML = this.templates[t](l, 'preview-id');
+            }
+        },
+
+        inject() { 
+            const ed = document.getElementById('raw-terminal'); 
+            if (ed.hasAttribute('readonly')) return alert("LOCKED"); 
+            const t = document.getElementById('dreamer-type').value; 
+            const l = document.getElementById('dreamer-label').value; 
+            const id = document.getElementById('dreamer-id').value; 
+            const code = `\n\n` + this.templates[t](l, id) + `\n`; 
+            const pos = ed.selectionStart; 
+            ed.value = ed.value.substring(0, pos) + code + ed.value.substring(ed.selectionEnd); 
+            Nexus.state.vfs[Nexus.state.activeFile] = ed.value; 
+            Nexus.vfs.save(); 
+            Nexus.ui.closeModal('dreamer'); 
+            Nexus.ui.updateGutter(); 
+        },
+
+        // --- 3. STRESS TESTING & NIGHT CYCLE ---
         async startNightCycle() {
             Nexus.sentinel.log("[DREAMER] Initiating Background Stress Test...", "accent");
             const testPromises = [];
             
-            // Iterate through the Virtual File System data
             for (const [filename, code] of Object.entries(Nexus.state.vfs)) {
                 if (!filename.endsWith('.js')) continue;
                 try {
@@ -1285,22 +1332,21 @@ window.Nexus = {
                             testPromises.push(Nexus.chronos.runTest(block));
                         }
                     });
-                } catch(e) {
-                    // Ignore syntax errors during background crawl
-                }
+                } catch(e) {}
             }
             
-            Nexus.sentinel.log(`[DREAMER] Queued ${testPromises.length} logic branches for Chronos injection.`, "warn");
+            Nexus.sentinel.log(`[DREAMER] Queued ${testPromises.length} logic branches for Chronos.`, "warn");
             const results = await Promise.all(testPromises);
             
             const failures = results.filter(r => !r.success);
             if (failures.length > 0) {
-                Nexus.sentinel.log(`[DREAMER] Night Cycle Complete. ${failures.length} branch(es) threw exceptions under load.`, "danger");
+                Nexus.sentinel.log(`[DREAMER] Night Cycle: ${failures.length} branches threw exceptions.`, "danger");
             } else {
-                Nexus.sentinel.log(`[DREAMER] Night Cycle Complete. All branches survived time-dilation.`, "success");
+                Nexus.sentinel.log(`[DREAMER] Night Cycle: All branches survived time-dilation.`, "success");
             }
         }
     },
+
 
     omni: {
         path: [],
@@ -2543,69 +2589,7 @@ outline: {
     }
 },
 
-dreamer: {
-    templates: { 
-        'btn-tactical': (l, id) => `<button id="${id || 'btn-01'}" style="padding:12px 24px; background:var(--gold, #d29922); color:#000; border:none; border-radius:8px; font-weight:bold; cursor:pointer; box-shadow:0 4px 15px rgba(210,153,34,0.3); transition:all 0.2s;">${l || 'TACTICAL ACTION'}</button>`, 
-        
-        'card-gold': (l, id) => `<div id="${id || 'card-01'}" style="border:1px solid var(--gold, #d29922); background:rgba(210,153,34,0.05); padding:20px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.5);"><h3 style="color:var(--gold, #d29922); margin-top:0;">${l || 'DATA MODULE'}</h3><p style="color:var(--text, #c9d1d9); font-size:14px;">Telemetry synced and stable.</p></div>`, 
-        
-        'grid-skill': (l, id) => `<div id="${id || 'grid-01'}" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;">${Array(9).fill().map((_, i) => `<button style="height:80px; background:var(--surface, #21262d); color:var(--text, #c9d1d9); border:1px solid var(--border, #30363d); border-radius:12px; font-size:24px; font-weight:bold;">${i+1}</button>`).join('')}</div>`,
-        
-        'nav-bottom': (l, id) => `<nav id="${id || 'nav-01'}" style="position:fixed; bottom:0; left:0; width:100%; background:var(--panel, #161b22); display:flex; justify-content:space-around; align-items:center; padding:15px; border-top:1px solid var(--border, #30363d); z-index:100;"><button style="border:none; background:transparent; color:var(--text, #c9d1d9); display:flex; flex-direction:column; align-items:center; gap:5px;"><span style="font-size:20px;">🏠</span><span style="font-size:10px;">${l || 'Home'}</span></button><button style="border:none; background:var(--accent, #2f81f7); color:#fff; border-radius:50%; width:55px; height:55px; display:flex; justify-content:center; align-items:center; font-size:24px; box-shadow:0 0 20px rgba(47,129,247,0.4); transform:translateY(-15px);">+</button><button style="border:none; background:transparent; color:var(--text, #c9d1d9); display:flex; flex-direction:column; align-items:center; gap:5px;"><span style="font-size:20px;">👤</span><span style="font-size:10px;">Profile</span></button></nav>`,
-        
-        'modal-box': (l, id) => `<div id="${id || 'modal-01'}" style="position:fixed; inset:0; background:rgba(0,0,0,0.85); backdrop-filter:blur(5px); display:flex; align-items:center; justify-content:center; z-index:1000;"><div style="background:var(--panel, #161b22); width:85%; max-width:400px; padding:25px; border-radius:20px; border:1px solid var(--border, #30363d); box-shadow:0 25px 50px rgba(0,0,0,1);"><h3 style="color:var(--gold, #d29922); margin-top:0; border-bottom:1px solid var(--border, #30363d); padding-bottom:10px;">${l || 'SYSTEM ALERT'}</h3><p style="font-size:14px; color:var(--text, #c9d1d9); line-height:1.5; margin-bottom:25px;">Operation successfully initialized.</p><button style="width:100%; padding:15px; background:var(--accent, #2f81f7); color:#fff; border:none; border-radius:10px; font-weight:bold; cursor:pointer;" onclick="this.closest('#${id || 'modal-01'}').style.display='none'">ACKNOWLEDGE</button></div></div>`,
-        
-        'list-view': (l, id) => `<div id="${id || 'list-01'}" style="display:flex; flex-direction:column; gap:8px;">${Array(4).fill().map((_, i) => `<div style="background:var(--surface, #21262d); border:1px solid var(--border, #30363d); padding:15px; border-radius:12px; display:flex; justify-content:space-between; align-items:center;"><div style="display:flex; align-items:center; gap:15px;"><div style="width:40px; height:40px; background:var(--bg, #0d1117); border-radius:50%; display:flex; justify-content:center; align-items:center; font-weight:bold; color:var(--gold, #d29922);">${i+1}</div><div style="display:flex; flex-direction:column;"><strong style="color:var(--text, #c9d1d9);">${l || 'Data Matrix'} ${i+1}</strong><span style="font-size:10px; color:var(--text, #c9d1d9); opacity:0.5;">Status: Online</span></div></div><span style="color:var(--accent, #2f81f7); font-size:20px;">→</span></div>`).join('')}</div>`,
-        
-        'input-group': (l, id) => `<div id="${id || 'input-wrap'}" style="display:flex; flex-direction:column; gap:8px; margin-bottom:20px;"><label style="font-size:11px; color:var(--gold, #d29922); font-weight:900; letter-spacing:1px; text-transform:uppercase;">${l || 'AUTHORIZATION CODE'}</label><input type="text" placeholder="Enter secure payload..." style="padding:15px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:10px; color:#fff; font-family:monospace; font-size:14px; outline:none; transition:border-color 0.3s;" onfocus="this.style.borderColor='var(--accent, #2f81f7)'" onblur="this.style.borderColor='var(--border, #30363d)'"></div>`,
-        
-        'toggle-switch': (l, id) => `<label id="${id || 'toggle-01'}" style="display:flex; align-items:center; gap:15px; cursor:pointer; padding:10px 0;"><div style="position:relative; width:50px; height:26px; background:var(--border, #30363d); border-radius:13px; overflow:hidden; transition:background 0.3s;"><input type="checkbox" style="opacity:0; width:0; height:0; position:absolute;" onchange="this.nextElementSibling.style.transform = this.checked ? 'translateX(24px)' : 'translateX(0)'; this.parentElement.style.background = this.checked ? 'var(--success, #3fb950)' : 'var(--border, #30363d)';"><div style="position:absolute; top:2px; left:2px; width:22px; height:22px; background:#fff; border-radius:50%; transition:transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);"></div></div><span style="font-size:14px; color:var(--text, #c9d1d9); font-weight:bold;">${l || 'Override Protocol'}</span></label>`,
-        
-        'loader-spinner': (l, id) => `<div id="${id || 'spinner-01'}" style="display:flex; flex-direction:column; align-items:center; justify-content:center; gap:15px; padding:30px;"><div style="width:40px; height:40px; border:4px solid var(--border, #30363d); border-top-color:var(--accent, #2f81f7); border-radius:50%; animation:nexusSpin 1s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;"></div><style>@keyframes nexusSpin { to { transform: rotate(360deg); } }</style><span style="font-size:11px; color:var(--gold, #d29922); font-weight:900; letter-spacing:2px;">${l || 'SYNTHESIZING...'}</span></div>`,
-        
-        'hero-section': (l, id) => `<header id="${id || 'hero-01'}" style="text-align:center; padding:50px 20px; background:linear-gradient(135deg, var(--panel, #161b22), var(--bg, #0d1117)); border-bottom:1px solid var(--border, #30363d);"><h1 style="color:var(--accent, #2f81f7); font-size:36px; margin:0 0 15px 0;">${l || 'Next Gen Platform'}</h1><p style="color:var(--text, #c9d1d9); font-size:16px; margin-bottom:30px; opacity:0.8;">Empowering developers with limitless tools.</p><div style="display:flex; justify-content:center; gap:15px;"><button style="padding:12px 24px; background:var(--accent, #2f81f7); color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">GET STARTED</button><button style="padding:12px 24px; background:transparent; color:var(--text, #c9d1d9); border:1px solid var(--border, #30363d); border-radius:8px; font-weight:bold; cursor:pointer;">LEARN MORE</button></div></header>`,
-        
-        'auth-matrix': (l, id) => `<div id="${id || 'auth-01'}" style="max-width:350px; margin:40px auto; padding:30px; background:var(--surface, #21262d); border:1px solid var(--border, #30363d); border-radius:16px; box-shadow:0 15px 35px rgba(0,0,0,0.5);"><h2 style="text-align:center; color:var(--gold, #d29922); margin-top:0;">${l || 'SECURE LOGIN'}</h2><div style="display:flex; flex-direction:column; gap:15px; margin-top:20px;"><input type="text" placeholder="Username / ID" style="padding:14px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:8px; color:#fff; outline:none;"><input type="password" placeholder="Passcode" style="padding:14px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:8px; color:#fff; outline:none;"><button style="margin-top:10px; padding:15px; background:var(--accent, #2f81f7); color:#fff; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">AUTHENTICATE</button></div></div>`,
-        
-        'toast-alert': (l, id) => `<div id="${id || 'toast-01'}" style="position:fixed; top:20px; right:20px; background:var(--success, #3fb950); color:#fff; padding:15px 25px; border-radius:8px; font-weight:bold; box-shadow:0 10px 20px rgba(63,185,80,0.3); z-index:9999; animation:slideIn 0.3s ease-out;">${l || 'Operation Successful'}</div><style>@keyframes slideIn { from{transform:translateX(100%); opacity:0;} to{transform:translateX(0); opacity:1;} }</style>`,
-        
-        'chat-bubble': (l, id) => `<div id="${id || 'chat-wrap'}" style="display:flex; flex-direction:column; gap:15px; padding:20px;"><div style="align-self:flex-start; max-width:75%; background:var(--surface, #21262d); border:1px solid var(--border, #30363d); padding:12px 18px; border-radius:18px 18px 18px 0; color:var(--text, #c9d1d9);">${l || 'System: Awaiting command.'}</div><div style="align-self:flex-end; max-width:75%; background:var(--accent, #2f81f7); padding:12px 18px; border-radius:18px 18px 0 18px; color:#fff; box-shadow:0 5px 15px rgba(47,129,247,0.2);">Acknowledged. Initiating.</div></div>`,
-        
-        'settings-panel': (l, id) => `<div id="${id || 'settings-01'}" style="background:var(--surface, #21262d); border:1px solid var(--border, #30363d); border-radius:12px; overflow:hidden;"><div style="padding:15px 20px; background:var(--bg, #0d1117); font-weight:bold; color:var(--gold, #d29922); border-bottom:1px solid var(--border, #30363d);">${l || 'SYSTEM PREFERENCES'}</div><div style="padding:15px 20px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border, #30363d);"><span style="color:var(--text, #c9d1d9);">Telemetry Tracking</span><label style="position:relative; width:44px; height:24px; background:var(--success, #3fb950); border-radius:12px;"><input type="checkbox" checked style="opacity:0; width:0; height:0;"><div style="position:absolute; top:2px; left:22px; width:20px; height:20px; background:#fff; border-radius:50%; transition:left 0.2s;"></div></label></div><div style="padding:15px 20px; display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--text, #c9d1d9);">Dark Protocol</span><label style="position:relative; width:44px; height:24px; background:var(--border, #30363d); border-radius:12px;"><input type="checkbox" style="opacity:0; width:0; height:0;"><div style="position:absolute; top:2px; left:2px; width:20px; height:20px; background:#fff; border-radius:50%; transition:left 0.2s;"></div></label></div></div>`,
-        
-        'pricing-card': (l, id) => `<div id="${id || 'price-01'}" style="width:280px; background:linear-gradient(180deg, var(--surface, #21262d), var(--bg, #0d1117)); border:2px solid var(--gold, #d29922); border-radius:16px; padding:30px 20px; text-align:center; position:relative; overflow:hidden; margin:0 auto;"><div style="position:absolute; top:15px; right:-35px; background:var(--gold, #d29922); color:#000; padding:5px 40px; font-size:10px; font-weight:900; transform:rotate(45deg);">PRO</div><h3 style="color:var(--text, #c9d1d9); margin:0;">${l || 'NEXUS TIER'}</h3><div style="font-size:42px; font-weight:900; color:#fff; margin:15px 0;">$29<span style="font-size:16px; color:var(--text, #c9d1d9); opacity:0.6;">/mo</span></div><ul style="list-style:none; padding:0; margin:20px 0; color:var(--text, #c9d1d9); font-size:14px; text-align:left;"><li style="margin-bottom:10px;">✓ Infinite Vault Storage</li><li style="margin-bottom:10px;">✓ Deep AST Linting</li></ul><button style="width:100%; padding:15px; background:var(--gold, #d29922); color:#000; border:none; border-radius:8px; font-weight:900; cursor:pointer;">UPGRADE SECURELY</button></div>`,
-        
-        'progress-bar': (l, id) => `<div id="${id || 'prog-01'}" style="width:100%; padding:10px 0;"><div style="display:flex; justify-content:space-between; margin-bottom:8px; font-size:12px; font-weight:bold;"><span style="color:var(--text, #c9d1d9);">${l || 'Extracting Payload...'}</span><span style="color:var(--accent, #2f81f7);">78%</span></div><div style="width:100%; height:8px; background:var(--bg, #0d1117); border:1px solid var(--border, #30363d); border-radius:4px; overflow:hidden;"><div style="width:78%; height:100%; background:var(--accent, #2f81f7); border-radius:4px; box-shadow:0 0 10px rgba(47,129,247,0.5);"></div></div></div>`,
-        
-        'accordion-menu': (l, id) => `<details id="${id || 'acc-01'}" style="background:var(--surface, #21262d); border:1px solid var(--border, #30363d); border-radius:8px; margin-bottom:10px;"><summary style="padding:15px; color:var(--gold, #d29922); font-weight:bold; cursor:pointer; outline:none;">${l || 'File Metadata'}</summary><div style="padding:15px; border-top:1px solid var(--border, #30363d); color:var(--text, #c9d1d9); font-size:14px; line-height:1.6; background:var(--bg, #0d1117);">Signature verified. Awaiting manual extraction protocol.</div></details>`,
-        
-        'profile-header': (l, id) => `<div id="${id || 'prof-01'}" style="display:flex; align-items:center; gap:20px; padding:20px; background:var(--surface, #21262d); border-radius:16px; border:1px solid var(--border, #30363d);"><div style="width:70px; height:70px; border-radius:50%; background:var(--accent, #2f81f7); display:flex; justify-content:center; align-items:center; font-size:28px; color:#fff; font-weight:bold; box-shadow:0 0 20px rgba(47,129,247,0.4);">A</div><div style="flex:1;"><h2 style="margin:0 0 5px 0; color:#fff; font-size:20px;">${l || 'Amanda'}</h2><p style="margin:0 0 10px 0; color:var(--text, #c9d1d9); font-size:12px; opacity:0.7;">Systems Architect</p></div></div>`
-    },
-
-    updatePreview() { 
-        const t = document.getElementById('dreamer-type').value;
-        const l = document.getElementById('dreamer-label').value; 
-        const p = document.getElementById('dreamer-preview'); 
-        if (p && this.templates[t]) {
-            p.innerHTML = this.templates[t](l, 'preview-id');
-        }
-    },
-
-    inject() { 
-        const ed = document.getElementById('raw-terminal'); 
-        if (ed.hasAttribute('readonly')) return alert("LOCKED"); 
-        const t = document.getElementById('dreamer-type').value; 
-        const l = document.getElementById('dreamer-label').value; 
-        const id = document.getElementById('dreamer-id').value; 
-        const code = `\n\n` + this.templates[t](l, id) + `\n`; 
-        const pos = ed.selectionStart; 
-        ed.value = ed.value.substring(0, pos) + code + ed.value.substring(ed.selectionEnd); 
-        Nexus.state.vfs[Nexus.state.activeFile] = ed.value; 
-        Nexus.vfs.save(); 
-        Nexus.ui.closeModal('dreamer'); 
-        Nexus.ui.updateGutter(); 
-    }
-},
+    
 graph: {
         render() {
             const c = document.getElementById('graph-viewport'); 
@@ -2955,7 +2939,8 @@ graph: {
         Nexus.ui.updateGutter();
     }
     this.findNext(1);
-}
+    }
+},
 
 writer: {
     go() {
@@ -3001,6 +2986,7 @@ writer: {
             statusEl.style.opacity = "0.5";
         }, 800);
     }
+    
 },
 
 shell: {
@@ -3233,34 +3219,34 @@ ui: {
     }
 },
  jumpRelative(offset) {
-            if(!Nexus.state.activeFile) return;
-            const ed = document.getElementById('raw-terminal');
-            const lines = ed.value.split('\n');
-            const currentPos = ed.selectionStart;
-            
-            let currentLine = 0, chars = 0;
-            for(let i=0; i<lines.length; i++) {
-                chars += lines[i].length + 1;
-                if(chars > currentPos) { 
-                    currentLine = i; 
-                    break; 
-                }
-            }
-            
-            const targetLine = Math.max(0, Math.min(lines.length - 1, currentLine + offset));
-            let pos = 0;
-            for (let i = 0; i < targetLine; i++) pos += lines[i].length + 1;
-            
-            ed.focus();
-            ed.setSelectionRange(pos, pos);
-            setTimeout(() => {
-                 const lh = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
-ed.scrollTop = 15 + ((linesBefore - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
+    if(!Nexus.state.activeFile) return;
+    const ed = document.getElementById('raw-terminal');
+    const lines = ed.value.split('\n');
+    const currentPos = ed.selectionStart;
+    
+    let currentLine = 0, chars = 0;
+    for(let i=0; i<lines.length; i++) {
+        chars += lines[i].length + 1;
+        if(chars > currentPos) { 
+            currentLine = i; 
+            break; 
+        }
+    }
+    
+    const targetLine = Math.max(0, Math.min(lines.length - 1, currentLine + offset));
+    let pos = 0;
+    for (let i = 0; i < targetLine; i++) pos += lines[i].length + 1;
+    
+    ed.focus();
+    ed.setSelectionRange(pos, pos);
+    
+    setTimeout(() => {
+        const lh = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
+        const targetScroll = 15 + (targetLine * lh) - (ed.clientHeight / 2) + (lh / 2);
+        ed.scrollTop = Math.max(0, targetScroll);
+    }, 50);
+},
 
-                const targetScroll = 15 + (targetLine * lineHeight) - (ed.clientHeight / 2) + (lineHeight / 2);
-                ed.scrollTop = Math.max(0, targetScroll);
-            }, 50);
-        },
 
         renderUtilBar() {
             const layoutStr = Nexus.state.prefs.utilLayout || 'jump, up20, down20, color, undo, redo, tab';
@@ -3533,25 +3519,26 @@ ed.scrollTop = 15 + ((linesBefore - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
             } 
         },
 
-        nuke() { 
+              nuke() { 
             if (confirm("☢ FACTORY RESET: All files and settings will be permanently erased. Proceed?")) { 
                 localforage.clear().then(() => {
                     location.reload();
                 }); 
-            } 
+            }
         }
-    }
-};
+    } // Closes the "ui" object literal
+}; // Closes the "window.Nexus" object literal
 
 /* --- GLOBAL LISTENERS & ENGINE HOOKS --- */
 const editor = document.getElementById('raw-terminal');
 const gutter = document.getElementById('gutter');
 let saveDelayTimer = null;
 
+// Gutter Logic
+editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
+
 editor.oninput = () => { 
     if(!Nexus.state.activeFile) return;
-    
-    // Sync UI value to VFS data state
     Nexus.state.vfs[Nexus.state.activeFile] = editor.value; 
     Nexus.ui.updateGutter(); 
     Nexus.sentinel.pulse(); 
@@ -3560,13 +3547,11 @@ editor.oninput = () => {
     st.innerText = "SAVING...";
     st.style.color = "var(--gold)";
     
-    // Debounced Autosave to LocalStorage
     clearTimeout(saveDelayTimer);
     saveDelayTimer = setTimeout(() => {
-        Nexus.vfs.save(); // Corrected routing
+        Nexus.vfs.save(); 
         st.innerText = "SAVED";
         st.style.color = "var(--success)";
-        
         setTimeout(() => {
             if(!editor.hasAttribute('readonly')) {
                 st.innerText = editor.getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)";
@@ -3578,50 +3563,38 @@ editor.oninput = () => {
     }, 1200);
 };
 
-// Keep gutter in sync with textarea scroll
-editor.onscroll = () => { 
-    gutter.scrollTop = editor.scrollTop; 
-};
-
 editor.onkeydown = (e) => { 
     if (e.key === 'Tab') { 
         e.preventDefault(); 
         if (editor.hasAttribute('readonly')) return;
-        
         const s = editor.selectionStart; 
         const tabSpaces = " ".repeat(Nexus.state.prefs.tabWidth || 2);
-        
         editor.value = editor.value.substring(0, s) + tabSpaces + editor.value.substring(editor.selectionEnd); 
         editor.selectionStart = editor.selectionEnd = s + tabSpaces.length; 
-        
         Nexus.state.vfs[Nexus.state.activeFile] = editor.value;
         Nexus.ui.updateGutter();
     } 
 };
 
-/* --- CURSOR TRACKING (FOOTER METRICS) --- */
 const updateCursorPos = () => {
     if(!Nexus.state.activeFile || !editor.value) {
         document.getElementById('foot-pos').innerText = "LN 1, COL 1";
         return;
     }
     const pos = editor.selectionStart;
-    const textBefore = editor.value.substring(0, pos);
-    const lines = textBefore.split('\n');
-    const currentLine = lines.length;
-    const currentCol = lines[lines.length - 1].length + 1;
-    document.getElementById('foot-pos').innerText = `LN ${currentLine}, COL ${currentCol}`;
+    const lines = editor.value.substring(0, pos).split('\n');
+    document.getElementById('foot-pos').innerText = `LN ${lines.length}, COL ${lines[lines.length - 1].length + 1}`;
 };
 
 editor.addEventListener('keyup', updateCursorPos);
 editor.addEventListener('click', updateCursorPos);
 editor.addEventListener('input', updateCursorPos);
 
-// Initialize Sovereign Boot
 window.addEventListener('DOMContentLoaded', async () => { 
     console.log("Nexus Prime: Initiating Sovereign Bootloader...");
     await Nexus.ui.boot(); 
 });
+
 </script>
 </body>
 </html>
