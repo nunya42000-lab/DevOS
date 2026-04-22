@@ -449,12 +449,7 @@
         </div>
     </div>
 
-    <div id="kb-monolith" class="floating-widget kb-pos-bottom">
-        <div class="kb-drag-handle"></div>
-        <div id="kb-mount-point"></div> </div>
-
-    <div id="nexus-fab-container"></div>
-
+    
     <footer id="footer">
         <div id="foot-status">ENGINE: VANILLA</div>
         <div id="foot-file">NO FILE OPEN</div>
@@ -539,7 +534,8 @@
             <button class="tool-btn btn-accent" onclick="Nexus.sentinel.purgeZombies()">PURGE ZOMBIES</button>
         </div>
 
-        <div id="graph-viewport" style="flex:1; margin:15px; background:#000; border:1px solid var(--border); border-radius:12px;"></div>
+        <div id="graph-viewport-hub" style="flex:1; background:#000; position:relative;"></div>
+
         
         <div id="diag-out" class="p-body" style="height:120px; background:#000; border-top:1px solid var(--border);">
             <div style="color:var(--warn)">[SYSTEM GRAPH READY]</div>
@@ -682,7 +678,8 @@
     <div id="modal-graph" class="modal-overlay">
         <div class="modal-content" style="background:#000;">
             <div class="p-head"><span>🌌 CELESTIAL NAVIGATOR</span><button class="close-x" onclick="Nexus.ui.closeModal('graph')">&times;</button></div>
-            <div id="graph-viewport-fullscreen" style="flex:1;"></div>
+          <div id="graph-viewport-modal" style="flex:1;"></div>
+
             <div style="padding:12px; font-size:10px; color:var(--gold); text-align:center; background:var(--panel); border-top:1px solid var(--border); letter-spacing:1px;">
                 DRAG NODES TO ORBIT • TAP TO WARP
             </div>
@@ -756,6 +753,7 @@ db.version(1).stores({
     vault: '++id, title, category, *tags',
     history: '++id, timestamp, fileId, delta' // For Global Undo/Redo
 });
+const walk = acorn.walk;
 
 /* --- 3. MODULE: COMPRESSOR (AST-AWARE) --- */
 Nexus.compressor = {
@@ -1261,6 +1259,7 @@ Nexus.vfs = {
     async boot() {
         try {
             Nexus.terminal.log("VFS: Initializing Sovereign Vortex...", "warn");
+        
             
             // 1. Check for files in Dexie
             const fileCount = await db.files.count();
@@ -1922,9 +1921,9 @@ Nexus.sentinel = {
             await db.contents.update(record.id, { content: rebuiltCode });
             Nexus.editor.inject(rebuiltCode, Nexus.state.activeFileName);
 
-            this.log(`MEDIC AST: Rebuild successful. Applied ${issues.length} structural mutations.`, "success");
+            Nexus.terminal.log(`MEDIC AST: Rebuild successful. Applied ${issues.length} structural mutations.`, "success");
         } catch (e) {
-            this.log(`AST FATAL: File structurally compromised.<br><small>${e.message}</small>`, "danger");
+            Nexus.terminal.log(`AST FATAL: File structurally compromised.<br><small>${e.message}</small>`, "danger");
         }
     },
 
@@ -2146,60 +2145,67 @@ Nexus.outline = {
     }
 };
 
-/* --- 22. MODULE: GRAPH (D3 Force-Directed Map) --- */
+/* --- 22. MODULE: GRAPH (Engine Update) --- */
 Nexus.graph = {
     async render() {
-        Nexus.ui.openModal('graph');
-        const container = document.getElementById('graph-viewport-fullscreen') || document.getElementById('graph-viewport');
+        // Detect the active target: Modal takes priority over the Hub
+        const isModalOpen = document.getElementById('modal-graph').classList.contains('active');
+        const targetId = isModalOpen ? 'graph-viewport-modal' : 'graph-viewport-hub';
+        const container = document.getElementById(targetId);
+        
         if (!container) return;
 
         const files = await db.files.toArray();
-        const width = container.clientWidth;
-        const height = container.clientHeight;
+        const width = container.clientWidth || 300;
+        const height = container.clientHeight || 400;
 
-        // Clear existing SVG
+        // Clear previous render to prevent "Ghost Overlays"
         container.innerHTML = "";
 
-        // D3 Simulation Setup
-        const nodes = files.map(f => ({ id: f.name, active: f.id === Nexus.state.activeFileId }));
-        // Logic for links (imports) would go here based on Sentinel scan
-        const links = []; 
+        const nodes = files.map(f => ({ 
+            id: f.name, 
+            active: f.id === Nexus.state.activeFileId 
+        }));
 
         const svg = d3.select(container).append("svg")
-            .attr("width", width).attr("height", height)
+            .attr("width", "100%").attr("height", "100%")
+            .attr("viewBox", `0 0 ${width} ${height}`)
             .style("background", "#000");
 
         const simulation = d3.forceSimulation(nodes)
-            .force("charge", d3.forceManyBody().strength(-150))
+            .force("charge", d3.forceManyBody().strength(-120))
             .force("center", d3.forceCenter(width / 2, height / 2))
-            .force("collision", d3.forceCollide().radius(30));
+            .force("collision", d3.forceCollide().radius(25));
 
-        const node = svg.append("g").selectAll("g")
+        const nodeGroup = svg.append("g").selectAll("g")
             .data(nodes).enter().append("g")
             .on("click", (e, d) => {
                 const file = files.find(f => f.name === d.id);
                 Nexus.vfs.openFile(file.id);
-                Nexus.ui.closeModal('graph');
+                if (isModalOpen) Nexus.ui.closeModal('graph');
             });
 
-        node.append("circle")
-            .attr("r", 10)
+        nodeGroup.append("circle")
+            .attr("r", 8)
             .attr("fill", d => d.active ? "var(--accent)" : "var(--surface)")
             .attr("stroke", "var(--gold)")
             .attr("stroke-width", d => d.active ? 3 : 1);
 
-        node.append("text")
+        nodeGroup.append("text")
             .text(d => d.id)
-            .attr("dy", 25)
-            .attr("fill", "#fff")
-            .attr("font-size", "10px")
+            .attr("dy", 20)
+            .attr("fill", "#8b949e")
+            .attr("font-size", "9px")
             .attr("text-anchor", "middle");
 
         simulation.on("tick", () => {
-            node.attr("transform", d => `translate(${d.x},${d.y})`);
+            nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
         });
+        
+        Nexus.terminal.log(`GRAPH: Mounted to ${targetId.toUpperCase()}`, "info");
     }
 };
+
 
 /* --- 23. MODULE: SETTINGS (Dexie Persistence) --- */
 Nexus.settings = {
@@ -2269,7 +2275,14 @@ Nexus.kbEditor = {
     },
 /* --- 25. MODULE: KB EDITOR (Sovereign Layout Builder) --- */
 Nexus.kbEditor = {
-    ...Nexus.kbEditor, // Inherit currentLang and tempLayout from previous turn
+    ...Nexus.kbEditor,
+    tempLayout: null,
+
+    open() {
+        this.tempLayout = JSON.parse(JSON.stringify(Nexus.state.prefs.kbLayouts || {}));
+        Nexus.ui.openModal('kb-builder');
+        this.render();
+    },
 
     render() {
         const list = document.getElementById('kb-builder-list');
@@ -2279,22 +2292,16 @@ Nexus.kbEditor = {
             <div class="item-row" style="background:var(--surface); margin-bottom:8px; border-radius:10px; padding:12px;">
                 <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:10px; color:var(--gold); font-weight:900; width:40px;">SHOW</span>
-                        <input type="text" value="${k.d.replace(/"/g, '&quot;')}" 
-                               onchange="Nexus.kbEditor.update(${i}, 'd', this.value)" 
-                               class="sleek-input" style="padding:8px;">
+                        <span style="font-size:10px; color:var(--gold); width:40px;">SHOW</span>
+                        <input type="text" value="${k.d}" onchange="Nexus.kbEditor.update(${i}, 'd', this.value)" class="sleek-input" style="padding:8px;">
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:10px; color:var(--accent); font-weight:900; width:40px;">CODE</span>
-                        <input type="text" value="${k.i.replace(/"/g, '&quot;')}" 
-                               onchange="Nexus.kbEditor.update(${i}, 'i', this.value)" 
-                               class="sleek-input" style="padding:8px;">
+                        <span style="font-size:10px; color:var(--accent); width:40px;">CODE</span>
+                        <input type="text" value="${k.i}" onchange="Nexus.kbEditor.update(${i}, 'i', this.value)" class="sleek-input" style="padding:8px;">
                     </div>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px; margin-left:12px;">
-                    <button class="tool-btn" style="padding:6px;" onclick="Nexus.kbEditor.moveUp(${i})">▲</button>
-                    <button class="tool-btn" style="padding:6px;" onclick="Nexus.kbEditor.moveDown(${i})">▼</button>
-                    <button class="tool-btn btn-danger" style="padding:6px;" onclick="Nexus.kbEditor.remove(${i})">🗑</button>
+                    <button class="tool-btn btn-danger" onclick="Nexus.kbEditor.remove(${i})">🗑</button>
                 </div>
             </div>`).join('');
     },
@@ -2303,25 +2310,12 @@ Nexus.kbEditor = {
     add() { this.tempLayout[this.currentLang].push({d: 'New', i: 'New'}); this.render(); },
     remove(i) { this.tempLayout[this.currentLang].splice(i, 1); this.render(); },
     
-    moveUp(i) { 
-        if(i > 0) { 
-            [this.tempLayout[this.currentLang][i], this.tempLayout[this.currentLang][i-1]] = [this.tempLayout[this.currentLang][i-1], this.tempLayout[this.currentLang][i]];
-            this.render(); 
-        } 
-    },
-    
-    moveDown(i) { 
-        if(i < this.tempLayout[this.currentLang].length - 1) { 
-            [this.tempLayout[this.currentLang][i], this.tempLayout[this.currentLang][i+1]] = [this.tempLayout[this.currentLang][i+1], this.tempLayout[this.currentLang][i]];
-            this.render(); 
-        } 
-    },
-    
     async save() { 
         Nexus.state.prefs.kbLayouts = JSON.parse(JSON.stringify(this.tempLayout)); 
         await Nexus.settings.update('kbLayouts', Nexus.state.prefs.kbLayouts); 
         Nexus.ui.closeModal('kb-builder'); 
-        Nexus.terminal.log("KEYBOARD: Layout committed and hot-reloaded.", "success");
+        Nexus.kb.render();
+        Nexus.terminal.log("KEYBOARD: Layout committed.", "success");
     }
 };
 
@@ -2996,12 +2990,21 @@ Nexus.ui = {
 };
 /* --- 33. MODULE: UI (Modals, Sandbox, and System Recovery) --- */
 Nexus.ui = {
-    ...Nexus.ui, // Inherit previous UI methods
+    ...Nexus.ui, 
 
-    ToggleSidebar(s) { 
-        const id = (s === 'left') ? 'left-sidebar' : 'right-sidebar';
+    toggleSidebar(s) { 
+        const id = (s === 'left') ? 'panel-left' : 'panel-right';
         const el = document.getElementById(id);
         if (el) el.classList.toggle('open'); 
+    },
+
+    toggleWidget(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const isVisible = el.style.display === 'flex';
+        el.style.display = isVisible ? 'none' : 'flex';
+        Nexus.state.widgets[id] = !isVisible;
+        if (!isVisible && id === 'kb-monolith') Nexus.kb.render();
     },
 
     toggleSlide(t, forceOpen = false) { 
@@ -3017,43 +3020,30 @@ Nexus.ui = {
         if (id === 'dreamer') Nexus.dreamer.updatePreview(); 
         if (id === 'graph') Nexus.graph.render(); 
         if (id === 'settings') Nexus.settings.calcStorage(); 
-        if (id === 'combine') {
-            const list = document.getElementById('combine-list');
-            const files = await db.files.toArray();
-            list.innerHTML = files.map(f => `
-                <label style="display:flex; align-items:center; gap:12px; padding:14px; background:var(--surface); border-radius:12px; margin-bottom:8px; cursor:pointer;">
-                    <input type="checkbox" value="${f.id}" class="combine-cb" style="width:20px; height:20px;"> 
-                    <span style="font-family:var(--font-mono); font-size:12px;">${f.name}</span>
-                </label>
-            `).join('');
-        }
         const modal = document.getElementById('modal-' + id);
         if (modal) modal.classList.add('active'); 
     },
 
-    openCombineModal() { this.openModal('combine'); },
-    closeModal(id) { document.getElementById('modal-' + id).classList.remove('active'); },
+    closeModal(id) { 
+        const modal = document.getElementById('modal-' + id);
+        if (modal) modal.classList.remove('active'); 
+    },
+
     toggleSun() { document.body.classList.toggle('outdoor-mode'); },
 
-    // PROVING GROUNDS: The Sandbox Execution Engine
     async runSandbox() { 
         const frame = document.getElementById('sandbox-frame');
         const consoleOut = document.getElementById('ghost-console'); 
         if (!frame || !consoleOut || !Nexus.state.activeFileId) return; 
         
         consoleOut.innerHTML = "<div style='opacity:0.5; font-size:10px;'>[INITIALIZING ISOLATED PROCESS...]</div>"; 
-        
         const record = await db.contents.where({ fileId: Nexus.state.activeFileId }).first();
         const rawCode = record.content;
         
-        // Ghost Console Injection Script
-        const ghostScript = `
-        <script>
+        const ghostScript = `<script>
             const _log = (m, c) => {
                 const d = document.createElement('div');
-                d.style.color = c;
-                d.style.padding = '3px 0';
-                d.style.borderBottom = '1px solid rgba(255,255,255,0.05)';
+                d.style.color = c; d.style.padding = '3px 0';
                 d.style.fontSize = '11px';
                 d.innerText = '> ' + (typeof m === 'object' ? JSON.stringify(m) : m);
                 const out = window.parent.document.getElementById('ghost-console');
@@ -3061,31 +3051,25 @@ Nexus.ui = {
             };
             console.log = (...a) => _log(a.join(' '), '#3fb950');
             console.error = (...a) => _log('[ERR] ' + a.join(' '), '#f85149');
-            console.warn = (...a) => _log('[WARN] ' + a.join(' '), '#d29922');
             window.onerror = (m, u, l) => _log('CRASH (Line ' + l + '): ' + m, '#f85149');
         <\/script>`;
 
-        if (Nexus.state.activeFileName.endsWith('.html')) {
-            frame.srcdoc = rawCode.includes('<head>') 
-                ? rawCode.replace('<head>', '<head>' + ghostScript) 
-                : ghostScript + rawCode;
-        } else {
-            // Treat as JS Module
-            frame.srcdoc = `${ghostScript}<script type="module">${rawCode}<\/script>`;
-        }
+        frame.srcdoc = Nexus.state.activeFileName.endsWith('.html') 
+            ? (rawCode.includes('<head>') ? rawCode.replace('<head>', '<head>' + ghostScript) : ghostScript + rawCode)
+            : `${ghostScript}<script type="module">${rawCode}<\/script>`;
+            
         Nexus.terminal.log("SANDBOX: Process hot-swapped.", "success");
     },
 
-    // NUCLEAR PROTOCOL: Secure Data Wipe
     async nuke() { 
-        if (confirm("☢ WARNING: This will permanently purge the VFS, Vault, and History. Proceed?")) { 
-            await db.delete(); // Nukes Dexie Database
+        if (confirm("☢ WARNING: Permanently purge the VFS?")) { 
+            await db.delete();
             localStorage.clear();
-            Nexus.terminal.log("SYSTEM: Data sectors purged. Rebooting...", "danger");
-            setTimeout(() => location.reload(), 1000);
+            location.reload();
         }
     }
 };
+
 
 /* --- 34. GLOBAL EVENT LISTENERS & KINETIC HOOKS --- */
 let saveDebounce = null;
@@ -3175,6 +3159,35 @@ Nexus.terminal = {
         
         const prefix = colors[type] || colors.info;
         this.instance.writeln(`${prefix}> ${msg}${colors.reset}`);
+    }
+};
+Nexus.editor = {
+    inject(code, filename) {
+        const ed = document.getElementById('raw-terminal');
+        const footFile = document.getElementById('foot-file');
+        if (footFile) footFile.innerText = "FILE: " + filename.toUpperCase();
+
+        if (Nexus.state.isCM6 && Nexus.editorCore.view) {
+            const view = Nexus.editorCore.view;
+            view.dispatch({
+                changes: { from: 0, to: view.state.doc.length, insert: code }
+            });
+        } else if (ed) {
+            ed.value = code;
+            Nexus.ui.updateGutter();
+        }
+    },
+    updateFooter() {
+        const footFile = document.getElementById('foot-file');
+        if (footFile) footFile.innerText = "FILE: " + Nexus.state.activeFileName.toUpperCase();
+    }
+};
+Nexus.widgetConfig = {
+    keyboard: { currentLang: 'js' },
+    writerVocab: {
+        code: ["function ", "const ", "let ", "await ", "return ", "if (", "else ", "try { "],
+        html: ["<div>", "</span>", "</div>", "<section>", "<nav>", "<ul>", "<li>"],
+        essay: ["Furthermore, ", "Implicitly, ", "The matrix ", "Sovereign ", "Architecture "]
     }
 };
 
