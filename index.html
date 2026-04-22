@@ -354,7 +354,8 @@
     }
 
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-<body>
+</style>
+    <body>
 <div id="app-root">
     <canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
 
@@ -412,18 +413,6 @@
         <div id="terminal-container"></div>
     </div>
 
-    <div id="left-sidebar" class="side-panel left-p">
-        <div class="p-head">CODEX FILES <span onclick="Nexus.ui.toggleSidebar('left')">✕</span></div>
-        <div id="vfs-list" class="p-body"></div>
-    </div>
-
-    <div id="right-sidebar" class="side-panel right-p">
-        <div class="p-head">PROVING GROUNDS <span onclick="Nexus.ui.toggleSidebar('right')">✕</span></div>
-        <div id="sandbox-wrap">
-            <iframe id="sandbox-frame"></iframe>
-            <div id="ghost-console"></div>
-        </div>
-    </div>
 
     <div id="utility-bar" class="floating-widget util-vertical" style="top: 20%; right: 10px;">
         <div class="util-grip"></div>
@@ -723,7 +712,8 @@
             </div>
         </div>
     </div>
-/* --- 1. THE SOVEREIGN CORE INITIALIZATION --- */
+<script>
+        /* --- 1. THE SOVEREIGN CORE INITIALIZATION --- */
 window.Nexus = {
     state: {
         activeFileId: null,      // Primary Key for Dexie
@@ -3016,12 +3006,14 @@ Nexus.ui = {
         }
     },
 
-    async openModal(id) { 
+        async openModal(id) { 
+        const modal = document.getElementById('modal-' + id);
+        if (modal) modal.classList.add('active'); // Add the class FIRST
+
+        // Now the renderers know the modal is the active target
         if (id === 'dreamer') Nexus.dreamer.updatePreview(); 
         if (id === 'graph') Nexus.graph.render(); 
         if (id === 'settings') Nexus.settings.calcStorage(); 
-        const modal = document.getElementById('modal-' + id);
-        if (modal) modal.classList.add('active'); 
     },
 
     closeModal(id) { 
