@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -1018,54 +1018,63 @@ window.Nexus = {
         }
     },
     
-    async toggleEditor() {
+        async toggleEditor() {
         const rawTerm = document.getElementById('raw-terminal');
         const gutter = document.getElementById('gutter');
         const cmContainer = document.getElementById('cm6-container');
+        
+        // Failsafe: Ensure we have a file to swap
+        if (!Nexus.state.activeFile) return alert("VORTEX EMPTY: Load a file first.");
         const currentCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
 
-        if (this.editorCore.isCM6) {
-            // SWITCH TO VANILLA
+        if (Nexus.editorCore.isCM6) {
+            // --- BACK TO VANILLA ---
             document.getElementById('foot-status').innerText = "ENGINE: VANILLA";
-            if (this.editorCore.view) this.editorCore.view.destroy();
+            if (Nexus.editorCore.view) Nexus.editorCore.view.destroy();
             
             cmContainer.style.display = 'none';
             gutter.style.display = 'block';
             rawTerm.style.display = 'block';
             
             rawTerm.value = currentCode;
-            this.editorCore.isCM6 = false;
+            Nexus.editorCore.isCM6 = false;
             Nexus.ui.updateGutter();
         } else {
-            // SWITCH TO CM6
+            // --- SWITCH TO CM6 ---
             document.getElementById('foot-status').innerText = "ENGINE: CM6 LOADING...";
-            rawTerm.style.display = 'none';
-            gutter.style.display = 'none';
-            cmContainer.style.display = 'block';
-
-            if (!this.editorCore.isLoaded) {
+            
+            if (!Nexus.editorCore.isLoaded) {
                 try {
-                    const cm6 = await import("https://esm.sh/codemirror@6.0.1?bundle");
-                    const cmState = await import("https://esm.sh/@codemirror/state@6.4.0?bundle");
-                    const cmJS = await import("https://esm.sh/@codemirror/lang-javascript@6.2.1?bundle");
-                    const cmTheme = await import("https://esm.sh/@codemirror/theme-one-dark@6.1.2?bundle");
+                    // Using dynamic imports for CM6 modules
+                    const [cm6, cmState, cmJS, cmTheme] = await Promise.all([
+                        import("https://esm.sh/codemirror@6.0.1?bundle"),
+                        import("https://esm.sh/@codemirror/state@6.4.0?bundle"),
+                        import("https://esm.sh/@codemirror/lang-javascript@6.2.1?bundle"),
+                        import("https://esm.sh/@codemirror/theme-one-dark@6.1.2?bundle")
+                    ]);
                     
-                    this.editorCore.modules = {
+                    Nexus.editorCore.modules = {
                         basicSetup: cm6.basicSetup,
                         EditorView: cm6.EditorView,
                         EditorState: cmState.EditorState,
                         javascript: cmJS.javascript,
                         oneDark: cmTheme.oneDark
                     };
-                    this.editorCore.isLoaded = true;
+                    Nexus.editorCore.isLoaded = true;
                 } catch (e) {
-                    alert("Failed to load CM6 Modules. Reverting.");
-                    return this.toggleEditor();
+                    console.error("CM6 Load Error:", e);
+                    alert("Module Error: Check connection or ESM availability.");
+                    return;
                 }
             }
 
-            const { EditorState, EditorView, basicSetup, javascript, oneDark } = this.editorCore.modules;
+            const { EditorState, EditorView, basicSetup, javascript, oneDark } = Nexus.editorCore.modules;
             
+            // Hide Vanilla UI
+            rawTerm.style.display = 'none';
+            gutter.style.display = 'none';
+            cmContainer.style.display = 'block';
+
             const state = EditorState.create({
                 doc: currentCode,
                 extensions: [
@@ -1081,12 +1090,12 @@ window.Nexus = {
                 ]
             });
 
-            this.editorCore.view = new EditorView({
+            Nexus.editorCore.view = new EditorView({
                 state,
                 parent: cmContainer
             });
 
-            this.editorCore.isCM6 = true;
+            Nexus.editorCore.isCM6 = true;
             document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
         }
     },
@@ -3433,18 +3442,27 @@ ui: {
             document.body.classList.toggle('outdoor-mode'); 
         },
 
-        updateGutter() { 
-            const ed = document.getElementById('raw-terminal');
-            const gutter = document.getElementById('gutter');
-            if(!ed.value) { 
-                gutter.innerHTML = "1"; 
-                return; 
-            }
-            const lineCount = ed.value.split('\n').length; 
-            // Using a single string join for performance
-            gutter.innerHTML = Array.from({length: lineCount}, (_, i) => i + 1).join('<br>'); 
-        },
-        runSandbox() { 
+            updateGutter() { 
+        const ed = document.getElementById('raw-terminal');
+        const gutter = document.getElementById('gutter');
+        if (!ed || !gutter) return;
+
+        // Ensure the gutter matches editor visibility
+        if (Nexus.editorCore.isCM6) {
+            gutter.style.display = 'none';
+            return;
+        }
+
+        const lines = ed.value.split('\n');
+        const lineCount = lines.length;
+        
+        // Generate gutter numbers
+        gutter.innerHTML = Array.from({length: lineCount}, (_, i) => i + 1).join('<br>'); 
+        
+        // FORCE Scroll Sync (Crucial for mobile)
+        gutter.scrollTop = ed.scrollTop;
+    },
+     runSandbox() { 
             const f = document.getElementById('sandbox-frame');
             const c = document.getElementById('ghost-console'); 
             if(!f || !c) return; 
