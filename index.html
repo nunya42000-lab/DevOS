@@ -6,15 +6,15 @@
     <meta name="theme-color" content="#282c34">
     <title>DevOS Nexus Prime v40.20 - Codex Matrix</title>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script> 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
-  
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 
 <style>
     :root {
@@ -475,7 +475,8 @@
             <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar')">✍️ WRITE</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith')">⌨ KEY</button>
             <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
-            
+            <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('spotlight')">🛰️ SPOTLIGHT</button>
+         
             <button class="tool-btn btn-gold" onclick="Nexus.ui.beautify()">✨ BEAUTIFY</button>
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
             <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
@@ -657,13 +658,21 @@
         </div>
         <div id="diag-out" class="p-body" style="background:#000; margin:15px; border-radius:10px; border:1px solid var(--border);">[SENTINEL ENGINE OFFLINE]</div>
     </div>
+<div id="shell-slide">
+    <div id="terminal-container" style="height:100%; width:100%;"></div>
+    <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:10;">&times;</button>
+</div>
 
-    <div id="shell-slide">
-        <div style="font-weight:900; color:var(--gold); margin-right:15px; font-family:monospace; font-size:18px;">&gt;_</div>
-        <input type="text" id="shell-input" placeholder="Execute System Command (JS)..." onkeydown="if(event.key === 'Enter') { Nexus.shell.exec(this.value); this.value=''; }">
-        <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="margin-left:15px; color:#fff;">&times;</button>
+<div id="modal-spotlight" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head"><span>🛰️ PROJECT SPOTLIGHT</span><button class="close-x" onclick="Nexus.ui.closeModal('spotlight')">&times;</button></div>
+        <div class="modal-body">
+            <input type="text" id="spotlight-input" class="sleek-input" placeholder="Search all project sectors..." oninput="Nexus.spotlight.search(this.value)">
+            <div id="spotlight-results" style="margin-top:15px; display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
     </div>
-
+</div>
+ 
     <div id="modal-manual" class="modal-overlay">
         <div class="modal-content">
             <div class="p-head"><span>📖 NEXUS CODEX (MANUAL)</span><button class="close-x" onclick="Nexus.ui.closeModal('manual')">&times;</button></div>
@@ -1029,7 +1038,7 @@ window.Nexus = {
         // Save state after injection
         const code = Nexus.state.isCM6 ? Nexus.editorCore.view.state.doc.toString() : document.getElementById('raw-terminal').value;
         await db.contents.where({ fileId }).modify({ content: code });
-    },
+    };
 
     /* --- 3. VFS VORTEX (Dexie-Aware) --- */
     vfs: {
@@ -1384,21 +1393,43 @@ window.Nexus = {
                 p.innerHTML = this.templates[t](l, 'preview-id');
             }
         },
+inject() {
+    const ed = document.getElementById('raw-terminal');
+    // 1. Safety Check (Pixel 7 Keyboard lock prevention)
+    if (ed.hasAttribute('readonly') && !Nexus.state.isCM6) return alert("VORTEX LOCKED");
 
-        inject() { 
-            const ed = document.getElementById('raw-terminal'); 
-            if (ed.hasAttribute('readonly')) return alert("LOCKED"); 
-            const t = document.getElementById('dreamer-type').value; 
-            const l = document.getElementById('dreamer-label').value; 
-            const id = document.getElementById('dreamer-id').value; 
-            const code = `\n\n` + this.templates[t](l, id) + `\n`; 
-            const pos = ed.selectionStart; 
-            ed.value = ed.value.substring(0, pos) + code + ed.value.substring(ed.selectionEnd); 
-            Nexus.state.vfs[Nexus.state.activeFile] = ed.value; 
-            Nexus.vfs.save(); 
-            Nexus.ui.closeModal('dreamer'); 
-            Nexus.ui.updateGutter(); 
-        },
+    const type = document.getElementById('dreamer-type').value;
+    const label = document.getElementById('dreamer-label').value;
+    const id = document.getElementById('dreamer-id').value;
+    const ext = Nexus.state.activeFileName.split('.').pop().toLowerCase();
+
+    // 2. Resolution: Check v42 Blueprints first, fallback to v40 Templates
+    const blueprint = this.blueprints?.[type] || this.templates[type];
+    
+    let payload = "";
+    if (typeof blueprint === 'function') {
+        // Handle v40 style: Templates are functions that return strings
+        payload = blueprint(label, id);
+    } else if (typeof blueprint === 'object') {
+        // Handle v42 style: Blueprints are objects with .html, .js, .css
+        payload = blueprint[ext] || blueprint.html || "";
+    }
+
+    if (payload) {
+        // 3. The Sovereign Pipeline
+        // We use injectChar so the Backspace logic and Dexie Auto-save trigger
+        Nexus.ui.injectChar(`\n${payload}\n`);
+        
+        Nexus.ui.closeModal('dreamer');
+        Nexus.ui.updateGutter();
+        
+        if (Nexus.terminal) {
+            Nexus.terminal.log(`ARCHITECT: ${type} injected into ${ext.toUpperCase()} sector.`, "success");
+        }
+    } else {
+        alert(`No blueprint found for .${ext} files.`);
+    }
+}
 
         // --- 3. STRESS TESTING & NIGHT CYCLE ---
         async startNightCycle() {
