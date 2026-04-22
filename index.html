@@ -2268,6 +2268,7 @@ Nexus.kbEditor = {
     ...Nexus.kbEditor,
     tempLayout: null,
 
+    // Deep clone the current state to the buffer so we don't break the live UI while editing
     open() {
         this.tempLayout = JSON.parse(JSON.stringify(Nexus.state.prefs.kbLayouts || {}));
         Nexus.ui.openModal('kb-builder');
@@ -2276,38 +2277,78 @@ Nexus.kbEditor = {
 
     render() {
         const list = document.getElementById('kb-builder-list');
+        if (!list) return;
+
         const keys = this.tempLayout[this.currentLang] || [];
         
         list.innerHTML = keys.map((k, i) => `
-            <div class="item-row" style="background:var(--surface); margin-bottom:8px; border-radius:10px; padding:12px;">
+            <div class="item-row" style="background:var(--surface); margin-bottom:8px; border-radius:10px; padding:12px; display:flex; align-items:center;">
                 <div style="flex:1; display:flex; flex-direction:column; gap:8px;">
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:10px; color:var(--gold); width:40px;">SHOW</span>
-                        <input type="text" value="${k.d}" onchange="Nexus.kbEditor.update(${i}, 'd', this.value)" class="sleek-input" style="padding:8px;">
+                        <span style="font-size:10px; color:var(--gold); font-weight:900; width:40px;">SHOW</span>
+                        <input type="text" value="${k.d.replace(/"/g, '&quot;')}" 
+                               onchange="Nexus.kbEditor.update(${i}, 'd', this.value)" 
+                               class="sleek-input" style="padding:8px;">
                     </div>
                     <div style="display:flex; align-items:center; gap:10px;">
-                        <span style="font-size:10px; color:var(--accent); width:40px;">CODE</span>
-                        <input type="text" value="${k.i}" onchange="Nexus.kbEditor.update(${i}, 'i', this.value)" class="sleek-input" style="padding:8px;">
+                        <span style="font-size:10px; color:var(--accent); font-weight:900; width:40px;">CODE</span>
+                        <input type="text" value="${k.i.replace(/"/g, '&quot;')}" 
+                               onchange="Nexus.kbEditor.update(${i}, 'i', this.value)" 
+                               class="sleek-input" style="padding:8px;">
                     </div>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:6px; margin-left:12px;">
-                    <button class="tool-btn btn-danger" onclick="Nexus.kbEditor.remove(${i})">🗑</button>
+                    <button class="tool-btn" style="padding:6px; min-width:32px;" onclick="Nexus.kbEditor.moveUp(${i})">▲</button>
+                    <button class="tool-btn" style="padding:6px; min-width:32px;" onclick="Nexus.kbEditor.moveDown(${i})">▼</button>
+                    <button class="tool-btn btn-danger" style="padding:6px; min-width:32px;" onclick="Nexus.kbEditor.remove(${i})">🗑</button>
                 </div>
-            </div>`).join('');
+            </div>`).join('') || `<div style="text-align:center; opacity:0.5; padding:20px;">No keys defined for ${this.currentLang.toUpperCase()}</div>`;
     },
     
-    update(i, field, val) { this.tempLayout[this.currentLang][i][field] = val; },
-    add() { this.tempLayout[this.currentLang].push({d: 'New', i: 'New'}); this.render(); },
-    remove(i) { this.tempLayout[this.currentLang].splice(i, 1); this.render(); },
+    update(i, field, val) { 
+        if (this.tempLayout[this.currentLang][i]) {
+            this.tempLayout[this.currentLang][i][field] = val; 
+        }
+    },
+
+    add() { 
+        if (!this.tempLayout[this.currentLang]) this.tempLayout[this.currentLang] = [];
+        this.tempLayout[this.currentLang].push({d: 'New', i: 'New'}); 
+        this.render(); 
+    },
+
+    remove(i) { 
+        this.tempLayout[this.currentLang].splice(i, 1); 
+        this.render(); 
+    },
+    
+    moveUp(i) { 
+        if(i > 0) { 
+            const arr = this.tempLayout[this.currentLang];
+            [arr[i], arr[i-1]] = [arr[i-1], arr[i]];
+            this.render(); 
+        } 
+    },
+    
+    moveDown(i) { 
+        const arr = this.tempLayout[this.currentLang];
+        if(i < arr.length - 1) { 
+            [arr[i], arr[i+1]] = [arr[i+1], arr[i]];
+            this.render(); 
+        } 
+    },
     
     async save() { 
+        // Atomic commit to state and Dexie
         Nexus.state.prefs.kbLayouts = JSON.parse(JSON.stringify(this.tempLayout)); 
         await Nexus.settings.update('kbLayouts', Nexus.state.prefs.kbLayouts); 
+        
         Nexus.ui.closeModal('kb-builder'); 
-        Nexus.kb.render();
-        Nexus.terminal.log("KEYBOARD: Layout committed.", "success");
+        Nexus.kb.render(); // Hot-reload the live keyboard matrix
+        Nexus.terminal.log("KEYBOARD: Sovereign Matrix re-aligned and committed.", "success");
     }
 };
+
 
 /* --- 26. MODULE: KB (The Sovereign Input Matrix) --- */
 Nexus.kb = {
