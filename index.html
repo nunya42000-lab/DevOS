@@ -2388,7 +2388,8 @@ Nexus.search = {
         Nexus.state.searchOpts[opt] = !Nexus.state.searchOpts[opt];
         document.getElementById(opt + '-btn').classList.toggle('active');
     },
-
+execute() { this.findNext(1); },
+    
     buildRegex() {
         const term = document.getElementById('find-input').value;
         if (!term) return null;
