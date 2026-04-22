@@ -17,6 +17,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jshint/2.13.6/jshint.min.js"></script>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <style>
     :root {
         --bg: #0d1117; 
@@ -3130,6 +3134,48 @@ window.addEventListener('keydown', (e) => {
         Nexus.history.record();
     }
 });
+/* --- 36. MODULE: TERMINAL (xterm.js Integration) --- */
+Nexus.terminal = {
+    instance: null,
+    
+    init() {
+        const container = document.getElementById('terminal-container');
+        if (!container || this.instance) return;
+
+        // Initialize xterm.js
+        this.instance = new Terminal({
+            theme: {
+                background: '#0d1117',
+                foreground: '#c9d1d9',
+                cursor: '#58a6ff',
+                selection: 'rgba(88, 166, 255, 0.3)'
+            },
+            fontFamily: 'var(--font-mono)',
+            fontSize: 12,
+            cursorBlink: true,
+            convertEol: true
+        });
+
+        this.instance.open(container);
+        this.log("SOVEREIGN SHELL v42.0 INITIALIZED", "success");
+    },
+
+    log(msg, type = "info") {
+        if (!this.instance) return console.log(`[${type}] ${msg}`);
+        
+        const colors = {
+            success: "\x1b[32m", // Green
+            error: "\x1b[31m",   // Red
+            warn: "\x1b[33m",    // Yellow
+            info: "\x1b[36m",    // Cyan
+            danger: "\x1b[1;31m", // Bold Red
+            reset: "\x1b[0m"
+        };
+        
+        const prefix = colors[type] || colors.info;
+        this.instance.writeln(`${prefix}> ${msg}${colors.reset}`);
+    }
+};
 
 /* --- 35. THE SOVEREIGN BOOTLOADER --- */
 window.addEventListener('DOMContentLoaded', async () => { 
@@ -3148,3 +3194,6 @@ window.addEventListener('DOMContentLoaded', async () => {
         console.error("Critical Boot Failure:", e);
     }
 });
+</script>
+</body>
+</html>
