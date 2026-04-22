@@ -969,13 +969,87 @@
 </div>
 
 <script>
+/* --- 1. SOVEREIGN DATABASE (Dexie.js) --- */
+const db = new Dexie('NexusCodexDB');
+db.version(1).stores({
+    files: '++id, name, path, extension, lastModified',
+    contents: '++id, fileId, content',
+    vault: '++id, title, category, content',
+    history: '++id, timestamp, fileId, content' 
+});
+
 window.Nexus = {
-    editorCore: {
+    state: {
+        activeFileId: null,
+        activeFileName: "NONE",
         isCM6: false,
-        isLoaded: false,
-        view: null,
-        modules: {}
+        prefs: { fontSize: 14, tabWidth: 4, kbPos: 'bottom', kbRows: 3 },
+        widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false }
     },
+    
+    /* --- 2. THE SOVEREIGN INJECTOR (Backspace & CM6 Fix) --- */
+    async injectChar(val) {
+        const fileId = Nexus.state.activeFileId;
+        if (!fileId) return;
+
+        if (Nexus.state.isCM6 && Nexus.editorCore.view) {
+            const view = Nexus.editorCore.view;
+            const sel = view.state.selection.main;
+            if (val === 'BACKSPACE') {
+                view.dispatch({
+                    changes: { from: sel.empty ? Math.max(0, sel.from - 1) : sel.from, to: sel.to, insert: "" },
+                    scrollIntoView: true
+                });
+            } else {
+                view.dispatch({
+                    changes: { from: sel.from, to: sel.to, insert: val },
+                    selection: { anchor: sel.from + val.length },
+                    scrollIntoView: true
+                });
+            }
+        } else {
+            const ed = document.getElementById('raw-terminal');
+            const start = ed.selectionStart;
+            const end = ed.selectionEnd;
+            if (val === 'BACKSPACE') {
+                if (start === end) {
+                    ed.value = ed.value.substring(0, Math.max(0, start - 1)) + ed.value.substring(end);
+                    ed.setSelectionRange(start - 1, start - 1);
+                } else {
+                    ed.value = ed.value.substring(0, start) + ed.value.substring(end);
+                    ed.setSelectionRange(start, start);
+                }
+            } else {
+                ed.value = ed.value.substring(0, start) + val + ed.value.substring(end);
+                ed.setSelectionRange(start + val.length, start + val.length);
+            }
+            ed.focus();
+            Nexus.ui.updateGutter();
+        }
+        // Save state after injection
+        const code = Nexus.state.isCM6 ? Nexus.editorCore.view.state.doc.toString() : document.getElementById('raw-terminal').value;
+        await db.contents.where({ fileId }).modify({ content: code });
+    },
+
+    /* --- 3. VFS VORTEX (Dexie-Aware) --- */
+    vfs: {
+        async boot() {
+            const latest = await db.files.orderBy('lastModified').reverse().first();
+            if (latest) await this.openFile(latest.id);
+            else this.setEmptyState();
+            this.renderAccordion();
+        },
+        async openFile(id) {
+            const file = await db.files.get(id);
+            const record = await db.contents.where({ fileId: id }).first();
+            Nexus.state.activeFileId = id;
+            Nexus.state.activeFileName = file.name;
+            Nexus.editor.inject(record.content, file.name);
+            document.getElementById('raw-terminal').removeAttribute('readonly');
+        }
+    }
+};
+
     compressor: {
         async run(level) {
             const ed = document.getElementById('raw-terminal');
