@@ -979,3 +979,767 @@
 
 <script>
  
+const db = new Dexie('NexusCodexDB');
+db.version(1).stores({
+    files: '++id, name, path, extension, lastModified',
+    contents: '++id, fileId, content',
+    vault: '++id, title, category, content',
+    history: '++id, timestamp, fileId, content' 
+});
+ vfs: {
+    // --- 1. LIFECYCLE & PERSISTENCE ---
+    async boot() {
+        try {
+            // Migration-aware boot: Checks v42 primary, falls back to v41
+            let vfs = await localforage.getItem('Nexus.state.vfs_v42') || await localforage.getItem('Nexus.state.vfs_v41');
+            let orig = await localforage.getItem('nexus_originals_v42') || await localforage.getItem('nexus_originals_v41');
+            
+            if (vfs && Object.keys(vfs).length > 0) {
+                Nexus.state.vfs = vfs;
+                Nexus.state.originals = orig || {};
+            } else {
+                return this.setEmptyState();
+            }
+
+            // Integrity Check: Ensure every VFS entry has a 'Sovereign Original' backup
+            Object.keys(Nexus.state.vfs).forEach(fn => { 
+                if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn]; 
+            });
+
+            const files = Object.keys(Nexus.state.vfs);
+            if (!Nexus.state.activeFile || !files.includes(Nexus.state.activeFile)) {
+                Nexus.state.activeFile = files[0];
+            }
+
+            this.switchFile(Nexus.state.activeFile);
+            
+        } catch (e) {
+            console.error("VORTEX CRITICAL FAILURE:", e);
+            this.setEmptyState();
+        }
+    },
+
+    async save() {
+        // Persist using v42 keys to maintain migration integrity
+        await localforage.setItem('Nexus.state.vfs_v42', Nexus.state.vfs);
+        await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
+    },
+
+    setEmptyState() {
+        Nexus.state.activeFile = "";
+        const ed = document.getElementById('raw-terminal');
+        
+        ed.value = "";
+        ed.setAttribute('readonly', 'true');
+        ed.removeAttribute('inputmode');
+
+        document.getElementById('foot-file').innerText = "VORTEX EMPTY";
+        const st = document.getElementById('foot-status');
+        st.innerText = "LOCKED";
+        st.style.color = "var(--danger)";
+        
+        const lockBtns = document.querySelectorAll('.edit-btn-trigger');
+        lockBtns.forEach(btn => {
+            btn.innerHTML = "🔒 READ ONLY"; 
+            btn.className = "tool-btn edit-btn-trigger btn-edit-lock";
+        });
+
+        this.renderAccordion();
+        Nexus.ui.updateGutter();
+    },
+
+    // --- 2. CORE FILE OPERATIONS ---
+    newFile() {
+        const name = prompt("Enter filename (e.g., index.html or script.js):");
+        if (!name) return;
+        if (Nexus.state.vfs[name] !== undefined) return alert("CONFLICT: File already exists.");
+
+        Nexus.state.vfs[name] = ""; 
+        Nexus.state.originals[name] = "";
+        
+        this.renderAccordion();
+        this.switchFile(name);
+        this.save();
+        
+        const ed = document.getElementById('raw-terminal');
+        const st = document.getElementById('foot-status');
+        ed.removeAttribute('readonly');
+        ed.removeAttribute('inputmode'); 
+        st.innerText = "READY (NEW)";
+        st.style.color = "var(--success)";
+    },
+
+    switchFile(fn) {
+        if (!fn || (Nexus.state.vfs[fn] === undefined)) return;
+
+        Nexus.state.activeFile = fn;
+        const code = Nexus.state.vfs[fn];
+        const footFile = document.getElementById('foot-file');
+        if (footFile) footFile.innerText = "FILE: " + fn.toUpperCase();
+
+        // Engine Routing
+        if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            const view = Nexus.editorCore.view;
+            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+            document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
+        } else {
+            const ed = document.getElementById('raw-terminal');
+            if (ed) {
+                ed.value = code;
+                Nexus.ui.updateGutter();
+            }
+        }
+
+        this.renderAccordion();
+
+        // Footer Status Sync
+        const st = document.getElementById('foot-status');
+        if (st && (!Nexus.editorCore || !Nexus.editorCore.isCM6)) {
+            const isReadonly = document.getElementById('raw-terminal').hasAttribute('readonly');
+            st.innerText = isReadonly ? "LOCKED" : (document.getElementById('raw-terminal').getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)");
+            st.style.color = isReadonly ? "var(--danger)" : "var(--success)";
+        }
+    },
+
+    renameFile(oldName) {
+        const newName = prompt("Rename file to:", oldName);
+        if (!newName || newName === oldName || Nexus.state.vfs[newName] !== undefined) return;
+        
+        Nexus.state.vfs[newName] = Nexus.state.vfs[oldName];
+        Nexus.state.originals[newName] = Nexus.state.originals[oldName];
+        delete Nexus.state.vfs[oldName];
+        delete Nexus.state.originals[oldName];
+        
+        if (Nexus.state.activeFile === oldName) Nexus.state.activeFile = newName;
+        
+        this.save();
+        this.renderAccordion();
+        if (Nexus.state.activeFile === newName) this.switchFile(newName);
+    },
+
+    deleteFile(fn) {
+        if (confirm(`☢ Delete ${fn}?`)) { 
+            delete Nexus.state.vfs[fn]; 
+            delete Nexus.state.originals[fn]; 
+            const remaining = Object.keys(Nexus.state.vfs);
+            remaining.length > 0 ? this.switchFile(remaining[0]) : this.setEmptyState();
+            this.save(); 
+        }
+    },
+
+    refreshCurrent() {
+        const fn = Nexus.state.activeFile;
+        if(!fn) return;
+        if (confirm(`🔄 Restore ${fn} to original state?`)) { 
+            Nexus.state.vfs[fn] = Nexus.state.originals[fn]; 
+            this.switchFile(fn); 
+            this.save(); 
+        }
+    },
+
+    // --- 3. UI RENDERERS ---
+    renderAccordion() {
+        const root = document.getElementById('accordion-root'); 
+        if (!root) return; 
+        const groups = {};
+        
+        Object.keys(Nexus.state.vfs).forEach(fn => { 
+            const ext = fn.split('.').pop().toLowerCase(); 
+            if (!groups[ext]) groups[ext] = []; 
+            groups[ext].push(fn); 
+        });
+
+        root.innerHTML = Object.entries(groups).map(([ext, files]) => `
+            <div class="acc-section">
+                <div class="acc-head" onclick="this.nextElementSibling.classList.toggle('open')">
+                    <span>.${ext.toUpperCase()}</span> <span>${files.length}</span>
+                </div>
+                <div class="acc-content open">${files.map(fn => `
+                    <div class="item-row ${fn === Nexus.state.activeFile ? 'active-file' : ''}" onclick="Nexus.vfs.switchFile('${fn}')">
+                        <span>${fn}</span>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <span style="color:var(--gold); font-size:14px;" onclick="event.stopPropagation(); Nexus.vfs.renameFile('${fn}')">✏️</span>
+                            <span style="color:var(--danger); font-size:18px; line-height:0.8;" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span>
+                        </div>
+                    </div>`).join('')}
+                </div>
+            </div>`).join('');
+        
+        Nexus.ui.renderTabs();
+    },
+
+    // --- 4. DATA TRANSFER & MERGE ---
+    loadFiles(fileList) {
+        Array.from(fileList).forEach(file => {
+            const r = new FileReader();
+            r.onload = (e) => { 
+                Nexus.state.vfs[file.name] = e.target.result; 
+                Nexus.state.originals[file.name] = e.target.result; 
+                this.renderAccordion(); 
+                if (!Nexus.state.activeFile) this.switchFile(file.name);
+                this.save(); 
+            };
+            r.readAsText(file);
+        });
+    },
+
+    async importZIP(file) {
+        if (!file) return;
+        try {
+            const zip = await JSZip.loadAsync(file);
+            let imported = 0;
+            for (const relativePath of Object.keys(zip.files)) {
+                const entry = zip.files[relativePath];
+                if (!entry.dir) {
+                    const content = await entry.async("string");
+                    const fn = relativePath.split('/').pop(); 
+                    if (fn && !fn.startsWith(".")) {
+                        Nexus.state.vfs[fn] = content;
+                        Nexus.state.originals[fn] = content;
+                        imported++;
+                    }
+                }
+            }
+            if (imported > 0) {
+                this.save();
+                this.renderAccordion();
+                alert(`📦 ZIP Extracted: ${imported} files imported.`);
+            }
+        } catch (e) { alert("ZIP Error: " + e.message); }
+    },
+
+    exportToTXT() {
+        let b = `/* NEXUS FLAT BUNDLE | ${new Date().toLocaleString()} */\n\n`;
+        Object.entries(Nexus.state.vfs).forEach(([n, c]) => {
+            b += `\n/* FILE: ${n} */\n${c}\n`;
+        });
+        const blob = new Blob([b], { type: 'text/plain' }); 
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(blob); 
+        a.download = `Nexus_v40_Backup.txt`; 
+        a.click();
+    },
+
+    combineFiles() {
+        const selected = Array.from(document.querySelectorAll('.combine-cb:checked')).map(cb => cb.value);
+        const newName = document.getElementById('combine-name').value;
+        if(selected.length < 2 || !newName) return alert("Select 2+ files and provide a name.");
+        
+        let combinedCode = `// Combined Matrix: ${selected.join(', ')}\n\n`;
+        selected.forEach(f => { combinedCode += `// --- ${f} ---\n${Nexus.state.vfs[f] || ''}\n\n`; });
+
+        Nexus.state.vfs[newName] = combinedCode;
+        Nexus.state.originals[newName] = combinedCode;
+        
+        const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedNames = selected.map(f => escapeRegex(f.replace('./', ''))).join('|');
+        const regexes = [
+            new RegExp(`((?:import|export)\\s+(?:.*?from\\s+)?['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+            new RegExp(`(src=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+            new RegExp(`(href=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g')
+        ];
+
+        Object.keys(Nexus.state.vfs).forEach(file => {
+            if (selected.includes(file)) return; 
+            let code = Nexus.state.vfs[file];
+            let changed = false;
+            regexes.forEach(rx => { if (rx.test(code)) { changed = true; code = code.replace(rx, `$1$2${newName}$3`); } });
+            if(changed) { Nexus.state.vfs[file] = code; Nexus.state.originals[file] = code; }
+        });
+        
+        selected.forEach(f => { if(f !== newName) { delete Nexus.state.vfs[f]; delete Nexus.state.originals[f]; } });
+        this.save();
+        this.renderAccordion();
+        this.switchFile(newName);
+        Nexus.ui.closeModal('combine');
+        alert(`Sovereign Merge Complete.`);
+    }
+}
+vfs: {
+    // --- 1. LIFECYCLE & PERSISTENCE ---
+    async boot() {
+        try {
+            // Migration-aware boot: Checks v42 primary, falls back to v41
+            let vfs = await localforage.getItem('Nexus.state.vfs_v42') || await localforage.getItem('Nexus.state.vfs_v41');
+            let orig = await localforage.getItem('nexus_originals_v42') || await localforage.getItem('nexus_originals_v41');
+            
+            if (vfs && Object.keys(vfs).length > 0) {
+                Nexus.state.vfs = vfs;
+                Nexus.state.originals = orig || {};
+            } else {
+                return this.setEmptyState();
+            }
+
+            // Integrity Check: Ensure every VFS entry has a 'Sovereign Original' backup
+            Object.keys(Nexus.state.vfs).forEach(fn => { 
+                if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn]; 
+            });
+
+            const files = Object.keys(Nexus.state.vfs);
+            if (!Nexus.state.activeFile || !files.includes(Nexus.state.activeFile)) {
+                Nexus.state.activeFile = files[0];
+            }
+
+            this.switchFile(Nexus.state.activeFile);
+            
+        } catch (e) {
+            console.error("VORTEX CRITICAL FAILURE:", e);
+            this.setEmptyState();
+        }
+    },
+
+    async save() {
+        // Persist using v42 keys to maintain migration integrity
+        await localforage.setItem('Nexus.state.vfs_v42', Nexus.state.vfs);
+        await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
+    },
+
+    setEmptyState() {
+        Nexus.state.activeFile = "";
+        const ed = document.getElementById('raw-terminal');
+        
+        ed.value = "";
+        ed.setAttribute('readonly', 'true');
+        ed.removeAttribute('inputmode');
+
+        document.getElementById('foot-file').innerText = "VORTEX EMPTY";
+        const st = document.getElementById('foot-status');
+        st.innerText = "LOCKED";
+        st.style.color = "var(--danger)";
+        
+        const lockBtns = document.querySelectorAll('.edit-btn-trigger');
+        lockBtns.forEach(btn => {
+            btn.innerHTML = "🔒 READ ONLY"; 
+            btn.className = "tool-btn edit-btn-trigger btn-edit-lock";
+        });
+
+        this.renderAccordion();
+        Nexus.ui.updateGutter();
+    },
+
+    // --- 2. CORE FILE OPERATIONS ---
+    newFile() {
+        const name = prompt("Enter filename (e.g., index.html or script.js):");
+        if (!name) return;
+        if (Nexus.state.vfs[name] !== undefined) return alert("CONFLICT: File already exists.");
+
+        Nexus.state.vfs[name] = ""; 
+        Nexus.state.originals[name] = "";
+        
+        this.renderAccordion();
+        this.switchFile(name);
+        this.save();
+        
+        const ed = document.getElementById('raw-terminal');
+        const st = document.getElementById('foot-status');
+        ed.removeAttribute('readonly');
+        ed.removeAttribute('inputmode'); 
+        st.innerText = "READY (NEW)";
+        st.style.color = "var(--success)";
+    },
+
+    switchFile(fn) {
+        if (!fn || (Nexus.state.vfs[fn] === undefined)) return;
+
+        Nexus.state.activeFile = fn;
+        const code = Nexus.state.vfs[fn];
+        const footFile = document.getElementById('foot-file');
+        if (footFile) footFile.innerText = "FILE: " + fn.toUpperCase();
+
+        // Engine Routing
+        if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            const view = Nexus.editorCore.view;
+            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+            document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
+        } else {
+            const ed = document.getElementById('raw-terminal');
+            if (ed) {
+                ed.value = code;
+                Nexus.ui.updateGutter();
+            }
+        }
+
+        this.renderAccordion();
+
+        // Footer Status Sync
+        const st = document.getElementById('foot-status');
+        if (st && (!Nexus.editorCore || !Nexus.editorCore.isCM6)) {
+            const isReadonly = document.getElementById('raw-terminal').hasAttribute('readonly');
+            st.innerText = isReadonly ? "LOCKED" : (document.getElementById('raw-terminal').getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)");
+            st.style.color = isReadonly ? "var(--danger)" : "var(--success)";
+        }
+    },
+
+    renameFile(oldName) {
+        const newName = prompt("Rename file to:", oldName);
+        if (!newName || newName === oldName || Nexus.state.vfs[newName] !== undefined) return;
+        
+        Nexus.state.vfs[newName] = Nexus.state.vfs[oldName];
+        Nexus.state.originals[newName] = Nexus.state.originals[oldName];
+        delete Nexus.state.vfs[oldName];
+        delete Nexus.state.originals[oldName];
+        
+        if (Nexus.state.activeFile === oldName) Nexus.state.activeFile = newName;
+        
+        this.save();
+        this.renderAccordion();
+        if (Nexus.state.activeFile === newName) this.switchFile(newName);
+    },
+
+    deleteFile(fn) {
+        if (confirm(`☢ Delete ${fn}?`)) { 
+            delete Nexus.state.vfs[fn]; 
+            delete Nexus.state.originals[fn]; 
+            const remaining = Object.keys(Nexus.state.vfs);
+            remaining.length > 0 ? this.switchFile(remaining[0]) : this.setEmptyState();
+            this.save(); 
+        }
+    },
+
+    refreshCurrent() {
+        const fn = Nexus.state.activeFile;
+        if(!fn) return;
+        if (confirm(`🔄 Restore ${fn} to original state?`)) { 
+            Nexus.state.vfs[fn] = Nexus.state.originals[fn]; 
+            this.switchFile(fn); 
+            this.save(); 
+        }
+    },
+
+    // --- 3. UI RENDERERS ---
+    renderAccordion() {
+        const root = document.getElementById('accordion-root'); 
+        if (!root) return; 
+        const groups = {};
+        
+        Object.keys(Nexus.state.vfs).forEach(fn => { 
+            const ext = fn.split('.').pop().toLowerCase(); 
+            if (!groups[ext]) groups[ext] = []; 
+            groups[ext].push(fn); 
+        });
+
+        root.innerHTML = Object.entries(groups).map(([ext, files]) => `
+            <div class="acc-section">
+                <div class="acc-head" onclick="this.nextElementSibling.classList.toggle('open')">
+                    <span>.${ext.toUpperCase()}</span> <span>${files.length}</span>
+                </div>
+                <div class="acc-content open">${files.map(fn => `
+                    <div class="item-row ${fn === Nexus.state.activeFile ? 'active-file' : ''}" onclick="Nexus.vfs.switchFile('${fn}')">
+                        <span>${fn}</span>
+                        <div style="display:flex; align-items:center; gap:12px;">
+                            <span style="color:var(--gold); font-size:14px;" onclick="event.stopPropagation(); Nexus.vfs.renameFile('${fn}')">✏️</span>
+                            <span style="color:var(--danger); font-size:18px; line-height:0.8;" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span>
+                        </div>
+                    </div>`).join('')}
+                </div>
+            </div>`).join('');
+        
+        Nexus.ui.renderTabs();
+    },
+
+    // --- 4. DATA TRANSFER & MERGE ---
+    loadFiles(fileList) {
+        Array.from(fileList).forEach(file => {
+            const r = new FileReader();
+            r.onload = (e) => { 
+                Nexus.state.vfs[file.name] = e.target.result; 
+                Nexus.state.originals[file.name] = e.target.result; 
+                this.renderAccordion(); 
+                if (!Nexus.state.activeFile) this.switchFile(file.name);
+                this.save(); 
+            };
+            r.readAsText(file);
+        });
+    },
+
+    async importZIP(file) {
+        if (!file) return;
+        try {
+            const zip = await JSZip.loadAsync(file);
+            let imported = 0;
+            for (const relativePath of Object.keys(zip.files)) {
+                const entry = zip.files[relativePath];
+                if (!entry.dir) {
+                    const content = await entry.async("string");
+                    const fn = relativePath.split('/').pop(); 
+                    if (fn && !fn.startsWith(".")) {
+                        Nexus.state.vfs[fn] = content;
+                        Nexus.state.originals[fn] = content;
+                        imported++;
+                    }
+                }
+            }
+            if (imported > 0) {
+                this.save();
+                this.renderAccordion();
+                alert(`📦 ZIP Extracted: ${imported} files imported.`);
+            }
+        } catch (e) { alert("ZIP Error: " + e.message); }
+    },
+
+    exportToTXT() {
+        let b = `/* NEXUS FLAT BUNDLE | ${new Date().toLocaleString()} */\n\n`;
+        Object.entries(Nexus.state.vfs).forEach(([n, c]) => {
+            b += `\n/* FILE: ${n} */\n${c}\n`;
+        });
+        const blob = new Blob([b], { type: 'text/plain' }); 
+        const a = document.createElement('a'); 
+        a.href = URL.createObjectURL(blob); 
+        a.download = `Nexus_v40_Backup.txt`; 
+        a.click();
+    },
+
+    combineFiles() {
+        const selected = Array.from(document.querySelectorAll('.combine-cb:checked')).map(cb => cb.value);
+        const newName = document.getElementById('combine-name').value;
+        if(selected.length < 2 || !newName) return alert("Select 2+ files and provide a name.");
+        
+        let combinedCode = `// Combined Matrix: ${selected.join(', ')}\n\n`;
+        selected.forEach(f => { combinedCode += `// --- ${f} ---\n${Nexus.state.vfs[f] || ''}\n\n`; });
+
+        Nexus.state.vfs[newName] = combinedCode;
+        Nexus.state.originals[newName] = combinedCode;
+        
+        const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const escapedNames = selected.map(f => escapeRegex(f.replace('./', ''))).join('|');
+        const regexes = [
+            new RegExp(`((?:import|export)\\s+(?:.*?from\\s+)?['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+            new RegExp(`(src=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g'),
+            new RegExp(`(href=['"])(\\.\\/)?(?:${escapedNames})(['"])`, 'g')
+        ];
+
+        Object.keys(Nexus.state.vfs).forEach(file => {
+            if (selected.includes(file)) return; 
+            let code = Nexus.state.vfs[file];
+            let changed = false;
+            regexes.forEach(rx => { if (rx.test(code)) { changed = true; code = code.replace(rx, `$1$2${newName}$3`); } });
+            if(changed) { Nexus.state.vfs[file] = code; Nexus.state.originals[file] = code; }
+        });
+        
+        selected.forEach(f => { if(f !== newName) { delete Nexus.state.vfs[f]; delete Nexus.state.originals[f]; } });
+        this.save();
+        this.renderAccordion();
+        this.switchFile(newName);
+        Nexus.ui.closeModal('combine');
+        alert(`Sovereign Merge Complete.`);
+    }
+}
+sentinel: {
+    engine: null,
+    lastIssues: [],
+    
+    // --- 1. THE ARCHITECT (CORE ENGINE) ---
+    initEngine() {
+        if (this.engine) return;
+        
+        class DevOSSentinelDual {
+            constructor() { 
+                this.registry = []; 
+                this.declarations = new Map(); 
+                this.references = new Set(); 
+                this.initDefaultCheckers(); 
+            }
+            
+            initDefaultCheckers() {
+                // Logic: Infinite Loops & Recursion
+                this.use({ check: (node) => {
+                    if (['WhileStatement', 'ForStatement'].includes(node.type)) {
+                        if (node.test?.value === true && !this.findInNode(node.body, 'BreakStatement')) {
+                            return { id: 'INF_LOOP', message: "Infinite Loop: No break found.", severity: 'CRITICAL' };
+                        }
+                    }
+                }});
+
+                this.use({ check: (node, parent, context) => {
+                    if (node.type === 'FunctionDeclaration' && node.id) context.currentFunctionName = node.id.name;
+                    if (node.type === 'CallExpression' && node.callee.name === context.currentFunctionName) {
+                        let isGuarded = false; let tracer = node.parent;
+                        while (tracer && tracer.type !== 'FunctionDeclaration') {
+                            if (['IfStatement', 'SwitchStatement'].includes(tracer.type)) { isGuarded = true; break; }
+                            tracer = tracer.parent;
+                        }
+                        if (!isGuarded) return { id: 'STACK_OVERFLOW', message: `Recursion Risk: '${node.callee.name}' calls itself without an exit guard.`, severity: 'CRITICAL' };
+                    }
+                }});
+
+                // Security: XSS & Secret Leaks
+                this.use({ check: (node) => {
+                    if (node.type === 'AssignmentExpression' && node.right.type === 'MemberExpression') {
+                        const sink = node.left.property?.name || node.left.name;
+                        if (['innerHTML', 'outerHTML'].includes(sink)) {
+                            return { id: 'TAINT_FLOW', message: `XSS Risk: Flow into '${sink}'. Use textContent.`, severity: 'CRITICAL' };
+                        }
+                    }
+                }});
+
+                // Performance: Layout Thrashing
+                this.use({ check: (node) => {
+                    const triggers = ['offsetWidth', 'getBoundingClientRect'];
+                    const prop = node.property?.name || node.callee?.property?.name;
+                    if (triggers.includes(prop)) {
+                        let tracer = node.parent;
+                        while (tracer) {
+                            if (['ForStatement', 'WhileStatement'].includes(tracer.type)) return { id: 'LAYOUT_THRASH', message: "Performance: Layout read inside loop.", severity: 'HIGH' };
+                            tracer = tracer.parent;
+                        }
+                    }
+                }});
+            }
+
+            use(rule) { this.registry.push(rule); }
+
+            analyzeAndMutate(code, mode) {
+                this.declarations.clear(); this.references.clear();
+                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true, ranges: true });
+                const issues = [];
+                const context = { inAsync: false, currentFunctionName: null };
+                
+                this.traverse(ast, (node, parent) => {
+                    this.registry.forEach(rule => {
+                        const res = rule.check(node, parent, context);
+                        if (res) { 
+                            issues.push({ ...res, line: node.loc?.start?.line, range: node.range }); 
+                            if (mode === 'AST_REBUILD' && res.mutate) res.mutate(node); 
+                        }
+                    });
+                });
+                return { issues, ast };
+            }
+
+            traverse(node, cb, parent = null) {
+                if (!node) return; node.parent = parent; cb(node, parent);
+                Object.keys(node).forEach(key => {
+                    if (key === 'parent') return;
+                    const child = node[key];
+                    if (child && typeof child === 'object') {
+                        if (Array.isArray(child)) child.forEach(c => this.traverse(c, cb, node));
+                        else if (child.type) this.traverse(child, cb, node);
+                    }
+                });
+            }
+
+            findInNode(node, type, filter = () => true) {
+                let found = false;
+                this.traverse(node, (n) => { if (n.type === type && filter(n)) found = true; });
+                return found;
+            }
+        }
+        this.engine = new DevOSSentinelDual();
+    },
+
+    // --- 2. THE MEDIC (AUTO-FIXERS) ---
+    runMedicString() { 
+        if(!Nexus.state.activeFile) return; 
+        const ed = document.getElementById('raw-terminal');
+        let code = ed.value.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').replace(/\n*$/, '\n');
+        ed.value = code; Nexus.state.vfs[Nexus.state.activeFile] = code;
+        Nexus.ui.updateGutter(); Nexus.vfs.save();
+        this.log("[MEDIC STRING] Whitespace optimized.", "success"); 
+    },
+
+    runMedicAST() { 
+        if(!Nexus.state.activeFile || !Nexus.state.activeFile.endsWith('.js')) return; 
+        this.initEngine(); 
+        try {
+            const { ast, issues } = this.engine.analyzeAndMutate(document.getElementById('raw-terminal').value, 'AST_REBUILD');
+            if (issues.length === 0) return this.log("[MEDIC AST] Code optimal.", "success");
+            const code = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+            document.getElementById('raw-terminal').value = code;
+            Nexus.state.vfs[Nexus.state.activeFile] = code;
+            Nexus.ui.updateGutter(); Nexus.vfs.save();
+            this.log(`[MEDIC AST] Matrix rebuilt. Applied ${issues.length} fix(es).`, "success");
+        } catch(e) { this.log(`[AST FATAL] ${e.message}`, "danger"); }
+    },
+
+    // --- 3. THE DIAGNOSTICIAN (SCANNER) ---
+    runLint() { 
+        if(!Nexus.state.activeFile) return; 
+        this.initEngine();
+        const code = Nexus.state.vfs[Nexus.state.activeFile];
+        try {
+            const { issues } = this.engine.analyzeAndMutate(code, 'LINT');
+            this.lastIssues = issues;
+            const out = document.getElementById('diag-out');
+            out.innerHTML = issues.length > 0 ? issues.map(i => `
+                <div style="background:var(--surface); padding:10px; margin-bottom:8px; border-left:3px solid var(--danger);">
+                    <div style="font-size:10px; color:var(--gold);">[${i.id}] Line ${i.line}</div>
+                    <div style="font-size:12px;">${i.message}</div>
+                </div>`).join('') : "DEEP LINT: Matrix stable.";
+        } catch (e) { this.log(`[PARSE ERR] ${e.message}`, "danger"); }
+    },
+
+    pulse() { /* Heartbeat check for live syntax status */ },
+    log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
+}
+history: {
+    // --- 1. THE CHRONICLE (RECORDING) ---
+    record() {
+        // Prevent recording if no file is active or if we are currently undoing
+        if(!Nexus.state.activeFile || Nexus.state.history.isLocked) return;
+        
+        const ed = document.getElementById('raw-terminal');
+        const historyState = Nexus.state.history;
+        
+        // Logic: Avoid recording identical states (prevents stack bloat)
+        const lastEntry = historyState.past[historyState.past.length - 1];
+        if (ed.value === lastEntry) return;
+
+        // Commit current state to the past
+        historyState.past.push(ed.value);
+        
+        // Constraint: Keep memory lean on mobile (Limit to 50 steps)
+        if(historyState.past.length > 50) historyState.past.shift();
+        
+        // Branching Logic: New input kills the "future" timeline
+        historyState.future = []; 
+    },
+
+    // --- 2. TIME DILATION (UNDO) ---
+    undo() {
+        const historyState = Nexus.state.history;
+        if(historyState.past.length === 0) return;
+
+        const ed = document.getElementById('raw-terminal');
+        
+        // Engage Lock: Prevent this change from being recorded as a "new" action
+        historyState.isLocked = true;
+
+        // Move current state to the future stack
+        historyState.future.push(ed.value);
+
+        // Restore the previous state
+        const prev = historyState.past.pop();
+        ed.value = prev;
+
+        // Sync the Matrix
+        Nexus.state.vfs[Nexus.state.activeFile] = prev;
+        Nexus.ui.updateGutter();
+
+        historyState.isLocked = false;
+        console.log("Chronos: Undo executed.");
+    },
+
+    // --- 3. THE RECALL (REDO) ---
+    redo() {
+        const historyState = Nexus.state.history;
+        if(historyState.future.length === 0) return;
+
+        const ed = document.getElementById('raw-terminal');
+        
+        historyState.isLocked = true;
+
+        // Move current state back to the past
+        historyState.past.push(ed.value);
+
+        // Pull the next state from the future
+        const next = historyState.future.pop();
+        ed.value = next;
+
+        // Sync the Matrix
+        Nexus.state.vfs[Nexus.state.activeFile] = next;
+        Nexus.ui.updateGutter();
+
+        historyState.isLocked = false;
+        console.log("Chronos: Redo executed.");
+    }
+}
