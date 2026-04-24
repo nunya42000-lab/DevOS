@@ -1019,27 +1019,7 @@ window.Nexus = {
         view: null,
         modules: {},
      
-  async toggleEditor() {
-    const rawTerm = document.getElementById('raw-terminal');
-    const gutter = document.getElementById('gutter');
-    const cmContainer = document.getElementById('cm6-container');
-    
-    if (!Nexus.state.activeFile) return alert("VORTEX EMPTY: Load a file first.");
-    const currentCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
-
-    if (Nexus.editorCore.isCM6) {
-        // --- BACK TO VANILLA ---
-        if (Nexus.editorCore.view) Nexus.editorCore.view.destroy();
-        Nexus.editorCore.isCM6 = false;
-        
-        cmContainer.style.display = 'none';
-        cmContainer.innerHTML = ""; // Clear the instance
-        gutter.style.display = 'block';
-        rawTerm.style.display = 'block';
-        
-        rawTerm.value = currentCode;
- 
-    },
+  
     vfs: {
     // --- 1. LIFECYCLE & PERSISTENCE ---
     async boot() {
