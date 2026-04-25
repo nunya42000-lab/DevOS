@@ -599,33 +599,26 @@
         </div>
     </div>
 
-    <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 280px;">
+        <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 280px;">
         <div class="drag-handle" onmousedown="Nexus.ui.handleHandleTap(event, 'writer-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'writer-bar')">⋯</div>
         <div class="sleek-bar-content" style="flex-direction: column; align-items: stretch; padding:10px;">
             <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                <span style="font-size:10px; color:var(--gold); font-weight:bold;">AUTO-WRITER</span>
+                <span style="font-size:10px; color:var(--gold); font-weight:bold;">BOILERPLATE ARCHITECT</span>
                 <span id="writer-status" style="font-size:9px; opacity:0.5;">IDLE</span>
             </div>
             <div style="display:flex; gap:8px; margin-bottom:8px;">
-                <select id="write-mode" class="sleek-input" style="padding:6px; font-size:11px;">
-                    <option value="code">Syntax Elements</option>
-                    <option value="story">Prose / Story</option>
-                    <option value="custom">Custom Array</option>
+                <select id="write-mode" class="sleek-input" style="padding:10px; font-size:12px; width:100%;">
+                    <option value="fetch">🌐 Async Fetch API</option>
+                    <option value="component">🧩 Web Component</option>
+                    <option value="canvas">🎨 Canvas Render Loop</option>
+                    <option value="express">⚙️ Express.js Server</option>
+                    <option value="observer">👁️ Intersection Observer</option>
                 </select>
-                <label style="display:flex; align-items:center; font-size:11px; color:#abb2bf; gap:4px; cursor:pointer;">
-                    <input type="checkbox" id="write-html"> Wrap HTML
-                </label>
             </div>
-            <div style="display:flex; gap:5px;">
-                <input type="number" id="write-count" value="10" class="sleek-input" style="width:60px; padding:6px; text-align:center;">
-                <select id="write-unit" class="sleek-input" style="flex:1; padding:6px; font-size:11px;">
-                    <option value="words">Words/Items</option>
-                    <option value="paragraphs">Paragraphs</option>
-                </select>
-                <button class="sleek-btn" style="background:var(--gold); color:#000; font-weight:bold;" onclick="Nexus.writer.go()">▶ GO</button>
-            </div>
+            <button class="sleek-btn" style="background:var(--gold); color:#000; font-weight:bold; width:100%; padding:10px;" onclick="Nexus.writer.go()">⚡ INJECT STRUCTURE</button>
         </div>
     </div>
+
 
     <div id="kb-monolith" class="floating-widget kb-pos-bottom">
         <div class="drag-handle" onmousedown="Nexus.ui.handleHandleTap(event, 'kb-monolith')" ontouchstart="Nexus.ui.handleHandleTap(event, 'kb-monolith')"></div>
