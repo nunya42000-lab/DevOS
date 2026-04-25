@@ -1392,7 +1392,7 @@ window.Nexus = {
         Nexus.ui.closeModal('combine');
         alert(`Sovereign Merge Complete.`);
     
-}
+},
      mergeAllJS() {
         const jsFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.js'));
         if(jsFiles.length === 0) return alert("No JS files found in Vortex to merge.");
@@ -1488,7 +1488,7 @@ window.Nexus = {
             Nexus.state.vfs = {}; Nexus.state.originals = {};
             db.files.clear(); db.contents.clear();
             this.setEmptyState(); this.save();
- }},
+ }}
     },
 
 history: {
