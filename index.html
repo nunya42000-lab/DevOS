@@ -1870,12 +1870,14 @@ intel: {
                     if (!Nexus.editorCore.isLoaded) {
                         // FIX 1: Stripped version numbers. 
                         // ESM.sh will now resolve a perfectly matched, conflict-free dependency tree.
-                        const [cm6, cmState, cmView, cmJS, cmTheme] = await Promise.all([
+                                                // Added the cmLang import at the bottom
+                        const [cm6, cmState, cmView, cmJS, cmTheme, cmLang] = await Promise.all([
                             import("https://esm.sh/codemirror"),
                             import("https://esm.sh/@codemirror/state"),
                             import("https://esm.sh/@codemirror/view"),
                             import("https://esm.sh/@codemirror/lang-javascript"),
-                            import("https://esm.sh/@codemirror/theme-one-dark")
+                            import("https://esm.sh/@codemirror/theme-one-dark"),
+                            import("https://esm.sh/@codemirror/language") 
                         ]);
                         
                         Nexus.editorCore.modules = {
@@ -1883,8 +1885,11 @@ intel: {
                             EditorView: cmView.EditorView,
                             EditorState: cmState.EditorState,
                             javascript: cmJS.javascript,
-                            oneDark: cmTheme.oneDark
+                            oneDark: cmTheme.oneDark,
+                            foldAll: cmLang.foldAll,       // Extracted fold command
+                            unfoldAll: cmLang.unfoldAll    // Extracted unfold command
                         };
+
                         Nexus.editorCore.isLoaded = true;
                     }
 
@@ -3468,6 +3473,21 @@ ui: {
             } catch(e) {
                 alert("Beautify engine encountered an error: " + e.message);
             }
+        },
+        collapseAll() {
+            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+                return alert("Folding is only supported in the CM6 Engine.");
+            }
+            const { foldAll } = Nexus.editorCore.modules;
+            foldAll(Nexus.editorCore.view);
+        },
+
+        expandAll() {
+            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+                return alert("Folding is only supported in the CM6 Engine.");
+            }
+            const { unfoldAll } = Nexus.editorCore.modules;
+            unfoldAll(Nexus.editorCore.view);
         },
 
         renderTabs() {
