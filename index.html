@@ -916,7 +916,7 @@
                 <div class="item-row" style="flex-direction:column; align-items:flex-start;">
                     <span style="margin-bottom:10px;">Utility Tools (Comma separated)</span>
                     <input type="text" id="pref-util-layout" onchange="Nexus.settings.update('utilLayout', this.value)" style="width:100%; background:var(--bg); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-size:11px;">
-                    <span style="font-size:9px; color:var(--gold); margin-top:5px;">Available: jump, up20, down20, color, undo, redo, tab</span>
+                    <span style="font-size:9px; color:var(--gold); margin-top:5px;">Available: jump, up20, down20, color, undo, redo, tab, fold, unfold</span>
                 </div>
 
                 <div class="item-row">
@@ -3426,7 +3426,9 @@ ui: {
                 'color': `<button class="sleek-btn" onclick="document.getElementById('color-picker-input').click()"><img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Color_circle_%28hue_sat%29.png" style="width:20px; border-radius:50%;"><span class="util-lbl">Picker</span></button>`,       
                 'undo': `<button class="sleek-btn" onclick="Nexus.history.undo()"><span style="font-size:18px;">↶</span><span class="util-lbl">Undo</span></button>`,
                 'redo': `<button class="sleek-btn" onclick="Nexus.history.redo()"><span style="font-size:18px;">↷</span><span class="util-lbl">Redo</span></button>`,
-                'tab': `<button class="sleek-btn" onclick="Nexus.ui.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`
+                'tab': `<button class="sleek-btn" onclick="Nexus.ui.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
+               'fold': `<button class="sleek-btn" onclick="Nexus.ui.collapseAll()"><span style="font-size:18px;">≥≤</span><span class="util-lbl">Fold</span></button>`,
+                'unfold': `<button class="sleek-btn" onclick="Nexus.ui.expandAll()"><span style="font-size:18px;">≤≥</span><span class="util-lbl">Unfold</span></button>`
             };
             
             const container = document.querySelector('#utility-bar .sleek-bar-content');
