@@ -508,8 +508,7 @@
             <button class="tool-btn btn-gold" onclick="Nexus.intel.scan()">🧠 NEURAL INTEL</button>
             <button class="tool-btn btn-gold" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('graph')">🌌 SYSTEM GRAPH</button>
-            
+            <button onclick="Nexus.graph.render(); Nexus.ui.openModal('graph');">GRAPH</button>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleSlide('shell')">⌨ SHELL</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️ SUN MODE</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️ SETTINGS</button>
@@ -888,10 +887,11 @@
     </div>
 
     <div id="modal-graph" class="modal-overlay">
-        <div class="modal-content" style="background:#000;">
-            <div class="p-head"><span>🌌 CELESTIAL NAVIGATOR</span><button class="close-x" onclick="Nexus.ui.closeModal('graph')">&times;</button></div>
-            <div id="graph-viewport" style="flex:1;"></div>
-            <div style="padding:10px; font-size:10px; color:var(--gold); text-align:center; background:var(--panel); border-top:1px solid var(--border);">TAP NODES TO WARP</div>
+        <div id="modal-graph" class="modal-overlay" style="display:none;" onclick="if(event.target===this) Nexus.ui.closeModal('graph')">
+        <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto; background: var(--bg);">
+            <h2 style="margin-top:0; color:var(--gold);">Project Radar</h2>
+            <div id="graph-results" style="background:var(--surface); padding:15px; border-radius:8px;"></div>
+            <button class="sleek-btn" style="width:100%; margin-top:15px;" onclick="Nexus.ui.closeModal('graph')">Close Scanner</button>
         </div>
     </div>
 
@@ -2836,38 +2836,117 @@ outline: {
 },
 
     
-graph: {
-        render() {
-            const c = document.getElementById('graph-viewport'); 
-            if (!c) return; 
+    graph: {
+        analyze() {
             const files = Object.keys(Nexus.state.vfs);
-            const w = c.clientWidth || 300, h = c.clientHeight || 400;
-            const cx = w / 2, cy = h / 2;
-            const r = Math.min(w, h) * 0.35;
+            const deps = {};
+            const incoming = {};
+            
+            // Initialize graph nodes
+            files.forEach(f => { deps[f] = []; incoming[f] = 0; });
 
-            let svg = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="background:#000;">
-                <circle cx="${cx}" cy="${cy}" r="15" fill="none" stroke="var(--gold)" stroke-width="2">
-                    <animate attributeName="r" values="12;16;12" dur="3s" repeatCount="indefinite" />
-                </circle>`;
+            files.forEach(file => {
+                const code = Nexus.state.vfs[file] || "";
+                const ext = file.split('.').pop().toLowerCase();
+                let matches = [];
 
-            files.forEach((fn, i) => { 
-                const a = (i / files.length) * Math.PI * 2;
-                const x = cx + r * Math.cos(a);
-                const y = cy + r * Math.sin(a);
-                const active = (fn === Nexus.state.activeFile);
+                if (ext === 'html') {
+                    // Extract <script src="..."> and <link href="...">
+                    const scriptRegex = /<script[^>]+src=["']([^"']+)["']/gi;
+                    const linkRegex = /<link[^>]+href=["']([^"']+)["']/gi;
+                    let m;
+                    while((m = scriptRegex.exec(code))) matches.push(m[1]);
+                    while((m = linkRegex.exec(code))) matches.push(m[1]);
+                } else if (ext === 'js') {
+                    // Extract ES6: import {x} from './file.js' OR import './file.js'
+                    const importRegex = /import\s+(?:.*from\s+)?["']([^"']+)["']/gi;
+                    let m;
+                    while((m = importRegex.exec(code))) matches.push(m[1]);
+                } else if (ext === 'css') {
+                    // Extract CSS: @import url("file.css")
+                    const importRegex = /@import\s+(?:url\()?["']?([^"'\)]+)["']?\)?/gi;
+                    let m;
+                    while((m = importRegex.exec(code))) matches.push(m[1]);
+                }
 
-                svg += `
-                    <line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${active ? 'var(--accent)' : 'var(--border)'}" opacity="0.4" />
-                    <g onclick="Nexus.vfs.switchFile('${fn}'); Nexus.ui.closeModal('graph');" style="cursor:pointer;">
-                        <circle cx="${x}" cy="${y}" r="8" fill="${active ? 'var(--accent)' : 'var(--panel)'}" />
-                        <text x="${x}" y="${y+20}" fill="#fff" font-size="9" text-anchor="middle">${fn}</text>
-                    </g>`; 
+                // Map relationships
+                matches.forEach(dep => {
+                    // Clean relative pathing
+                    let cleanDep = dep.replace(/^\.\//, '').replace(/^\//, '');
+                    if (files.includes(cleanDep)) {
+                        if (!deps[file].includes(cleanDep)) {
+                            deps[file].push(cleanDep);
+                            incoming[cleanDep]++;
+                        }
+                    }
+                });
             });
 
-            c.innerHTML = svg + `</svg>`;
+            return { deps, incoming, files };
+        },
+
+        render() {
+            const { deps, incoming, files } = this.analyze();
+            
+            // Anchor the tree to main entry points
+            let mainRoots = files.filter(f => incoming[f] === 0 && (f === 'index.html' || f === 'manifest.json'));
+            if (mainRoots.length === 0 && files.includes('index.html')) mainRoots = ['index.html'];
+
+            // Orphans are files with 0 incoming connections that ARE NOT root entry points
+            const orphans = files.filter(f => incoming[f] === 0 && !mainRoots.includes(f));
+
+            const container = document.getElementById('graph-results');
+            if (!container) return;
+
+            let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.6;">`;
+            
+            // --- SECTION 1: THE ACTIVE TREE ---
+            html += `<h3 style="color:var(--success); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:0;">🌳 Active Matrix (Linked)</h3>`;
+            
+            const buildTree = (node, prefix, isLast, visited) => {
+                if (visited.has(node)) {
+                    return `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--danger)">🔄 ${node} (Circular Loop)</span></div>`;
+                }
+                visited.add(node);
+                
+                let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${node}'); Nexus.ui.closeModal('graph');">${node}</span></div>`;
+                
+                const children = deps[node] || [];
+                for (let i = 0; i < children.length; i++) {
+                    const childIsLast = i === children.length - 1;
+                    const newPrefix = prefix + (isLast ? '    ' : '│   ');
+                    line += buildTree(children[i], newPrefix, childIsLast, new Set(visited));
+                }
+                return line;
+            };
+
+            if (mainRoots.length > 0) {
+                mainRoots.forEach(r => {
+                    html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.vfs.switchFile('${r}'); Nexus.ui.closeModal('graph');">${r}</span></div>`;
+                    const children = deps[r] || [];
+                    for (let i = 0; i < children.length; i++) {
+                        html += buildTree(children[i], '', i === children.length - 1, new Set([r]));
+                    }
+                });
+            } else {
+                html += `<div style="color:var(--danger); opacity:0.8;">No entry points detected. Create an index.html file.</div>`;
+            }
+
+            // --- SECTION 2: THE ORPHANS ---
+            html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors (Unlinked)</h3>`;
+            
+            if (orphans.length > 0) {
+                orphans.forEach(o => {
+                    html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onmouseover="this.style.opacity='1'; this.style.color='var(--danger)'" onmouseout="this.style.opacity='0.6'; this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
+                });
+            } else {
+                html += `<div style="color:var(--success); opacity:0.8;">System clean. 100% of files are linked.</div>`;
+            }
+
+            html += `</div>`;
+            container.innerHTML = html;
         }
     },
-
             settings: {
         async boot() { 
             const saved = await localforage.getItem('nexus_prefs_v42'); 
