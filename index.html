@@ -1828,82 +1828,92 @@ intel: {
         }
     },
     
-        async toggleEditor() {
-    const rawTerm = document.getElementById('raw-terminal');
-    const gutter = document.getElementById('gutter');
-    const cmContainer = document.getElementById('cm6-container');
-    
-    if (!Nexus.state.activeFile) return alert("VORTEX EMPTY: Load a file first.");
-    const currentCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
+              async toggleEditor() {
+            const rawTerm = document.getElementById('raw-terminal');
+            const gutter = document.getElementById('gutter');
+            const cmContainer = document.getElementById('cm6-container');
+            
+            if (!Nexus.state.activeFile) return alert("VORTEX EMPTY: Load a file first.");
+            const currentCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
 
-    if (Nexus.editorCore.isCM6) {
-        // --- BACK TO VANILLA ---
-        if (Nexus.editorCore.view) Nexus.editorCore.view.destroy();
-        Nexus.editorCore.isCM6 = false;
-        
-        cmContainer.style.display = 'none';
-        cmContainer.innerHTML = ""; // Clear the instance
-        gutter.style.display = 'block';
-        rawTerm.style.display = 'block';
-        
-        rawTerm.value = currentCode;
-        Nexus.ui.updateGutter();
-        document.getElementById('foot-status').innerText = "ENGINE: VANILLA";
-    } else {
-        // --- SWITCH TO CM6 ---
-        document.getElementById('foot-status').innerText = "ENGINE: CM6 LOADING...";
-        
-        if (!Nexus.editorCore.isLoaded) {
-            try {
-                const [cm6, cmState, cmJS, cmTheme] = await Promise.all([
-                    import("https://esm.sh/codemirror@6.0.1?bundle"),
-                    import("https://esm.sh/@codemirror/state@6.4.0?bundle"),
-                    import("https://esm.sh/@codemirror/lang-javascript@6.2.1?bundle"),
-                    import("https://esm.sh/@codemirror/theme-one-dark@6.1.2?bundle")
-                ]);
+            if (Nexus.editorCore.isCM6) {
+                // --- BACK TO VANILLA ---
+                if (Nexus.editorCore.view) {
+                    Nexus.editorCore.view.destroy();
+                    Nexus.editorCore.view = null;
+                }
+                Nexus.editorCore.isCM6 = false;
+                Nexus.state.isCM6 = false; // Sync global state
                 
-                Nexus.editorCore.modules = {
-                    basicSetup: cm6.basicSetup,
-                    EditorView: cm6.EditorView,
-                    EditorState: cmState.EditorState,
-                    javascript: cmJS.javascript,
-                    oneDark: cmTheme.oneDark
-                };
-                Nexus.editorCore.isLoaded = true;
-            } catch (e) {
-                alert("Dynamic Import Failed. Check connection or browser version.");
-                return;
+                cmContainer.style.display = 'none';
+                cmContainer.innerHTML = ""; 
+                gutter.style.display = 'block';
+                rawTerm.style.display = 'block';
+                
+                rawTerm.value = currentCode;
+                Nexus.ui.updateGutter();
+                document.getElementById('foot-status').innerText = "ENGINE: VANILLA";
+            } else {
+                // --- SWITCH TO CM6 ---
+                document.getElementById('foot-status').innerText = "ENGINE: CM6 LOADING...";
+                
+                if (!Nexus.editorCore.isLoaded) {
+                    try {
+                        // FIX 1 & 2: Removed ?bundle to prevent duplicate state crashes
+                        // and added the missing @codemirror/view package
+                        const [cm6, cmState, cmView, cmJS, cmTheme] = await Promise.all([
+                            import("https://esm.sh/codemirror@6.0.1"),
+                            import("https://esm.sh/@codemirror/state@6.4.0"),
+                            import("https://esm.sh/@codemirror/view@6.22.0"),
+                            import("https://esm.sh/@codemirror/lang-javascript@6.2.1"),
+                            import("https://esm.sh/@codemirror/theme-one-dark@6.1.2")
+                        ]);
+                        
+                        Nexus.editorCore.modules = {
+                            basicSetup: cm6.basicSetup,
+                            EditorView: cmView.EditorView, // FIX: Pulling from correct package
+                            EditorState: cmState.EditorState,
+                            javascript: cmJS.javascript,
+                            oneDark: cmTheme.oneDark
+                        };
+                        Nexus.editorCore.isLoaded = true;
+                    } catch (e) {
+                        document.getElementById('foot-status').innerText = "ENGINE: VANILLA (FAIL)";
+                        alert("Engine Swap Failed. Network or CORS blocked the modules.\n\n" + e.message);
+                        return;
+                    }
+                }
+
+                const { EditorState, EditorView, basicSetup, javascript, oneDark } = Nexus.editorCore.modules;
+                
+                rawTerm.style.display = 'none';
+                gutter.style.display = 'none';
+                cmContainer.style.display = 'block';
+
+                Nexus.editorCore.view = new EditorView({
+                    state: EditorState.create({
+                        doc: currentCode,
+                        extensions: [
+                            basicSetup, 
+                            javascript(), 
+                            oneDark,
+                            EditorView.updateListener.of((update) => {
+                                if (update.docChanged) {
+                                    Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
+                                    Nexus.vfs.save();
+                                }
+                            })
+                        ]
+                    }),
+                    parent: cmContainer
+                });
+
+                Nexus.editorCore.isCM6 = true;
+                Nexus.state.isCM6 = true; // FIX 3: Sync global state
+                document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
             }
-        }
-
-        const { EditorState, EditorView, basicSetup, javascript, oneDark } = Nexus.editorCore.modules;
-        
-        rawTerm.style.display = 'none';
-        gutter.style.display = 'none';
-        cmContainer.style.display = 'block';
-
-        Nexus.editorCore.view = new EditorView({
-            state: EditorState.create({
-                doc: currentCode,
-                extensions: [
-                    basicSetup, javascript(), oneDark,
-                    EditorView.updateListener.of((update) => {
-                        if (update.docChanged) {
-                            Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
-                            Nexus.vfs.save();
-                        }
-                    })
-                ]
-            }),
-            parent: cmContainer
-        });
-
-        Nexus.editorCore.isCM6 = true;
-        document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
-    }
-},
-
-
+        },
+  
     applyFix: function(issueIndex) {
         const ed = document.getElementById('raw-terminal');
         if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply fix.");
