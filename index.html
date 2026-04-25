@@ -17,7 +17,8 @@
  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
+ 
 <style>
     :root {
         --bg: #0d1117; 
@@ -1631,20 +1632,27 @@ sentinel: {
                     }
                     return { issues, ast };
                 }
-
                 traverse(node, callback, parent = null) {
-                    if (!node) return; 
+                    // --- THE FIX: The Primitive Shield ---
+                    // Abort immediately if the node is a primitive (like the number 69037)
+                    if (!node || typeof node !== 'object') return; 
+                    
                     node.parent = parent; 
                     callback(node, parent);
+                    
                     Object.keys(node).forEach(key => {
                         if (key === 'parent') return;
                         const child = node[key];
                         if (child && typeof child === 'object') { 
-                            if (Array.isArray(child)) child.forEach(c => this.traverse(c, callback, node)); 
-                            else if (child.type) this.traverse(child, callback, node); 
+                            if (Array.isArray(child)) {
+                                child.forEach(c => this.traverse(c, callback, node)); 
+                            } else if (child.type) {
+                                this.traverse(child, callback, node); 
+                            }
                         }
                     });
                 }
+
 
                 findInNode(node, type, filter = () => true) {
                     let found = false;
