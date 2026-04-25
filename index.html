@@ -1828,7 +1828,7 @@ intel: {
         }
     },
     
-              async toggleEditor() {
+                    async toggleEditor() {
             const rawTerm = document.getElementById('raw-terminal');
             const gutter = document.getElementById('gutter');
             const cmContainer = document.getElementById('cm6-container');
@@ -1857,62 +1857,81 @@ intel: {
                 // --- SWITCH TO CM6 ---
                 document.getElementById('foot-status').innerText = "ENGINE: CM6 LOADING...";
                 
-                if (!Nexus.editorCore.isLoaded) {
-                    try {
-                        // FIX 1 & 2: Removed ?bundle to prevent duplicate state crashes
-                        // and added the missing @codemirror/view package
+                try {
+                    if (!Nexus.editorCore.isLoaded) {
+                        // FIX 1: Stripped version numbers. 
+                        // ESM.sh will now resolve a perfectly matched, conflict-free dependency tree.
                         const [cm6, cmState, cmView, cmJS, cmTheme] = await Promise.all([
-                            import("https://esm.sh/codemirror@6.0.1"),
-                            import("https://esm.sh/@codemirror/state@6.4.0"),
-                            import("https://esm.sh/@codemirror/view@6.22.0"),
-                            import("https://esm.sh/@codemirror/lang-javascript@6.2.1"),
-                            import("https://esm.sh/@codemirror/theme-one-dark@6.1.2")
+                            import("https://esm.sh/codemirror"),
+                            import("https://esm.sh/@codemirror/state"),
+                            import("https://esm.sh/@codemirror/view"),
+                            import("https://esm.sh/@codemirror/lang-javascript"),
+                            import("https://esm.sh/@codemirror/theme-one-dark")
                         ]);
                         
                         Nexus.editorCore.modules = {
                             basicSetup: cm6.basicSetup,
-                            EditorView: cmView.EditorView, // FIX: Pulling from correct package
+                            EditorView: cmView.EditorView,
                             EditorState: cmState.EditorState,
                             javascript: cmJS.javascript,
                             oneDark: cmTheme.oneDark
                         };
                         Nexus.editorCore.isLoaded = true;
-                    } catch (e) {
-                        document.getElementById('foot-status').innerText = "ENGINE: VANILLA (FAIL)";
-                        alert("Engine Swap Failed. Network or CORS blocked the modules.\n\n" + e.message);
-                        return;
                     }
+
+                    const { EditorState, EditorView, basicSetup, javascript, oneDark } = Nexus.editorCore.modules;
+                    
+                    rawTerm.style.display = 'none';
+                    gutter.style.display = 'none';
+                    
+                    // FIX 2: Change container to flex to respect parent dimensions
+                    cmContainer.style.display = 'flex';
+                    cmContainer.style.flexDirection = 'column';
+
+                    // FIX 3: Inject an explicit CSS Theme to prevent height collapse
+                    const fixedHeight = EditorView.theme({
+                        "&": { height: "100%", width: "100%", flex: 1 },
+                        ".cm-scroller": { overflow: "auto" }
+                    });
+
+                    Nexus.editorCore.view = new EditorView({
+                        state: EditorState.create({
+                            doc: currentCode,
+                            extensions: [
+                                basicSetup, 
+                                javascript(), 
+                                oneDark,
+                                fixedHeight, // Apply the height fix
+                                EditorView.updateListener.of((update) => {
+                                    if (update.docChanged) {
+                                        Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
+                                        Nexus.vfs.save();
+                                    }
+                                })
+                            ]
+                        }),
+                        parent: cmContainer
+                    });
+
+                    Nexus.editorCore.isCM6 = true;
+                    Nexus.state.isCM6 = true;
+                    document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
+                    
+                } catch (e) {
+                    // FIX 4: The try/catch now covers instantiation. 
+                    // If it crashes, it will tell you EXACTLY why instead of blanking out.
+                    document.getElementById('foot-status').innerText = "ENGINE: VANILLA (FAIL)";
+                    console.error("CM6 Ignition Fault:", e);
+                    alert("Engine Swap Crashed.\n\n" + e.message);
+                    
+                    // Failsafe revert to Vanilla UI
+                    cmContainer.style.display = 'none';
+                    gutter.style.display = 'block';
+                    rawTerm.style.display = 'block';
                 }
-
-                const { EditorState, EditorView, basicSetup, javascript, oneDark } = Nexus.editorCore.modules;
-                
-                rawTerm.style.display = 'none';
-                gutter.style.display = 'none';
-                cmContainer.style.display = 'block';
-
-                Nexus.editorCore.view = new EditorView({
-                    state: EditorState.create({
-                        doc: currentCode,
-                        extensions: [
-                            basicSetup, 
-                            javascript(), 
-                            oneDark,
-                            EditorView.updateListener.of((update) => {
-                                if (update.docChanged) {
-                                    Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
-                                    Nexus.vfs.save();
-                                }
-                            })
-                        ]
-                    }),
-                    parent: cmContainer
-                });
-
-                Nexus.editorCore.isCM6 = true;
-                Nexus.state.isCM6 = true; // FIX 3: Sync global state
-                document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
             }
         },
+  
   
     applyFix: function(issueIndex) {
         const ed = document.getElementById('raw-terminal');
