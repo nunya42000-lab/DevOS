@@ -2284,6 +2284,56 @@ Nexus.editorCore.currentExtensions = [
             Nexus.sentinel.log(`[FIX FAILED] AST reconstruction error: ${e.message}`, "danger");
         }
     },
+    applyAllFixes() {
+        const ed = document.getElementById('raw-terminal');
+        if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply bulk fixes.");
+        if (!this.lastIssues || this.lastIssues.length === 0) return;
+
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let codeToTest = ed.value;
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) codeToTest = Nexus.editorCore.view.state.doc.toString();
+
+        let preScript = "", postScript = "", isHtml = false;
+        if (ext === 'html') {
+            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+            if (match) {
+                isHtml = true;
+                const scriptStart = codeToTest.indexOf(match[1]);
+                preScript = codeToTest.substring(0, scriptStart);
+                postScript = codeToTest.substring(scriptStart + match[1].length);
+                codeToTest = match[1];
+            } else return;
+        }
+
+        try {
+            const { ast } = this.engine.analyzeAndMutate(codeToTest, 'LINT');
+            
+            // Apply all mutations in a single AST traversal pass
+            this.engine.traverse(ast, (node) => {
+                this.lastIssues.forEach(issue => {
+                    if (issue.mutate && node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
+                        issue.mutate(node);
+                    }
+                });
+            });
+
+            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+            if (isHtml) fixedCode = preScript + fixedCode + postScript;
+
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode } });
+            } else ed.value = fixedCode;
+            
+            Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
+            Nexus.ui.updateGutter();
+            Nexus.vfs.save();
+            
+            this.log(`[AUTO-MEDIC] System purged. Successfully applied ${this.lastIssues.filter(i => i.mutate).length} bulk mutations.`, "success");
+            this.lastIssues = []; // Clear queue
+        } catch (e) {
+            this.log(`[FIX FAILED] Bulk AST reconstruction error: ${e.message}`, "danger");
+        }
+    },
 
 
     // --- ADVANCED ENGINES ADAPTED FOR THE MATRIX ---
@@ -2928,8 +2978,7 @@ grab() {
         }
     },
   
-                      
-outline: {
+           outline: {
     scan() {
         if (!Nexus.state.activeFile) return alert("No active file.");
         const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
@@ -2995,49 +3044,16 @@ outline: {
         Nexus.ui.openModal('outline');
     },
 
-            jumpPrompt(directLine) {
-            if(!Nexus.state.activeFile) return;
+    jump(ln) {
+        Nexus.ui.closeModal('outline');
+        Nexus.ui.jumpPrompt(ln); 
+    }
+},
+                         
+
+
             
-            // If the Outline passes a line number, use it. Otherwise, open the prompt.
-            const ln = directLine || prompt("Jump to Line:");
-            
-            if (ln) {
-                const line = parseInt(ln);
-                
-                // --- CM6 ROUTING ---
-                if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                    const view = Nexus.editorCore.view;
-                    const doc = view.state.doc;
-                    // Clamp line request to actual document length
-                    const targetLine = Math.max(1, Math.min(line, doc.lines));
-                    const pos = doc.line(targetLine).from;
-                    
-                    view.dispatch({
-                        selection: { anchor: pos },
-                        scrollIntoView: true
-                    });
-                    view.focus();
-                    return;
-                }
-
-                // --- VANILLA ROUTING ---
-                const ed = document.getElementById('raw-terminal');
-                const lines = ed.value.split('\n');
-                let pos = 0;
-                for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
-                
-                ed.focus(); 
-                ed.setSelectionRange(pos, pos);
-                
-                setTimeout(() => {
-                    const lh = 22; // Match your CSS line-height
-                    const targetScroll = 15 + ((line - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
-                    ed.scrollTop = Math.max(0, targetScroll);
-                }, 50);
-            }
-        },
-
-
+        
     
     graph: {
             analyze() {
@@ -3807,9 +3823,14 @@ ui: {
         },
 
         
-        jumpPrompt() {
+      
+
+        jumpPrompt(directLine) {
             if(!Nexus.state.activeFile) return;
-            const ln = prompt("Jump to Line:");
+            
+            // If the Outline passes a line number, use it. Otherwise, open the prompt.
+            const ln = directLine || prompt("Jump to Line:");
+            
             if (ln) {
                 const line = parseInt(ln);
                 
@@ -3894,6 +3915,7 @@ ui: {
                 ed.scrollTop = Math.max(0, targetScroll);
             }, 50);
         },
+
 
 
         renderUtilBar() {
