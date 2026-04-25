@@ -2693,14 +2693,19 @@ graph: {
                     {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
                 ];
             }
-
             // --- 2. HTML DEFAULTS ---
             if(!Nexus.state.prefs.kbLayouts.html || Nexus.state.prefs.kbLayouts.html.length === 0) {
                 Nexus.state.prefs.kbLayouts.html = [
-                    {d: '<>', i: '<*#>'}, {d: '</>', i: '</*#>'}, {d: 'div', i: '<div>*#</div>'}, {d: 'span', i: '<span>*#</span>'}, 
-                    {d: 'p', i: '<p>*#</p>'}, {d: 'a', i: '<a href="*#"></a>'}, {d: 'img', i: '<img src="*#" alt="">'},
+                    {d: '<>', i: '<*#>'}, {d: '</>', i: '<\\/*#>'}, 
+                    {d: 'div', i: '<div>*#<\\/div>'}, {d: 'span', i: '<span>*#<\\/span>'}, 
+                    {d: 'p', i: '<p>*#<\\/p>'}, {d: 'a', i: '<a href="*#"><\\/a>'}, 
+                    {d: 'img', i: '<img src="*#" alt="">'},
                     {d: 'class=""', i: 'class="*#"'}, {d: 'id=""', i: 'id="*#"'}, {d: 'style=""', i: 'style="*#"'}, 
-                    {d: 'script', i: '<script>\n\t*#\n</script>'}, {d: 'style', i: '<style>\n\t*#\n</style>'},
+                    
+                    // Escaped the script and style tags to prevent the parser from terminating the file!
+                    {d: 'script', i: '<script>\n\t*#\n<\\/script>'}, 
+                    {d: 'style', i: '<style>\n\t*#\n<\\/style>'},
+                    
                     {d: '!--', i: ''}, {d: '=', i: '='}, {d: '/', i: '/'},
                     {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
                 ];
