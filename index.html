@@ -2005,8 +2005,121 @@ log(msg, type = "info") {
 
             document.getElementById('diag-out').innerHTML = htmlOut;
         },
+applyFix: function(issueIndex) {
+        const ed = document.getElementById('raw-terminal');
+        if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply fix.");
+        const issue = this.lastIssues[issueIndex];
+        if (!issue || !issue.mutate) return;
+ const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let codeToTest = Nexus.state.vfs[Nexus.state.activeFile];
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            codeToTest = Nexus.editorCore.view.state.doc.toString();
+        }
 
-                pulse() {
+        let preScript = "", postScript = "", isHtml = false;
+
+        // If it's HTML, we MUST isolate the script tag before parsing
+        if (ext === 'html') {
+            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+            if (match) {
+                isHtml = true;
+                const scriptStart = codeToTest.indexOf(match[1]);
+                preScript = codeToTest.substring(0, scriptStart);
+                postScript = codeToTest.substring(scriptStart + match[1].length);
+                codeToTest = match[1];
+            } else {
+                return alert("No valid script tags found to fix.");
+            }
+        }
+
+        try {
+            const { ast } = Nexus.sentinel.engine.analyzeAndMutate(codeToTest, 'LINT');
+            
+            // Replaced the missing 'acorn.walk' dependency with your internal Sentinel traverser
+            Nexus.sentinel.engine.traverse(ast, (node) => {
+                if (node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
+                    issue.mutate(node); 
+                }
+            });
+
+            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+            
+            // Re-wrap the HTML shell if necessary
+            if (isHtml) {
+                fixedCode = preScript + fixedCode + postScript;
+            }
+
+            // Sync the updated code to whichever engine is currently active
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                Nexus.editorCore.view.dispatch({
+                    changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode }
+                });
+            } else {
+                ed.value = fixedCode;
+            }
+            
+            Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
+            Nexus.ui.updateGutter();
+            Nexus.vfs.save();
+            
+            Nexus.sentinel.log(`[AUTO-FIX] Applied resolution for ${issue.id}.`, "success");
+        } catch (e) {
+            Nexus.sentinel.log(`[FIX FAILED] AST reconstruction error: ${e.message}`, "danger");
+        }
+    },
+    applyAllFixes() {
+        const ed = document.getElementById('raw-terminal');
+        if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply bulk fixes.");
+        if (!this.lastIssues.length) return;
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let codeToTest = ed.value;
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) codeToTest = Nexus.editorCore.view.state.doc.toString();
+
+        let preScript = "", postScript = "", isHtml = false;
+        if (ext === 'html') {
+            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+            if (match) {
+                isHtml = true;
+                const scriptStart = codeToTest.indexOf(match[1]);
+                preScript = codeToTest.substring(0, scriptStart);
+                postScript = codeToTest.substring(scriptStart + match[1].length);
+                codeToTest = match[1];
+            } else return;
+        }
+
+        try {
+            const { ast } = this.engine.analyzeAndMutate(codeToTest, 'LINT');
+            
+            // Apply all mutations in a single AST traversal pass
+            this.engine.traverse(ast, (node) => {
+                this.lastIssues.forEach(issue => {
+                    if (issue.mutate && node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
+                        issue.mutate(node);
+                    }
+                });
+            });
+
+            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+            if (isHtml) fixedCode = preScript + fixedCode + postScript;
+
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode } });
+            } else ed.value = fixedCode;
+            
+            Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
+            Nexus.ui.updateGutter();
+            Nexus.vfs.save();
+            
+            this.log(`[AUTO-MEDIC] System purged. Successfully applied ${this.lastIssues.filter(i => i.mutate).length} bulk mutations.`, "success");
+            this.lastIssues = []; // Clear queue
+        } catch (e) {
+            this.log(`Purge complete: ${this.lastIssues.length} mutations applied.`, "success");
+        this.lastIssues = [];
+        }
+    },
+
+    
+ pulse() {
             if(!Nexus.state.activeFile) return;
             const st = document.getElementById('foot-status');
             const code = document.getElementById('raw-terminal').value;
@@ -2301,121 +2414,8 @@ Nexus.editorCore.currentExtensions = [
         },
   
   
-        applyFix: function(issueIndex) {
-        const ed = document.getElementById('raw-terminal');
-        if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply fix.");
-        const issue = Nexus.sentinel.lastIssues ? Nexus.sentinel.lastIssues[issueIndex] : null;
-        if (!issue || !issue.mutate) return;
-
-        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-        let codeToTest = ed.value;
-        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-            codeToTest = Nexus.editorCore.view.state.doc.toString();
-        }
-
-        let preScript = "", postScript = "", isHtml = false;
-
-        // If it's HTML, we MUST isolate the script tag before parsing
-        if (ext === 'html') {
-            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-            if (match) {
-                isHtml = true;
-                const scriptStart = codeToTest.indexOf(match[1]);
-                preScript = codeToTest.substring(0, scriptStart);
-                postScript = codeToTest.substring(scriptStart + match[1].length);
-                codeToTest = match[1];
-            } else {
-                return alert("No valid script tags found to fix.");
-            }
-        }
-
-        try {
-            const { ast } = Nexus.sentinel.engine.analyzeAndMutate(codeToTest, 'LINT');
-            
-            // Replaced the missing 'acorn.walk' dependency with your internal Sentinel traverser
-            Nexus.sentinel.engine.traverse(ast, (node) => {
-                if (node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
-                    issue.mutate(node); 
-                }
-            });
-
-            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
-            
-            // Re-wrap the HTML shell if necessary
-            if (isHtml) {
-                fixedCode = preScript + fixedCode + postScript;
-            }
-
-            // Sync the updated code to whichever engine is currently active
-            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                Nexus.editorCore.view.dispatch({
-                    changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode }
-                });
-            } else {
-                ed.value = fixedCode;
-            }
-            
-            Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
-            Nexus.ui.updateGutter();
-            Nexus.vfs.save();
-            
-            Nexus.sentinel.log(`[AUTO-FIX] Applied resolution for ${issue.id}.`, "success");
-        } catch (e) {
-            Nexus.sentinel.log(`[FIX FAILED] AST reconstruction error: ${e.message}`, "danger");
-        }
-    },
-    applyAllFixes() {
-        const ed = document.getElementById('raw-terminal');
-        if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply bulk fixes.");
-        if (!this.lastIssues || this.lastIssues.length === 0) return;
-
-        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-        let codeToTest = ed.value;
-        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) codeToTest = Nexus.editorCore.view.state.doc.toString();
-
-        let preScript = "", postScript = "", isHtml = false;
-        if (ext === 'html') {
-            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-            if (match) {
-                isHtml = true;
-                const scriptStart = codeToTest.indexOf(match[1]);
-                preScript = codeToTest.substring(0, scriptStart);
-                postScript = codeToTest.substring(scriptStart + match[1].length);
-                codeToTest = match[1];
-            } else return;
-        }
-
-        try {
-            const { ast } = this.engine.analyzeAndMutate(codeToTest, 'LINT');
-            
-            // Apply all mutations in a single AST traversal pass
-            this.engine.traverse(ast, (node) => {
-                this.lastIssues.forEach(issue => {
-                    if (issue.mutate && node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
-                        issue.mutate(node);
-                    }
-                });
-            });
-
-            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
-            if (isHtml) fixedCode = preScript + fixedCode + postScript;
-
-            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode } });
-            } else ed.value = fixedCode;
-            
-            Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
-            Nexus.ui.updateGutter();
-            Nexus.vfs.save();
-            
-            this.log(`[AUTO-MEDIC] System purged. Successfully applied ${this.lastIssues.filter(i => i.mutate).length} bulk mutations.`, "success");
-            this.lastIssues = []; // Clear queue
-        } catch (e) {
-            this.log(`[FIX FAILED] Bulk AST reconstruction error: ${e.message}`, "danger");
-        }
-    },
-
-
+        
+    
     // --- ADVANCED ENGINES ADAPTED FOR THE MATRIX ---
     context: {
         graph: new Map(),
