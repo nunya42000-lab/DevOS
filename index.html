@@ -1249,7 +1249,7 @@ window.Nexus = {
         Object.keys(Nexus.state.vfs).forEach(fn => { 
             const ext = fn.split('.').pop().toLowerCase(); 
             if (!groups[ext]) groups[ext] = []; 
-           ll groups[ext].push(fn); 
+            groups[ext].push(fn); 
         });
 
         root.innerHTML = Object.entries(groups).map(([ext, files]) => `
