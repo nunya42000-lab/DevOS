@@ -1922,26 +1922,22 @@ sentinel: {
             document.getElementById('diag-out').innerHTML = htmlOut;
         },
 
-        pulse() {
+                pulse() {
             if(!Nexus.state.activeFile) return;
-            const ed = document.getElementById('raw-terminal'); 
-            const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
-            const btns = document.querySelectorAll('button[onclick*="runMedic"]');
-            if (btns.length === 0) return;
-            let codeToTest = ed.value;
-            if (isHtml) {
-                const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-                if (match) codeToTest = match[1]; else return;
-            }
+            const st = document.getElementById('foot-status');
+            const code = document.getElementById('raw-terminal').value;
+            
             try { 
-                new Function(codeToTest); 
-                btns.forEach(b => { b.style.boxShadow = "none"; b.style.color = "var(--gold)"; }); 
+                // Light-speed syntax check
+                new Function(code); 
+                // If it passes, don't change the text, just ensure the color is normal
+                if (st.style.color === "var(--danger)") st.style.color = "var(--success)";
             } catch (e) { 
-                btns.forEach(b => { b.style.boxShadow = "0 0 15px var(--danger)"; b.style.color = "var(--danger)"; }); 
+                // If it's a syntax error, turn the status red to warn you immediately
+                st.style.color = "var(--danger)";
             }
         },
-        log(m, t) { document.getElementById('diag-out').innerHTML = `<div style="color:var(--${t})">${m}</div>`; }
-    },
+
      
 intel: {
     scan() {
@@ -2365,50 +2361,47 @@ Nexus.editorCore.currentExtensions = [
     },
 
     refactor: {
+        refactor: {
         async renameGlobal() {
-            const oldName = prompt("Enter target identifier to rename:");
+            const oldName = prompt("Rename identifier (Global AST pass):");
             if (!oldName) return;
             
-            // Rebuild the global context map to ensure it's fresh
-            Nexus.context.graph.clear(); 
-            Nexus.context.definitions.clear();
-            
-            for (const [filename, code] of Object.entries(Nexus.state.vfs)) {
-                Nexus.context.build(code, filename);
-            }
-
-            const definition = Nexus.context.definitions.get(oldName);
-            const usages = Nexus.context.graph.get(oldName) || [];
-            
-            if (!definition && usages.length === 0) {
-                return alert(`Identifier '${oldName}' not found in AST context.`);
-            }
-
-            const newName = prompt(`Found ${usages.length} usages. Rename '${oldName}' to:`);
+            const newName = prompt(`Change all instances of '${oldName}' to:`);
             if (!newName) return;
 
             let filesModified = 0;
-            const targetFiles = new Set([definition?.path, ...usages.map(u => u.path)].filter(Boolean));
+            const files = Object.keys(Nexus.state.vfs);
 
-            for (const filename of targetFiles) {
+            files.forEach(filename => {
                 let code = Nexus.state.vfs[filename];
+                if (!filename.endsWith('.js')) return;
+
                 try {
+                    // Use Sentinel's internal engine to parse and traverse
+                    Nexus.sentinel.initEngine();
                     const { ast } = Nexus.sentinel.engine.analyzeAndMutate(code, 'LINT');
-                    acorn.walk.simple(ast, {
-                        Identifier: (node) => {
-                            if (node.name === oldName) node.name = newName;
+                    let changed = false;
+
+                    Nexus.sentinel.engine.traverse(ast, (node) => {
+                        if (node.type === 'Identifier' && node.name === oldName) {
+                            node.name = newName;
+                            changed = true;
                         }
                     });
-                    Nexus.state.vfs[filename] = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
-                    filesModified++;
-                } catch(e) { console.warn(`Refactor failed on ${filename}`); }
-            }
+
+                    if (changed) {
+                        const newCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+                        Nexus.state.vfs[filename] = newCode;
+                        Nexus.state.originals[filename] = newCode;
+                        filesModified++;
+                    }
+                } catch(e) { console.warn(`Refactor skipped ${filename}: Syntax error.`); }
+            });
 
             if (filesModified > 0) {
-                document.getElementById('raw-terminal').value = Nexus.state.vfs[Nexus.state.activeFile];
-                Nexus.ui.updateGutter();
+                Nexus.vfs.switchFile(Nexus.state.activeFile);
                 Nexus.vfs.save();
-                Nexus.sentinel.log(`[REFACTOR] Successfully renamed '${oldName}' to '${newName}' across ${filesModified} file(s).`, "success");
+                alert(`SUCCESS: Refactored '${oldName}' -> '${newName}' across ${filesModified} sectors.`);
             }
         }
     },
@@ -4172,26 +4165,30 @@ ui: {
         st.innerText = isReadonly ? "LOCKED" : (ed.getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)");
         st.style.color = isReadonly ? "var(--danger)" : "var(--success)";
     },
-            updateGutter() { 
-        const ed = document.getElementById('raw-terminal');
-        const gutter = document.getElementById('gutter');
-        if (!ed || !gutter) return;
+                    updateGutter() { 
+            const ed = document.getElementById('raw-terminal');
+            const gutter = document.getElementById('gutter');
+            if (!ed || !gutter || Nexus.editorCore.isCM6) {
+                if(gutter) gutter.style.display = Nexus.editorCore.isCM6 ? 'none' : 'block';
+                return;
+            }
 
-        if (Nexus.editorCore.isCM6) {
-            gutter.style.display = 'none';
-            return;
-        } else {
-            gutter.style.display = 'block'; // Ensure it returns when switching back
-        }
+            const lines = ed.value.split('\n');
+            const lineCount = lines.length;
+            
+            // Only re-render if the number of lines actually changed
+            if (gutter.dataset.lastCount != lineCount) {
+                let gutterHTML = '';
+                // Pro-Tip: Cache the line numbers in a single string to reduce DOM thrashing
+                for (let i = 1; i <= lineCount; i++) {
+                    gutterHTML += i + '<br>';
+                }
+                gutter.innerHTML = gutterHTML;
+                gutter.dataset.lastCount = lineCount;
+            }
+            gutter.scrollTop = ed.scrollTop;
+        },
 
-        const lines = ed.value.split('\n');
-        // Optimized: Only re-render if line count changed to save battery
-        if (gutter.dataset.lastCount != lines.length) {
-            gutter.innerHTML = Array.from({length: lines.length}, (_, i) => i + 1).join('<br>'); 
-            gutter.dataset.lastCount = lines.length;
-        }
-        gutter.scrollTop = ed.scrollTop;
-    },
      runSandbox() { 
             const f = document.getElementById('sandbox-frame');
             const c = document.getElementById('ghost-console'); 
