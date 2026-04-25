@@ -327,8 +327,7 @@
         position: fixed; 
         inset: 0; 
         background: rgba(0,0,0,0.85); 
-        z-index: 10000; 
-        display: none; 
+        z-index: 10000;
         align-items: center; 
         justify-content: center; 
         backdrop-filter: blur(10px); 
@@ -976,14 +975,14 @@
             </div>
         </div>
     </div>
-<div id="modal-graph" class="modal-overlay" style="display:none;" onclick="if(event.target===this) Nexus.ui.closeModal('graph')">
-        <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto; background: var(--bg);">
-            <h2 style="margin-top:0; color:var(--gold);">Project Radar</h2>
-            <div id="graph-results" style="background:var(--surface); padding:15px; border-radius:8px;"></div>
-            <button class="sleek-btn" style="width:100%; margin-top:15px;" onclick="Nexus.ui.closeModal('graph')">Close Scanner</button>
-        </div>
+<div id="modal-graph" class="modal-overlay" onclick="if(event.target===this) Nexus.ui.closeModal('graph')">
+    <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto; background: var(--bg);">
+        <h2 style="margin-top:0; color:var(--gold); padding: 20px 20px 0 20px;">Project Radar</h2>
+        <div id="graph-results" style="background:var(--surface); margin: 0 20px 20px 20px; padding:15px; border-radius:8px;"></div>
+        <button class="sleek-btn" style="width: calc(100% - 40px); margin: 0 20px 20px 20px; padding: 15px;" onclick="Nexus.ui.closeModal('graph')">Close Scanner</button>
+    </div>
 </div>
- 
+
     <footer id="footer">
         <div id="foot-file">NO FILES OPEN</div>
         <div style="margin-left:auto; display:flex; gap:25px;">
