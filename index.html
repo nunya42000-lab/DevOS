@@ -2423,7 +2423,6 @@ Nexus.editorCore.currentExtensions = [
         }
     },
 
-    refactor: {
         refactor: {
         async renameGlobal() {
             const oldName = prompt("Rename identifier (Global AST pass):");
@@ -2440,7 +2439,6 @@ Nexus.editorCore.currentExtensions = [
                 if (!filename.endsWith('.js')) return;
 
                 try {
-                    // Use Sentinel's internal engine to parse and traverse
                     Nexus.sentinel.initEngine();
                     const { ast } = Nexus.sentinel.engine.analyzeAndMutate(code, 'LINT');
                     let changed = false;
@@ -2467,7 +2465,7 @@ Nexus.editorCore.currentExtensions = [
                 alert(`SUCCESS: Refactored '${oldName}' -> '${newName}' across ${filesModified} sectors.`);
             }
         }
-    },
+    }, // <--- This now correctly closes the Refactor engine.
 
     neural: {
         analyzeDelta(oldIssues, newIssues, oldGraphSize, newGraphSize) {
