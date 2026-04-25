@@ -2606,7 +2606,7 @@ graph: {
         }
     },
 
-    settings: {
+        settings: {
         async boot() { 
             const saved = await localforage.getItem('nexus_prefs_v42'); 
             if (saved) Nexus.state.prefs = saved; 
@@ -2622,8 +2622,18 @@ graph: {
                     {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
                 ];
             }
+
+            // --- THE PATCH: Safe Array Initialization ---
+            // Ensure all language arrays exist so the Builder doesn't crash on .push()
+            ['html', 'css', 'js', 'qwerty'].forEach(lang => {
+                if (!Nexus.state.prefs.kbLayouts[lang]) {
+                    Nexus.state.prefs.kbLayouts[lang] = [];
+                }
+            });
+
             this.apply(); 
         },
+
 
         update(k, v) { 
             // Ensure numeric types for critical editor prefs
@@ -3140,10 +3150,46 @@ ui: {
             }
         },
 
-        injectChar(val) {
+                injectChar(val) {
             const ed = document.getElementById('raw-terminal');
             if (ed.hasAttribute('readonly') || !Nexus.state.activeFile) return;
 
+            // Pre-process special characters and cursor positioning
+            let processed = val.replace(/\*\+/g, '\t').replace(/\\t/g, '\t'); 
+            let cursorOffset = processed.indexOf('*#'); 
+            
+            if (cursorOffset !== -1) {
+                processed = processed.replace(/\*\#/g, '');
+            } else {
+                cursorOffset = processed.length;
+            }
+
+            // --- NEW: CM6 ENGINE ROUTING ---
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                const view = Nexus.editorCore.view;
+                const pos = view.state.selection.main.head;
+                
+                if (val === 'BACKSPACE') {
+                    if (pos > 0) {
+                        view.dispatch({
+                            changes: { from: pos - 1, to: pos, insert: "" },
+                            selection: { anchor: pos - 1 }
+                        });
+                    }
+                } else {
+                    view.dispatch({
+                        changes: { from: pos, insert: processed },
+                        selection: { anchor: pos + cursorOffset }
+                    });
+                }
+                
+                Nexus.state.vfs[Nexus.state.activeFile] = view.state.doc.toString();
+                Nexus.vfs.save();
+                Nexus.history.record();
+                return; // Exit out so we don't double-type into the vanilla terminal
+            }
+
+            // --- VANILLA TERMINAL ROUTING ---
             const start = ed.selectionStart;
             const end = ed.selectionEnd;
             
@@ -3156,18 +3202,7 @@ ui: {
                     ed.setSelectionRange(start, start);
                 }
             } else {
-                // Support both *+ and literal \t for tab characters
-                let processed = val.replace(/\*\+/g, '\t').replace(/\\t/g, '\t'); 
-                let cursorOffset = processed.indexOf('*#'); 
-                
-                if (cursorOffset !== -1) {
-                    processed = processed.replace(/\*\#/g, '');
-                } else {
-                    cursorOffset = processed.length;
-                }
-
                 ed.value = ed.value.substring(0, start) + processed + ed.value.substring(end);
-                
                 const newPos = start + cursorOffset;
                 ed.setSelectionRange(newPos, newPos);
             }
@@ -3176,7 +3211,6 @@ ui: {
             Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
             this.updateGutter();
             
-            // Persist the change and trigger a history record
             Nexus.vfs.save();
             Nexus.history.record();
             ed.dispatchEvent(new Event('input'));
