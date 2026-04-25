@@ -113,13 +113,16 @@
     .btn-danger { background: var(--danger); color: #fff; border: none; }
 
     /* --- 2. MAIN WORKSPACE & TABS --- */
-    #workspace { 
+        #workspace { 
         flex: 1; 
         display: flex; 
         flex-direction: column; 
         position: relative; 
         overflow: hidden; 
+        min-height: 0; /* <-- THE FIX */
     }
+
+    
     
     #file-tabs-bar { 
         display: flex; 
@@ -164,9 +167,15 @@
     }
     .tab-close:hover { opacity: 1; }
 
-    #editor-view { flex: 1; display: flex; background: #000; position: relative; }
-    body.outdoor-mode #editor-view { background: #fff; }
-    
+    #editor-view { 
+        flex: 1; 
+        display: flex; 
+        background: #000; 
+        position: relative; 
+        overflow: hidden; /* <-- THE FIX */
+        min-height: 0;    /* <-- THE FIX */
+    }
+
     #gutter { 
         width: 45px; 
         background: var(--bg); 
@@ -3275,54 +3284,94 @@ ui: {
             ed.dispatchEvent(new Event('input'));
         },
 
+        
         jumpPrompt() {
-    if(!Nexus.state.activeFile) return;
-    const ln = prompt("Jump to Line:");
-    if (ln) {
-        const line = parseInt(ln);
-        const ed = document.getElementById('raw-terminal');
-        const lines = ed.value.split('\n');
-        let pos = 0;
-        for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
-        
-        ed.focus(); 
-        ed.setSelectionRange(pos, pos);
-        
-        setTimeout(() => {
-            const lh = 22; // Match your CSS line-height
-            const targetScroll = 15 + ((line - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
-            ed.scrollTop = Math.max(0, targetScroll);
-        }, 50);
-    }
-},
- jumpRelative(offset) {
-    if(!Nexus.state.activeFile) return;
-    const ed = document.getElementById('raw-terminal');
-    const lines = ed.value.split('\n');
-    const currentPos = ed.selectionStart;
-    
-    let currentLine = 0, chars = 0;
-    for(let i=0; i<lines.length; i++) {
-        chars += lines[i].length + 1;
-        if(chars > currentPos) { 
-            currentLine = i; 
-            break; 
-        }
-    }
-    
-    const targetLine = Math.max(0, Math.min(lines.length - 1, currentLine + offset));
-    let pos = 0;
-    for (let i = 0; i < targetLine; i++) pos += lines[i].length + 1;
-    
-    ed.focus();
-    ed.setSelectionRange(pos, pos);
-    
-    setTimeout(() => {
-        const lh = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
-        const targetScroll = 15 + (targetLine * lh) - (ed.clientHeight / 2) + (lh / 2);
-        ed.scrollTop = Math.max(0, targetScroll);
-    }, 50);
-},
+            if(!Nexus.state.activeFile) return;
+            const ln = prompt("Jump to Line:");
+            if (ln) {
+                const line = parseInt(ln);
+                
+                // --- CM6 ROUTING ---
+                if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                    const view = Nexus.editorCore.view;
+                    const doc = view.state.doc;
+                    // Clamp line request to actual document length
+                    const targetLine = Math.max(1, Math.min(line, doc.lines));
+                    const pos = doc.line(targetLine).from;
+                    
+                    view.dispatch({
+                        selection: { anchor: pos },
+                        scrollIntoView: true
+                    });
+                    view.focus();
+                    return;
+                }
+
+                // --- VANILLA ROUTING ---
+                const ed = document.getElementById('raw-terminal');
+                const lines = ed.value.split('\n');
+                let pos = 0;
+                for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
+                
+                ed.focus(); 
+                ed.setSelectionRange(pos, pos);
+                
+                setTimeout(() => {
+                    const lh = 22; // Match your CSS line-height
+                    const targetScroll = 15 + ((line - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
+                    ed.scrollTop = Math.max(0, targetScroll);
+                }, 50);
+            }
+        },
+
+        jumpRelative(offset) {
+            if(!Nexus.state.activeFile) return;
+            
+            // --- CM6 ROUTING ---
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                const view = Nexus.editorCore.view;
+                const doc = view.state.doc;
+                const currentPos = view.state.selection.main.head;
+                const currentLine = doc.lineAt(currentPos).number;
+                
+                const targetLine = Math.max(1, Math.min(doc.lines, currentLine + offset));
+                const newPos = doc.line(targetLine).from;
+                
+                view.dispatch({
+                    selection: { anchor: newPos },
+                    scrollIntoView: true
+                });
+                view.focus();
+                return;
+            }
+
+            // --- VANILLA ROUTING ---
+            const ed = document.getElementById('raw-terminal');
+            const lines = ed.value.split('\n');
+            const currentPos = ed.selectionStart;
+            
+            let currentLine = 0, chars = 0;
+            for(let i=0; i<lines.length; i++) {
+                chars += lines[i].length + 1;
+                if(chars > currentPos) { 
+                    currentLine = i; 
+                    break; 
+                }
+            }
+            
+            const targetLine = Math.max(0, Math.min(lines.length - 1, currentLine + offset));
+            let pos = 0;
+            for (let i = 0; i < targetLine; i++) pos += lines[i].length + 1;
+            
+            ed.focus();
+            ed.setSelectionRange(pos, pos);
+            
+            setTimeout(() => {
+                const lh = parseInt(window.getComputedStyle(ed).lineHeight) || 22;
+                const targetScroll = 15 + (targetLine * lh) - (ed.clientHeight / 2) + (lh / 2);
+                ed.scrollTop = Math.max(0, targetScroll);
+            }, 50);
+        },
 
 
         renderUtilBar() {
