@@ -1780,52 +1780,7 @@ intel: {
 },
 
     /* --- 2. THE SOVEREIGN INJECTOR --- */
-    async injectChar(val) {
-        const fileId = Nexus.state.activeFileId;
-        // Proceed even without a fileId if editing a raw file in VFS
-        
-        if (Nexus.state.isCM6 && Nexus.editorCore.view) {
-            const view = Nexus.editorCore.view;
-            const sel = view.state.selection.main;
-            if (val === 'BACKSPACE') {
-                view.dispatch({
-                    changes: { from: sel.empty ? Math.max(0, sel.from - 1) : sel.from, to: sel.to, insert: "" },
-                    scrollIntoView: true
-                });
-            } else {
-                view.dispatch({
-                    changes: { from: sel.from, to: sel.to, insert: val },
-                    selection: { anchor: sel.from + val.length },
-                    scrollIntoView: true
-                });
-            }
-        } else {
-            const ed = document.getElementById('raw-terminal');
-            const start = ed.selectionStart;
-            const end = ed.selectionEnd;
-            if (val === 'BACKSPACE') {
-                if (start === end) {
-                    ed.value = ed.value.substring(0, Math.max(0, start - 1)) + ed.value.substring(end);
-                    ed.setSelectionRange(start - 1, start - 1);
-                } else {
-                    ed.value = ed.value.substring(0, start) + ed.value.substring(end);
-                    ed.setSelectionRange(start, start);
-                }
-            } else {
-                ed.value = ed.value.substring(0, start) + val + ed.value.substring(end);
-                ed.setSelectionRange(start + val.length, start + val.length);
-            }
-            ed.focus();
-            Nexus.ui.updateGutter();
-        }
-        
-        // Save state after injection
-        const code = Nexus.state.isCM6 ? Nexus.editorCore.view.state.doc.toString() : document.getElementById('raw-terminal').value;
-        if (fileId) {
-            await db.contents.where({ fileId }).modify({ content: code });
-        }
-    },
-
+    
     compressor: {
         // ... (compressor logic continues here normally)
 
