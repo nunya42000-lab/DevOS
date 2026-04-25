@@ -715,46 +715,109 @@
  
     <div id="modal-manual" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>📖 NEXUS CODEX (MANUAL)</span><button class="close-x" onclick="Nexus.ui.closeModal('manual')">&times;</button></div>
-            <div class="modal-body" style="padding: 20px 30px;">
-                <div class="man-h1">Welcome to Nexus Prime</div>
-                <div class="man-p">Nexus Prime is an entirely offline, AST-aware IDE built specifically for mobile/PWA environments.</div>
+    <div class="p-head"><span>📖 NEXUS PRIME v40.20 - THE MASTER CODEX</span><button class="close-x" onclick="Nexus.ui.closeModal('manual')">&times;</button></div>
+    <div class="modal-body" style="padding: 25px 35px; line-height: 1.6;">
 
-                <div class="man-h1">The Kinetic Widgets</div>
-                <div class="man-h2">🛠 UTIL (Utility Bar)</div>
-                <div class="man-p">Floating quick actions: <b>Line Jump</b>, <b>Color Picker</b>, <b>Undo/Redo</b>, and <b>Tab Injector</b>.</div>
-                
-                <div class="man-h2">🔍 FIND &amp; REP (Search Bar)</div>
-                <div class="man-p">Draggable search. Supports <b>Aa</b>, <b>Regex</b>, and <b>Global</b> search. Tap REP to execute.</div>
-                
-                <div class="man-h2">✍️ WRITE (Auto-Writer)</div>
-                <div class="man-p">Generates mock data. Options: <b>Syntax</b>, <b>Story</b>, or <b>Custom</b>.</div>
-
-                <div class="man-h2">⌨ KEY (Keyboard Monolith)</div>
-                <div class="man-p">Custom coding keyboard. Use the <b>✏️ Pencil</b> to build buttons. Use <code>*#</code> for cursor positioning.</div>
-
-                <div class="man-h1">Vortex System (File Management)</div>
-                <div class="man-h2">📁 VORTEX (Left Panel)</div>
-                <div class="man-p">Virtual File System. Supports ZIP imports and flat TXT exports.</div>
-
-                <div class="man-h2">🔗 COMBINE FILES</div>
-                <div class="man-p">Merge files and automatically update <code>import</code> or <code>src</code> paths.</div>
-
-                <div class="man-h2">💾 VAULT</div>
-                <div class="man-p">Persistent snippet library. Archive active code via <b>Cut</b> or <b>Copy</b>.</div>
-
-                <div class="man-h1">Diagnostics &amp; Testing</div>
-                <div class="man-h2">🩺 DIAGNOSTICS (Sentinel)</div>
-                <div class="man-p">AST Static analysis. <b>Deep Lint</b>, <b>String Patch</b>, and <b>AST Rebuild</b> functions.</div>
-
-                <div class="man-h2">▶ PROVING GROUNDS (Sandbox)</div>
-                <div class="man-p">Iframe execution with a <b>Ghost Console</b> to intercept logs and errors.</div>
-
-                <div class="man-h1">Other Utilities</div>
-                <div class="man-h2">✨ BEAUTIFY / 🌙 DREAMER / 🌌 SYSTEM GRAPH / 🗺️ OUTLINE</div>
-            </div>
+        <div style="text-align:center; margin-bottom:30px; border:1px solid var(--gold); padding:15px; background:rgba(210,153,34,0.05); border-radius:12px;">
+            <div style="font-size:11px; letter-spacing:3px; color:var(--gold); font-weight:900;">SOVEREIGN ARCHITECTURE</div>
+            <div style="font-size:13px; color:var(--text); opacity:0.8;">Nexus Prime is an AST-aware, mobile-native Integrated Development Environment.</div>
         </div>
+
+        <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-bottom:15px;">TIER I: THE KINETIC INTERFACE</div>
+        
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. The Infinite Ribbon</div>
+        <div class="man-p">The top navigation bar is a seamless loop. <b>Swipe horizontally</b> to access secondary tools (Vault, Radar, Settings). It will wrap around infinitely.</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Kinetic Widgets (Util / Search / Writer)</div>
+        <div class="man-p">Widgets are floating modules designed for one-handed operation.
+            <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
+                <li><b>Draggable:</b> Grab handles (⋯) to reposition anywhere.</li>
+                <li><b>Magnetic Docking:</b> Double-tap a handle to snap the widget to the screen edge.</li>
+                <li><b>Visibility:</b> Toggle widgets via the 🧩 <b>WIDGETS</b> dropdown in the ribbon.</li>
+            </ul>
+        </div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">3. Edit-Lock Protocol</div>
+        <div class="man-p">Tap the 🔒 <b>READ ONLY</b> icon to cycle states:
+            <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
+                <li><b style="color:var(--danger);">READ ONLY:</b> Safe mode. No inputs possible.</li>
+                <li><b style="color:var(--accent);">UTIL MODE:</b> Interaction enabled, but OS keyboard suppressed. Use for coding with Widgets/Keyboard Monolith.</li>
+                <li><b style="color:var(--success);">FULL EDIT:</b> Standard input mode. OS keyboard will activate on tap.</li>
+            </ul>
+        </div>
+
+        <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER II: VORTEX FILE SYSTEM (VFS)</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. VFS Explorer</div>
+        <div class="man-p">Files are stored in the <b>Sovereign Database (Dexie.js)</b>. They persist even if you close the browser. Open the 📁 <b>VORTEX</b> panel to manage sectors.</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Matrix Build Operations</div>
+        <div class="man-p">Located in the Vortex panel, these are high-level build commands:
+            <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
+                <li><b>⚡ BUNDLE:</b> Compiles the entire project (HTML+CSS+JS) into a single standalone HTML file. Escapes internal tags to prevent breakage.</li>
+                <li><b>⚡ MERGE JS:</b> Concatenates all <code>.js</code> files into a single production script.</li>
+                <li><b>✂️ SPLIT JS:</b> Uses the AST to identify independent functions/classes and shatters a single file into multiple modular <code>.js</code> sectors.</li>
+                <li><b>🔗 COMBINE:</b> Merges specific files and <b>automatically re-routes</b> <code>import</code> and <code>src</code> paths throughout the rest of the project.</li>
+            </ul>
+        </div>
+
+        <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER III: NEURAL ENGINES (DIAGNOSTICS)</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Sentinel AST Medic</div>
+        <div class="man-p">Sentinel performs 16+ structural checks. It detects <b>Infinite Loops</b>, <b>XSS Vulnerabilities</b>, <b>Recursion Risks</b>, and <b>Zombies</b> (unused variables).
+            <br><i>Action:</i> Click <b>FIX ALL</b> to apply bulk mutations to your code automatically.</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Neural Heuristics (Intel)</div>
+        <div class="man-p">A high-level analytical scan. It calculates "Code Health" based on payload size, security risks, and structural patterns.
+            <br><i>Action:</i> Tap the large % Health number in the Intel modal to view <b>Deduction Logs</b>.</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">3. Radar Graph</div>
+        <div class="man-p">A visual dependency map. It tracks how files are connected.
+            <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
+                <li><b>Green Tree:</b> Fully linked and functional paths.</li>
+                <li><b>Red Orphans:</b> Files that are not imported by anything (Dead Code).</li>
+            </ul>
+        </div>
+
+        <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER IV: TEMPORAL MECHANICS</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. The Commander Deck (Merge Engine)</div>
+        <div class="man-p">When performing complex merges or restoring snapshots, use the <b>Merge Engine</b>. It provides a line-by-line diff. Select <b>Left</b>, <b>Right</b>, or <b>Both</b> for every conflict to assemble the final code.</div>
+
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Sovereign Vault</div>
+        <div class="man-p">A persistent snippet library. Highlighting code and selecting <b>+ GRAB</b> stores the logic in your Vault. Vault items are available across all files and sessions.</div>
+
+        <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER V: CMD & SHELL</div>
+        
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Native VFS Commands</div>
+        <div class="man-p">Type the following into the CMD slider for fast file manipulation:
+            <ul style="padding-left:20px; font-family:monospace; font-size:11px; margin-top:5px; background:var(--bg); padding:10px; border-radius:8px;">
+                <li><b>ls</b> - List all project sectors.</li>
+                <li><b>touch [filename]</b> - Create a new file instantly.</li>
+                <li><b>rm [filename]</b> - Delete a file.</li>
+                <li><b>cat [filename]</b> - View file content in terminal output.</li>
+                <li><b>clear</b> - Wipe current editor content.</li>
+            </ul>
+        </div>
+
+        <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER VI: OMNI GESTURE LAYER</div>
+        
+        <div class="man-h2" style="color:var(--gold); font-weight:bold;">3-Finger Gesture Activation</div>
+        <div class="man-p">Touch the screen with 3 fingers to activate the <b>Omni Layer</b>. Draw a path to trigger commands:
+            <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
+                <li><b>D → L :</b> Fire Sentinel Deep Lint.</li>
+                <li><b>U → D → U → D :</b> Run Neural Heuristics (Intel).</li>
+                <li><b>D → R → U → L :</b> Auto-Format active file.</li>
+            </ul>
+        </div>
+
+        <div style="margin-top:40px; text-align:center; font-size:10px; opacity:0.5; font-family:monospace;">
+            NEXUS PRIME OS v40.20 | SYSTEM ENCRYPTION: ACTIVE | BUILD STATUS: STABLE
+        </div>
+
     </div>
+</div>
+
 
     <div id="modal-combine" class="modal-overlay">
         <div class="modal-content">
