@@ -1391,8 +1391,8 @@ window.Nexus = {
         this.switchFile(newName);
         Nexus.ui.closeModal('combine');
         alert(`Sovereign Merge Complete.`);
-    }
-},
+    
+}
      mergeAllJS() {
         const jsFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.js'));
         if(jsFiles.length === 0) return alert("No JS files found in Vortex to merge.");
@@ -1488,7 +1488,7 @@ window.Nexus = {
             Nexus.state.vfs = {}; Nexus.state.originals = {};
             db.files.clear(); db.contents.clear();
             this.setEmptyState(); this.save();
-        }
+ }},
     },
 
 history: {
@@ -3825,46 +3825,55 @@ ui: {
         
       
 
-        jumpPrompt(directLine) {
+                jumpPrompt(directLine) {
             if(!Nexus.state.activeFile) return;
             
-            // If the Outline passes a line number, use it. Otherwise, open the prompt.
-            const ln = directLine || prompt("Jump to Line:");
+            // 1. Safety Guard: Ignore accidental MouseEvents from button clicks
+            let ln = directLine;
+            if (typeof directLine === 'object') ln = null; 
             
-            if (ln) {
-                const line = parseInt(ln);
+            // 2. Trigger prompt if no valid line was passed
+            if (!ln) ln = prompt("Jump to Line:");
+            if (!ln) return; // User cancelled
+            
+            // 3. The NaN Guard: Prevent letters from crashing the CM6 document state!
+            const line = parseInt(ln);
+            if (isNaN(line) || line < 1) return alert("Invalid line number.");
+            
+            // --- CM6 ROUTING ---
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                const view = Nexus.editorCore.view;
+                const doc = view.state.doc;
                 
-                // --- CM6 ROUTING ---
-                if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                    const view = Nexus.editorCore.view;
-                    const doc = view.state.doc;
-                    // Clamp line request to actual document length
-                    const targetLine = Math.max(1, Math.min(line, doc.lines));
-                    const pos = doc.line(targetLine).from;
-                    
-                    view.dispatch({
-                        selection: { anchor: pos },
-                        scrollIntoView: true
-                    });
-                    view.focus();
-                    return;
-                }
-
-                // --- VANILLA ROUTING ---
-                const ed = document.getElementById('raw-terminal');
-                const lines = ed.value.split('\n');
-                let pos = 0;
-                for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
+                // Clamp line request to actual document length
+                const targetLine = Math.max(1, Math.min(line, doc.lines));
+                const pos = doc.line(targetLine).from;
                 
-                ed.focus(); 
-                ed.setSelectionRange(pos, pos);
-                
-                setTimeout(() => {
-                    const lh = 22; // Match your CSS line-height
-                    const targetScroll = 15 + ((line - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
-                    ed.scrollTop = Math.max(0, targetScroll);
-                }, 50);
+                view.dispatch({
+                    selection: { anchor: pos },
+                    scrollIntoView: true
+                });
+                view.focus();
+                return;
             }
+
+            // --- VANILLA ROUTING ---
+            const ed = document.getElementById('raw-terminal');
+            const lines = ed.value.split('\n');
+            let pos = 0;
+            
+            // Safe upper limit to prevent out-of-bounds looping
+            const safeLineLimit = Math.min(line - 1, lines.length);
+            for (let i = 0; i < safeLineLimit; i++) pos += lines[i].length + 1;
+            
+            ed.focus(); 
+            ed.setSelectionRange(pos, pos);
+            
+            setTimeout(() => {
+                const lh = 22; // Match your CSS line-height
+                const targetScroll = 15 + ((line - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
+                ed.scrollTop = Math.max(0, targetScroll);
+            }, 50);
         },
 
         jumpRelative(offset) {
