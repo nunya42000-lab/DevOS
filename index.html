@@ -1948,72 +1948,101 @@ sentinel: {
     },
      
 intel: {
-        scan() {
-            if(!Nexus.state.activeFile) return alert("No active file to scan.");
-            const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
-            
-            const loc = code.split('\n').length;
-            const size = new Blob([code]).size;
-            
-            const vars = (code.match(/(?:const|let|var)\s+\w+/g) || []).length;
-            const funcs = (code.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
-            
-            let patterns = [];
-            if(/document\.(getElementById|querySelector)/.test(code)) patterns.push('DOM Manipulator');
-            if(/async|await|Promise/.test(code)) patterns.push('Async Flow');
-            if(/fetch\(|XMLHttpRequest/.test(code)) patterns.push('Network Protocol');
-            if(/for\s*\(|while\s*\(/.test(code)) patterns.push('Loop Construct');
-            if(/localStorage|localforage/.test(code)) patterns.push('Persistent Storage');
-            if(/import|export/.test(code)) patterns.push('Module Export');
-            
-            let health = 100;
-            if(size > 50000) health -= 10;
-            if(/eval\(/.test(code)) health -= 25; 
-            if(/console\.log/.test(code)) health -= 5;
-            if(loc > 1500) health -= 10;
-            if(patterns.length === 0 && loc > 50) health -= 5;
-            health = Math.max(0, Math.min(100, health));
+    scan() {
+        if(!Nexus.state.activeFile) return alert("No active file to scan.");
+        const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        
+        const loc = code.split('\n').length;
+        const size = new Blob([code]).size;
+        
+        let vars = 0, funcs = 0;
+        let patterns = [];
+        let health = 100;
+        let deductions = []; // Track exactly what lowers the score
 
- // Failsafe
-            
-            document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
-            
-            const healthDisp = document.getElementById('intel-health-display');
-            const healthBar = document.getElementById('intel-health-bar');
-            
-            healthDisp.innerText = health + '%';
-            healthBar.style.width = health + '%';
-            
-            let color = (health < 50) ? 'var(--danger)' : (health < 80) ? 'var(--warn)' : 'var(--success)';
-            healthDisp.style.color = color;
-            healthBar.style.background = color;
-            
-            document.getElementById('intel-metrics-grid').innerHTML = `
-                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">LINES OF CODE</div>
-                    <div style="font-size:24px; font-weight:900; color:#fff;">${loc}</div>
-                </div>
-                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">PAYLOAD SIZE</div>
-                    <div style="font-size:24px; font-weight:900; color:#fff;">${(size/1024).toFixed(2)} KB</div>
-                </div>
-                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">DECLARATIONS</div>
-                    <div style="font-size:24px; font-weight:900; color:#fff;">${vars}</div>
-                </div>
-                <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                    <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">FUNCTIONS</div>
-                    <div style="font-size:24px; font-weight:900; color:#fff;">${funcs}</div>
-                </div>
-            `;
-            
-            const pContainer = document.getElementById('intel-patterns');
-            pContainer.innerHTML = patterns.length > 0 
-                ? patterns.map(p => `<span style="background:rgba(47,129,247,0.15); border:1px solid var(--accent); color:var(--accent); padding:6px 12px; border-radius:6px; font-size:11px; font-weight:bold; letter-spacing:0.5px;">${p}</span>`).join('') 
-                : '<span style="font-size:12px; color:var(--text); opacity:0.5; font-style:italic;">No patterns detected.</span>';
-                Nexus.ui.openModal('intel');
+        // 1. AST Traversal for accurate counting in JS
+        if (ext === 'js') {
+            try {
+                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+                const walk = (node) => {
+                    if (!node || typeof node !== 'object') return;
+                    if (node.type === 'VariableDeclarator') vars++;
+                    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'MethodDefinition'].includes(node.type)) funcs++;
+                    Object.values(node).forEach(v => {
+                        if (Array.isArray(v)) v.forEach(walk); else walk(v);
+                    });
+                };
+                walk(ast);
+            } catch(e) { deductions.push("[-20] AST Parse Failure (Syntax Error)"); health -= 20; }
+        } else {
+            // HTML/CSS Fallback
+            vars = (code.match(/(?:const|let|var)\s+\w+/g) || []).length;
+            funcs = (code.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
+        }
+
+        // 2. Pattern Recognition
+        if(/document\.(getElementById|querySelector)/.test(code)) patterns.push('DOM Manipulator');
+        if(/async|await|Promise/.test(code)) patterns.push('Async Flow');
+        if(/fetch\(|XMLHttpRequest/.test(code)) patterns.push('Network Protocol');
+        if(/for\s*\(|while\s*\(/.test(code)) patterns.push('Loop Construct');
+        if(/localStorage|localforage|Dexie/.test(code)) patterns.push('Persistent Storage');
+        if(/import|export/.test(code)) patterns.push('Module Export');
+        
+        // 3. Health Deductions
+        if(size > 50000) { health -= 10; deductions.push("[-10] Payload exceeds 50KB"); }
+        if(/eval\(/.test(code)) { health -= 25; deductions.push("[-25] eval() detected (Security Risk)"); }
+        if(/console\.log/.test(code)) { health -= 5; deductions.push("[-5] console.log left in code"); }
+        if(loc > 1500) { health -= 10; deductions.push("[-10] File exceeds 1500 lines"); }
+        if(patterns.length === 0 && loc > 50) { health -= 5; deductions.push("[-5] No structural patterns detected (>50 lines)"); }
+        
+        health = Math.max(0, Math.min(100, health));
+        if (deductions.length === 0) deductions.push("[✓] Code is pristine. 0 Deductions.");
+
+        document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
+        
+        const healthDisp = document.getElementById('intel-health-display');
+        const healthBar = document.getElementById('intel-health-bar');
+        
+        healthDisp.innerText = health + '%';
+        healthBar.style.width = health + '%';
+        
+        // Add the click-to-reveal deductions feature directly to the DOM node
+        healthDisp.style.cursor = "pointer";
+        healthDisp.onclick = () => alert("HEALTH DIAGNOSTICS:\n\n" + deductions.join('\n'));
+        
+        let color = (health < 50) ? 'var(--danger)' : (health < 80) ? 'var(--warn)' : 'var(--success)';
+        healthDisp.style.color = color;
+        healthBar.style.background = color;
+        
+        document.getElementById('intel-metrics-grid').innerHTML = `
+            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">LINES OF CODE</div>
+                <div style="font-size:24px; font-weight:900; color:#fff;">${loc}</div>
+            </div>
+            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">PAYLOAD SIZE</div>
+                <div style="font-size:24px; font-weight:900; color:#fff;">${(size/1024).toFixed(2)} KB</div>
+            </div>
+            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">DECLARATIONS</div>
+                <div style="font-size:24px; font-weight:900; color:#fff;">${vars}</div>
+            </div>
+            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
+                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">FUNCTIONS</div>
+                <div style="font-size:24px; font-weight:900; color:#fff;">${funcs}</div>
+            </div>
+        `;
+        
+        const pContainer = document.getElementById('intel-patterns');
+        pContainer.innerHTML = patterns.length > 0 
+            ? patterns.map(p => `<span style="background:rgba(47,129,247,0.15); border:1px solid var(--accent); color:var(--accent); padding:6px 12px; border-radius:6px; font-size:11px; font-weight:bold; letter-spacing:0.5px;">${p}</span>`).join('') 
+            : '<span style="font-size:12px; color:var(--text); opacity:0.5; font-style:italic;">No patterns detected.</span>';
+        
+        Nexus.ui.openModal('intel');
     }
 },
+
 
     /* --- 2. THE SOVEREIGN INJECTOR --- */
         compressor: {
@@ -2907,55 +2936,72 @@ grab() {
 outline: {
     scan() {
         if (!Nexus.state.activeFile) return alert("No active file.");
-        const ed = document.getElementById('raw-terminal');
-        const lines = ed.value.split('\n');
+        const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
         const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
         let out = [];
-        
-        lines.forEach((line, i) => {
-            const text = line.trim();
-            if (text.length === 0) return;
-            
-            let match = false;
-            let display = text.substring(0, 50).replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-            if (ext === 'js' || ext === 'json') {
-                if (/^(?:export\s+|default\s+)?(?:async\s+)?function\s+\w+/.test(text) || 
-                    /^(?:const|let|var)\s+\w+\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*=>/.test(text) ||
-                    /^(?:class|struct)\s+\w+/.test(text) ||
-                    /^\w+\s*\([^)]*\)\s*\{/.test(text) && !text.includes('if') && !text.includes('for') && !text.includes('while')) {
-                    match = true;
-                }
-            } else if (ext === 'html') {
-                if (/<[^>]+id="[^"]+"|<h[1-6]|<section|<nav|<footer|<header/.test(text)) {
-                    match = true;
-                }
-            } else if (ext === 'css') {
-                if (/^[.#a-zA-Z][^{]*\{/.test(text)) {
-                    match = true;
-                }
-            }
+        if (ext === 'js') {
+            try {
+                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
+                const walk = (node) => {
+                    if (!node || typeof node !== 'object') return;
+                    
+                    let name = "", type = "", color = "";
+                    if (node.type === 'FunctionDeclaration' && node.id) { name = node.id.name; type = "ƒ"; color = "var(--accent)"; }
+                    else if (node.type === 'ClassDeclaration' && node.id) { name = node.id.name; type = "©"; color = "var(--success)"; }
+                    else if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier') {
+                        if (node.init && ['FunctionExpression', 'ArrowFunctionExpression'].includes(node.init.type)) {
+                            name = node.id.name; type = "ƒ"; color = "var(--accent)";
+                        } else {
+                            name = node.id.name; type = "ν"; color = "var(--gold)";
+                        }
+                    } else if (node.type === 'MethodDefinition' && node.key) { name = node.key.name; type = "ƒ"; color = "var(--accent)"; }
 
-            if (match) out.push({ line: i + 1, text: display });
-        });
+                    if (name) out.push({ line: node.loc.start.line, text: `<strong style="color:${color}; margin-right:5px;">${type}</strong> ${name}` });
+                    
+                    Object.values(node).forEach(v => {
+                        if (Array.isArray(v)) v.forEach(walk); else walk(v);
+                    });
+                };
+                walk(ast);
+            } catch(e) { out.push({ line: 1, text: "AST Syntax Error: Cannot build precise outline." }); }
+        } else {
+            // HTML / CSS RegEx Fallback
+            const lines = code.split('\n');
+            lines.forEach((line, i) => {
+                const text = line.trim();
+                if (text.length === 0) return;
+                let display = "";
+                if (ext === 'html') {
+                    const match = text.match(/<([a-zA-Z0-9-]+)[^>]*id=['"]([^'"]+)['"]/);
+                    if (match) display = `<strong style="color:var(--gold);">#${match[2]}</strong> (${match[1]})`;
+                    else if (/<h[1-6]/.test(text)) display = text.replace(/<[^>]+>/g, '').substring(0, 30);
+                } else if (ext === 'css') {
+                    if (/^[.#a-zA-Z][^{]*\{/.test(text)) display = text.split('{')[0].trim();
+                }
+                if (display) out.push({ line: i + 1, text: display });
+            });
+        }
 
         const list = document.getElementById('outline-list');
         if (out.length > 0) {
-            list.innerHTML = out.map(item => `
-                <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px;" onclick="Nexus.outline.jump(${item.line})">
-                    <span style="color:var(--gold); font-size:10px; font-weight:bold; width:40px; flex-shrink:0;">LN ${item.line}</span>
-                    <span style="font-family:monospace; font-size:12px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.text}</span>
+            // Deduplicate items on the exact same line
+            const unique = out.filter((v, i, a) => a.findIndex(t => (t.line === v.line)) === i);
+            list.innerHTML = unique.map(item => `
+                <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer;" onclick="Nexus.outline.jump(${item.line})">
+                    <span style="color:var(--text); opacity:0.5; font-size:10px; font-weight:bold; width:40px; flex-shrink:0;">LN ${item.line}</span>
+                    <span style="font-family:monospace; font-size:13px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.text}</span>
                 </div>
             `).join('');
         } else {
             list.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text); opacity:0.5;">No structural nodes detected.</div>`;
         }
-        
         Nexus.ui.openModal('outline');
     },
 
     jump(ln) {
         Nexus.ui.closeModal('outline');
+        Nexus.ui.jumpPrompt(ln); // Reuse your existing line jumper
         const ed = document.getElementById('raw-terminal');
         const lines = ed.value.split('\n');
         let pos = 0;
