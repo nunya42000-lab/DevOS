@@ -3531,6 +3531,7 @@ ui: {
 const editor = document.getElementById('raw-terminal');
 const gutter = document.getElementById('gutter');
 let saveDelayTimer = null;
+let visualResetTimer = null; // New timer to prevent race conditions
 
 // Gutter Logic
 editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
@@ -3546,13 +3547,17 @@ editor.oninput = () => {
     st.style.color = "var(--gold)";
     
     clearTimeout(saveDelayTimer);
+    clearTimeout(visualResetTimer); // Kill any pending visual resets if typing resumes
+    
     saveDelayTimer = setTimeout(() => {
         Nexus.vfs.save(); 
         st.innerText = "SAVED";
         st.style.color = "var(--success)";
-        setTimeout(() => {
+        
+        visualResetTimer = setTimeout(() => {
             if(!editor.hasAttribute('readonly')) {
                 st.innerText = editor.getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)";
+                st.style.color = ""; // Reset to default CSS text color to fix the color bleed
             } else {
                 st.innerText = "LOCKED";
                 st.style.color = "var(--danger)";
@@ -3565,10 +3570,12 @@ editor.onkeydown = (e) => {
     if (e.key === 'Tab') { 
         e.preventDefault(); 
         if (editor.hasAttribute('readonly')) return;
-        const s = editor.selectionStart; 
+        
         const tabSpaces = " ".repeat(Nexus.state.prefs.tabWidth || 2);
-        editor.value = editor.value.substring(0, s) + tabSpaces + editor.value.substring(editor.selectionEnd); 
-        editor.selectionStart = editor.selectionEnd = s + tabSpaces.length; 
+        
+        // Preserve Undo/Redo history by using execCommand instead of mutating editor.value
+        document.execCommand('insertText', false, tabSpaces);
+        
         Nexus.state.vfs[Nexus.state.activeFile] = editor.value;
         Nexus.ui.updateGutter();
     } 
