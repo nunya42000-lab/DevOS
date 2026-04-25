@@ -1876,8 +1876,11 @@ sentinel: {
                 if (issues.length === 0) {
                     this.log("DEEP LINT: Matrix looks solid. No syntax anomalies.", "success");
                 } else {
-                    let outHtml = `<div style="color:var(--danger); margin-bottom:10px; font-weight:bold;">FOUND ${issues.length} ISSUE(S):</div>`;
-                    issues.forEach((iss, idx) => {
+                    let outHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+    <div style="color:var(--danger); font-weight:bold;">FOUND ${issues.length} ISSUE(S):</div>
+    <button class="tool-btn btn-success" style="padding:4px 10px; font-size:10px;" onclick="Nexus.sentinel.applyAllFixes()">FIX ALL</button>
+</div>`;   
+                 issues.forEach((iss, idx) => {
                         const color = iss.severity === 'WARN' ? 'var(--warn)' : (iss.severity === 'CRITICAL' ? 'var(--danger)' : 'var(--gold)');
                         outHtml += `
                             <div style="background:var(--surface); padding:10px; margin-bottom:8px; border-left:3px solid ${color}; border-radius:4px;">
