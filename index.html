@@ -3516,71 +3516,79 @@ if(document.getElementById('pref-formatter')) document.getElementById('pref-form
 },
 
 writer: {
+    templates: {
+        'fetch': "async function fetchData(url) {\n\ttry {\n\t\tconst res = await fetch(url);\n\t\tif (!res.ok) throw new Error('Network fault');\n\t\tconst data = await res.json();\n\t\treturn data;\n\t} catch (err) {\n\t\tconsole.error('Fetch error:', err);\n\t\tthrow err;\n\t}\n}",
+        'component': "class CustomMatrixElement extends HTMLElement {\n\tconstructor() {\n\t\tsuper();\n\t\tthis.attachShadow({ mode: 'open' });\n\t}\n\tconnectedCallback() {\n\t\tthis.shadowRoot.innerHTML = `\n\t\t\t<style>:host { display: block; padding: 10px; }</style>\n\t\t\t<div>Component Initialized</div>\n\t\t`;\n\t}\n}\ncustomElements.define('matrix-element', CustomMatrixElement);",
+        'canvas': "const canvas = document.getElementById('omniCanvas');\nconst ctx = canvas.getContext('2d');\nfunction resize() {\n\tcanvas.width = window.innerWidth;\n\tcanvas.height = window.innerHeight;\n}\nwindow.addEventListener('resize', resize);\nresize();\n\nfunction animate() {\n\tctx.clearRect(0, 0, canvas.width, canvas.height);\n\t// Render logic here\n\trequestAnimationFrame(animate);\n}\nanimate();",
+        'express': "const express = require('express');\nconst app = express();\napp.use(express.json());\n\napp.get('/api/status', (req, res) => {\n\tres.json({ status: 'active', matrix: true });\n});\n\napp.listen(3000, () => console.log('DevOS Server running on 3000'));",
+        'observer': "const observer = new IntersectionObserver((entries) => {\n\tentries.forEach(entry => {\n\t\tif (entry.isIntersecting) {\n\t\t\tentry.target.classList.add('visible');\n\t\t}\n\t});\n}, { threshold: 0.1 });\n\ndocument.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));"
+    },
     go() {
         const ed = document.getElementById('raw-terminal');
-        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR");
+        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
         
+        const mode = document.getElementById('write-mode').value;
+        const result = this.templates[mode];
+
+        Nexus.ui.injectChar(result + "\n");
+
         const statusEl = document.getElementById('writer-status');
-        statusEl.innerText = "WRITING...";
+        statusEl.innerText = "INJECTED";
         statusEl.style.color = "var(--success)";
         statusEl.style.opacity = "1";
-
-        const count = parseInt(document.getElementById('write-count').value);
-        const mode = document.getElementById('write-mode').value;
-        const unit = document.getElementById('write-unit').value;
-        const wrapHtml = document.getElementById('write-html').checked;
-        const vocab = Nexus.widgetConfig.writerVocab[mode];
-        
-        let result = "";
-        const generatePhrase = (len) => {
-            let phrase = "";
-            for(let i=0; i<len; i++) {
-                phrase += vocab[Math.floor(Math.random() * vocab.length)];
-            }
-            return phrase.trim();
-        };
-
-        if (unit === 'words') {
-            result = generatePhrase(count);
-            if (wrapHtml) result = '<p>' + result + '</p>';
-        } else { 
-            for(let i=0; i<count; i++) {
-                let para = generatePhrase(Math.floor(Math.random() * 15) + 10) + "."; 
-                if (wrapHtml) result += '<p>' + para + '</p>\n';
-                else result += para + "\n\n";
-            }
-        }
-
-        Nexus.ui.injectChar(result.trim());
-
         setTimeout(() => {
             statusEl.innerText = "IDLE";
             statusEl.style.color = "";
             statusEl.style.opacity = "0.5";
-        }, 800);
+        }, 1500);
     }
-    
 },
 
 shell: {
-    exec(cmd) {
+    exec(cmdStr) {
         const ed = document.getElementById('raw-terminal');
+        const args = cmdStr.trim().split(' ');
+        const cmd = args[0].toLowerCase();
+        let out = "";
+
         try {
-            // Robust execution wrapper
-            const result = new Function(`return eval(${JSON.stringify(cmd)})`)();
-            
-            if (!ed.hasAttribute('readonly') && Nexus.state.activeFile) {
-                const output = "\n// Shell: " + cmd + "\n// -> " + result + "\n";
-                ed.value += output;
-                Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
-                Nexus.ui.updateGutter();
-                Nexus.vfs.save(); // Ensure shell output is persisted
-                ed.scrollTop = ed.scrollHeight;
+            // Pro Mode Native Commands
+            if (cmd === 'ls') {
+                out = Object.keys(Nexus.state.vfs).join('\n');
+            } else if (cmd === 'touch' && args[1]) {
+                if (!Nexus.state.vfs[args[1]]) {
+                    Nexus.state.vfs[args[1]] = "";
+                    Nexus.state.originals[args[1]] = "";
+                    Nexus.vfs.renderAccordion();
+                    out = `Created sector: ${args[1]}`;
+                } else out = `Sector already exists: ${args[1]}`;
+            } else if (cmd === 'rm' && args[1]) {
+                if (Nexus.state.vfs[args[1]]) {
+                    delete Nexus.state.vfs[args[1]];
+                    delete Nexus.state.originals[args[1]];
+                    Nexus.vfs.renderAccordion();
+                    out = `Deleted sector: ${args[1]}`;
+                } else out = `Sector not found: ${args[1]}`;
+            } else if (cmd === 'cat' && args[1]) {
+                out = Nexus.state.vfs[args[1]] || `Sector not found: ${args[1]}`;
+            } else if (cmd === 'clear') {
+                ed.value = "";
+                Nexus.state.vfs[Nexus.state.activeFile] = "";
+                out = "Terminal cleared.";
             } else {
-                alert("Shell Output:\n" + result);
+                // Fallback to JS Eval for math/logic testing
+                out = new Function(`return eval(${JSON.stringify(cmdStr)})`)();
+            }
+
+            // Print Output
+            if (!ed.hasAttribute('readonly') && Nexus.state.activeFile) {
+                const outputLog = `\n/* $ ${cmdStr} */\n/* -> ${String(out).replace(/\n/g, '\n   ')} */\n`;
+                Nexus.ui.injectChar(outputLog);
+            } else {
+                alert(`[DevOS Shell] ${cmdStr}\n\n${out}`);
             }
         } catch (e) {
-            alert("Shell Error: " + e.message);
+            alert(`Shell Fault: ${e.message}`);
         }
     }
 },
