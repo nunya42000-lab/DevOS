@@ -2674,13 +2674,16 @@ graph: {
         }
     },
 
-        settings: {
+            settings: {
         async boot() { 
             const saved = await localforage.getItem('nexus_prefs_v42'); 
             if (saved) Nexus.state.prefs = saved; 
             
-            // Default QWERTY fallback if missing
-            if(!Nexus.state.prefs.kbLayouts.qwerty) {
+            // Ensure the base object exists
+            if (!Nexus.state.prefs.kbLayouts) Nexus.state.prefs.kbLayouts = {};
+
+            // --- 1. QWERTY DEFAULTS ---
+            if(!Nexus.state.prefs.kbLayouts.qwerty || Nexus.state.prefs.kbLayouts.qwerty.length === 0) {
                 Nexus.state.prefs.kbLayouts.qwerty = [
                     {d: '1', i: '1'}, {d: '2', i: '2'}, {d: '3', i: '3'}, {d: '4', i: '4'}, {d: '5', i: '5'}, {d: '6', i: '6'}, {d: '7', i: '7'}, {d: '8', i: '8'}, {d: '9', i: '9'}, {d: '0', i: '0'},
                     {d: 'q', i: 'q'}, {d: 'w', i: 'w'}, {d: 'e', i: 'e'}, {d: 'r', i: 'r'}, {d: 't', i: 't'}, {d: 'y', i: 'y'}, {d: 'u', i: 'u'}, {d: 'i', i: 'i'}, {d: 'o', i: 'o'}, {d: 'p', i: 'p'},
@@ -2691,13 +2694,42 @@ graph: {
                 ];
             }
 
-            // --- THE PATCH: Safe Array Initialization ---
-            // Ensure all language arrays exist so the Builder doesn't crash on .push()
-            ['html', 'css', 'js', 'qwerty'].forEach(lang => {
-                if (!Nexus.state.prefs.kbLayouts[lang]) {
-                    Nexus.state.prefs.kbLayouts[lang] = [];
-                }
-            });
+            // --- 2. HTML DEFAULTS ---
+            if(!Nexus.state.prefs.kbLayouts.html || Nexus.state.prefs.kbLayouts.html.length === 0) {
+                Nexus.state.prefs.kbLayouts.html = [
+                    {d: '<>', i: '<*#>'}, {d: '</>', i: '</*#>'}, {d: 'div', i: '<div>*#</div>'}, {d: 'span', i: '<span>*#</span>'}, 
+                    {d: 'p', i: '<p>*#</p>'}, {d: 'a', i: '<a href="*#"></a>'}, {d: 'img', i: '<img src="*#" alt="">'},
+                    {d: 'class=""', i: 'class="*#"'}, {d: 'id=""', i: 'id="*#"'}, {d: 'style=""', i: 'style="*#"'}, 
+                    {d: 'script', i: '<script>\n\t*#\n</script>'}, {d: 'style', i: '<style>\n\t*#\n</style>'},
+                    {d: '!--', i: ''}, {d: '=', i: '='}, {d: '/', i: '/'},
+                    {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
+                ];
+            }
+
+            // --- 3. CSS DEFAULTS ---
+            if(!Nexus.state.prefs.kbLayouts.css || Nexus.state.prefs.kbLayouts.css.length === 0) {
+                Nexus.state.prefs.kbLayouts.css = [
+                    {d: '{}', i: '{\n\t*#\n}'}, {d: ':', i: ': '}, {d: ';', i: ';'}, {d: '#', i: '#'}, {d: '.', i: '.'}, 
+                    {d: 'px', i: 'px'}, {d: '%', i: '%'}, {d: 'rem', i: 'rem'}, {d: 'var()', i: 'var(--*#)'},
+                    {d: 'color', i: 'color: *#;'}, {d: 'bg', i: 'background: *#;'}, {d: 'margin', i: 'margin: *#;'}, 
+                    {d: 'padding', i: 'padding: *#;'}, {d: 'display', i: 'display: *#;'}, {d: 'flex', i: 'flex'}, 
+                    {d: 'grid', i: 'grid'}, {d: '/* */', i: '/* *# */'}, {d: '!imp', i: '!important'},
+                    {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
+                ];
+            }
+
+            // --- 4. JS DEFAULTS ---
+            if(!Nexus.state.prefs.kbLayouts.js || Nexus.state.prefs.kbLayouts.js.length === 0) {
+                Nexus.state.prefs.kbLayouts.js = [
+                    {d: '()', i: '(*#)'}, {d: '{}', i: '{\n\t*#\n}'}, {d: '[]', i: '[*#]'}, {d: '${}', i: '${*#}'}, 
+                    {d: '=>', i: '=> '}, {d: '===', i: '=== '}, {d: '!==', i: '!== '}, {d: '&&', i: '&& '}, {d: '||', i: '|| '},
+                    {d: 'const', i: 'const *#'}, {d: 'let', i: 'let *#'}, {d: 'fn', i: 'function *#() {\n\t\n}'}, 
+                    {d: 'async', i: 'async '}, {d: 'await', i: 'await '}, {d: 'return', i: 'return *#;'},
+                    {d: 'log', i: 'console.log(*#);'}, {d: 'getEl', i: "document.getElementById('*#')"}, 
+                    {d: "''", i: "'*#'"}, {d: '""', i: '"*#"'}, {d: '``', i: '`*#`'},
+                    {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
+                ];
+            }
 
             this.apply(); 
         },
