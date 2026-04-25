@@ -515,7 +515,6 @@
             <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
           <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE FILES</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
             <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ PROVING GROUNDS</button>
             
@@ -650,7 +649,7 @@
         <div class="kb-row-container" id="kb-rows-wrapper"></div>
     </div>
 
-   <aside id="panel-left" class="side-panel left-p">
+       <aside id="panel-left" class="side-panel left-p">
         <div class="p-head"><span>VORTEX EXPLORER</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('left')">&times;</button></div>
         <div class="p-body">
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
@@ -661,25 +660,30 @@
                 <input type="file" id="load-trigger" multiple style="display:none;" onchange="Nexus.vfs.loadFiles(this.files)">
                 <input type="file" id="zip-trigger" accept=".zip" style="display:none;" onchange="Nexus.vfs.importZIP(this.files[0])">
             </div>
+
+            <div class="section-label">Matrix Operations</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom: 8px;">
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE</button>
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.bundleToHTML()">⚡ BUNDLE</button>
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.mergeAllJS()">⚡ MERGE JS</button>
+                <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.vfs.splitJSFile()">✂️ SPLIT JS</button>
+            </div>
             
-            <div style="display:flex; justify-content:space-between; align-items:center; margin: 25px 0 10px 0;">
+            <button class="tool-btn btn-danger" style="width:100%; justify-content:center; margin-bottom: 25px;" onclick="Nexus.vfs.clearAll()">🗑️ CLEAR VORTEX</button>
+            
+            <div style="display:flex; justify-content:space-between; align-items:center; margin: 0 0 10px 0;">
                 <div class="section-label" style="margin:0;">Virtual File System</div>
-             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px;">
-    <button class="tool-btn btn-gold" style="width:100%; justify-content:center;" onclick="Nexus.vfs.mergeAllJS()">⚡ MERGE ALL JS</button>
-    <button class="tool-btn btn-gold" style="width:100%; justify-content:center;" onclick="Nexus.vfs.bundleToHTML()">⚡ BUNDLE TO HTML</button>
-    <button class="tool-btn btn-accent" style="width:100%; justify-content:center;" onclick="Nexus.vfs.splitJSFile()">✂️ MODULARIZE JS</button>
-    <button class="tool-btn btn-danger" style="width:100%; justify-content:center;" onclick="Nexus.vfs.clearAll()">🗑️ CLEAR VORTEX</button>
-             </div>
-             
                 <button class="tool-btn btn-accent" style="padding:5px 10px; font-size:9px;" onclick="Nexus.snapshots.create(); Nexus.ui.openModal('merger')">📸 SNAPSHOT</button>
             </div>
             
             <div id="accordion-root"></div>
-            <div class="section-label">Project Export</div>
+
+            <div class="section-label" style="margin-top:25px;">Project Export</div>
             <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.vfs.exportToTXT()">📄 EXPORT TO TXT</button>
             <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.ui.exportZIP()">📦 BUNDLE PROJECT (ZIP)</button>
         </div>
     </aside>
+
 
     <aside id="panel-right" class="side-panel right-p">
         <div class="p-head"><span>PROVING GROUNDS</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('right')">&times;</button></div>
