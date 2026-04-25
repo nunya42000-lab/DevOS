@@ -1640,6 +1640,27 @@ history: {
 },
 sentinel: {
         engine: null,
+ /* --- ADD THIS TO NEXUS.SENTINEL --- */
+log(msg, type = "info") {
+    const out = document.getElementById('diag-out');
+    if (!out) return;
+    const colors = {
+        success: "var(--success)",
+        danger: "var(--danger)",
+        warn: "var(--warn)",
+        accent: "var(--accent)"
+    };
+    const color = colors[type] || "var(--text)";
+    const entry = document.createElement('div');
+    entry.style.cssText = `color: ${color}; margin-bottom: 5px; font-size: 12px; border-left: 2px solid ${color}; padding-left: 10px;`;
+    entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    
+    // Clear the "OFFLINE" message on first real log
+    if (out.innerText.includes("OFFLINE")) out.innerHTML = "";
+    
+    out.prepend(entry);
+},
+
         lastIssues: [],
         initEngine() {
             if (this.engine) return;
