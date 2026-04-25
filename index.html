@@ -1792,37 +1792,48 @@ intel: {
 },
 
     /* --- 2. THE SOVEREIGN INJECTOR --- */
-    
-    compressor: {
-        // ... (compressor logic continues here normally)
-
+        compressor: {
         async run(level) {
             const ed = document.getElementById('raw-terminal');
             if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("LOCKED");
 
-            const code = ed.value;
-            try {
-                // Parse with Acorn to ensure valid JS
-                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-                let compressed = "";
+            // Sync from CM6 if active
+            let code = ed.value;
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                code = Nexus.editorCore.view.state.doc.toString();
+            }
+            
+            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
 
-                if (level === 'lean') {
-                    // Level 1: Standard Beauty but NO comments or extra whitespace
-                    compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
-                } 
-                else if (level === 'functional') {
-                    // Level 2: One line per top-level declaration (Function, Class, Const)
-                    compressed = ast.body.map(node => {
-                        return astring.generate(node, { indent: '', lineEnd: '' });
-                    }).join('\n');
-                } 
-                else if (level === 'nuclear') {
-                    // Level 3: The whole file is a single line
-                    compressed = astring.generate(ast, { indent: '', lineEnd: '' });
+            try {
+                let compressed = "";
+                
+                if (ext === 'html' || ext === 'css') {
+                    // Fallback Regex minifier for non-JS files
+                    if (level === 'lean') {
+                        compressed = code.replace(/^[ \t]+/gm, ''); 
+                    } else {
+                        compressed = code.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+                    }
+                } else {
+                    // Strict AST compression for .js files
+                    const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+                    if (level === 'lean') {
+                        compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
+                    } else if (level === 'functional') {
+                        compressed = ast.body.map(node => astring.generate(node, { indent: '', lineEnd: '' })).join('\n');
+                    } else if (level === 'nuclear') {
+                        compressed = astring.generate(ast, { indent: '', lineEnd: '' });
+                    }
                 }
 
-                // Update VFS and UI
-                ed.value = compressed;
+                // Sync UI and VFS
+                if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                    Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: compressed } });
+                } else {
+                    ed.value = compressed;
+                }
+                
                 Nexus.state.vfs[Nexus.state.activeFile] = compressed;
                 Nexus.ui.updateGutter();
                 Nexus.vfs.save();
@@ -1832,10 +1843,11 @@ intel: {
                 st.innerText = `COMPRESSED: ${level.toUpperCase()}`;
                 st.style.color = "var(--success)";
             } catch (e) {
-                alert("Compression Error: AST Parse failed. Check for syntax errors first.\n\n" + e.message);
+                alert("Compression Error: " + e.message);
             }
         }
     },
+
     
                     async toggleEditor() {
             const rawTerm = document.getElementById('raw-terminal');
@@ -1947,40 +1959,70 @@ intel: {
         },
   
   
-    applyFix: function(issueIndex) {
+        applyFix: function(issueIndex) {
         const ed = document.getElementById('raw-terminal');
         if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply fix.");
-        // Grab the issue from our custom Sentinel engine's last run
         const issue = Nexus.sentinel.lastIssues ? Nexus.sentinel.lastIssues[issueIndex] : null;
         if (!issue || !issue.mutate) return;
 
-        // Use our AST String rebuilder instead of Regex string replacement
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let codeToTest = ed.value;
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            codeToTest = Nexus.editorCore.view.state.doc.toString();
+        }
+
+        let preScript = "", postScript = "", isHtml = false;
+
+        // If it's HTML, we MUST isolate the script tag before parsing
+        if (ext === 'html') {
+            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+            if (match) {
+                isHtml = true;
+                const scriptStart = codeToTest.indexOf(match[1]);
+                preScript = codeToTest.substring(0, scriptStart);
+                postScript = codeToTest.substring(scriptStart + match[1].length);
+                codeToTest = match[1];
+            } else {
+                return alert("No valid script tags found to fix.");
+            }
+        }
+
         try {
-            // Re-run the AST parse specifically for this mutation
-            const { ast } = Nexus.sentinel.engine.analyzeAndMutate(ed.value, 'LINT');
+            const { ast } = Nexus.sentinel.engine.analyzeAndMutate(codeToTest, 'LINT');
             
-            // Find the specific node and apply the mutation
-            acorn.walk.simple(ast, {
-                [issue.nodeType]: (node) => {
-                    if (node.start === issue.range[0] && node.end === issue.range[1]) {
-                        issue.mutate(node); 
-                    }
+            // Replaced the missing 'acorn.walk' dependency with your internal Sentinel traverser
+            Nexus.sentinel.engine.traverse(ast, (node) => {
+                if (node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
+                    issue.mutate(node); 
                 }
             });
 
-            const fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
             
-            // Apply to our Textarea and VFS
-            ed.value = fixedCode;
+            // Re-wrap the HTML shell if necessary
+            if (isHtml) {
+                fixedCode = preScript + fixedCode + postScript;
+            }
+
+            // Sync the updated code to whichever engine is currently active
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                Nexus.editorCore.view.dispatch({
+                    changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode }
+                });
+            } else {
+                ed.value = fixedCode;
+            }
+            
             Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
             Nexus.ui.updateGutter();
             Nexus.vfs.save();
             
             Nexus.sentinel.log(`[AUTO-FIX] Applied resolution for ${issue.id}.`, "success");
         } catch (e) {
-            Nexus.sentinel.log(`[FIX FAILED] AST reconstruction error.`, "danger");
+            Nexus.sentinel.log(`[FIX FAILED] AST reconstruction error: ${e.message}`, "danger");
         }
     },
+
 
     // --- ADVANCED ENGINES ADAPTED FOR THE MATRIX ---
     context: {
@@ -2124,34 +2166,53 @@ intel: {
             });
         }
     },
-        spotlight: {
+                spotlight: {
             search(query) {
                 const res = document.getElementById('spotlight-results');
-                
-                // Clear out if the search bar is empty
                 if (!query) { 
                     res.innerHTML = ''; 
                     return; 
                 }
                 
                 const q = query.toLowerCase();
-                // Filter the VFS for matching filenames
-                const matches = Object.keys(Nexus.state.vfs).filter(f => f.toLowerCase().includes(q));
+                const matches = [];
+                
+                Object.keys(Nexus.state.vfs).forEach(file => {
+                    const content = (Nexus.state.vfs[file] || "").toLowerCase();
+                    const isNameMatch = file.toLowerCase().includes(q);
+                    
+                    if (isNameMatch || content.includes(q)) {
+                        let snippet = "";
+                        // If it's a content match, grab a 60-character context window
+                        if (!isNameMatch && content.includes(q)) {
+                            const idx = content.indexOf(q);
+                            const start = Math.max(0, idx - 20);
+                            const end = Math.min(content.length, idx + 40);
+                            snippet = "..." + (Nexus.state.vfs[file].substring(start, end))
+                                .replace(/</g, '&lt;').replace(/>/g, '&gt;') + "...";
+                        }
+                        matches.push({ file, snippet, isNameMatch });
+                    }
+                });
                 
                 if (matches.length === 0) {
                     res.innerHTML = '<div style="color:var(--danger); font-size:12px; padding:10px;">No sectors match query.</div>';
                     return;
                 }
                 
-                // Render clickable results that instantly swap the editor to that file
-                res.innerHTML = matches.map(f => `
-                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; transition: background 0.2s;" onclick="Nexus.vfs.switchFile('${f}'); Nexus.ui.closeModal('spotlight'); document.getElementById('spotlight-input').value=''; document.getElementById('spotlight-results').innerHTML='';">
-                        <span style="color:var(--gold); font-size:16px; margin-right:10px;">📄</span>
-                        <span style="font-family:monospace; font-size:14px; color:var(--text);">${f}</span>
+                res.innerHTML = matches.map(m => `
+                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; transition: background 0.2s; flex-direction:column; align-items:flex-start;" 
+                         onclick="Nexus.vfs.switchFile('${m.file}'); Nexus.ui.closeModal('spotlight'); document.getElementById('spotlight-input').value=''; document.getElementById('spotlight-results').innerHTML='';">
+                        <div style="display:flex; align-items:center;">
+                            <span style="color:var(--gold); font-size:16px; margin-right:10px;">📄</span>
+                            <span style="font-family:monospace; font-size:14px; color:var(--text); font-weight:bold;">${m.file}</span>
+                        </div>
+                        ${m.snippet ? `<div style="font-size:11px; color:var(--text); opacity:0.6; margin-top:6px; font-family:monospace; padding-left:26px;">${m.snippet}</div>` : ''}
                     </div>
                 `).join('');
             }
         },
+
  
         dreamer: {
         // --- 1. UI ARCHITECT TEMPLATES ---
