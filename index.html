@@ -13,6 +13,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/standalone.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/estree.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/babel.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/html.js"></script>
+<script src="https://unpkg.com/prettier@3.2.5/plugins/postcss.js"></script>
  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
@@ -215,7 +220,21 @@
         overscroll-behavior: contain;
     }
     #raw-terminal[readonly] { opacity: 0.4; user-select: none !important; }
-
+#widget-drop-menu { 
+    position: fixed; 
+    top: 55px; 
+    background: var(--panel); 
+    border: 1px solid var(--border); 
+    border-radius: 8px; 
+    padding: 8px; 
+    display: none; 
+    flex-direction: column; 
+    gap: 5px; 
+    z-index: 10000; 
+    box-shadow: 0 10px 40px rgba(0,0,0,0.9); 
+}
+#widget-drop-menu.active { display: flex; }
+ 
     /* --- 3. SIDEBARS --- */
     .side-panel { 
         position: fixed; 
@@ -474,21 +493,24 @@
 <body>
 
 <div id="app-root">
-    <canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
+ <div id="widget-drop-menu">
+    <button class="tool-btn" onclick="Nexus.ui.toggleWidget('utility-bar'); this.parentElement.classList.remove('active')">🛠 UTIL</button>
+    <button class="tool-btn" onclick="Nexus.ui.toggleWidget('search-bar'); this.parentElement.classList.remove('active')">🔍 FIND & REP</button>
+    <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar'); this.parentElement.classList.remove('active')">✍️ WRITE</button>
+    <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith'); this.parentElement.classList.remove('active')">⌨ KEY</button>
+ </div>
+ 
+ <canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
 
     <nav id="ribbon-container">
         <div id="ribbon-track">
             <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('manual')">📖 MANUAL</button>
             <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             <button class="tool-btn" style="background:#58a6ff; color:#000; border:none;" onclick="Nexus.toggleEditor()">🔄 SWAP ENGINE</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleWidget('utility-bar')">🛠 UTIL</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleWidget('search-bar')">🔍 FIND & REP</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar')">✍️ WRITE</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith')">⌨ KEY</button>
-            <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+            <button id="widget-drop-btn" class="tool-btn" onclick="Nexus.ui.toggleWidgetDrop(event)">🧩 WIDGETS ▾</button>
+<button class="tool-btn btn-gold" onclick="Nexus.ui.formatCode()">✨ AUTO-FORMAT</button>
+  <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('spotlight')">🛰️ SPOTLIGHT</button>
-         
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.beautify()">✨ BEAUTIFY</button>
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
             <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ FACTORY RESET</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁 VORTEX</button>
@@ -642,6 +664,13 @@
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin: 25px 0 10px 0;">
                 <div class="section-label" style="margin:0;">Virtual File System</div>
+             <div style="display:flex; flex-direction:column; gap:8px; margin-bottom: 20px;">
+    <button class="tool-btn btn-gold" style="width:100%; justify-content:center;" onclick="Nexus.vfs.mergeAllJS()">⚡ MERGE ALL JS</button>
+    <button class="tool-btn btn-gold" style="width:100%; justify-content:center;" onclick="Nexus.vfs.bundleToHTML()">⚡ BUNDLE TO HTML</button>
+    <button class="tool-btn btn-accent" style="width:100%; justify-content:center;" onclick="Nexus.vfs.splitJSFile()">✂️ MODULARIZE JS</button>
+    <button class="tool-btn btn-danger" style="width:100%; justify-content:center;" onclick="Nexus.vfs.clearAll()">🗑️ CLEAR VORTEX</button>
+             </div>
+             
                 <button class="tool-btn btn-accent" style="padding:5px 10px; font-size:9px;" onclick="Nexus.snapshots.create(); Nexus.ui.openModal('merger')">📸 SNAPSHOT</button>
             </div>
             
@@ -907,7 +936,16 @@
                         <option value="2">2 Spaces</option>
                         <option value="4">4 Spaces</option>
                     </select>
+               <div class="item-row">
+    <span>Formatting Engine</span>
+    <select id="pref-formatter" onchange="Nexus.settings.update('formatter', this.value)" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
+        <option value="prettier">Prettier (Strict)</option>
+        <option value="beautify">JS-Beautify (Legacy)</option>
+    </select>
+               </div>
+                 
                 </div>
+             
                 
                 <div class="section-label">Kinetic Widgets Config</div>
                 <div class="item-row" style="flex-direction:column; align-items:flex-start;">
@@ -1360,6 +1398,102 @@ window.Nexus = {
         alert(`Sovereign Merge Complete.`);
     }
 },
+     mergeAllJS() {
+        const jsFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.js'));
+        if(jsFiles.length === 0) return alert("No JS files found in Vortex to merge.");
+        let mergedCode = `/* NEXUS OMNI-MERGE: ${jsFiles.length} FILES */\n\n`;
+        jsFiles.forEach(f => { mergedCode += `\n/* --- SECTOR: ${f} --- */\n${Nexus.state.vfs[f] || ''}\n`; });
+        const newName = "merged_core.js";
+        Nexus.state.vfs[newName] = mergedCode;
+        Nexus.state.originals[newName] = mergedCode;
+        this.save(); this.renderAccordion(); this.switchFile(newName);
+        alert(`Successfully merged ${jsFiles.length} files into ${newName}.`);
+    },
+        bundleToHTML() {
+        let htmlFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.html'));
+        let targetHtml = htmlFiles.includes('index.html') ? 'index.html' : htmlFiles[0];
+        
+        if (!targetHtml) return alert("No HTML file found to act as the base shell.");
+
+        let code = Nexus.state.vfs[targetHtml];
+        
+        // Gather and Inject CSS
+        const cssFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.css'));
+        if (cssFiles.length > 0) {
+            let cssBlock = cssFiles.map(f => `/* --- ${f} --- */\n${Nexus.state.vfs[f]}`).join('\n');
+            
+            // FIX 1: Use a callback () => to prevent $ tokens from corrupting the CSS
+            if (code.includes('</head>')) {
+                code = code.replace('</head>', () => `\n<style>\n${cssBlock}\n</style>\n</head>`);
+            } else {
+                code += `\n<style>\n${cssBlock}\n</style>`;
+            }
+        }
+
+        // Gather and Inject JS
+        const jsFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.js'));
+        if (jsFiles.length > 0) {
+            let jsBlock = jsFiles.map(f => `/* --- ${f} --- */\n${Nexus.state.vfs[f]}`).join('\n');
+            
+            // FIX 2: Escape nested script tags so they don't shatter the HTML parser
+            jsBlock = jsBlock.replace(/<\/script>/gi, '<\\/script>');
+
+            // FIX 3: Use a callback () => to prevent $ tokens from corrupting the JS logic
+            if (code.includes('</body>')) {
+                code = code.replace('</body>', () => `\n<script>\n${jsBlock}\n</script>\n</body>`);
+            } else {
+                code += `\n<script>\n${jsBlock}\n</script>`;
+            }
+        }
+
+        const newName = "bundled_app.html";
+        Nexus.state.vfs[newName] = code;
+        Nexus.state.originals[newName] = code;
+        this.save();
+        this.renderAccordion();
+        this.switchFile(newName);
+        alert(`Project fully bundled into ${newName}. Code integrity preserved.`);
+    },
+
+    splitJSFile() {
+        const active = Nexus.state.activeFile;
+        if (!active.endsWith('.js')) return alert("Select an active .js file to modularize.");
+        const code = Nexus.state.vfs[active];
+        if (!code) return;
+        try {
+            const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+            let remainingNodes = [], splitCount = 0;
+            ast.body.forEach(node => {
+                let name = null;
+                if (node.type === 'FunctionDeclaration' && node.id) name = node.id.name;
+                else if (node.type === 'ClassDeclaration' && node.id) name = node.id.name;
+                else if (node.type === 'VariableDeclaration') {
+                    const decl = node.declarations[0];
+                    if (decl && decl.id && decl.init && (decl.init.type === 'ArrowFunctionExpression' || decl.init.type === 'FunctionExpression')) name = decl.id.name;
+                }
+                if (name) {
+                    const snippet = astring.generate(node);
+                    Nexus.state.vfs[name + ".js"] = snippet; Nexus.state.originals[name + ".js"] = snippet;
+                    splitCount++;
+                } else { remainingNodes.push(node); }
+            });
+            if (splitCount > 0) {
+                ast.body = remainingNodes;
+                const leftover = astring.generate(ast);
+                Nexus.state.vfs[active] = leftover; Nexus.state.originals[active] = leftover;
+                this.save(); this.renderAccordion(); this.switchFile(active);
+                alert(`Split into ${splitCount} new components.`);
+            } else { alert("No top-level functions or classes detected."); }
+        } catch (e) { alert("AST Error: " + e.message); }
+    },
+    clearAll() {
+        if (confirm("☢️ WIPE VORTEX: Delete ALL files in the Virtual File System? Settings/Vault remain.")) {
+            Nexus.state.vfs = {}; Nexus.state.originals = {};
+            db.files.clear(); db.contents.clear();
+            this.setEmptyState(); this.save();
+        }
+    },
+
 history: {
     // --- 1. THE CHRONICLE (RECORDING) ---
         record() {
@@ -3038,7 +3172,8 @@ outline: {
             if(document.getElementById('pref-util-mode')) document.getElementById('pref-util-mode').value = Nexus.state.prefs.utilDock || 'dock-right';
             if(document.getElementById('pref-writer-custom')) document.getElementById('pref-writer-custom').value = Nexus.state.prefs.customVocab || "";
             if(document.getElementById('pref-util-layout')) document.getElementById('pref-util-layout').value = Nexus.state.prefs.utilLayout || 'jump, up20, down20, color, undo, redo, tab';
-
+if(document.getElementById('pref-formatter')) document.getElementById('pref-formatter').value = Nexus.state.prefs.formatter || 'prettier';
+         
             const util = document.getElementById('utility-bar');
             if (util) {
                 if(Nexus.state.prefs.utilDock === 'dock-right') {
@@ -3708,7 +3843,44 @@ ui: {
                     .join('');
             }
         },
-        beautify() {
+        toggleWidgetDrop(e) {
+        const menu = document.getElementById('widget-drop-menu');
+        const rect = e.target.getBoundingClientRect();
+        menu.style.left = rect.left + 'px';
+        menu.classList.toggle('active');
+        const closeMenu = (evt) => {
+            if (!menu.contains(evt.target) && evt.target !== e.target) {
+                menu.classList.remove('active'); document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 50);
+    },
+    formatCode() {
+        if ((Nexus.state.prefs.formatter || 'prettier') === 'prettier') this.runPrettier();
+        else this.runJSBeautify();
+    },
+    async runPrettier() {
+        if(!Nexus.state.activeFile) return;
+        const ed = document.getElementById('raw-terminal');
+        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let code = ed.value, parser = 'babel', plugins = [prettierPlugins.babel, prettierPlugins.estree];
+        if (ext === 'html') { parser = 'html'; plugins = [prettierPlugins.html]; } 
+        else if (ext === 'css') { parser = 'css'; plugins = [prettierPlugins.postcss]; } 
+        else if (ext !== 'js' && ext !== 'json') return alert("Prettier unsupported here.");
+        try {
+            const formatted = await prettier.format(code, { parser, plugins, tabWidth: Nexus.state.prefs.tabWidth, printWidth: 80, singleQuote: true });
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: formatted } });
+            else ed.value = formatted;
+            Nexus.state.vfs[Nexus.state.activeFile] = formatted;
+            this.updateGutter(); Nexus.vfs.save();
+            const st = document.getElementById('foot-status');
+            st.innerText = "PRETTIFIED (STRICT)"; st.style.color = "var(--success)";
+            setTimeout(() => Nexus.ui.syncStatus(), 2000);
+        } catch(e) { alert("Prettier Error:\n" + e.message); }
+    },
+   
+ runJSBeautify() {
             if(!Nexus.state.activeFile) return;
             const ed = document.getElementById('raw-terminal');
             if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
