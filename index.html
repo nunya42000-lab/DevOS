@@ -1409,7 +1409,7 @@ window.Nexus = {
         this.save(); this.renderAccordion(); this.switchFile(newName);
         alert(`Successfully merged ${jsFiles.length} files into ${newName}.`);
     },
-        bundleToHTML() {
+            bundleToHTML() {
         let htmlFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.html'));
         let targetHtml = htmlFiles.includes('index.html') ? 'index.html' : htmlFiles[0];
         
@@ -1421,8 +1421,6 @@ window.Nexus = {
         const cssFiles = Object.keys(Nexus.state.vfs).filter(f => f.endsWith('.css'));
         if (cssFiles.length > 0) {
             let cssBlock = cssFiles.map(f => `/* --- ${f} --- */\n${Nexus.state.vfs[f]}`).join('\n');
-            
-            // FIX 1: Use a callback () => to prevent $ tokens from corrupting the CSS
             if (code.includes('</head>')) {
                 code = code.replace('</head>', () => `\n<style>\n${cssBlock}\n</style>\n</head>`);
             } else {
@@ -1435,14 +1433,17 @@ window.Nexus = {
         if (jsFiles.length > 0) {
             let jsBlock = jsFiles.map(f => `/* --- ${f} --- */\n${Nexus.state.vfs[f]}`).join('\n');
             
-            // FIX 2: Escape nested script tags so they don't shatter the HTML parser
+            // Escape nested script tags so they don't shatter the HTML parser
             jsBlock = jsBlock.replace(/<\/script>/gi, '<\\/script>');
 
-            // FIX 3: Use a callback () => to prevent $ tokens from corrupting the JS logic
+            // THE FIX: Break up the script tags so the IDE doesn't think the main file is ending!
+            const scriptOpen = '<scr' + 'ipt>';
+            const scriptClose = '</scr' + 'ipt>';
+
             if (code.includes('</body>')) {
-                code = code.replace('</body>', () => `\n<script>\n${jsBlock}\n</script>\n</body>`);
+                code = code.replace('</body>', () => `\n${scriptOpen}\n${jsBlock}\n${scriptClose}\n</body>`);
             } else {
-                code += `\n<script>\n${jsBlock}\n</script>`;
+                code += `\n${scriptOpen}\n${jsBlock}\n${scriptClose}`;
             }
         }
 
@@ -1454,6 +1455,7 @@ window.Nexus = {
         this.switchFile(newName);
         alert(`Project fully bundled into ${newName}. Code integrity preserved.`);
     },
+
 
     splitJSFile() {
         const active = Nexus.state.activeFile;
