@@ -659,9 +659,11 @@
         <div id="diag-out" class="p-body" style="background:#000; margin:15px; border-radius:10px; border:1px solid var(--border);">[SENTINEL ENGINE OFFLINE]</div>
     </div>
 <div id="shell-slide">
-    <div id="terminal-container" style="height:100%; width:100%;"></div>
+    <span style="color:var(--accent); font-family:monospace; font-weight:bold; font-size:18px; margin-right:10px;">&gt;</span>
+    <input type="text" id="shell-input" placeholder="Execute command..." onkeydown="if(event.key === 'Enter') { Nexus.shell.exec(this.value); this.value=''; }">
     <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:10;">&times;</button>
 </div>
+
 
 <div id="modal-spotlight" class="modal-overlay">
     <div class="modal-content">
@@ -2079,7 +2081,35 @@ intel: {
             });
         }
     },
-
+        spotlight: {
+            search(query) {
+                const res = document.getElementById('spotlight-results');
+                
+                // Clear out if the search bar is empty
+                if (!query) { 
+                    res.innerHTML = ''; 
+                    return; 
+                }
+                
+                const q = query.toLowerCase();
+                // Filter the VFS for matching filenames
+                const matches = Object.keys(Nexus.state.vfs).filter(f => f.toLowerCase().includes(q));
+                
+                if (matches.length === 0) {
+                    res.innerHTML = '<div style="color:var(--danger); font-size:12px; padding:10px;">No sectors match query.</div>';
+                    return;
+                }
+                
+                // Render clickable results that instantly swap the editor to that file
+                res.innerHTML = matches.map(f => `
+                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; transition: background 0.2s;" onclick="Nexus.vfs.switchFile('${f}'); Nexus.ui.closeModal('spotlight'); document.getElementById('spotlight-input').value=''; document.getElementById('spotlight-results').innerHTML='';">
+                        <span style="color:var(--gold); font-size:16px; margin-right:10px;">📄</span>
+                        <span style="font-family:monospace; font-size:14px; color:var(--text);">${f}</span>
+                    </div>
+                `).join('');
+            }
+        },
+ 
         dreamer: {
         // --- 1. UI ARCHITECT TEMPLATES ---
         templates: { 
