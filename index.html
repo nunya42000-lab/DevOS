@@ -2999,76 +2999,98 @@ outline: {
         Nexus.ui.openModal('outline');
     },
 
-    jump(ln) {
-        Nexus.ui.closeModal('outline');
-        Nexus.ui.jumpPrompt(ln); // Reuse your existing line jumper
-        const ed = document.getElementById('raw-terminal');
-        const lines = ed.value.split('\n');
-        let pos = 0;
-        for (let i = 0; i < Math.min(ln - 1, lines.length); i++) {
-            pos += lines[i].length + 1;
-        }
-        
-        ed.focus(); 
-        ed.setSelectionRange(pos, pos);
-        
-        setTimeout(() => {
-            // Logic: Top padding + (Line Index * Line Height) - half-viewport + half-line
-            const targetScroll = 15 + ((ln - 1) * 22) - (ed.clientHeight / 2) + 11;
-            ed.scrollTop = Math.max(0, targetScroll);
-        }, 50);
-    }
-},
+            jumpPrompt(directLine) {
+            if(!Nexus.state.activeFile) return;
+            
+            // If the Outline passes a line number, use it. Otherwise, open the prompt.
+            const ln = directLine || prompt("Jump to Line:");
+            
+            if (ln) {
+                const line = parseInt(ln);
+                
+                // --- CM6 ROUTING ---
+                if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                    const view = Nexus.editorCore.view;
+                    const doc = view.state.doc;
+                    // Clamp line request to actual document length
+                    const targetLine = Math.max(1, Math.min(line, doc.lines));
+                    const pos = doc.line(targetLine).from;
+                    
+                    view.dispatch({
+                        selection: { anchor: pos },
+                        scrollIntoView: true
+                    });
+                    view.focus();
+                    return;
+                }
+
+                // --- VANILLA ROUTING ---
+                const ed = document.getElementById('raw-terminal');
+                const lines = ed.value.split('\n');
+                let pos = 0;
+                for (let i = 0; i < Math.min(line - 1, lines.length); i++) pos += lines[i].length + 1;
+                
+                ed.focus(); 
+                ed.setSelectionRange(pos, pos);
+                
+                setTimeout(() => {
+                    const lh = 22; // Match your CSS line-height
+                    const targetScroll = 15 + ((line - 1) * lh) - (ed.clientHeight / 2) + (lh / 2);
+                    ed.scrollTop = Math.max(0, targetScroll);
+                }, 50);
+            }
+        },
+
 
     
     graph: {
-        analyze() {
-            const files = Object.keys(Nexus.state.vfs);
-            const deps = {};
-            const incoming = {};
+            analyze() {
+        const files = Object.keys(Nexus.state.vfs);
+        const deps = {};
+        const incoming = {};
+        
+        files.forEach(f => { deps[f] = []; incoming[f] = 0; });
+
+        files.forEach(file => {
+            const code = Nexus.state.vfs[file] || "";
+            const ext = file.split('.').pop().toLowerCase();
+            let matches = [];
+
+            // Catch HTML dependencies
+            if (ext === 'html') {
+                const htmlRegex = /<(?:script|link)[^>]+(?:src|href)=["']([^"']+)["']/gi;
+                let m; while((m = htmlRegex.exec(code))) matches.push(m[1]);
+            } 
             
-            // Initialize graph nodes
-            files.forEach(f => { deps[f] = []; incoming[f] = 0; });
+            // Catch ES6 Imports and Dynamic Imports, even without extensions
+            const importRegex = /(?:import|export)\s+(?:.*?from\s+)?['"]([^'"]+)['"]/gi;
+            let m; while((m = importRegex.exec(code))) matches.push(m[1]);
+            
+            // Catch CSS Imports
+            if (ext === 'css') {
+                const cssRegex = /@import\s+(?:url\()?["']?([^"'\)]+)["']?\)?/gi;
+                let c; while((c = cssRegex.exec(code))) matches.push(c[1]);
+            }
 
-            files.forEach(file => {
-                const code = Nexus.state.vfs[file] || "";
-                const ext = file.split('.').pop().toLowerCase();
-                let matches = [];
-
-                if (ext === 'html') {
-                    // Extract <script src="..."> and <link href="...">
-                    const scriptRegex = /<script[^>]+src=["']([^"']+)["']/gi;
-                    const linkRegex = /<link[^>]+href=["']([^"']+)["']/gi;
-                    let m;
-                    while((m = scriptRegex.exec(code))) matches.push(m[1]);
-                    while((m = linkRegex.exec(code))) matches.push(m[1]);
-                } else if (ext === 'js') {
-                    // Extract ES6: import {x} from './file.js' OR import './file.js'
-                    const importRegex = /import\s+(?:.*from\s+)?["']([^"']+)["']/gi;
-                    let m;
-                    while((m = importRegex.exec(code))) matches.push(m[1]);
-                } else if (ext === 'css') {
-                    // Extract CSS: @import url("file.css")
-                    const importRegex = /@import\s+(?:url\()?["']?([^"'\)]+)["']?\)?/gi;
-                    let m;
-                    while((m = importRegex.exec(code))) matches.push(m[1]);
+            matches.forEach(dep => {
+                let cleanDep = dep.replace(/^\.\//, '').replace(/^\//, '');
+                
+                // THE FIX: If the import drops the .js extension, automatically resolve it
+                if (!files.includes(cleanDep) && files.includes(cleanDep + '.js')) {
+                    cleanDep += '.js';
                 }
 
-                // Map relationships
-                matches.forEach(dep => {
-                    // Clean relative pathing
-                    let cleanDep = dep.replace(/^\.\//, '').replace(/^\//, '');
-                    if (files.includes(cleanDep)) {
-                        if (!deps[file].includes(cleanDep)) {
-                            deps[file].push(cleanDep);
-                            incoming[cleanDep]++;
-                        }
+                if (files.includes(cleanDep) && cleanDep !== file) {
+                    if (!deps[file].includes(cleanDep)) {
+                        deps[file].push(cleanDep);
+                        incoming[cleanDep]++;
                     }
-                });
+                }
             });
+        });
 
-            return { deps, incoming, files };
-        },
+        return { deps, incoming, files };
+    },
 
         render() {
             const { deps, incoming, files } = this.analyze();
