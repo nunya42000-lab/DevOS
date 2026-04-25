@@ -12,7 +12,9 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/astring/1.8.1/astring.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 
@@ -1036,18 +1038,38 @@ window.Nexus = {
     // --- 1. LIFECYCLE & PERSISTENCE ---
     async boot() {
         try {
-            // Migration-aware boot: Checks v42 primary, falls back to v41
-            let vfs = await localforage.getItem('Nexus.state.vfs_v42') || await localforage.getItem('Nexus.state.vfs_v41');
-            let orig = await localforage.getItem('nexus_originals_v42') || await localforage.getItem('nexus_originals_v41');
+        async boot() {
+        try {
+            // 1. Attempt to boot from Sovereign Database (Dexie)
+            const fileRecords = await db.files.toArray();
             
-            if (vfs && Object.keys(vfs).length > 0) {
-                Nexus.state.vfs = vfs;
-                Nexus.state.originals = orig || {};
+            if (fileRecords.length > 0) {
+                Nexus.state.vfs = {};
+                Nexus.state.originals = {};
+                
+                for (const file of fileRecords) {
+                    const contentRec = await db.contents.where('fileId').equals(file.id).first();
+                    Nexus.state.vfs[file.name] = contentRec ? contentRec.content : "";
+                    // Populate originals for refresh/revert functionality
+                    Nexus.state.originals[file.name] = Nexus.state.vfs[file.name];
+                }
             } else {
-                return this.setEmptyState();
+                // 2. Fallback & Migrate from Legacy LocalForage
+                let legacyVFS = await localforage.getItem('Nexus.state.vfs_v42') || await localforage.getItem('Nexus.state.vfs_v41');
+                let legacyOrig = await localforage.getItem('nexus_originals_v42') || await localforage.getItem('nexus_originals_v41');
+                
+                if (legacyVFS && Object.keys(legacyVFS).length > 0) {
+                    Nexus.state.vfs = legacyVFS;
+                    Nexus.state.originals = legacyOrig || {};
+                    // Execute migration to Dexie
+                    await this.syncToDexie();
+                    console.log("Sovereign Database: Migration from LocalForage complete.");
+                } else {
+                    return this.setEmptyState();
+                }
             }
 
-            // Integrity Check: Ensure every VFS entry has a 'Sovereign Original' backup
+            // Ensure integrity
             Object.keys(Nexus.state.vfs).forEach(fn => { 
                 if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn]; 
             });
@@ -1065,11 +1087,15 @@ window.Nexus = {
         }
     },
 
-    async save() {
-        // Persist using v42 keys to maintain migration integrity
-        await localforage.setItem('Nexus.state.vfs_v42', Nexus.state.vfs);
+
+        async save() {
+        // Push current RAM state to Dexie Database
+        await this.syncToDexie();
+        
+        // Update the legacy originals for the UI refresh feature
         await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
     },
+
 
     setEmptyState() {
         Nexus.state.activeFile = "";
@@ -1093,6 +1119,42 @@ window.Nexus = {
         this.renderAccordion();
         Nexus.ui.updateGutter();
     },
+    async syncToDexie() {
+        const now = Date.now();
+        
+        // 1. Sync RAM to Disk (Upsert)
+        for (const [name, content] of Object.entries(Nexus.state.vfs)) {
+            let fileRec = await db.files.where('name').equals(name).first();
+            let fileId;
+            
+            if (!fileRec) {
+                // New file: Insert into files table, then contents table
+                const ext = name.split('.').pop().toLowerCase();
+                fileId = await db.files.add({ name, path: '/', extension: ext, lastModified: now });
+                await db.contents.add({ fileId, content });
+            } else {
+                // Existing file: Update timestamp and content
+                fileId = fileRec.id;
+                await db.files.update(fileId, { lastModified: now });
+                
+                const contentRec = await db.contents.where('fileId').equals(fileId).first();
+                if (contentRec) {
+                    await db.contents.update(contentRec.id, { content });
+                } else {
+                    await db.contents.add({ fileId, content });
+                }
+            }
+        }
+        
+        // 2. Prune Deleted Files (If it's in Dexie but missing from RAM, delete it)
+        const allFiles = await db.files.toArray();
+        for (const f of allFiles) {
+            if (Nexus.state.vfs[f.name] === undefined) {
+                await db.contents.where('fileId').equals(f.id).delete();
+                await db.files.delete(f.id);
+            }
+        }
+    },
 
     // --- 2. CORE FILE OPERATIONS ---
     newFile() {
@@ -1115,29 +1177,34 @@ window.Nexus = {
         st.style.color = "var(--success)";
     },
 
-    switchFile(fn) {
-    if (!fn || (Nexus.state.vfs[fn] === undefined)) return;
+        switchFile(fn) {
+        if (!fn || (Nexus.state.vfs[fn] === undefined)) return;
 
-    Nexus.state.activeFile = fn;
-    Nexus.state.activeFileName = fn; // Added this line to fix logic routing
-    const code = Nexus.state.vfs[fn];
-    
-    const footFile = document.getElementById('foot-file');
-    if (footFile) footFile.innerText = "FILE: " + fn.toUpperCase();
+        Nexus.state.activeFile = fn;
+        Nexus.state.activeFileName = fn; 
+        const code = Nexus.state.vfs[fn];
+        
+        const footFile = document.getElementById('foot-file');
+        if (footFile) footFile.innerText = "FILE: " + fn.toUpperCase();
 
-    if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-        const view = Nexus.editorCore.view;
-        view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
-    } else {
-        const ed = document.getElementById('raw-terminal');
-        if (ed) {
-            ed.value = code;
-            Nexus.ui.updateGutter(); // Refresh gutter for the new file
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            // THE FIX: Create a pristine state to sever the Undo history from the previous file
+            const newState = Nexus.editorCore.modules.EditorState.create({
+                doc: code,
+                extensions: Nexus.editorCore.currentExtensions
+            });
+            Nexus.editorCore.view.setState(newState);
+        } else {
+            const ed = document.getElementById('raw-terminal');
+            if (ed) {
+                ed.value = code;
+                Nexus.ui.updateGutter();
+            }
         }
-    }
-    this.renderAccordion();
-    Nexus.ui.syncStatus(); // Ensure footer matches lock state
-},
+        this.renderAccordion();
+        Nexus.ui.syncStatus(); 
+    },
+
 
     renameFile(oldName) {
         const newName = prompt("Rename file to:", oldName);
@@ -1184,7 +1251,7 @@ window.Nexus = {
         Object.keys(Nexus.state.vfs).forEach(fn => { 
             const ext = fn.split('.').pop().toLowerCase(); 
             if (!groups[ext]) groups[ext] = []; 
-            groups[ext].push(fn); 
+           ll groups[ext].push(fn); 
         });
 
         root.innerHTML = Object.entries(groups).map(([ext, files]) => `
@@ -1295,74 +1362,86 @@ window.Nexus = {
 },
 history: {
     // --- 1. THE CHRONICLE (RECORDING) ---
-    record() {
-        // Prevent recording if no file is active or if we are currently undoing
+        record() {
         if(!Nexus.state.activeFile || Nexus.state.history.isLocked) return;
         
         const ed = document.getElementById('raw-terminal');
         const historyState = Nexus.state.history;
         
-        // Logic: Avoid recording identical states (prevents stack bloat)
+        let codeToSave = ed.value;
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            codeToSave = Nexus.editorCore.view.state.doc.toString();
+        }
+        
         const lastEntry = historyState.past[historyState.past.length - 1];
-        if (ed.value === lastEntry) return;
+        if (codeToSave === lastEntry) return;
 
-        // Commit current state to the past
-        historyState.past.push(ed.value);
-        
-        // Constraint: Keep memory lean on mobile (Limit to 50 steps)
+        // 1. Push to ultra-fast RAM stack for instant Undo/Redo
+        historyState.past.push(codeToSave);
         if(historyState.past.length > 50) historyState.past.shift();
-        
-        // Branching Logic: New input kills the "future" timeline
         historyState.future = []; 
+
+        // 2. Background Sync to Dexie Chronicle Archive
+        db.files.where('name').equals(Nexus.state.activeFile).first().then(fileRec => {
+            if (fileRec) {
+                db.history.add({
+                    timestamp: Date.now(),
+                    fileId: fileRec.id,
+                    content: codeToSave
+                });
+            }
+        }).catch(e => console.warn("Chronos Archive Sync Failed:", e));
     },
 
     // --- 2. TIME DILATION (UNDO) ---
-    undo() {
+        undo() {
+        // --- CM6 ROUTING ---
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            // Send standard Ctrl+Z keystroke to CM6
+            const view = Nexus.editorCore.view;
+            view.dispatch({ annotations: window.Transaction?.userEvent?.of("undo") });
+            // CM6 requires pulling the undo command from basicSetup, 
+            // the easiest fallback without a new import is forcing a keyboard event:
+            view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'z', ctrlKey: true}));
+            return;
+        }
+
+        // --- VANILLA ROUTING ---
         const historyState = Nexus.state.history;
         if(historyState.past.length === 0) return;
-
         const ed = document.getElementById('raw-terminal');
         
-        // Engage Lock: Prevent this change from being recorded as a "new" action
         historyState.isLocked = true;
-
-        // Move current state to the future stack
         historyState.future.push(ed.value);
-
-        // Restore the previous state
         const prev = historyState.past.pop();
         ed.value = prev;
 
-        // Sync the Matrix
         Nexus.state.vfs[Nexus.state.activeFile] = prev;
         Nexus.ui.updateGutter();
-
         historyState.isLocked = false;
-        console.log("Chronos: Undo executed.");
     },
 
-    // --- 3. THE RECALL (REDO) ---
     redo() {
+        // --- CM6 ROUTING ---
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            const view = Nexus.editorCore.view;
+            view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {key: 'y', ctrlKey: true}));
+            return;
+        }
+
+        // --- VANILLA ROUTING ---
         const historyState = Nexus.state.history;
         if(historyState.future.length === 0) return;
-
         const ed = document.getElementById('raw-terminal');
         
         historyState.isLocked = true;
-
-        // Move current state back to the past
         historyState.past.push(ed.value);
-
-        // Pull the next state from the future
         const next = historyState.future.pop();
         ed.value = next;
 
-        // Sync the Matrix
         Nexus.state.vfs[Nexus.state.activeFile] = next;
         Nexus.ui.updateGutter();
-
         historyState.isLocked = false;
-        console.log("Chronos: Redo executed.");
     }
 },
 sentinel: {
@@ -1919,7 +1998,20 @@ intel: {
                         "&": { height: "100%", width: "100%", flex: 1 },
                         ".cm-scroller": { overflow: "auto" }
                     });
-
+// Add this so we can reuse your exact CM6 setup when switching files
+Nexus.editorCore.currentExtensions = [
+    basicSetup, 
+    javascript(), 
+    oneDark,
+    fixedHeight,
+    EditorView.updateListener.of((update) => {
+        if (update.docChanged && update.userEvent) { // Added userEvent check to prevent infinite loops
+            Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
+            Nexus.vfs.save();
+        }
+    })
+];
+                 
                     Nexus.editorCore.view = new EditorView({
                         state: EditorState.create({
                             doc: currentCode,
@@ -2467,13 +2559,43 @@ inject() {
         }
     },
     vault: {
-        async boot() { 
-            const saved = await localforage.getItem('nexus_vault_v40'); 
-            if (saved) Nexus.state.vault = saved; 
-            this.render(); 
+                async boot() { 
+            try {
+                // 1. Attempt to load from Dexie
+                const records = await db.vault.toArray();
+                if (records.length > 0) {
+                    // Map Dexie's schema back to the RAM array structure
+                    Nexus.state.vault = records.map(r => ({ name: r.title, code: r.content, id: r.id }));
+                } else {
+                    // 2. Fallback & Migrate legacy LocalForage snippets
+                    const saved = await localforage.getItem('nexus_vault_v40'); 
+                    if (saved && saved.length > 0) { 
+                        Nexus.state.vault = saved; 
+                        // Push them into the new Dexie table
+                        const bulk = saved.map(s => ({ title: s.name, category: 'migrated', content: s.code }));
+                        await db.vault.bulkAdd(bulk);
+                    }
+                }
+                this.render(); 
+            } catch (e) {
+                console.error("Vault Boot Failure:", e);
+            }
         },
-        save() { localforage.setItem('nexus_vault_v40', Nexus.state.vault); },
-        grab() { 
+
+        async save() { 
+            try {
+                // Wipe and rewrite to ensure exact synchronization with the RAM array
+                await db.vault.clear();
+                const bulk = Nexus.state.vault.map(s => ({ title: s.name, category: 'general', content: s.code }));
+                await db.vault.bulkAdd(bulk);
+                
+                // Keep localforage updated as a temporary failsafe backup
+                localforage.setItem('nexus_vault_v40', Nexus.state.vault); 
+            } catch (e) {
+                console.error("Vault Sync Failure:", e);
+            }
+        },
+grab() { 
             const ed = document.getElementById('raw-terminal'); 
             const code = ed.value.substring(ed.selectionStart, ed.selectionEnd) || ed.value; 
             const name = prompt("Snippet Name:"); 
