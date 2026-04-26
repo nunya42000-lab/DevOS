@@ -1639,7 +1639,7 @@ history: {
         historyState.isLocked = false;
     }
 },
-Nexus.sentinel = {
+Sentinel : {
     engine: null,
     lastIssues: [],
 
@@ -2503,8 +2503,7 @@ Nexus.editorCore.currentExtensions = [
             const blob = new Blob([workerCode], { type: 'application/javascript' });
             this.worker = new Worker(URL.createObjectURL(blob));
  // The Right Way (Sovereign Architecture)
-const blob = new Blob([workerCode], { type: 'application/javascript' });
-const workerUrl = URL.createObjectURL(blob);
+RL(blob);
 
 // The browser reads the data from the URL RIGHT HERE
 this.worker = new Worker(workerUrl);
@@ -4122,7 +4121,7 @@ initInfiniteRibbon() {
 
     // Use requestAnimationFrame to ensure the initial jump is invisible
     requestAnimationFrame(() => { c.scrollLeft = t.scrollWidth / 3; });
-}
+},
  
                 initEdgeSwipes() { 
             let startX = 0; 
@@ -4245,7 +4244,7 @@ initInfiniteRibbon() {
             gutter.scrollTop = ed.scrollTop;
         },
 
-     runSandbox() { 
+     
      runSandbox() { 
     const f = document.getElementById('sandbox-frame');
     const c = document.getElementById('ghost-console'); 
