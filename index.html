@@ -3674,9 +3674,7 @@ exec(cmdStr) {
     // ... existing exec logic
  
         const ed = document.getElementById('raw-terminal');
-        const args = cmdStr.trim().split(' ');
-        const cmd = args[0].toLowerCase();
-        let out = "";
+        
 
         try {
             // Pro Mode Native Commands
