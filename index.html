@@ -2203,36 +2203,56 @@ intel: {
         healthDisp.onclick = () => alert("HEALTH DIAGNOSTICS:\n\n" + deductions.join('\n'));
         
         let color = (health < 50) ? 'var(--danger)' : (health < 80) ? 'var(--warn)' : 'var(--success)';
-        healthDisp.style.color = color;
-        healthBar.style.background = color;
+intel: {
+    scan() {
+        if(!Nexus.state.activeFile) return;
+        const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+        let vars = 0, funcs = 0;
+        let patterns = [];   // <--- FIXED: Initialized
+        let deductions = []; // <--- FIXED: Initialized
+        let health = 100;
+        const size = new Blob([code]).size;
+        const loc = code.split('\n').length;
+
+        try {
+            const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+            const walk = (node) => {
+                if (!node || typeof node !== 'object') return;
+                if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'MethodDefinition'].includes(node.type)) funcs++;
+                if (node.type === 'VariableDeclarator') vars++;
+                for (let key in node) {
+                    if (node[key] && typeof node[key] === 'object') {
+                        if (Array.isArray(node[key])) node[key].forEach(walk);
+                        else walk(node[key]);
+                    }
+                }
+            };
+            walk(ast);
+        } catch(e) { 
+            console.warn("AST Scan failed, using regex fallback.");
+            vars = (code.match(/(?:const|let|var)\s+\w+/g) || []).length;
+            funcs = (code.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
+        }
+
+        if(/document\.(getElementById|querySelector)/.test(code)) patterns.push('DOM Manipulator');
+        if(/async|await|Promise/.test(code)) patterns.push('Async Flow');
+        if(/fetch\(|XMLHttpRequest/.test(code)) patterns.push('Network Protocol');
+
+        if(size > 50000) { health -= 10; deductions.push("[-10] Payload exceeds 50KB"); }
+        if(/eval\(/.test(code)) { health -= 25; deductions.push("[-25] eval() detected"); }
         
-        document.getElementById('intel-metrics-grid').innerHTML = `
-            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">LINES OF CODE</div>
-                <div style="font-size:24px; font-weight:900; color:#fff;">${loc}</div>
-            </div>
-            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">PAYLOAD SIZE</div>
-                <div style="font-size:24px; font-weight:900; color:#fff;">${(size/1024).toFixed(2)} KB</div>
-            </div>
-            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">DECLARATIONS</div>
-                <div style="font-size:24px; font-weight:900; color:#fff;">${vars}</div>
-            </div>
-            <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">FUNCTIONS</div>
-                <div style="font-size:24px; font-weight:900; color:#fff;">${funcs}</div>
-            </div>
-        `;
+        health = Math.max(0, Math.min(100, health));
         
-        const pContainer = document.getElementById('intel-patterns');
-        pContainer.innerHTML = patterns.length > 0 
-            ? patterns.map(p => `<span style="background:rgba(47,129,247,0.15); border:1px solid var(--accent); color:var(--accent); padding:6px 12px; border-radius:6px; font-size:11px; font-weight:bold; letter-spacing:0.5px;">${p}</span>`).join('') 
-            : '<span style="font-size:12px; color:var(--text); opacity:0.5; font-style:italic;">No patterns detected.</span>';
-        
+        // UI Sync
+        document.getElementById('intel-target-name').innerText = Nexus.state.activeFile.toUpperCase();
+        const healthDisp = document.getElementById('intel-health-display');
+        healthDisp.innerText = health + '%';
+        document.getElementById('intel-health-bar').style.width = health + '%';
+        healthDisp.onclick = () => alert("DIAGNOSTICS:\n\n" + deductions.join('\n'));
+
         Nexus.ui.openModal('intel');
     }
-},
+}
 
 
     /* --- 2. THE SOVEREIGN INJECTOR --- */
@@ -4310,63 +4330,32 @@ initInfiniteRibbon() {
      
      runSandbox() {
     const f = document.getElementById('sandbox-frame');
-    // BUNDLE THE WHOLE PROJECT
-    let fullBundle = Nexus.vfs.getBundledCode(); // Implement a helper that joins all files
-    
-    // Inject Controller UI into the iframe
-    const controller = `
-        <div id="sandbox-ctrl" style="position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.8); padding:10px; border-radius:8px; z-index:999999; display:flex; gap:10px; font-family:sans-serif;">
-            <select onchange="window.NexusSpeed = this.value" style="background:#222; color:#fff; border:1px solid #444;">
-                <option value="1">1x Speed</option>
-                <option value="0.5">0.5x (Debug)</option>
-            </select>
-            <button onclick="location.reload()" style="background:var(--accent); border:none; color:#fff;">RELOAD</button>
-        </div>
-    `;
-    f.srcdoc = fullBundle + controller;
-}
-
-    // 2. The Sovereign Source: Always pull from VFS State (Safe for CM6 and Vanilla)
     const activeCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
-    
-    // 3. The Diagnostic Interceptor (Your Console Hook)
+    const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
+
+    // Diagnostic Interceptor
     const inj = "<scr" + "ipt>\n" +
         "const send = (msg, col) => {\n" +
             "const d = document.createElement('div');\n" +
-            "d.style.color = col;\n" +
-            "d.style.padding = '4px 0';\n" +
-            "d.style.borderBottom = '1px solid rgba(255,255,255,0.05)';\n" +
+            "d.style.color = col; d.style.padding = '4px 0';\n" +
             "d.innerText = '> ' + msg;\n" +
             "const container = window.parent.document.getElementById('ghost-console');\n" +
-            "if(container) { container.appendChild(d); d.scrollIntoView({ behavior: 'smooth' }); }\n" +
+            "if(container) { container.appendChild(d); d.scrollIntoView(); }\n" +
         "};\n" +
-        "console.log = (...args) => send(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#3fb950');\n" +
+        "console.log = (...args) => send(args.join(' '), '#3fb950');\n" +
         "console.error = (...args) => send('[ERR] ' + args.join(' '), '#f85149');\n" +
-        "console.warn = (...args) => send('[WARN] ' + args.join(' '), '#d29922');\n" +
-        "window.onerror = (msg, url, line, col, err) => {\n" +
-            "send('Crash at line ' + line + ': ' + msg, '#f85149');\n" +
-            "return false;\n" +
-        "};\n" +
+        "window.onerror = (m, u, l) => { send('Line ' + l + ': ' + m, '#f85149'); return false; };\n" +
     "</scr" + "ipt>\n"; 
-    
-    const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
-    
+
     if (isHtml) {
-        let htmlCode = activeCode;
-        // Inject into <head> for early interception
-        if (htmlCode.includes('<head>')) {
-            htmlCode = htmlCode.replace('<head>', '<head>\n' + inj);
-        } else {
-            htmlCode = inj + htmlCode;
-        }
-        f.srcdoc = htmlCode;
+        f.srcdoc = activeCode.includes('<head>') ? activeCode.replace('<head>', '<head>' + inj) : inj + activeCode;
     } else {
-        // Safe wrap for raw JS (escaping internal scripts to prevent premature termination)
         const safeJS = activeCode.replace(/<\/script>/gi, '<\\/script>'); 
         f.srcdoc = inj + '<scr'+'ipt type="module">\n' + safeJS + '\n</scr'+'ipt>'; 
     }
 },
 
+    
 
         async exportZIP() { 
             const status = document.getElementById('foot-status'); 
