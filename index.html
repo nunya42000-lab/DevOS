@@ -164,7 +164,50 @@
         color: var(--accent); 
         font-weight: bold; 
     }
-    
+    /* Help Modal Refined Styling */
+.modal-body {
+    background: #0d1117; /* Solid dark background */
+    color: #c9d1d9;
+    scrollbar-width: thin;
+}
+
+.man-h1 { 
+    color: var(--accent); 
+    font-size: 1.2rem; 
+    font-weight: 800; 
+    border-bottom: 1px solid var(--border); 
+    padding-bottom: 10px; 
+    margin: 25px 0 15px 0; 
+    letter-spacing: 1px;
+}
+
+.man-h2 { 
+    color: var(--gold); 
+    font-size: 0.95rem; 
+    font-weight: 700; 
+    margin-top: 20px; 
+}
+
+.man-p { 
+    font-size: 13px; 
+    line-height: 1.6; 
+    opacity: 0.85; 
+    margin-bottom: 15px; 
+}
+
+.man-p b { color: #fff; }
+
+/* Better bullet points for mobile */
+.modal-body ul {
+    padding-left: 18px;
+    list-style-type: square;
+    color: var(--accent);
+}
+
+.modal-body li {
+    margin-bottom: 8px;
+}
+ 
     .tab-close { 
         color: var(--danger); 
         font-size: 16px; 
@@ -3662,19 +3705,26 @@ shell: {
 },
 
 ui: {
-    async boot() { 
-        // Bootloader routing correction
-        await Nexus.vfs.boot(); 
-        await Nexus.vault.boot(); 
-        await Nexus.snapshots.boot(); 
-        await Nexus.settings.boot(); 
-        
-        Nexus.omni.init();           
+    // Update your boot function to be non-blocking
+async boot() { 
+    await Nexus.vfs.boot(); 
+    await Nexus.vault.boot(); 
+    await Nexus.snapshots.boot(); 
+    await Nexus.settings.boot(); 
+    
+    Nexus.omni.init();
+    
+    // Check if element exists before updating preview
+    if (document.getElementById('dreamer-type')) {
         Nexus.dreamer.updatePreview(); 
-        this.renderUtilBar();  
-        this.initInfiniteRibbon(); 
-        this.initEdgeSwipes(); 
-        
+    }
+    
+    this.renderUtilBar();  
+    this.initInfiniteRibbon(); 
+    this.initEdgeSwipes(); 
+    this.syncStatus(); // Ensure initial state is pushed to footer
+
+
         // Restore widget visibility from state
         Object.keys(Nexus.state.widgets).forEach(id => {
             const el = document.getElementById(id);
