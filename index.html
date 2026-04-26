@@ -547,42 +547,40 @@
  <canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
 
     <nav id="ribbon-container">
-        <div id="ribbon-track">
-          <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
-     
-         <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁</button>
-          <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
-          <button class="tool-btn" style="background:#58a6ff; color:#000; border:none;" onclick="Nexus.toggleEditor()">🔄 ENGINE</button>
-            <button id="widget-drop-btn" class="tool-btn" onclick="Nexus.ui.toggleWidgetDrop(event)">🧩 WIDGETS ▾</button>
-         
-                       <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('spotlight')">🔎</button>
-            <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.toggleMenu(event, 'comp', [{label:'🟢 Lean', action:()=>Nexus.compressor.run('lean')}, {label:'🟡 Functional', action:()=>Nexus.compressor.run('functional')}, {label:'🔴 Nuclear', action:()=>Nexus.compressor.run('nuclear')}])"
-            
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleMenu(event, 'format', [{label:'✨ Prettier', action:()=>Nexus.ui.runPrettier()}, {label:'🎨 Beautify', action:()=>Nexus.ui.runJSBeautify()}])"
-         
-            <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
-            
-            <button class="tool-btn btn-gold" onclick="Nexus.intel.scan()">🧠 INTEL</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
-    <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph');">🕸️ Radar</button>
-<button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
-            
-            <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ RUN</button>
-         <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
-            <button class="tool-btn" style="color:var(--danger)" onclick="Nexus.vault.cutFile()">✂️</button>
-            <button class="tool-btn" style="color:var(--success)" onclick="Nexus.vault.copyFile()">📋</button>
-            
-            <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleSlide('shell')">⌨ CMD</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️</button>
-   <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ NUKE</button>
-         <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('manual')">❓</button>
-      
-        </div>
-    </nav>
+    <div id="ribbon-track">
+        <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁</button>
+        <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
+        <button id="widget-drop-btn" class="tool-btn" onclick="Nexus.ui.toggleWidgetDrop(event)">🧩 WIDGETS ▾</button>
+        
+        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+        
+        <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleMenu(event, 'format', [
+            {label:'✨ Prettier (Strict)', action:()=>Nexus.ui.runPrettier()},
+            {label:'🎨 Beautify (Legacy)', action:()=>Nexus.ui.runJSBeautify()}
+        ])">FORMAT ▾</button>
+
+        <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.toggleMenu(event, 'comp', [
+            {label:'🟢 Lean (Whitespace)', action:()=>Nexus.compressor.run('lean')},
+            {label:'🟡 Functional (Density)', action:()=>Nexus.compressor.run('functional')},
+            {label:'🔴 Nuclear (Minify)', action:()=>Nexus.compressor.run('nuclear')}
+        ])">COMPRESS ▾</button>
+
+        <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleMenu(event, 'vault-actions', [
+            {label:'📂 Open Vault', action:()=>Nexus.ui.openModal('vault')},
+            {label:'✂️ Cut to Vault', action:()=>Nexus.vault.cutFile()},
+            {label:'📋 Copy to Vault', action:()=>Nexus.vault.copyFile()},
+            {label:'💥 Cut All to Vault', action:()=>Nexus.vault.cutAll()},
+            {label:'👯 Copy All to Vault', action:()=>Nexus.vault.copyAll()}
+        ])">VAULT ▾</button>
+
+        <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
+        <button class="tool-btn btn-gold" onclick="Nexus.intel.scan()">🧠 INTEL</button>
+        <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph');">🕸️ RADAR</button>
+        <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ RUN</button>
+        <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('manual')">❓</button>
+    </div>
+</nav>
+
 
     <div id="workspace">
         <div id="file-tabs-bar"></div>
@@ -2148,45 +2146,27 @@ Sentinel : {
      
 intel: {
     scan() {
-        if(!Nexus.state.activeFile) return alert("No active file to scan.");
+        if(!Nexus.state.activeFile) return;
         const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
-        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-        
-        const loc = code.split('\n').length;
-        const size = new Blob([code]).size;
-        
         let vars = 0, funcs = 0;
-        let patterns = [];
-        let health = 100;
-        let deductions = []; // Track exactly what lowers the score
 
-        // 1. AST Traversal for accurate counting in JS
-        if (ext === 'js') {
-            try {
-                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-                // Replace the walker in Nexus.intel.scan
-const walk = (node) => {
-    if (!node || typeof node !== 'object') return;
-    // Track ALL function types
-    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'MethodDefinition'].includes(node.type)) {
-        funcs++;
-    }
-    // Track Variables (including destructured)
-    if (node.type === 'VariableDeclarator') {
-        vars++;
-    }
-    // Deep recursive search
-    for (let key in node) {
-        if (node[key] && typeof node[key] === 'object') {
-            if (Array.isArray(node[key])) node[key].forEach(walk);
-            else walk(node[key]);
-        }
-    }
-};
-
-                walk(ast);
-            } catch(e) { deductions.push("[-20] AST Parse Failure (Syntax Error)"); health -= 20; }
-        } else {
+        try {
+            const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+            // RECURSIVE WALKER: This catches arrow funcs, methods, and nested declarations
+            const walk = (node) => {
+                if (!node || typeof node !== 'object') return;
+                if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'MethodDefinition'].includes(node.type)) funcs++;
+                if (node.type === 'VariableDeclarator') vars++;
+                for (let key in node) {
+                    if (node[key] && typeof node[key] === 'object') {
+                        if (Array.isArray(node[key])) node[key].forEach(walk);
+                        else walk(node[key]);
+                    }
+                }
+            };
+            walk(ast);
+        } catch(e) { console.warn("Intel AST partial fail, falling back to regex.
+                 } else {
             // HTML/CSS Fallback
             vars = (code.match(/(?:const|let|var)\s+\w+/g) || []).length;
             funcs = (code.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
@@ -3162,53 +3142,40 @@ grab() {
         
     
     graph: {
-            analyze() {
+    analyze() {
         const files = Object.keys(Nexus.state.vfs);
         const deps = {};
-        const incoming = {};
-        
-        files.forEach(f => { deps[f] = []; incoming[f] = 0; });
-
-        files.forEach(file => {
-            const code = Nexus.state.vfs[file] || "";
-            const ext = file.split('.').pop().toLowerCase();
-            let matches = [];
-
-            // Catch HTML dependencies
-            if (ext === 'html') {
-                const htmlRegex = /<(?:script|link)[^>]+(?:src|href)=["']([^"']+)["']/gi;
-                let m; while((m = htmlRegex.exec(code))) matches.push(m[1]);
-            } 
-            
-            // Catch ES6 Imports and Dynamic Imports, even without extensions
-            const importRegex = /(?:import|export)\s+(?:.*?from\s+)?['"]([^'"]+)['"]/gi;
-            let m; while((m = importRegex.exec(code))) matches.push(m[1]);
-            
-            // Catch CSS Imports
-            if (ext === 'css') {
-                const cssRegex = /@import\s+(?:url\()?["']?([^"'\)]+)["']?\)?/gi;
-                let c; while((c = cssRegex.exec(code))) matches.push(c[1]);
+        files.forEach(f => {
+            deps[f] = [];
+            const code = Nexus.state.vfs[f] || "";
+            // Improved Regex to catch imports without extensions
+            const importRegex = /(?:import|export|src|href).*?['"]([^'"]+)['"]/gi;
+            let m;
+            while((m = importRegex.exec(code))) {
+                let d = m[1].replace(/^\.\//, '');
+                if (files.includes(d)) deps[f].push(d);
+                else if (files.includes(d + '.js')) deps[f].push(d + '.js');
             }
-
-            matches.forEach(dep => {
-                let cleanDep = dep.replace(/^\.\//, '').replace(/^\//, '');
-                
-                // THE FIX: If the import drops the .js extension, automatically resolve it
-                if (!files.includes(cleanDep) && files.includes(cleanDep + '.js')) {
-                    cleanDep += '.js';
-                }
-
-                if (files.includes(cleanDep) && cleanDep !== file) {
-                    if (!deps[file].includes(cleanDep)) {
-                        deps[file].push(cleanDep);
-                        incoming[cleanDep]++;
-                    }
-                }
-            });
         });
-
-        return { deps, incoming, files };
+        return { deps, files };
     },
+    render() {
+        const { deps, files } = this.analyze();
+        const container = document.getElementById('graph-results');
+        
+        // RECURSIVE BRANCHING
+        const buildBranch = (node, depth = 0, visited = new Set()) => {
+            if (visited.has(node) || depth > 4) return ''; 
+            visited.add(node);
+            let html = `<div style="padding-left:15px; border-left:1px solid var(--border); margin:4px 0;">`;
+            html += `<span style="color:${depth === 0 ? 'var(--gold)' : 'var(--text)'}">${depth === 0 ? '📦' : '└──'} ${node}</span>`;
+            (deps[node] || []).forEach(child => html += buildBranch(child, depth + 1, new Set(visited)));
+            return html + `</div>`;
+        };
+
+        container.innerHTML = files.filter(f => f.endsWith('.html')).map(f => buildBranch(f)).join('');
+    }
+};
 
         // Updated Radar logic
 render() {
