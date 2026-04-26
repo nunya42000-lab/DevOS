@@ -677,7 +677,9 @@
                 <div style="color:#5c6370; align-self:center;">|</div>
                 <button class="kb-tab" onclick="Nexus.kb.switchLang('js')">JS</button>
                 <div style="color:#5c6370; align-self:center;">|</div>
-                <button class="kb-tab" onclick="Nexus.kb.switchLang('qwerty')">QWERTY</button>
+               <button class="kb-tab" onclick="Nexus.kb.switchLang('shell')">SHELL</button>
+           <div style="color:#5c6370; align-self:center;">|</div>
+             <button class="kb-tab" onclick="Nexus.kb.switchLang('qwerty')">QWERTY</button>
             </div>
             <div style="display:flex; gap:10px; align-items:center;">
                 <button class="sleek-btn" style="background:#282c34; border-radius:4px;" onclick="Nexus.kbEditor.open()">✏️</button>
@@ -3297,7 +3299,22 @@ render() {
                     {d: 'SPACE', i: ' '}, {d: 'ENTER', i: '\n'}, {d: 'BACKSPACE', i: 'BACKSPACE'}
                 ];
             }
-
+            if(!Nexus.state.prefs.kbLayouts.shell || Nexus.state.prefs.kbLayouts.shell.length === 0) {
+    Nexus.state.prefs.kbLayouts.shell = [
+        {d: 'HELP', i: 'help'},
+        {d: 'LS', i: 'ls'},
+        {d: 'TOUCH', i: 'touch *#'},
+        {d: 'RM', i: 'rm *#'},
+        {d: 'CAT', i: 'cat *#'},
+        {d: 'BUILD', i: 'build'},
+        {d: 'INTEL', i: 'intel'},
+        {d: 'FORMAT', i: 'format'},
+        {d: 'CLEAR', i: 'clear'},
+        {d: 'SPACE', i: ' '},
+        {d: 'ENTER', i: '\n'},
+        {d: 'BACKSPACE', i: 'BACKSPACE'}
+    ];
+}
             this.apply(); 
         },
 
@@ -3646,7 +3663,9 @@ commands: {
     nuke: "Factory reset DevOS."
 },
 exec(cmdStr) {
-    if (cmdStr === 'help') {
+   const args = cmdStr.trim().split(' ');
+        const cmd = args[0].toLowerCase(); 
+ if (cmdStr === 'help') {
         let helpText = "AVAILABLE COMMANDS:\\n";
         for (let c in this.commands) helpText += `${c.padEnd(8)} : ${this.commands[c]}\\n`;
         alert(helpText);
