@@ -557,9 +557,9 @@
          
                        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('spotlight')">🔎</button>
-            <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
+            <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.toggleMenu(event, 'comp', [{label:'🟢 Lean', action:()=>Nexus.compressor.run('lean')}, {label:'🟡 Functional', action:()=>Nexus.compressor.run('functional')}, {label:'🔴 Nuclear', action:()=>Nexus.compressor.run('nuclear')}])"
             
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.formatCode()">✨ FORMAT</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleMenu(event, 'format', [{label:'✨ Prettier', action:()=>Nexus.ui.runPrettier()}, {label:'🎨 Beautify', action:()=>Nexus.ui.runJSBeautify()}])"
          
             <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
             <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
@@ -2162,14 +2162,26 @@ intel: {
         if (ext === 'js') {
             try {
                 const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-                const walk = (node) => {
-                    if (!node || typeof node !== 'object') return;
-                    if (node.type === 'VariableDeclarator') vars++;
-                    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'MethodDefinition'].includes(node.type)) funcs++;
-                    Object.values(node).forEach(v => {
-                        if (Array.isArray(v)) v.forEach(walk); else walk(v);
-                    });
-                };
+                // Replace the walker in Nexus.intel.scan
+const walk = (node) => {
+    if (!node || typeof node !== 'object') return;
+    // Track ALL function types
+    if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'MethodDefinition'].includes(node.type)) {
+        funcs++;
+    }
+    // Track Variables (including destructured)
+    if (node.type === 'VariableDeclarator') {
+        vars++;
+    }
+    // Deep recursive search
+    for (let key in node) {
+        if (node[key] && typeof node[key] === 'object') {
+            if (Array.isArray(node[key])) node[key].forEach(walk);
+            else walk(node[key]);
+        }
+    }
+};
+
                 walk(ast);
             } catch(e) { deductions.push("[-20] AST Parse Failure (Syntax Error)"); health -= 20; }
         } else {
@@ -3196,68 +3208,34 @@ grab() {
         return { deps, incoming, files };
     },
 
-        render() {
-            const { deps, incoming, files } = this.analyze();
-            
-            // Anchor the tree to main entry points
-            let mainRoots = files.filter(f => incoming[f] === 0 && (f === 'index.html' || f === 'manifest.json'));
-            if (mainRoots.length === 0 && files.includes('index.html')) mainRoots = ['index.html'];
+        // Updated Radar logic
+render() {
+    const { deps, files } = this.analyze();
+    const container = document.getElementById('graph-results');
+    let html = `<div style="font-family:monospace; font-size:12px;">`;
 
-            // Orphans are files with 0 incoming connections that ARE NOT root entry points
-            const orphans = files.filter(f => incoming[f] === 0 && !mainRoots.includes(f));
+    const buildBranch = (node, depth = 0, visited = new Set()) => {
+        if (visited.has(node) || depth > 5) return ''; // Limit depth to 5 for mobile performance
+        visited.add(node);
+        
+        let branch = `<div style="padding-left:${depth * 15}px; border-left:1px solid var(--border);">`;
+        branch += `<span style="color:${depth === 0 ? 'var(--gold)' : 'var(--text)'}">${depth === 0 ? '📦' : '└──'} ${node}</span>`;
+        
+        (deps[node] || []).forEach(child => {
+            branch += buildBranch(child, depth + 1, new Set(visited));
+        });
+        
+        branch += `</div>`;
+        return branch;
+    };
 
-            const container = document.getElementById('graph-results');
-            if (!container) return;
+    files.filter(f => f.endsWith('.html')).forEach(root => {
+        html += buildBranch(root);
+    });
+    
+    container.innerHTML = html + `</div>`;
+ } },
 
-            let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.6;">`;
-            
-            // --- SECTION 1: THE ACTIVE TREE ---
-            html += `<h3 style="color:var(--success); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:0;">🌳 Active Matrix (Linked)</h3>`;
-            
-            const buildTree = (node, prefix, isLast, visited) => {
-                if (visited.has(node)) {
-                    return `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--danger)">🔄 ${node} (Circular Loop)</span></div>`;
-                }
-                visited.add(node);
-                
-                let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${node}'); Nexus.ui.closeModal('graph');">${node}</span></div>`;
-                
-                const children = deps[node] || [];
-                for (let i = 0; i < children.length; i++) {
-                    const childIsLast = i === children.length - 1;
-                    const newPrefix = prefix + (isLast ? '    ' : '│   ');
-                    line += buildTree(children[i], newPrefix, childIsLast, new Set(visited));
-                }
-                return line;
-            };
-
-            if (mainRoots.length > 0) {
-                mainRoots.forEach(r => {
-                    html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.vfs.switchFile('${r}'); Nexus.ui.closeModal('graph');">${r}</span></div>`;
-                    const children = deps[r] || [];
-                    for (let i = 0; i < children.length; i++) {
-                        html += buildTree(children[i], '', i === children.length - 1, new Set([r]));
-                    }
-                });
-            } else {
-                html += `<div style="color:var(--danger); opacity:0.8;">No entry points detected. Create an index.html file.</div>`;
-            }
-
-            // --- SECTION 2: THE ORPHANS ---
-            html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors (Unlinked)</h3>`;
-            
-            if (orphans.length > 0) {
-                orphans.forEach(o => {
-                    html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onmouseover="this.style.opacity='1'; this.style.color='var(--danger)'" onmouseout="this.style.opacity='0.6'; this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
-                });
-            } else {
-                html += `<div style="color:var(--success); opacity:0.8;">System clean. 100% of files are linked.</div>`;
-            }
-
-            html += `</div>`;
-            container.innerHTML = html;
-        }
-    },
             settings: {
         async boot() { 
             const saved = await localforage.getItem('nexus_prefs_v42'); 
@@ -3656,7 +3634,26 @@ writer: {
 },
 
 shell: {
-    exec(cmdStr) {
+    
+         // Add to Nexus.shell
+commands: {
+    ls: "List all project sectors.",
+    touch: "Create file: touch [name]",
+    rm: "Delete file: rm [name]",
+    build: "Compile project into ZIP.",
+    format: "Run Prettier on active file.",
+    intel: "Run deep neural scan.",
+    nuke: "Factory reset DevOS."
+},
+exec(cmdStr) {
+    if (cmdStr === 'help') {
+        let helpText = "AVAILABLE COMMANDS:\\n";
+        for (let c in this.commands) helpText += `${c.padEnd(8)} : ${this.commands[c]}\\n`;
+        alert(helpText);
+        return;
+    }
+    // ... existing exec logic
+ 
         const ed = document.getElementById('raw-terminal');
         const args = cmdStr.trim().split(' ');
         const cmd = args[0].toLowerCase();
@@ -3701,7 +3698,7 @@ shell: {
         } catch (e) {
             alert(`Shell Fault: ${e.message}`);
         }
-    }
+    }}
 },
 
 ui: {
@@ -3731,7 +3728,36 @@ async boot() {
             if (el) el.style.display = Nexus.state.widgets[id] ? 'flex' : 'none';
         });
     },
+    // Add this to Nexus.ui
+toggleMenu(event, menuId, options) {
+    let menu = document.getElementById(menuId + '-dropdown');
+    if (menu) {
+        menu.remove();
+        return;
+    }
+
+    menu = document.createElement('div');
+    menu.id = menuId + '-dropdown';
+    menu.style.cssText = `position:fixed; top:${event.target.getBoundingClientRect().bottom + 5}px; left:${event.target.getBoundingClientRect().left}px; background:var(--panel); border:1px solid var(--border); border-radius:8px; z-index:11000; display:flex; flex-direction:column; padding:5px; box-shadow:0 10px 30px rgba(0,0,0,0.5); min-width:150px;`;
+
+    options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.className = 'tool-btn';
+        btn.style.width = '100%';
+        btn.style.justifyContent = 'flex-start';
+        btn.style.marginBottom = '2px';
+        btn.innerHTML = opt.label;
+        btn.onclick = () => { opt.action(); menu.remove(); };
+        menu.appendChild(btn);
+    });
+
+    document.body.appendChild(menu);
     
+    // Close when clicking outside
+    const close = (e) => { if(!menu.contains(e.target) && e.target !== event.target) { menu.remove(); document.removeEventListener('click', close); } };
+    setTimeout(() => document.addEventListener('click', close), 50);
+}
+
     handleHandleTap(e, id) {
     const now = Date.now();
     if (Nexus.ui.lastTap && (now - Nexus.ui.lastTap < 300) && Nexus.ui.lastId === id) { 
@@ -4298,19 +4324,24 @@ initInfiniteRibbon() {
         },
 
      
-     runSandbox() { 
+     runSandbox() {
     const f = document.getElementById('sandbox-frame');
-    const c = document.getElementById('ghost-console'); 
-    if(!f || !c) return; 
+    // BUNDLE THE WHOLE PROJECT
+    let fullBundle = Nexus.vfs.getBundledCode(); // Implement a helper that joins all files
     
-    c.innerHTML = ""; 
+    // Inject Controller UI into the iframe
+    const controller = `
+        <div id="sandbox-ctrl" style="position:fixed; bottom:10px; right:10px; background:rgba(0,0,0,0.8); padding:10px; border-radius:8px; z-index:999999; display:flex; gap:10px; font-family:sans-serif;">
+            <select onchange="window.NexusSpeed = this.value" style="background:#222; color:#fff; border:1px solid #444;">
+                <option value="1">1x Speed</option>
+                <option value="0.5">0.5x (Debug)</option>
+            </select>
+            <button onclick="location.reload()" style="background:var(--accent); border:none; color:#fff;">RELOAD</button>
+        </div>
+    `;
+    f.srcdoc = fullBundle + controller;
+}
 
-    // 1. Check for Active File FIRST
-    if(!Nexus.state.activeFile) {
-        c.innerHTML = "<div style='color:var(--danger)'>&gt; Error: No active sector found in the Vortex.</div>";
-        return;
-    }
-    
     // 2. The Sovereign Source: Always pull from VFS State (Safe for CM6 and Vanilla)
     const activeCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
     
