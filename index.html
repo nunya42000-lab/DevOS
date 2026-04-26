@@ -22,6 +22,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
  <script src="https://cdn.jsdelivr.net/npm/astring@1.8.1/dist/astring.min.js"></script>
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script>
  
 <style>
     :root {
@@ -163,7 +164,50 @@
         color: var(--accent); 
         font-weight: bold; 
     }
-    
+    /* Help Modal Refined Styling */
+.modal-body {
+    background: #0d1117; /* Solid dark background */
+    color: #c9d1d9;
+    scrollbar-width: thin;
+}
+
+.man-h1 { 
+    color: var(--accent); 
+    font-size: 1.2rem; 
+    font-weight: 800; 
+    border-bottom: 1px solid var(--border); 
+    padding-bottom: 10px; 
+    margin: 25px 0 15px 0; 
+    letter-spacing: 1px;
+}
+
+.man-h2 { 
+    color: var(--gold); 
+    font-size: 0.95rem; 
+    font-weight: 700; 
+    margin-top: 20px; 
+}
+
+.man-p { 
+    font-size: 13px; 
+    line-height: 1.6; 
+    opacity: 0.85; 
+    margin-bottom: 15px; 
+}
+
+.man-p b { color: #fff; }
+
+/* Better bullet points for mobile */
+.modal-body ul {
+    padding-left: 18px;
+    list-style-type: square;
+    color: var(--accent);
+}
+
+.modal-body li {
+    margin-bottom: 8px;
+}
+ 
     .tab-close { 
         color: var(--danger); 
         font-size: 16px; 
@@ -504,36 +548,39 @@
 
     <nav id="ribbon-container">
         <div id="ribbon-track">
-            <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('manual')">❓</button>
-            <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
-            <button class="tool-btn" style="background:#58a6ff; color:#000; border:none;" onclick="Nexus.toggleEditor()">🔄 ENGINE</button>
+          <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+     
+         <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁</button>
+          <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
+          <button class="tool-btn" style="background:#58a6ff; color:#000; border:none;" onclick="Nexus.toggleEditor()">🔄 ENGINE</button>
             <button id="widget-drop-btn" class="tool-btn" onclick="Nexus.ui.toggleWidgetDrop(event)">🧩 WIDGETS ▾</button>
-<button class="tool-btn btn-gold" onclick="Nexus.ui.formatCode()">✨ FORMAT</button>
-  <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
+         
+                       <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('spotlight')">🔎</button>
-            <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
-            <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ NUKE</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁</button>
-          <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
-            <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ RUN</button>
+            <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
             
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
-            <button class="tool-btn" style="color:var(--danger)" onclick="Nexus.vault.cutFile()">✂️</button>
-            <button class="tool-btn" style="color:var(--success)" onclick="Nexus.vault.copyFile()">📋</button>
-            
+            <button class="tool-btn btn-gold" onclick="Nexus.ui.formatCode()">✨ FORMAT</button>
+         
             <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
             <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
             
             <button class="tool-btn btn-gold" onclick="Nexus.intel.scan()">🧠 INTEL</button>
             <button class="tool-btn btn-gold" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
     <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph');">🕸️ Radar</button>
-
-         
+<button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
+            
+            <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ RUN</button>
+         <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
+            <button class="tool-btn" style="color:var(--danger)" onclick="Nexus.vault.cutFile()">✂️</button>
+            <button class="tool-btn" style="color:var(--success)" onclick="Nexus.vault.copyFile()">📋</button>
+            
+            <button class="tool-btn" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.toggleSlide('shell')">⌨ CMD</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️</button>
+   <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢ NUKE</button>
+         <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('manual')">❓</button>
+      
         </div>
     </nav>
 
@@ -1638,30 +1685,150 @@ history: {
         historyState.isLocked = false;
     }
 },
-sentinel: {
-        engine: null,
- /* --- ADD THIS TO NEXUS.SENTINEL --- */
-log(msg, type = "info") {
-    const out = document.getElementById('diag-out');
-    if (!out) return;
-    const colors = {
-        success: "var(--success)",
-        danger: "var(--danger)",
-        warn: "var(--warn)",
-        accent: "var(--accent)"
-    };
-    const color = colors[type] || "var(--text)";
-    const entry = document.createElement('div');
-    entry.style.cssText = `color: ${color}; margin-bottom: 5px; font-size: 12px; border-left: 2px solid ${color}; padding-left: 10px;`;
-    entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
-    
-    // Clear the "OFFLINE" message on first real log
-    if (out.innerText.includes("OFFLINE")) out.innerHTML = "";
-    
-    out.prepend(entry);
-},
+Sentinel : {
+    engine: null,
+    lastIssues: [],
 
-        lastIssues: [],
+    // 1. Internal Logging Engine
+    log(msg, type = "info") {
+        const out = document.getElementById('diag-out');
+        if (!out) return;
+        const colors = { success: "var(--success)", danger: "var(--danger)", warn: "var(--warn)", accent: "var(--accent)" };
+        const entry = document.createElement('div');
+        entry.style.cssText = `color: ${colors[type] || "var(--text)"}; margin-bottom: 8px; border-left: 2px solid ${colors[type] || "var(--border)"}; padding-left: 10px; font-size: 12px;`;
+        entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        if (out.innerText.includes("OFFLINE")) out.innerHTML = "";
+        out.prepend(entry);
+    },
+
+    // 2. The Linter Logic
+    runLint() {
+        if (!Nexus.state.activeFile) return this.log("Error: No active sector.", "danger");
+        this.initEngine(); // Lazy-load Acorn engine
+
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+        let pre = "", post = "", isHtml = false;
+
+        // Isolate JS inside HTML if necessary
+        if (ext === 'html') {
+            const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+            if (match) {
+                isHtml = true;
+                const start = code.indexOf(match[1]);
+                pre = code.substring(0, start);
+                post = code.substring(start + match[1].length);
+                code = match[1];
+            } else return this.log("Lint: No script tags found.", "warn");
+        } else if (ext !== 'js') return this.log("Lint: Only JS/HTML supported.", "warn");
+
+        try {
+            const { issues } = this.engine.analyzeAndMutate(code, 'LINT');
+            this.lastIssues = issues; // Store for the "Fix" buttons
+
+            if (issues.length === 0) {
+                this.log("Matrix Solid. 0 Anomalies detected.", "success");
+            } else {
+                this.renderIssueList(issues);
+            }
+        } catch (e) {
+            this.log(`Structure Compromised: ${e.message}`, "danger");
+        }
+    },
+
+    // 3. Dynamic Issue Rendering
+    renderIssueList(issues) {
+        let html = `<div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+            <div style="color:var(--danger); font-weight:bold;">${issues.length} ISSUES</div>
+            <button class="tool-btn btn-success" style="padding:4px 8px; font-size:10px;" onclick="Nexus.sentinel.applyAllFixes()">FIX ALL</button>
+        </div>`;
+
+        issues.forEach((iss, idx) => {
+            const color = iss.severity === 'CRITICAL' ? 'var(--danger)' : 'var(--gold)';
+            html += `
+                <div style="background:var(--surface); padding:10px; margin-bottom:5px; border-left:3px solid ${color}; border-radius:4px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="color:${color}; font-size:10px; font-weight:bold;">${iss.id} | LN ${iss.line}</span>
+                        ${iss.mutate ? `<button class="tool-btn btn-gold" style="padding:2px 6px; font-size:9px;" onclick="Nexus.sentinel.applyFix(${idx})">FIX</button>` : ''}
+                    </div>
+                    <div style="font-size:11px; margin-top:4px; opacity:0.9;">${iss.message}</div>
+                </div>`;
+        });
+        document.getElementById('diag-out').innerHTML = html;
+    },
+
+    // 4. Atomic Mutation Engine
+    applyFix(idx) {
+        const issue = this.lastIssues[idx];
+        if (!issue || !issue.mutate) return;
+
+        this.mutateActiveVFS((code) => {
+            const { ast } = this.engine.analyzeAndMutate(code, 'LINT');
+            this.engine.traverse(ast, (node) => {
+                if (node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
+                    issue.mutate(node);
+                }
+            });
+            return astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+        });
+        this.log(`Fixed: ${issue.id}`, "success");
+        this.runLint(); // Re-scan after fix
+    },
+
+    applyAllFixes() {
+        this.mutateActiveVFS((code) => {
+            const { ast } = this.engine.analyzeAndMutate(code, 'LINT');
+            this.engine.traverse(ast, (node) => {
+                this.lastIssues.forEach(issue => {
+                    if (issue.mutate && node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
+                        issue.mutate(node);
+                    }
+                });
+            });
+            return astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+        });
+        this.log("Bulk Patch Applied.", "success");
+        this.lastIssues = [];
+        this.runLint();
+    },
+
+    // 5. HELPER: The Sovereign Mutation Pipeline
+    mutateActiveVFS(mutationFn) {
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let fullCode = Nexus.state.vfs[Nexus.state.activeFile];
+        let targetCode = fullCode;
+        let pre = "", post = "";
+
+        // Handle HTML Isolation
+        if (ext === 'html') {
+            const match = fullCode.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+            if (match) {
+                const start = fullCode.indexOf(match[1]);
+                pre = fullCode.substring(0, start);
+                post = fullCode.substring(start + match[1].length);
+                targetCode = match[1];
+            }
+        }
+
+        const mutated = mutationFn(targetCode);
+        const finalCode = pre + mutated + post;
+
+        // Sync to Editor & Disk
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: finalCode } });
+        } else {
+            document.getElementById('raw-terminal').value = finalCode;
+        }
+
+        Nexus.state.vfs[Nexus.state.activeFile] = finalCode;
+        Nexus.vfs.save();
+        Nexus.ui.updateGutter();
+    },
+    
+    // ... initEngine and other existing sentinel logic ...
+
+
+ 
         initEngine() {
             if (this.engine) return;
             class DevOSSentinelDual {
@@ -1934,54 +2101,7 @@ log(msg, type = "info") {
             }
         },
 
-        runLint() { 
-            if(!Nexus.state.activeFile) return; 
-            this.initEngine(); 
-            
-            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-            let codeToTest = Nexus.state.vfs[Nexus.state.activeFile] || "";
-            
-            if (ext === 'html') {
-                const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-                if (match) {
-                    codeToTest = match[1];
-                } else {
-                    return this.log("DEEP LINT: No valid script tags found to analyze.", "warn");
-                }
-            } else if (ext !== 'js') {
-                return this.log("DEEP LINT: AST Engine only supports JS and HTML script tags.", "warn");
-            }
-
-            try {
-                const { issues } = this.engine.analyzeAndMutate(codeToTest, 'LINT');
-                // Store issues for the Auto-Fix engine
-                this.lastIssues = issues;
-
-                if (issues.length === 0) {
-                    this.log("DEEP LINT: Matrix looks solid. No syntax anomalies.", "success");
-                } else {
-                    let outHtml = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-    <div style="color:var(--danger); font-weight:bold;">FOUND ${issues.length} ISSUE(S):</div>
-    <button class="tool-btn btn-success" style="padding:4px 10px; font-size:10px;" onclick="Nexus.sentinel.applyAllFixes()">FIX ALL</button>
-</div>`;   
-                 issues.forEach((iss, idx) => {
-                        const color = iss.severity === 'WARN' ? 'var(--warn)' : (iss.severity === 'CRITICAL' ? 'var(--danger)' : 'var(--gold)');
-                        outHtml += `
-                            <div style="background:var(--surface); padding:10px; margin-bottom:8px; border-left:3px solid ${color}; border-radius:4px;">
-                                <div style="display:flex; justify-content:space-between;">
-                                    <div style="color:${color}; font-size:11px; font-weight:bold; margin-bottom:4px;">[${iss.id}] - Line ${iss.line || '?'}</div>
-                                    ${iss.mutate ? `<button class="tool-btn btn-gold" style="padding:2px 6px; font-size:9px;" onclick="Nexus.applyFix(${idx})">FIX</button>` : ''}
-                                </div>
-                                <div style="font-size:12px; color:var(--text);">${iss.message}</div>
-                            </div>
-                        `;
-                    });
-                    document.getElementById('diag-out').innerHTML = outHtml;
-                }
-            } catch (e) {
-                this.log(`[AST PARSE ERROR] Code structure invalid.<br><br><span style="font-size:10px;">${e.message}</span>`, "danger");
-            }
-        },
+        
         scanDeps() { 
             if(!Nexus.state.activeFile) return; 
             const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
@@ -2005,135 +2125,27 @@ log(msg, type = "info") {
 
             document.getElementById('diag-out').innerHTML = htmlOut;
         },
-applyFix: function(issueIndex) {
-        const ed = document.getElementById('raw-terminal');
-        if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply fix.");
-        const issue = this.lastIssues[issueIndex];
-        if (!issue || !issue.mutate) return;
- const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-        let codeToTest = Nexus.state.vfs[Nexus.state.activeFile];
-        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-            codeToTest = Nexus.editorCore.view.state.doc.toString();
-        }
-
-        let preScript = "", postScript = "", isHtml = false;
-
-        // If it's HTML, we MUST isolate the script tag before parsing
-        if (ext === 'html') {
-            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-            if (match) {
-                isHtml = true;
-                const scriptStart = codeToTest.indexOf(match[1]);
-                preScript = codeToTest.substring(0, scriptStart);
-                postScript = codeToTest.substring(scriptStart + match[1].length);
-                codeToTest = match[1];
-            } else {
-                return alert("No valid script tags found to fix.");
-            }
-        }
-
-        try {
-            const { ast } = Nexus.sentinel.engine.analyzeAndMutate(codeToTest, 'LINT');
-            
-            // Replaced the missing 'acorn.walk' dependency with your internal Sentinel traverser
-            Nexus.sentinel.engine.traverse(ast, (node) => {
-                if (node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
-                    issue.mutate(node); 
-                }
-            });
-
-            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
-            
-            // Re-wrap the HTML shell if necessary
-            if (isHtml) {
-                fixedCode = preScript + fixedCode + postScript;
-            }
-
-            // Sync the updated code to whichever engine is currently active
-            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                Nexus.editorCore.view.dispatch({
-                    changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode }
-                });
-            } else {
-                ed.value = fixedCode;
-            }
-            
-            Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
-            Nexus.ui.updateGutter();
-            Nexus.vfs.save();
-            
-            Nexus.sentinel.log(`[AUTO-FIX] Applied resolution for ${issue.id}.`, "success");
-        } catch (e) {
-            Nexus.sentinel.log(`[FIX FAILED] AST reconstruction error: ${e.message}`, "danger");
-        }
-    },
-    applyAllFixes() {
-        const ed = document.getElementById('raw-terminal');
-        if (ed.hasAttribute('readonly')) return alert("Editor Locked. Cannot apply bulk fixes.");
-        if (!this.lastIssues.length) return;
-        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-        let codeToTest = ed.value;
-        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) codeToTest = Nexus.editorCore.view.state.doc.toString();
-
-        let preScript = "", postScript = "", isHtml = false;
-        if (ext === 'html') {
-            const match = codeToTest.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-            if (match) {
-                isHtml = true;
-                const scriptStart = codeToTest.indexOf(match[1]);
-                preScript = codeToTest.substring(0, scriptStart);
-                postScript = codeToTest.substring(scriptStart + match[1].length);
-                codeToTest = match[1];
-            } else return;
-        }
-
-        try {
-            const { ast } = this.engine.analyzeAndMutate(codeToTest, 'LINT');
-            
-            // Apply all mutations in a single AST traversal pass
-            this.engine.traverse(ast, (node) => {
-                this.lastIssues.forEach(issue => {
-                    if (issue.mutate && node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
-                        issue.mutate(node);
-                    }
-                });
-            });
-
-            let fixedCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
-            if (isHtml) fixedCode = preScript + fixedCode + postScript;
-
-            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: fixedCode } });
-            } else ed.value = fixedCode;
-            
-            Nexus.state.vfs[Nexus.state.activeFile] = fixedCode;
-            Nexus.ui.updateGutter();
-            Nexus.vfs.save();
-            
-            this.log(`[AUTO-MEDIC] System purged. Successfully applied ${this.lastIssues.filter(i => i.mutate).length} bulk mutations.`, "success");
-            this.lastIssues = []; // Clear queue
-        } catch (e) {
-            this.log(`Purge complete: ${this.lastIssues.length} mutations applied.`, "success");
-        this.lastIssues = [];
-        }
-    },
 
     
- pulse() {
-            if(!Nexus.state.activeFile) return;
-            const st = document.getElementById('foot-status');
-            const code = document.getElementById('raw-terminal').value;
-            
-            try { 
-                // Light-speed syntax check
-                new Function(code); 
-                // If it passes, don't change the text, just ensure the color is normal
-                if (st.style.color === "var(--danger)") st.style.color = "var(--success)";
-            } catch (e) { 
-                // If it's a syntax error, turn the status red to warn you immediately
-                st.style.color = "var(--danger)";
+     pulse() {
+        if(!Nexus.state.activeFile) return;
+        const st = document.getElementById('foot-status');
+        const code = document.getElementById('raw-terminal').value;
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        
+        try { 
+            if (ext === 'js') {
+                acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+            } else if (ext === 'html') {
+                const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+                if (match) acorn.parse(match[1], { ecmaVersion: 2022, sourceType: 'module' });
             }
- } },
+            if (st.style.color === "var(--danger)") st.style.color = "var(--success)";
+        } catch (e) { 
+            st.style.color = "var(--danger)";
+        }
+    }
+ },
 
      
 intel: {
@@ -2148,12 +2160,19 @@ intel: {
         let vars = 0, funcs = 0;
         let patterns = [];
         let health = 100;
-        let deductions = []; // Track exactly what lowers the score
+        let deductions = []; 
 
-        // 1. AST Traversal for accurate counting in JS
-        if (ext === 'js') {
+        // Extract script tags if it's an HTML file
+        let codeToParse = code;
+        if (ext === 'html') {
+            const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
+            if (match) codeToParse = match[1];
+        }
+
+        // 1. AST Traversal for accurate counting
+        if (ext === 'js' || (ext === 'html' && codeToParse !== code)) {
             try {
-                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+                const ast = acorn.parse(codeToParse, { ecmaVersion: 2022, sourceType: 'module' });
                 const walk = (node) => {
                     if (!node || typeof node !== 'object') return;
                     if (node.type === 'VariableDeclarator') vars++;
@@ -2163,12 +2182,20 @@ intel: {
                     });
                 };
                 walk(ast);
-            } catch(e) { deductions.push("[-20] AST Parse Failure (Syntax Error)"); health -= 20; }
+            } catch(e) { 
+                deductions.push("[-15] AST Engine Error: Syntax invalid, metrics estimated."); 
+                health -= 15; 
+                // Fallback to RegEx so the UI doesn't blank out
+                vars = (codeToParse.match(/(?:const|let|var)\s+\w+/g) || []).length;
+                funcs = (codeToParse.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
+            }
         } else {
-            // HTML/CSS Fallback
             vars = (code.match(/(?:const|let|var)\s+\w+/g) || []).length;
             funcs = (code.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
         }
+
+        // ... (Keep the rest of your pattern matching and UI rendering exactly the same)
+
 
         // 2. Pattern Recognition
         if(/document\.(getElementById|querySelector)/.test(code)) patterns.push('DOM Manipulator');
@@ -2540,6 +2567,15 @@ Nexus.editorCore.currentExtensions = [
             `;
             const blob = new Blob([workerCode], { type: 'application/javascript' });
             this.worker = new Worker(URL.createObjectURL(blob));
+ // The Right Way (Sovereign Architecture)
+RL(blob);
+
+// The browser reads the data from the URL RIGHT HERE
+this.worker = new Worker(workerUrl);
+
+// Now the 'workerUrl' is useless. Shred it to free up RAM.
+URL.revokeObjectURL(workerUrl); 
+         
         },
         runTest(code) {
             this.init();
@@ -3192,8 +3228,8 @@ grab() {
             const container = document.getElementById('graph-results');
             if (!container) return;
 
-            let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.6;">`;
-            
+            pre-wrap;):
+let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap;">`;
             // --- SECTION 1: THE ACTIVE TREE ---
             html += `<h3 style="color:var(--success); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:0;">🌳 Active Matrix (Linked)</h3>`;
             
@@ -3688,19 +3724,26 @@ shell: {
 },
 
 ui: {
-    async boot() { 
-        // Bootloader routing correction
-        await Nexus.vfs.boot(); 
-        await Nexus.vault.boot(); 
-        await Nexus.snapshots.boot(); 
-        await Nexus.settings.boot(); 
-        
-        Nexus.omni.init();           
+    // Update your boot function to be non-blocking
+async boot() { 
+    await Nexus.vfs.boot(); 
+    await Nexus.vault.boot(); 
+    await Nexus.snapshots.boot(); 
+    await Nexus.settings.boot(); 
+    
+    Nexus.omni.init();
+    
+    // Check if element exists before updating preview
+    if (document.getElementById('dreamer-type')) {
         Nexus.dreamer.updatePreview(); 
-        this.renderUtilBar();  
-        this.initInfiniteRibbon(); 
-        this.initEdgeSwipes(); 
-        
+    }
+    
+    this.renderUtilBar();  
+    this.initInfiniteRibbon(); 
+    this.initEdgeSwipes(); 
+    this.syncStatus(); // Ensure initial state is pushed to footer
+
+
         // Restore widget visibility from state
         Object.keys(Nexus.state.widgets).forEach(id => {
             const el = document.getElementById(id);
@@ -4131,26 +4174,28 @@ ui: {
                 activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
             }
         },
+initInfiniteRibbon() {
+    const c = document.getElementById('ribbon-container');
+    const t = document.getElementById('ribbon-track');
+    if (!c || !t) return;
 
-        initInfiniteRibbon() { 
-        const c = document.getElementById('ribbon-container');
-        const t = document.getElementById('ribbon-track'); 
-        if (!c || !t) return; 
-        
-        // Ensure track is long enough
-        t.innerHTML = t.innerHTML + t.innerHTML + t.innerHTML; 
-        
-        const resetScroll = () => {
-            const w = t.offsetWidth / 3;
-            if (c.scrollLeft >= w * 2) c.scrollLeft -= w;
-            if (c.scrollLeft <= 0) c.scrollLeft += w;
-        };
+    const fragment = document.createDocumentFragment();
+    // Clone the track twice to create the infinite loop nodes
+    fragment.appendChild(t.cloneNode(true));
+    fragment.appendChild(t.cloneNode(true));
+    t.appendChild(fragment);
 
-        c.addEventListener('scroll', resetScroll);
-        // Initial positioning
-        setTimeout(() => { c.scrollLeft = t.offsetWidth / 3; }, 100);
-    },
-        initEdgeSwipes() { 
+    c.addEventListener('scroll', () => {
+        const w = t.scrollWidth / 3;
+        if (c.scrollLeft >= w * 2) c.scrollLeft -= w;
+        if (c.scrollLeft <= 0) c.scrollLeft += w;
+    }, { passive: true }); // Passive = Smoother scrolling
+
+    // Use requestAnimationFrame to ensure the initial jump is invisible
+    requestAnimationFrame(() => { c.scrollLeft = t.scrollWidth / 3; });
+},
+ 
+                initEdgeSwipes() { 
             let startX = 0; 
             window.addEventListener('touchstart', (e) => { 
                 startX = e.touches[0].clientX; 
@@ -4271,55 +4316,61 @@ ui: {
             gutter.scrollTop = ed.scrollTop;
         },
 
+     
      runSandbox() { 
-            const f = document.getElementById('sandbox-frame');
-            const c = document.getElementById('ghost-console'); 
-            if(!f || !c) return; 
-            
-            c.innerHTML = ""; 
-            if(!Nexus.state.activeFile) {
-                c.innerHTML = "<div style='color:var(--danger)'>&gt; Error: No active file to run.</div>";
-                return;
-            }
-            
-            // Console & Error Interceptor for the Ghost Console
-            const inj = "<scr" + "ipt>\n" +
-                "const send = (msg, col) => {\n" +
-                    "const d = document.createElement('div');\n" +
-                    "d.style.color = col;\n" +
-                    "d.style.padding = '2px 0';\n" +
-                    "d.style.borderBottom = '1px solid rgba(255,255,255,0.05)';\n" +
-                    "d.innerText = '> ' + msg;\n" +
-                    "const container = window.parent.document.getElementById('ghost-console');\n" +
-                    "if(container) { container.appendChild(d); d.scrollIntoView(); }\n" +
-                "};\n" +
-                "console.log = (...args) => send(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#3fb950');\n" +
-                "console.error = (...args) => send('[ERR] ' + args.join(' '), '#f85149');\n" +
-                "console.warn = (...args) => send('[WARN] ' + args.join(' '), '#d29922');\n" +
-                "window.onerror = (msg, url, line, col, err) => {\n" +
-                    "send('Crash at line ' + line + ': ' + msg, '#f85149');\n" +
-                    "return false;\n" +
-                "};\n" +
-            "</scr" + "ipt>\n"; 
-            
-            const rawCode = document.getElementById('raw-terminal').value;
-            const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
-            
-            if (isHtml) {
-                let htmlCode = rawCode;
-                // Inject our diagnostic script into the head for early interception
-                if (htmlCode.includes('<head>')) {
-                    htmlCode = htmlCode.replace('<head>', '<head>\n' + inj);
-                } else {
-                    htmlCode = inj + htmlCode;
-                }
-                f.srcdoc = htmlCode;
-            } else {
-                // Wrap raw JS in a module-type script for preview
-                const safeCode = rawCode.replace(/<\/script>/gi, '<\\/script>'); 
-                f.srcdoc = inj + '<scr'+'ipt type="module">\n' + safeCode + '\n</scr'+'ipt>'; 
-            }
-        },
+    const f = document.getElementById('sandbox-frame');
+    const c = document.getElementById('ghost-console'); 
+    if(!f || !c) return; 
+    
+    c.innerHTML = ""; 
+
+    // 1. Check for Active File FIRST
+    if(!Nexus.state.activeFile) {
+        c.innerHTML = "<div style='color:var(--danger)'>&gt; Error: No active sector found in the Vortex.</div>";
+        return;
+    }
+    
+    // 2. The Sovereign Source: Always pull from VFS State (Safe for CM6 and Vanilla)
+    const activeCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
+    
+    // 3. The Diagnostic Interceptor (Your Console Hook)
+    const inj = "<scr" + "ipt>\n" +
+        "const send = (msg, col) => {\n" +
+            "const d = document.createElement('div');\n" +
+            "d.style.color = col;\n" +
+            "d.style.padding = '4px 0';\n" +
+            "d.style.borderBottom = '1px solid rgba(255,255,255,0.05)';\n" +
+            "d.innerText = '> ' + msg;\n" +
+            "const container = window.parent.document.getElementById('ghost-console');\n" +
+            "if(container) { container.appendChild(d); d.scrollIntoView({ behavior: 'smooth' }); }\n" +
+        "};\n" +
+        "console.log = (...args) => send(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#3fb950');\n" +
+        "console.error = (...args) => send('[ERR] ' + args.join(' '), '#f85149');\n" +
+        "console.warn = (...args) => send('[WARN] ' + args.join(' '), '#d29922');\n" +
+        "window.onerror = (msg, url, line, col, err) => {\n" +
+            "send('Crash at line ' + line + ': ' + msg, '#f85149');\n" +
+            "return false;\n" +
+        "};\n" +
+    "</scr" + "ipt>\n"; 
+    
+    const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
+    
+    if (isHtml) {
+        let htmlCode = activeCode;
+        // Inject into <head> for early interception
+        if (htmlCode.includes('<head>')) {
+            htmlCode = htmlCode.replace('<head>', '<head>\n' + inj);
+        } else {
+            htmlCode = inj + htmlCode;
+        }
+        f.srcdoc = htmlCode;
+    } else {
+        // Safe wrap for raw JS (escaping internal scripts to prevent premature termination)
+        const safeJS = activeCode.replace(/<\/script>/gi, '<\\/script>'); 
+        f.srcdoc = inj + '<scr'+'ipt type="module">\n' + safeJS + '\n</scr'+'ipt>'; 
+    }
+},
+
 
         async exportZIP() { 
             const status = document.getElementById('foot-status'); 
@@ -4432,4 +4483,3 @@ window.addEventListener('DOMContentLoaded', async () => {
 </script>
 </body>
 </html>
-
