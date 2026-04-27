@@ -2582,52 +2582,55 @@ URL.revokeObjectURL(workerUrl);
             });
         }
     },
-                spotlight: {
-            search(query) {
-                const res = document.getElementById('spotlight-results');
-                if (!query) { 
-                    res.innerHTML = ''; 
-                    return; 
+               spotlight: {
+    search(query) {
+        const res = document.getElementById('spotlight-results');
+        if (!query) { 
+            res.innerHTML = ''; 
+            return; 
+        }
+        
+        const q = query.toLowerCase();
+        const matches = [];
+        
+        // 1. Iterate through every file in the Vortex VFS 📁
+        Object.keys(Nexus.state.vfs).forEach(file => {
+            const content = Nexus.state.vfs[file] || "";
+            const lines = content.split('\n'); // Split into individual lines 🛠️
+            
+            // 2. Scan every single line for the query
+            lines.forEach((lineText, index) => {
+                if (lineText.toLowerCase().includes(q)) {
+                    matches.push({
+                        file: file,
+                        line: index + 1, // Lines are 1-indexed for the user
+                        text: lineText.trim()
+                    });
                 }
-                
-                const q = query.toLowerCase();
-                const matches = [];
-                
-                Object.keys(Nexus.state.vfs).forEach(file => {
-                    const content = (Nexus.state.vfs[file] || "").toLowerCase();
-                    const isNameMatch = file.toLowerCase().includes(q);
-                    
-                    if (isNameMatch || content.includes(q)) {
-                        let snippet = "";
-                        // If it's a content match, grab a 60-character context window
-                        if (!isNameMatch && content.includes(q)) {
-                            const idx = content.indexOf(q);
-                            const start = Math.max(0, idx - 20);
-                            const end = Math.min(content.length, idx + 40);
-                            snippet = "..." + (Nexus.state.vfs[file].substring(start, end))
-                                .replace(/</g, '&lt;').replace(/>/g, '&gt;') + "...";
-                        }
-                        matches.push({ file, snippet, isNameMatch });
-                    }
-                });
-                
-                if (matches.length === 0) {
-                    res.innerHTML = '<div style="color:var(--danger); font-size:12px; padding:10px;">No sectors match query.</div>';
-                    return;
-                }
-                
-                res.innerHTML = matches.map(m => `
-                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; transition: background 0.2s; flex-direction:column; align-items:flex-start;" 
-                         onclick="Nexus.vfs.switchFile('${m.file}'); Nexus.ui.closeModal('spotlight'); document.getElementById('spotlight-input').value=''; document.getElementById('spotlight-results').innerHTML='';">
-                        <div style="display:flex; align-items:center;">
-                            <span style="color:var(--gold); font-size:16px; margin-right:10px;">📄</span>
-                            <span style="font-family:monospace; font-size:14px; color:var(--text); font-weight:bold;">${m.file}</span>
-                        </div>
-                        ${m.snippet ? `<div style="font-size:11px; color:var(--text); opacity:0.6; margin-top:6px; font-family:monospace; padding-left:26px;">${m.snippet}</div>` : ''}
-                    </div>
-                `).join('');
-            }
-        },
+            });
+        });
+        
+        if (matches.length === 0) {
+            res.innerHTML = '<div style="color:var(--danger); font-size:12px; padding:10px;">No results found.</div>';
+            return;
+        }
+        
+        // 3. Render the full list with line numbers and click-to-jump logic 🔗
+        res.innerHTML = matches.map(m => `
+            <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; margin-bottom:5px; display:flex; flex-direction:column; align-items:flex-start;" 
+                 onclick="Nexus.vfs.switchFile('${m.file}'); setTimeout(() => Nexus.ui.jumpPrompt(${m.line}), 100); Nexus.ui.closeModal('spotlight');">
+                <div style="display:flex; justify-content:space-between; width:100%;">
+                    <span style="font-family:monospace; font-size:13px; color:var(--gold); font-weight:bold;">${m.file}</span>
+                    <span style="font-size:11px; color:var(--accent);">Line ${m.line}</span>
+                </div>
+                <div style="font-size:11px; color:var(--text); opacity:0.6; margin-top:4px; font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
+                    ${m.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                </div>
+            </div>
+        )`.join('');
+    }
+},
+ 
 
  
         dreamer: {
