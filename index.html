@@ -3829,6 +3829,95 @@ shell: {
     },
 
     async exec(cmdStr) {
+shell: {
+    // 🗄️ Registered commands for GitHub integration
+    commands: {
+        'pull': async (args) => {
+            const path = args[0];
+            if (!path) return "Error: Specify a file to pull.";
+            
+            const repo = Nexus.state.prefs.ghRepo;
+            const token = Nexus.state.prefs.ghToken;
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+            
+            try {
+                const res = await fetch(url, {
+                    headers: { "Authorization": `token ${token}` }
+                });
+                if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
+                
+                const data = await res.json();
+                // Decode from Base64 to UTF-8 string 🔓
+                const content = decodeURIComponent(escape(atob(data.content)));
+                
+                Nexus.state.vfs[path] = content;
+                return `${path}: Pulled from GitHub ✅`;
+            } catch (e) {
+                return `Pull failed: ${e.message} ❌`;
+            }
+        },
+
+        'push': async (args) => {
+            const path = args[0] || Nexus.state.activeFile;
+            if (!path) return "Error: No file specified.";
+
+            const commitMsg = args.slice(1).join(' ') || `Update ${path} via Nexus Prime`;
+            const repo = Nexus.state.prefs.ghRepo;
+            const token = Nexus.state.prefs.ghToken;
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+            
+            const content = Nexus.state.vfs[path];
+            if (content === undefined) return `Error: '${path}' not found locally.`;
+
+            try {
+                // Get current SHA to authorize the update 🆔
+                const getRes = await fetch(url, {
+                    headers: { "Authorization": `token ${token}` }
+                });
+                let sha = "";
+                if (getRes.ok) {
+                    const getData = await getRes.json();
+                    sha = getData.sha;
+                }
+
+                const payload = {
+                    message: commitMsg,
+                    content: btoa(unescape(encodeURIComponent(content))),
+                    sha: sha
+                };
+
+                const putRes = await fetch(url, {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": `token ${token}`,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!putRes.ok) {
+                    const errData = await putRes.json();
+                    throw new Error(errData.message || "Upload failed");
+                }
+
+                return `${path}: Pushed to GitHub ✅`;
+            } catch (e) {
+                return `Push failed: ${e.message} ❌`;
+            }
+        },
+
+        'config': (args) => {
+            const [action, key, value] = args;
+            if (action === 'set' && (key === 'ghToken' || key === 'ghRepo') && value) {
+                Nexus.state.prefs[key] = value;
+                return `Success: ${key} updated ⚙️`;
+            }
+            return "Usage: config set [ghToken|ghRepo] [value]";
+        }
+    },
+
+    // ⚡ The shell execution engine
+    async exec(cmdStr) {
         const parts = cmdStr.trim().split(/\s+/);
         const cmdName = parts[0].toLowerCase();
         const args = parts.slice(1);
@@ -3836,17 +3925,18 @@ shell: {
 
         try {
             if (action) {
-                const result = await action(args); // Handled as async
+                const result = await action(args); 
                 Nexus.ui.injectChar(`\n/* $ ${cmdStr} */\n/* -> ${result} */\n`);
                 return result;
             } else {
+                // Fallback to raw JS evaluation 🏃‍♂️
                 return eval(cmdStr);
             }
         } catch (e) {
             return `Shell Fault: ${e.message}`;
         }
     }
-},
+}
 
 
 ui: {
