@@ -2567,14 +2567,9 @@ Nexus.editorCore.currentExtensions = [
             const blob = new Blob([workerCode], { type: 'application/javascript' });
             this.worker = new Worker(URL.createObjectURL(blob));
  // The Right Way (Sovereign Architecture)
-RL(blob);
-
-// The browser reads the data from the URL RIGHT HERE
+const workerUrl = URL.createObjectURL(blob);
 this.worker = new Worker(workerUrl);
-
-// Now the 'workerUrl' is useless. Shred it to free up RAM.
-URL.revokeObjectURL(workerUrl); 
-         
+URL.revokeObjectURL(workerUrl);
         },
         runTest(code) {
             this.init();
@@ -2697,13 +2692,9 @@ inject() {
         
         Nexus.ui.closeModal('dreamer');
         Nexus.ui.updateGutter();
-        
-        if (Nexus.terminal) {
-            Nexus.terminal.log(`ARCHITECT: ${type} injected into ${ext.toUpperCase()} sector.`, "success");
+        if (Nexus.sentinel) {
+    Nexus.sentinel.log(`ARCHITECT: ${type} injected into ${ext.toUpperCase()} sector.`, "success");
         }
-    } else {
-        alert(`No blueprint found for .${ext} files.`);
-    }
 },
 
         // --- 3. STRESS TESTING & NIGHT CYCLE ---
@@ -3677,12 +3668,10 @@ shell: {
         const ed = document.getElementById('raw-terminal');
         const args = cmdStr.trim().split(' ');
         const cmd = args[0].toLowerCase();
-        let out = "";
-            } else {
-                // Fallback to JS Eval for math/logic testing
-                out = eval(cmdStr);
-    }
-     
+        et out = "";
+try {
+    // Pro Mode Native Commands
+    if (cmd === 'ls') {
         try {
             // Pro Mode Native Commands
             if (cmd === 'ls') {
