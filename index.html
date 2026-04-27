@@ -3663,49 +3663,132 @@ writer: {
 },
 
 shell: {
-    exec(cmdStr) {
-    const ed = document.getElementById('raw-terminal');
-    const args = cmdStr.trim().split(' ');
-    const cmd = args[0].toLowerCase();
-    let out = "";
-    
-    try {
-        if (cmd === 'ls') {
-            out = Object.keys(Nexus.state.vfs).join('\n');
-        } else if (cmd === 'touch' && args[1]) {
-            if (!Nexus.state.vfs[args[1]]) {
-                Nexus.state.vfs[args[1]] = "";
-                Nexus.state.originals[args[1]] = "";
-                Nexus.vfs.renderAccordion();
-                out = `Created sector: ${args[1]}`;
-            } else out = `Sector already exists: ${args[1]}`;
-        } else if (cmd === 'rm' && args[1]) {
-            if (Nexus.state.vfs[args[1]]) {
-                delete Nexus.state.vfs[args[1]];
-                delete Nexus.state.originals[args[1]];
-                Nexus.vfs.renderAccordion();
-                out = `Deleted sector: ${args[1]}`;
-            } else out = `Sector not found: ${args[1]}`;
-        } else if (cmd === 'cat' && args[1]) {
-            out = Nexus.state.vfs[args[1]] || `Sector not found: ${args[1]}`;
-        } else if (cmd === 'clear') {
-            ed.value = "";
-            Nexus.state.vfs[Nexus.state.activeFile] = "";
-            out = "Terminal cleared.";
-        } else {
-            out = eval(cmdStr);
-        }
+    commands: {
+        ls: () => {
+            return Object.keys(Nexus.state.vfs).join('\n') || "Vortex empty.";
+        },
+        
+        touch: (args) => {
+            const path = args[0];
+            if (!path) return "Error: Specify a path.";
+            if (Nexus.state.vfs[path]) return `Error: '${path}' already exists.`;
+            
+            // Path Integrity Scan 🛡️
+            const ancestors = path.split('/').slice(0, -1);
+            let currentPath = "";
+            for (const part of ancestors) {
+                currentPath = currentPath === "" ? part : `${currentPath}/${part}`;
+                if (Nexus.state.vfs[currentPath]) {
+                    return `Error: '${currentPath}' is a file, cannot be a folder.`;
+                }
+            }
+            
+            Nexus.state.vfs[path] = "";
+            Nexus.state.originals[path] = ""; 
+            Nexus.vfs.renderAccordion();
+            return `Created: ${path}`;
+        },
 
-        if (!ed.hasAttribute('readonly') && Nexus.state.activeFile) {
-            const outputLog = `\n/* $ ${cmdStr} */\n/* -> ${String(out).replace(/\n/g, '\n   ')} */\n`;
-            Nexus.ui.injectChar(outputLog);
-        } else {
-            alert(`[DevOS Shell] ${cmdStr}\n\n${out}`);
+        rm: (args) => {
+            const path = args[0];
+            if (!path || !Nexus.state.vfs[path]) return "Error: File not found.";
+            
+            delete Nexus.state.vfs[path];
+            delete Nexus.state.originals[path];
+            if (Nexus.state.activeFile === path) Nexus.state.activeFile = null;
+            Nexus.vfs.renderAccordion();
+            return `Deleted: ${path}`;
+        },
+
+        'delete-folder': (args) => {
+            const folderPath = args[0].endsWith('/') ? args[0] : `${args[0]}/`;
+            const allFiles = Object.keys(Nexus.state.vfs);
+            const toDelete = allFiles.filter(p => p.startsWith(folderPath));
+
+            if (toDelete.length === 0) return `Error: No files in '${folderPath}'`;
+
+            if (toDelete.includes(Nexus.state.activeFile)) {
+                Nexus.state.activeFile = null;
+            }
+
+            toDelete.forEach(p => {
+                delete Nexus.state.vfs[p];
+                delete Nexus.state.originals[p];
+            });
+
+            Nexus.vfs.renderAccordion();
+            return `Deleted ${toDelete.length} files from ${folderPath} 🗑️`;
+        },
+
+        cat: (args) => {
+            const path = args[0];
+            return Nexus.state.vfs[path] || "Error: File not found.";
+        },
+
+        'change-repo': (args) => {
+            const repo = args[0];
+            if (!repo) return "Usage: change-repo [user/repo]";
+            Nexus.settings.update('ghRepo', repo);
+            return `Target switched to: ${repo} 🔄`;
+        },
+
+        pull: async (args) => {
+            const path = args[0];
+            const token = Nexus.state.prefs.ghToken;
+            const repo = Nexus.state.prefs.ghRepo;
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+            try {
+                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+                if (!res.ok) throw new Error("File not found.");
+                const data = await res.json();
+                Nexus.state.vfs[path] = atob(data.content.replace(/\s/g, ''));
+                Nexus.vfs.renderAccordion();
+                return `${path}: Pulled 📥`;
+            } catch (e) { return `Error: ${e.message}`; }
+        },
+
+        'pull-all': async () => {
+            const token = Nexus.state.prefs.ghToken;
+            const repo = Nexus.state.prefs.ghRepo;
+            const url = `https://api.github.com/repos/${repo}/contents/`;
+            try {
+                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+                const items = await res.json();
+                let count = 0;
+                for (const item of items) {
+                    if (item.type === "file") {
+                        const fRes = await fetch(item.url, { headers: { "Authorization": `token ${token}` } });
+                        const fData = await fRes.json();
+                        Nexus.state.vfs[item.path] = atob(fData.content.replace(/\s/g, ''));
+                        count++;
+                    }
+                }
+                Nexus.vfs.renderAccordion();
+                return `Synced ${count} files ✅`;
+            } catch (e) { return `Sync failed: ${e.message}`; }
         }
-    } catch (e) {
-        alert(`Shell Fault: ${e.message}`);
+    },
+
+    async exec(cmdStr) {
+        const parts = cmdStr.trim().split(/\s+/);
+        const cmdName = parts[0].toLowerCase();
+        const args = parts.slice(1);
+        const action = this.commands[cmdName];
+
+        try {
+            if (action) {
+                const result = await action(args); // Handled as async
+                Nexus.ui.injectChar(`\n/* $ ${cmdStr} */\n/* -> ${result} */\n`);
+                return result;
+            } else {
+                return eval(cmdStr);
+            }
+        } catch (e) {
+            return `Shell Fault: ${e.message}`;
+        }
     }
-},
+}
+
 
 ui: {
     // Update your boot function to be non-blocking
