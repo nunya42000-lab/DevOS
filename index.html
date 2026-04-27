@@ -2015,25 +2015,24 @@ Sentinel : {
                     return { issues, ast };
                 }
                 traverse(node, callback, parent = null) {
-                    // --- THE FIX: The Primitive Shield ---
-                    // Abort immediately if the node is a primitive (like the number 69037)
-                    if (!node || typeof node !== 'object') return; 
-                    
-                    node.parent = parent; 
-                    callback(node, parent);
-                    
-                    Object.keys(node).forEach(key => {
-                        if (key === 'parent') return;
-                        const child = node[key];
-                        if (child && typeof child === 'object') { 
-                            if (Array.isArray(child)) {
-                                child.forEach(c => this.traverse(c, callback, node)); 
-                            } else if (child.type) {
-                                this.traverse(child, callback, node); 
-                            }
-                        }
-                    });
-                }
+    // THE FIX: Immediately abort if the node is a primitive (like a number or string)
+    if (!node || typeof node !== 'object') return; 
+    
+    node.parent = parent; 
+    callback(node, parent);
+    
+    Object.keys(node).forEach(key => {
+        if (key === 'parent') return;
+        const child = node[key];
+        if (child && typeof child === 'object') { 
+            if (Array.isArray(child)) {
+                child.forEach(c => this.traverse(c, callback, node)); 
+            } else if (child.type) {
+                this.traverse(child, callback, node); 
+            }
+        }
+    });
+},
 
 
                 findInNode(node, type, filter = () => true) {
@@ -3665,52 +3664,46 @@ writer: {
 
 shell: {
     exec(cmdStr) {
-        const ed = document.getElementById('raw-terminal');
-        const args = cmdStr.trim().split(' ');
-        const cmd = args[0].toLowerCase();
-        et out = "";
-try {
-    // Pro Mode Native Commands
-    if (cmd === 'ls') {
-        try {
-            // Pro Mode Native Commands
-            if (cmd === 'ls') {
-                out = Object.keys(Nexus.state.vfs).join('\n');
-            } else if (cmd === 'touch' && args[1]) {
-                if (!Nexus.state.vfs[args[1]]) {
-                    Nexus.state.vfs[args[1]] = "";
-                    Nexus.state.originals[args[1]] = "";
-                    Nexus.vfs.renderAccordion();
-                    out = `Created sector: ${args[1]}`;
-                } else out = `Sector already exists: ${args[1]}`;
-            } else if (cmd === 'rm' && args[1]) {
-                if (Nexus.state.vfs[args[1]]) {
-                    delete Nexus.state.vfs[args[1]];
-                    delete Nexus.state.originals[args[1]];
-                    Nexus.vfs.renderAccordion();
-                    out = `Deleted sector: ${args[1]}`;
-                } else out = `Sector not found: ${args[1]}`;
-            } else if (cmd === 'cat' && args[1]) {
-                out = Nexus.state.vfs[args[1]] || `Sector not found: ${args[1]}`;
-            } else if (cmd === 'clear') {
-                ed.value = "";
-                Nexus.state.vfs[Nexus.state.activeFile] = "";
-                out = "Terminal cleared.";
-            } else {
-                // Fallback to JS Eval for math/logic testing
-                out = new Function(`return eval(${JSON.stringify(cmdStr)})`)();
-            }
-
-            // Print Output
-            if (!ed.hasAttribute('readonly') && Nexus.state.activeFile) {
-                const outputLog = `\n/* $ ${cmdStr} */\n/* -> ${String(out).replace(/\n/g, '\n   ')} */\n`;
-                Nexus.ui.injectChar(outputLog);
-            } else {
-                alert(`[DevOS Shell] ${cmdStr}\n\n${out}`);
-            }
-        } catch (e) {
-            alert(`Shell Fault: ${e.message}`);
+    const ed = document.getElementById('raw-terminal');
+    const args = cmdStr.trim().split(' ');
+    const cmd = args[0].toLowerCase();
+    let out = "";
+    
+    try {
+        if (cmd === 'ls') {
+            out = Object.keys(Nexus.state.vfs).join('\n');
+        } else if (cmd === 'touch' && args[1]) {
+            if (!Nexus.state.vfs[args[1]]) {
+                Nexus.state.vfs[args[1]] = "";
+                Nexus.state.originals[args[1]] = "";
+                Nexus.vfs.renderAccordion();
+                out = `Created sector: ${args[1]}`;
+            } else out = `Sector already exists: ${args[1]}`;
+        } else if (cmd === 'rm' && args[1]) {
+            if (Nexus.state.vfs[args[1]]) {
+                delete Nexus.state.vfs[args[1]];
+                delete Nexus.state.originals[args[1]];
+                Nexus.vfs.renderAccordion();
+                out = `Deleted sector: ${args[1]}`;
+            } else out = `Sector not found: ${args[1]}`;
+        } else if (cmd === 'cat' && args[1]) {
+            out = Nexus.state.vfs[args[1]] || `Sector not found: ${args[1]}`;
+        } else if (cmd === 'clear') {
+            ed.value = "";
+            Nexus.state.vfs[Nexus.state.activeFile] = "";
+            out = "Terminal cleared.";
+        } else {
+            out = eval(cmdStr);
         }
+
+        if (!ed.hasAttribute('readonly') && Nexus.state.activeFile) {
+            const outputLog = `\n/* $ ${cmdStr} */\n/* -> ${String(out).replace(/\n/g, '\n   ')} */\n`;
+            Nexus.ui.injectChar(outputLog);
+        } else {
+            alert(`[DevOS Shell] ${cmdStr}\n\n${out}`);
+        }
+    } catch (e) {
+        alert(`Shell Fault: ${e.message}`);
     }
 },
 
@@ -3866,70 +3859,60 @@ async boot() {
         },
 
                 injectChar(val) {
-            const ed = document.getElementById('raw-terminal');
-            if (ed.hasAttribute('readonly') || !Nexus.state.activeFile) return;
+    const ed = document.getElementById('raw-terminal');
+    if (ed.hasAttribute('readonly') || !Nexus.state.activeFile) return;
 
-            // Pre-process special characters and cursor positioning
-            let processed = val.replace(/\*\+/g, '\t').replace(/\\t/g, '\t'); 
-            let cursorOffset = processed.indexOf('*#'); 
-            
-            if (cursorOffset !== -1) {
-                processed = processed.replace(/\*\#/g, '');
-            } else {
-                cursorOffset = processed.length;
-            }
+    let processed = val.replace(/\*\+/g, '\t').replace(/\\t/g, '\t'); 
+    let cursorOffset = processed.indexOf('*#'); 
+    
+    if (cursorOffset !== -1) {
+        processed = processed.replace(/\*\#/g, '');
+    } else {
+        cursorOffset = processed.length;
+    }
 
-            // --- NEW: CM6 ENGINE ROUTING ---
-            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                const view = Nexus.editorCore.view;
-                const pos = view.state.selection.main.head;
-                
-                if (val === 'BACKSPACE') {
-                    if (pos > 0) {
-                        view.dispatch({
-                            changes: { from: pos - 1, to: pos, insert: "" },
-                            selection: { anchor: pos - 1 }
-                        });
-                    }
-                } else {
-                    view.dispatch({
-                        changes: { from: pos, insert: processed },
-                        selection: { anchor: pos + cursorOffset }
-                    });
-                }
-                
-                Nexus.state.vfs[Nexus.state.activeFile] = view.state.doc.toString();
-                Nexus.vfs.save();
-                Nexus.history.record();
-                return; // Exit out so we don't double-type into the vanilla terminal
+    if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+        const view = Nexus.editorCore.view;
+        const pos = view.state.selection.main.head;
+        
+        if (val === 'BACKSPACE') {
+            if (pos > 0) {
+                view.dispatch({
+                    changes: { from: pos - 1, to: pos, insert: "" },
+                    selection: { anchor: pos - 1 }
+                });
             }
+        } else {
+            view.dispatch({
+                changes: { from: pos, insert: processed },
+                selection: { anchor: pos + cursorOffset }
+            });
+        }
+        
+        Nexus.state.vfs[Nexus.state.activeFile] = view.state.doc.toString();
+        Nexus.vfs.save();
+        Nexus.history.record();
+        return; 
+    }
 
-            // --- VANILLA TERMINAL ROUTING ---
-            const start = ed.selectionStart;
-            const end = ed.selectionEnd;
-            
-            if (val === 'BACKSPACE') {
-                if (start === end && start > 0) {
-                    ed.value = ed.value.substring(0, start - 1) + ed.value.substring(end);
-                    ed.setSelectionRange(start - 1, start - 1);
-                } else if (start !== end) {
-                    ed.value = ed.value.substring(0, start) + ed.value.substring(end);
-                    ed.setSelectionRange(start, start);
-                }
-            } else {
-                ed.value = ed.value.substring(0, start) + processed + ed.value.substring(end);
-                const newPos = start + cursorOffset;
-                ed.setSelectionRange(newPos, newPos);
-            }
-            
-            ed.focus();
-            Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
-            this.updateGutter();
-            
-            Nexus.vfs.save();
-            Nexus.history.record();
-            ed.dispatchEvent(new Event('input'));
-        },
+    const start = ed.selectionStart;
+    const end = ed.selectionEnd;
+    
+    if (val === 'BACKSPACE') {
+        if (start === end && start > 0) {
+            ed.value = ed.value.substring(0, start - 1) + ed.value.substring(end);
+            ed.setSelectionRange(start - 1, start - 1);
+        }
+    } else {
+        ed.value = ed.value.substring(0, start) + processed + ed.value.substring(end);
+        ed.setSelectionRange(start + cursorOffset, start + cursorOffset);
+    }
+    
+    Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+    this.updateGutter();
+    Nexus.vfs.save();
+    Nexus.history.record();
+},
 
         
       
