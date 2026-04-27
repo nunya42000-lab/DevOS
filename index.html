@@ -736,10 +736,10 @@
     <div id="diag-hub">
         <div class="p-head"><span>SENTINEL DIAGNOSTICS</span><button class="close-x" onclick="Nexus.ui.toggleSlide('diag')">&times;</button></div>
         <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding: 0 15px;">
-            <button class="tool-btn btn-danger" onclick="Nexus.sentinel.runLint()">1. DEEP LINT (16+ RULES)</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.sentinel.runMedicString()">2. MEDIC: STRING PATCH</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.sentinel.runMedicAST()">3. MEDIC: AST REBUILD</button>
-            <button class="tool-btn btn-accent" onclick="Nexus.sentinel.scanDeps()">4. SCAN IMPORTS</button>
+            <button class="tool-btn btn-danger" onclick="Nexus.Sentinel.runLint()">1. DEEP LINT (16+ RULES)</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicString()">2. MEDIC: STRING PATCH</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicAST()">3. MEDIC: AST REBUILD</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.Sentinel.scanDeps()">4. SCAN IMPORTS</button>
         </div>
         <div id="diag-out" class="p-body" style="background:#000; margin:15px; border-radius:10px; border:1px solid var(--border);">[SENTINEL ENGINE OFFLINE]</div>
     </div>
@@ -1739,7 +1739,7 @@ Sentinel : {
     renderIssueList(issues) {
         let html = `<div style="display:flex; justify-content:space-between; margin-bottom:10px;">
             <div style="color:var(--danger); font-weight:bold;">${issues.length} ISSUES</div>
-            <button class="tool-btn btn-success" style="padding:4px 8px; font-size:10px;" onclick="Nexus.sentinel.applyAllFixes()">FIX ALL</button>
+            <button class="tool-btn btn-success" style="padding:4px 8px; font-size:10px;" onclick="Nexus.Sentinel.applyAllFixes()">FIX ALL</button>
         </div>`;
 
         issues.forEach((iss, idx) => {
@@ -1748,7 +1748,7 @@ Sentinel : {
                 <div style="background:var(--surface); padding:10px; margin-bottom:5px; border-left:3px solid ${color}; border-radius:4px;">
                     <div style="display:flex; justify-content:space-between; align-items:center;">
                         <span style="color:${color}; font-size:10px; font-weight:bold;">${iss.id} | LN ${iss.line}</span>
-                        ${iss.mutate ? `<button class="tool-btn btn-gold" style="padding:2px 6px; font-size:9px;" onclick="Nexus.sentinel.applyFix(${idx})">FIX</button>` : ''}
+                        ${iss.mutate ? `<button class="tool-btn btn-gold" style="padding:2px 6px; font-size:9px;" onclick="Nexus.Sentinel.applyFix(${idx})">FIX</button>` : ''}
                     </div>
                     <div style="font-size:11px; margin-top:4px; opacity:0.9;">${iss.message}</div>
                 </div>`;
@@ -1824,7 +1824,7 @@ Sentinel : {
         Nexus.ui.updateGutter();
     },
     
-    // ... initEngine and other existing sentinel logic ...
+    // ... initEngine and other existing Sentinel logic ...
 
 
  
@@ -2485,11 +2485,11 @@ Nexus.editorCore.currentExtensions = [
                 if (!filename.endsWith('.js')) return;
 
                 try {
-                    Nexus.sentinel.initEngine();
-                    const { ast } = Nexus.sentinel.engine.analyzeAndMutate(code, 'LINT');
+                    Nexus.Sentinel.initEngine();
+                    const { ast } = Nexus.Sentinel.engine.analyzeAndMutate(code, 'LINT');
                     let changed = false;
 
-                    Nexus.sentinel.engine.traverse(ast, (node) => {
+                    Nexus.Sentinel.engine.traverse(ast, (node) => {
                         if (node.type === 'Identifier' && node.name === oldName) {
                             node.name = newName;
                             changed = true;
@@ -2691,15 +2691,15 @@ inject() {
         
         Nexus.ui.closeModal('dreamer');
         Nexus.ui.updateGutter();
-        if (Nexus.sentinel) {
-    Nexus.sentinel.log(`ARCHITECT: ${type} injected into ${ext.toUpperCase()} sector.`, "success");
+        if (Nexus.Sentinel) {
+    Nexus.Sentinel.log(`ARCHITECT: ${type} injected into ${ext.toUpperCase()} sector.`, "success");
         }
 }
 },
 
         // --- 3. STRESS TESTING & NIGHT CYCLE ---
         async startNightCycle() {
-            Nexus.sentinel.log("[DREAMER] Initiating Background Stress Test...", "accent");
+            Nexus.Sentinel.log("[DREAMER] Initiating Background Stress Test...", "accent");
             const testPromises = [];
             
             for (const [filename, code] of Object.entries(Nexus.state.vfs)) {
@@ -2715,14 +2715,14 @@ inject() {
                 } catch(e) {}
             }
             
-            Nexus.sentinel.log(`[DREAMER] Queued ${testPromises.length} logic branches for Chronos.`, "warn");
+            Nexus.Sentinel.log(`[DREAMER] Queued ${testPromises.length} logic branches for Chronos.`, "warn");
             const results = await Promise.all(testPromises);
             
             const failures = results.filter(r => !r.success);
             if (failures.length > 0) {
-                Nexus.sentinel.log(`[DREAMER] Night Cycle: ${failures.length} branches threw exceptions.`, "danger");
+                Nexus.Sentinel.log(`[DREAMER] Night Cycle: ${failures.length} branches threw exceptions.`, "danger");
             } else {
-                Nexus.sentinel.log(`[DREAMER] Night Cycle: All branches survived time-dilation.`, "success");
+                Nexus.Sentinel.log(`[DREAMER] Night Cycle: All branches survived time-dilation.`, "success");
             }
         }
     },
@@ -2786,7 +2786,7 @@ inject() {
             }
             
             // Route gesture to active UI logic
-            if (dirStr === 'DL') Nexus.sentinel.runLint(); 
+            if (dirStr === 'DL') Nexus.Sentinel.runLint(); 
             if (dirStr === 'UDUD') Nexus.intel.scan();     
             if (dirStr === 'DRUL') Nexus.ui.beautify();    
         }
@@ -4478,7 +4478,7 @@ editor.oninput = () => {
     if(!Nexus.state.activeFile) return;
     Nexus.state.vfs[Nexus.state.activeFile] = editor.value; 
     Nexus.ui.updateGutter(); 
-    Nexus.sentinel.pulse(); 
+    Nexus.Sentinel.pulse(); 
     
     const st = document.getElementById('foot-status');
     st.innerText = "SAVING...";
