@@ -2156,7 +2156,6 @@ Sentinel : {
     }
  },
 
-     
 intel: {
     scan() {
         if(!Nexus.state.activeFile) return alert("No active file to scan.");
@@ -2171,17 +2170,20 @@ intel: {
         let health = 100;
         let deductions = []; 
 
-        // Extract script tags if it's an HTML file
-        let codeToParse = code;
+        // 1. Universal Payload Extraction
+        let jsPayload = "";
         if (ext === 'html') {
-            const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-            if (match) codeToParse = match[1];
+            // Grabs all scripts EXCEPT those with a 'src' attribute
+            const scriptMatches = [...code.matchAll(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/gi)];
+            jsPayload = scriptMatches.map(m => m[1]).join('\n');
+        } else if (ext === 'js') {
+            jsPayload = code;
         }
 
-        // 1. AST Traversal for accurate counting
-        if (ext === 'js' || (ext === 'html' && codeToParse !== code)) {
+        // 2. AST Traversal
+        if (jsPayload) {
             try {
-                const ast = acorn.parse(codeToParse, { ecmaVersion: 2022, sourceType: 'module' });
+                const ast = acorn.parse(jsPayload, { ecmaVersion: 2022, sourceType: 'module' });
                 const walk = (node) => {
                     if (!node || typeof node !== 'object') return;
                     if (node.type === 'VariableDeclarator') vars++;
@@ -2192,21 +2194,14 @@ intel: {
                 };
                 walk(ast);
             } catch(e) { 
-                deductions.push("[-15] AST Engine Error: Syntax invalid, metrics estimated."); 
+                deductions.push("[-15] AST Engine Error: Syntax incomplete. Metrics estimated."); 
                 health -= 15; 
-                // Fallback to RegEx so the UI doesn't blank out
-                vars = (codeToParse.match(/(?:const|let|var)\s+\w+/g) || []).length;
-                funcs = (codeToParse.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
+                vars = (jsPayload.match(/(?:const|let|var)\s+\w+/g) || []).length;
+                funcs = (jsPayload.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
             }
-        } else {
-            vars = (code.match(/(?:const|let|var)\s+\w+/g) || []).length;
-            funcs = (code.match(/(?:function\s+\w+|\w+\s*=>)/g) || []).length;
         }
 
-        // ... (Keep the rest of your pattern matching and UI rendering exactly the same)
-
-
-        // 2. Pattern Recognition
+        // 3. Pattern Recognition (Scans the full file, not just JS)
         if(/document\.(getElementById|querySelector)/.test(code)) patterns.push('DOM Manipulator');
         if(/async|await|Promise/.test(code)) patterns.push('Async Flow');
         if(/fetch\(|XMLHttpRequest/.test(code)) patterns.push('Network Protocol');
@@ -2214,7 +2209,7 @@ intel: {
         if(/localStorage|localforage|Dexie/.test(code)) patterns.push('Persistent Storage');
         if(/import|export/.test(code)) patterns.push('Module Export');
         
-        // 3. Health Deductions
+        // 4. Health Deductions
         if(size > 50000) { health -= 10; deductions.push("[-10] Payload exceeds 50KB"); }
         if(/eval\(/.test(code)) { health -= 25; deductions.push("[-25] eval() detected (Security Risk)"); }
         if(/console\.log/.test(code)) { health -= 5; deductions.push("[-5] console.log left in code"); }
@@ -2232,7 +2227,6 @@ intel: {
         healthDisp.innerText = health + '%';
         healthBar.style.width = health + '%';
         
-        // Add the click-to-reveal deductions feature directly to the DOM node
         healthDisp.style.cursor = "pointer";
         healthDisp.onclick = () => alert("HEALTH DIAGNOSTICS:\n\n" + deductions.join('\n'));
         
@@ -2246,11 +2240,11 @@ intel: {
                 <div style="font-size:24px; font-weight:900; color:#fff;">${loc}</div>
             </div>
             <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">PAYLOAD SIZE</div>
+                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">PAYLOAD</div>
                 <div style="font-size:24px; font-weight:900; color:#fff;">${(size/1024).toFixed(2)} KB</div>
             </div>
             <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
-                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">DECLARATIONS</div>
+                <div style="font-size:10px; color:var(--text); opacity:0.6; letter-spacing:1px; margin-bottom:5px;">VARS</div>
                 <div style="font-size:24px; font-weight:900; color:#fff;">${vars}</div>
             </div>
             <div style="background:var(--bg); padding:15px; border-radius:10px; border:1px solid var(--border); text-align:center;">
@@ -2267,64 +2261,90 @@ intel: {
         Nexus.ui.openModal('intel');
     }
 },
+ compressor: {
+    async run(level) {
+        const ed = document.getElementById('raw-terminal');
+        if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("LOCKED");
 
+        // 1. Sync from CM6 or Vanilla
+        let code = ed.value;
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            code = Nexus.editorCore.view.state.doc.toString();
+        }
+        
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
 
-    /* --- 2. THE SOVEREIGN INJECTOR --- */
-        compressor: {
-        async run(level) {
-            const ed = document.getElementById('raw-terminal');
-            if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("LOCKED");
+        try {
+            let compressed = "";
+            
+            if (ext === 'html') {
+                // THE FIX: Safe HTML Compression via Script Isolation
+                const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+                const scripts = [];
+                
+                // Extract scripts and leave placeholder markers
+                let htmlSkeleton = code.replace(scriptRegex, (match, innerJS) => {
+                    scripts.push({ full: match, js: innerJS });
+                    return `___NEXUS_SCRIPT_${scripts.length - 1}___`;
+                });
 
-            // Sync from CM6 if active
-            let code = ed.value;
+                // Compress the HTML Shell
+                if (level === 'lean') {
+                    htmlSkeleton = htmlSkeleton.replace(/^[ \t]+/gm, ''); 
+                } else {
+                    htmlSkeleton = htmlSkeleton.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+                }
+
+                // Compress and Re-inject Scripts
+                compressed = htmlSkeleton.replace(/___NEXUS_SCRIPT_(\d+)___/g, (match, idx) => {
+                    const sc = scripts[idx];
+                    // Skip empty scripts or external scripts with src=
+                    if (!sc.js.trim() || sc.full.includes('src=')) return sc.full; 
+                    
+                    try {
+                        const ast = acorn.parse(sc.js, { ecmaVersion: 2022, sourceType: 'module' });
+                        let minJS = "";
+                        if (level === 'lean') minJS = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
+                        else if (level === 'functional') minJS = ast.body.map(n => astring.generate(n, { indent: '', lineEnd: '' })).join('\n');
+                        else minJS = astring.generate(ast, { indent: '', lineEnd: '' });
+                        
+                        return sc.full.replace(sc.js, `\n${minJS}\n`);
+                    } catch (e) {
+                        return sc.full; // If AST fails on incomplete code, safely leave it uncompressed
+                    }
+                });
+
+            } else if (ext === 'css') {
+                if (level === 'lean') compressed = code.replace(/^[ \t]+/gm, ''); 
+                else compressed = code.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+            } else {
+                // Strict AST compression for raw .js files
+                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+                if (level === 'lean') compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
+                else if (level === 'functional') compressed = ast.body.map(node => astring.generate(node, { indent: '', lineEnd: '' })).join('\n');
+                else if (level === 'nuclear') compressed = astring.generate(ast, { indent: '', lineEnd: '' });
+            }
+
+            // 2. Sync UI and VFS
             if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                code = Nexus.editorCore.view.state.doc.toString();
+                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: compressed } });
+            } else {
+                ed.value = compressed;
             }
             
-            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-
-            try {
-                let compressed = "";
-                
-                if (ext === 'html' || ext === 'css') {
-                    // Fallback Regex minifier for non-JS files
-                    if (level === 'lean') {
-                        compressed = code.replace(/^[ \t]+/gm, ''); 
-                    } else {
-                        compressed = code.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
-                    }
-                } else {
-                    // Strict AST compression for .js files
-                    const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-                    if (level === 'lean') {
-                        compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
-                    } else if (level === 'functional') {
-                        compressed = ast.body.map(node => astring.generate(node, { indent: '', lineEnd: '' })).join('\n');
-                    } else if (level === 'nuclear') {
-                        compressed = astring.generate(ast, { indent: '', lineEnd: '' });
-                    }
-                }
-
-                // Sync UI and VFS
-                if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                    Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: compressed } });
-                } else {
-                    ed.value = compressed;
-                }
-                
-                Nexus.state.vfs[Nexus.state.activeFile] = compressed;
-                Nexus.ui.updateGutter();
-                Nexus.vfs.save();
-                Nexus.ui.closeModal('compressor');
-                
-                const st = document.getElementById('foot-status');
-                st.innerText = `COMPRESSED: ${level.toUpperCase()}`;
-                st.style.color = "var(--success)";
-            } catch (e) {
-                alert("Compression Error: " + e.message);
-            }
+            Nexus.state.vfs[Nexus.state.activeFile] = compressed;
+            Nexus.ui.updateGutter();
+            Nexus.vfs.save();
+            Nexus.ui.closeModal('compressor');
+            
+            const st = document.getElementById('foot-status');
+            st.innerText = `COMPRESSED: ${level.toUpperCase()}`;
+            st.style.color = "var(--success)";
+        } catch (e) {
+            alert("Compression Error: " + e.message);
         }
-    },
+    }
+},
 
     
                     async toggleEditor() {
@@ -3095,12 +3115,35 @@ grab() {
         const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
         let out = [];
 
-        if (ext === 'js') {
+        // 1. HTML / CSS REGEX PASS
+        const lines = code.split('\n');
+        lines.forEach((line, i) => {
+            const text = line.trim();
+            if (text.length === 0) return;
+            let display = "";
+            if (ext === 'html') {
+                const match = text.match(/<([a-zA-Z0-9-]+)[^>]*id=['"]([^'"]+)['"]/);
+                if (match) display = `<strong style="color:var(--gold);">#${match[2]}</strong> (${match[1]})`;
+            } else if (ext === 'css') {
+                if (/^[.#a-zA-Z][^{]*\{/.test(text)) display = text.split('{')[0].trim();
+            }
+            if (display) out.push({ line: i + 1, text: display });
+        });
+
+        // 2. JAVASCRIPT AST PASS (With Line Preservation Trick)
+        let jsPayload = code;
+        if (ext === 'html') {
+            // Replace everything outside <script> tags with blank lines to preserve line numbers
+            jsPayload = code.replace(/(?:^|<\/script>)([\s\S]*?)(?:<script(?![^>]*src=)[^>]*>|$)/gi, (match, p1) => {
+                return '\n'.repeat(p1.split('\n').length - 1);
+            });
+        }
+
+        if (ext === 'js' || ext === 'html') {
             try {
-                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true });
+                const ast = acorn.parse(jsPayload, { ecmaVersion: 2022, sourceType: 'module', locations: true });
                 const walk = (node) => {
                     if (!node || typeof node !== 'object') return;
-                    
                     let name = "", type = "", color = "";
                     if (node.type === 'FunctionDeclaration' && node.id) { name = node.id.name; type = "ƒ"; color = "var(--accent)"; }
                     else if (node.type === 'ClassDeclaration' && node.id) { name = node.id.name; type = "©"; color = "var(--success)"; }
@@ -3113,35 +3156,21 @@ grab() {
                     } else if (node.type === 'MethodDefinition' && node.key) { name = node.key.name; type = "ƒ"; color = "var(--accent)"; }
 
                     if (name) out.push({ line: node.loc.start.line, text: `<strong style="color:${color}; margin-right:5px;">${type}</strong> ${name}` });
-                    
+
                     Object.values(node).forEach(v => {
                         if (Array.isArray(v)) v.forEach(walk); else walk(v);
                     });
                 };
                 walk(ast);
-            } catch(e) { out.push({ line: 1, text: "AST Syntax Error: Cannot build precise outline." }); }
-        } else {
-            // HTML / CSS RegEx Fallback
-            const lines = code.split('\n');
-            lines.forEach((line, i) => {
-                const text = line.trim();
-                if (text.length === 0) return;
-                let display = "";
-                if (ext === 'html') {
-                    const match = text.match(/<([a-zA-Z0-9-]+)[^>]*id=['"]([^'"]+)['"]/);
-                    if (match) display = `<strong style="color:var(--gold);">#${match[2]}</strong> (${match[1]})`;
-                    else if (/<h[1-6]/.test(text)) display = text.replace(/<[^>]+>/g, '').substring(0, 30);
-                } else if (ext === 'css') {
-                    if (/^[.#a-zA-Z][^{]*\{/.test(text)) display = text.split('{')[0].trim();
-                }
-                if (display) out.push({ line: i + 1, text: display });
-            });
+            } catch(e) { 
+                if(ext === 'js') out.push({ line: 1, text: `<strong style="color:var(--danger)">AST Error: Syntax Incomplete</strong>` }); 
+            }
         }
 
         const list = document.getElementById('outline-list');
         if (out.length > 0) {
-            // Deduplicate items on the exact same line
-            const unique = out.filter((v, i, a) => a.findIndex(t => (t.line === v.line)) === i);
+            // Deduplicate, sort by line number
+            const unique = out.sort((a,b) => a.line - b.line).filter((v, i, a) => a.findIndex(t => (t.line === v.line && t.text === v.text)) === i);
             list.innerHTML = unique.map(item => `
                 <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer;" onclick="Nexus.outline.jump(${item.line})">
                     <span style="color:var(--text); opacity:0.5; font-size:10px; font-weight:bold; width:40px; flex-shrink:0;">LN ${item.line}</span>
@@ -3159,49 +3188,39 @@ grab() {
         Nexus.ui.jumpPrompt(ln); 
     }
 },
-                         
-
 
             
-        
-    
-    graph: {
-            analyze() {
+   graph: {
+    analyze() {
         const files = Object.keys(Nexus.state.vfs);
         const deps = {};
         const incoming = {};
-        
         files.forEach(f => { deps[f] = []; incoming[f] = 0; });
+
+        const normalizePath = (relative) => {
+            let p = relative.replace(/['"]/g, '').trim();
+            if (p.startsWith('./')) p = p.substring(2);
+            if (p.startsWith('/')) p = p.substring(1);
+            if (!files.includes(p) && files.includes(p + '.js')) p += '.js';
+            if (!files.includes(p) && files.includes(p + '.css')) p += '.css';
+            return p;
+        };
 
         files.forEach(file => {
             const code = Nexus.state.vfs[file] || "";
-            const ext = file.split('.').pop().toLowerCase();
             let matches = [];
+            let m;
 
-            // Catch HTML dependencies
-            if (ext === 'html') {
-                const htmlRegex = /<(?:script|link)[^>]+(?:src|href)=["']([^"']+)["']/gi;
-                let m; while((m = htmlRegex.exec(code))) matches.push(m[1]);
-            } 
-            
-            // Catch ES6 Imports and Dynamic Imports, even without extensions
-            const importRegex = /(?:import|export)\s+(?:.*?from\s+)?['"]([^'"]+)['"]/gi;
-            let m; while((m = importRegex.exec(code))) matches.push(m[1]);
-            
-            // Catch CSS Imports
-            if (ext === 'css') {
-                const cssRegex = /@import\s+(?:url\()?["']?([^"'\)]+)["']?\)?/gi;
-                let c; while((c = cssRegex.exec(code))) matches.push(c[1]);
-            }
+            const importRegex = /(?:import|export)\s+(?:.*?\s+from\s+)?['"]([^'"]+)['"]/gi;
+            const htmlRegex = /<(?:script|link)[^>]+(?:src|href)=["']([^"']+)["']/gi;
+            const cssRegex = /@import\s+(?:url\()?["']?([^"'\)]+)["']?\)?/gi;
+
+            while((m = importRegex.exec(code))) matches.push(m[1]);
+            while((m = htmlRegex.exec(code))) matches.push(m[1]);
+            while((m = cssRegex.exec(code))) matches.push(m[1]);
 
             matches.forEach(dep => {
-                let cleanDep = dep.replace(/^\.\//, '').replace(/^\//, '');
-                
-                // THE FIX: If the import drops the .js extension, automatically resolve it
-                if (!files.includes(cleanDep) && files.includes(cleanDep + '.js')) {
-                    cleanDep += '.js';
-                }
-
+                const cleanDep = normalizePath(dep);
                 if (files.includes(cleanDep) && cleanDep !== file) {
                     if (!deps[file].includes(cleanDep)) {
                         deps[file].push(cleanDep);
@@ -3210,72 +3229,70 @@ grab() {
                 }
             });
         });
-
         return { deps, incoming, files };
     },
 
-        render() {
-            const { deps, incoming, files } = this.analyze();
+    render() {
+        const { deps, incoming, files } = this.analyze();
+        let mainRoots = files.filter(f => incoming[f] === 0);
+        if (mainRoots.length === 0 && files.includes('index.html')) mainRoots = ['index.html'];
+
+        const container = document.getElementById('graph-results');
+        if (!container) return;
+
+        let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap;">`;
+        html += `<h3 style="color:var(--success); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:0;">🌳 Active Matrix</h3>`;
+        
+        const touched = new Set(); // The ultimate fix for circular ghost islands
+
+        const buildTree = (node, prefix, isLast, visited) => {
+            touched.add(node);
+            if (visited.has(node)) {
+                return `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--danger)">🔄 ${node} (Circular Loop)</span></div>`;
+            }
+            visited.add(node);
             
-            // Anchor the tree to main entry points
-            let mainRoots = files.filter(f => incoming[f] === 0 && (f === 'index.html' || f === 'manifest.json'));
-            if (mainRoots.length === 0 && files.includes('index.html')) mainRoots = ['index.html'];
-
-            // Orphans are files with 0 incoming connections that ARE NOT root entry points
-            const orphans = files.filter(f => incoming[f] === 0 && !mainRoots.includes(f));
-
-            const container = document.getElementById('graph-results');
-            if (!container) return;
-
-let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap;">`;
-            // --- SECTION 1: THE ACTIVE TREE ---
-            html += `<h3 style="color:var(--success); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:0;">🌳 Active Matrix (Linked)</h3>`;
+            let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${node}'); Nexus.ui.closeModal('graph');">${node}</span></div>`;
             
-            const buildTree = (node, prefix, isLast, visited) => {
-                if (visited.has(node)) {
-                    return `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--danger)">🔄 ${node} (Circular Loop)</span></div>`;
-                }
-                visited.add(node);
-                
-                let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer; transition:color 0.2s;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${node}'); Nexus.ui.closeModal('graph');">${node}</span></div>`;
-                
-                const children = deps[node] || [];
+            const children = deps[node] || [];
+            for (let i = 0; i < children.length; i++) {
+                line += buildTree(children[i], prefix + (isLast ? '    ' : '│   '), i === children.length - 1, new Set(visited));
+            }
+            return line;
+        };
+
+        if (mainRoots.length > 0) {
+            mainRoots.forEach(r => {
+                html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.vfs.switchFile('${r}'); Nexus.ui.closeModal('graph');">${r}</span></div>`;
+                touched.add(r);
+                const children = deps[r] || [];
                 for (let i = 0; i < children.length; i++) {
-                    const childIsLast = i === children.length - 1;
-                    const newPrefix = prefix + (isLast ? '    ' : '│   ');
-                    line += buildTree(children[i], newPrefix, childIsLast, new Set(visited));
+                    html += buildTree(children[i], '', i === children.length - 1, new Set([r]));
                 }
-                return line;
-            };
-
-            if (mainRoots.length > 0) {
-                mainRoots.forEach(r => {
-                    html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.vfs.switchFile('${r}'); Nexus.ui.closeModal('graph');">${r}</span></div>`;
-                    const children = deps[r] || [];
-                    for (let i = 0; i < children.length; i++) {
-                        html += buildTree(children[i], '', i === children.length - 1, new Set([r]));
-                    }
-                });
-            } else {
-                html += `<div style="color:var(--danger); opacity:0.8;">No entry points detected. Create an index.html file.</div>`;
-            }
-
-            // --- SECTION 2: THE ORPHANS ---
-            html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors (Unlinked)</h3>`;
-            
-            if (orphans.length > 0) {
-                orphans.forEach(o => {
-                    html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onmouseover="this.style.opacity='1'; this.style.color='var(--danger)'" onmouseout="this.style.opacity='0.6'; this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
-                });
-            } else {
-                html += `<div style="color:var(--success); opacity:0.8;">System clean. 100% of files are linked.</div>`;
-            }
-
-            html += `</div>`;
-            container.innerHTML = html;
+            });
+        } else {
+            html += `<div style="color:var(--danger); opacity:0.8;">No entry points detected. Create an index.html.</div>`;
         }
-    },
-            settings: {
+
+        // Orphans are simply files that the rendering loop never touched
+        const orphans = files.filter(f => !touched.has(f));
+
+        html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors</h3>`;
+        if (orphans.length > 0) {
+            orphans.forEach(o => {
+                html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onclick="Nexus.vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
+            });
+        } else {
+            html += `<div style="color:var(--success); opacity:0.8;">System clean. 100% of files are linked.</div>`;
+        }
+
+        html += `</div>`;
+        container.innerHTML = html;
+    }
+},
+    
+    
+                    settings: {
         async boot() { 
             const saved = await localforage.getItem('nexus_prefs_v42'); 
             if (saved) Nexus.state.prefs = saved; 
@@ -4218,66 +4235,110 @@ async boot() {
         };
         setTimeout(() => document.addEventListener('click', closeMenu), 50);
     },
-
     async runPrettier() {
         if(!Nexus.state.activeFile) return;
         const ed = document.getElementById('raw-terminal');
         if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
+        
         const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-        let code = ed.value, parser = 'babel', plugins = [prettierPlugins.babel, prettierPlugins.estree];
-        if (ext === 'html') { parser = 'html'; plugins = [prettierPlugins.html]; } 
-        else if (ext === 'css') { parser = 'css'; plugins = [prettierPlugins.postcss]; } 
+        
+        let code = ed.value;
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            code = Nexus.editorCore.view.state.doc.toString();
+        }
+
+        let parser = 'babel';
+        
+        // THE FIX: Provide all plugins universally. Prettier delegates internally.
+        const plugins = [
+            prettierPlugins.babel, 
+            prettierPlugins.estree, 
+            prettierPlugins.html, 
+            prettierPlugins.postcss
+        ];
+
+        if (ext === 'html') { parser = 'html'; } 
+        else if (ext === 'css') { parser = 'css'; } 
         else if (ext !== 'js' && ext !== 'json') return alert("Prettier unsupported here.");
+        
         try {
-            const formatted = await prettier.format(code, { parser, plugins, tabWidth: Nexus.state.prefs.tabWidth, printWidth: 80, singleQuote: true });
-            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: formatted } });
-            else ed.value = formatted;
+            const formatted = await prettier.format(code, { 
+                parser, 
+                plugins, 
+                tabWidth: Nexus.state.prefs.tabWidth, 
+                printWidth: 80, 
+                singleQuote: true 
+            });
+            
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: formatted } });
+            } else {
+                ed.value = formatted;
+            }
+            
             Nexus.state.vfs[Nexus.state.activeFile] = formatted;
-            this.updateGutter(); Nexus.vfs.save();
+            this.updateGutter(); 
+            Nexus.vfs.save();
+            
             const st = document.getElementById('foot-status');
-            st.innerText = "PRETTIFIED (STRICT)"; st.style.color = "var(--success)";
+            st.innerText = "PRETTIFIED (STRICT)"; 
+            st.style.color = "var(--success)";
             setTimeout(() => Nexus.ui.syncStatus(), 2000);
-        } catch(e) { alert("Prettier Error:\n" + e.message); }
+        } catch(e) { 
+            alert("Prettier Error:\n" + e.message); 
+        }
     },
    
- runJSBeautify() {
-            if(!Nexus.state.activeFile) return;
-            const ed = document.getElementById('raw-terminal');
-            if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
-            
-            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-            let code = ed.value;
-            const opts = { indent_size: Nexus.state.prefs.tabWidth, wrap_line_length: 80, preserve_newlines: true };
-            
-            try {
-                if (ext === 'html' && typeof html_beautify === 'function') {
-                    code = html_beautify(code, opts);
-                } else if (ext === 'css' && typeof css_beautify === 'function') {
-                    code = css_beautify(code, opts);
-                } else if (typeof js_beautify === 'function') {
-                    code = js_beautify(code, opts);
-                }
-                
-                ed.value = code;
-                Nexus.state.vfs[Nexus.state.activeFile] = code;
-                this.updateGutter();
-                
-                // Routing Fix: Call logic module
-                Nexus.vfs.save();
-                
-                const st = document.getElementById('foot-status');
-                st.innerText = "BEAUTIFIED";
-                st.style.color = "var(--success)";
-                setTimeout(() => { 
-                    if (!ed.hasAttribute('readonly')) {
-                        st.innerText = ed.getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)"; 
-                    }
-                }, 2000);
-            } catch(e) {
-                alert("Beautify engine encountered an error: " + e.message);
+    runJSBeautify() {
+        if(!Nexus.state.activeFile) return;
+        const ed = document.getElementById('raw-terminal');
+        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
+        
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        
+        let code = ed.value;
+        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+            code = Nexus.editorCore.view.state.doc.toString();
+        }
+
+        // Tighter configuration for HTML files
+        const opts = { 
+            indent_size: Nexus.state.prefs.tabWidth, 
+            wrap_line_length: 80, 
+            preserve_newlines: true,
+            max_preserve_newlines: 2,
+            indent_inner_html: true 
+        };
+        
+        try {
+            if (ext === 'html' && typeof html_beautify === 'function') {
+                code = html_beautify(code, opts);
+            } else if (ext === 'css' && typeof css_beautify === 'function') {
+                code = css_beautify(code, opts);
+            } else if (typeof js_beautify === 'function') {
+                code = js_beautify(code, opts);
             }
-        },
-        collapseAll() {
+            
+            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: code } });
+            } else {
+                ed.value = code;
+            }
+
+            Nexus.state.vfs[Nexus.state.activeFile] = code;
+            this.updateGutter();
+            Nexus.vfs.save();
+            
+            const st = document.getElementById('foot-status');
+            st.innerText = "BEAUTIFIED";
+            st.style.color = "var(--success)";
+            setTimeout(() => Nexus.ui.syncStatus(), 2000);
+        } catch(e) {
+            alert("Beautify engine encountered an error: " + e.message);
+        }
+    },
+
+    collapseAll() {
             if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                 return alert("Folding is only supported in the CM6 Engine.");
             }
