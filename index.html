@@ -2584,57 +2584,52 @@ URL.revokeObjectURL(workerUrl);
             });
         }
     },
-               spotlight: {
-    search(query) {
-        const res = document.getElementById('spotlight-results');
-        if (!query) { 
-            res.innerHTML = ''; 
-            return; 
-        }
-        
-        const q = query.toLowerCase();
-        const matches = [];
-        
-        // 1. Iterate through every file in the Vortex VFS 📁
-        Object.keys(Nexus.state.vfs).forEach(file => {
-            const content = Nexus.state.vfs[file] || "";
-            const lines = content.split('\n'); // Split into individual lines 🛠️
-            
-            // 2. Scan every single line for the query
-            lines.forEach((lineText, index) => {
-                if (lineText.toLowerCase().includes(q)) {
-                    matches.push({
-                        file: file,
-                        line: index + 1, // Lines are 1-indexed for the user
-                        text: lineText.trim()
-                    });
+                       spotlight: {
+            search(query) {
+                const res = document.getElementById('spotlight-results');
+                if (!query) { 
+                    res.innerHTML = ''; 
+                    return; 
                 }
-            });
-        });
-        
-        if (matches.length === 0) {
-            res.innerHTML = '<div style="color:var(--danger); font-size:12px; padding:10px;">No results found.</div>';
-            return;
-        }
-        
-        // 3. Render the full list with line numbers and click-to-jump logic 🔗
-        res.innerHTML = matches.map(m => `
-            <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; margin-bottom:5px; display:flex; flex-direction:column; align-items:flex-start;" 
-                 onclick="Nexus.vfs.switchFile('${m.file}'); setTimeout(() => Nexus.ui.jumpPrompt(${m.line}), 100); Nexus.ui.closeModal('spotlight');">
-                <div style="display:flex; justify-content:space-between; width:100%;">
-                    <span style="font-family:monospace; font-size:13px; color:var(--gold); font-weight:bold;">${m.file}</span>
-                    <span style="font-size:11px; color:var(--accent);">Line ${m.line}</span>
-                </div>
-                <div style="font-size:11px; color:var(--text); opacity:0.6; margin-top:4px; font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
-                    ${m.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
-                </div>
-            </div>
-        )`.join('');
-    }
-},
- 
+                
+                const q = query.toLowerCase();
+                const matches = [];
+                
+                Object.keys(Nexus.state.vfs).forEach(file => {
+                    const content = Nexus.state.vfs[file] || "";
+                    const lines = content.split('\n');
+                    
+                    lines.forEach((lineText, index) => {
+                        if (lineText.toLowerCase().includes(q)) {
+                            matches.push({
+                                file: file,
+                                line: index + 1,
+                                text: lineText.trim()
+                            });
+                        }
+                    });
+                });
+                
+                if (matches.length === 0) {
+                    res.innerHTML = '<div style="color:var(--danger); font-size:12px; padding:10px;">No results found.</div>';
+                    return;
+                }
+                
+                res.innerHTML = matches.map(m => `
+                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; margin-bottom:5px; display:flex; flex-direction:column; align-items:flex-start;" 
+                         onclick="Nexus.vfs.switchFile('${m.file}'); setTimeout(() => Nexus.ui.jumpPrompt(${m.line}), 100); Nexus.ui.closeModal('spotlight');">
+                        <div style="display:flex; justify-content:space-between; width:100%;">
+                            <span style="font-family:monospace; font-size:13px; color:var(--gold); font-weight:bold;">${m.file}</span>
+                            <span style="font-size:11px; color:var(--accent);">Line ${m.line}</span>
+                        </div>
+                        <div style="font-size:11px; color:var(--text); opacity:0.6; margin-top:4px; font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
+                            ${m.text.replace(/</g, '&lt;').replace(/>/g, '&gt;')}
+                        </div>
+                    </div>
+                `).join(''); // <-- Fixed backtick added here
+            }
+        },
 
- 
         dreamer: {
         // --- 1. UI ARCHITECT TEMPLATES ---
         templates: { 
@@ -3668,275 +3663,76 @@ writer: {
     }
 },
 
-shell: {
-    commands: {
-        ls: () => {
-            return Object.keys(Nexus.state.vfs).join('\n') || "Vortex empty.";
-        },
-        
-        touch: (args) => {
-            const path = args[0];
-            if (!path) return "Error: Specify a path.";
-            if (Nexus.state.vfs[path]) return `Error: '${path}' already exists.`;
-            
-            // Path Integrity Scan 🛡️
-            const ancestors = path.split('/').slice(0, -1);
-            let currentPath = "";
-            for (const part of ancestors) {
-                currentPath = currentPath === "" ? part : `${currentPath}/${part}`;
-                if (Nexus.state.vfs[currentPath]) {
-                    return `Error: '${currentPath}' is a file, cannot be a folder.`;
-                }
-            }
-            
-            Nexus.state.vfs[path] = "";
-            Nexus.state.originals[path] = ""; 
-            Nexus.vfs.renderAccordion();
-            return `Created: ${path}`;
-        },
-
-        rm: (args) => {
-            const path = args[0];
-            if (!path || !Nexus.state.vfs[path]) return "Error: File not found.";
-            
-            delete Nexus.state.vfs[path];
-            delete Nexus.state.originals[path];
-            if (Nexus.state.activeFile === path) Nexus.state.activeFile = null;
-            Nexus.vfs.renderAccordion();
-            return `Deleted: ${path}`;
-        },
-
-        'delete-folder': (args) => {
-            const folderPath = args[0].endsWith('/') ? args[0] : `${args[0]}/`;
-            const allFiles = Object.keys(Nexus.state.vfs);
-            const toDelete = allFiles.filter(p => p.startsWith(folderPath));
-
-            if (toDelete.length === 0) return `Error: No files in '${folderPath}'`;
-
-            if (toDelete.includes(Nexus.state.activeFile)) {
-                Nexus.state.activeFile = null;
-            }
-
-            toDelete.forEach(p => {
-                delete Nexus.state.vfs[p];
-                delete Nexus.state.originals[p];
-            });
-
-            Nexus.vfs.renderAccordion();
-            return `Deleted ${toDelete.length} files from ${folderPath} 🗑️`;
-        },
-
-        cat: (args) => {
-            const path = args[0];
-            return Nexus.state.vfs[path] || "Error: File not found.";
-        },
-
-        'change-repo': (args) => {
-            const repo = args[0];
-            if (!repo) return "Usage: change-repo [user/repo]";
-            Nexus.settings.update('ghRepo', repo);
-            return `Target switched to: ${repo} 🔄`;
-        },
-
-        pull: async (args) => {
-            const path = args[0];
-            const token = Nexus.state.prefs.ghToken;
-            const repo = Nexus.state.prefs.ghRepo;
-            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-            try {
-                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
-                if (!res.ok) throw new Error("File not found.");
-                const data = await res.json();
-                Nexus.state.vfs[path] = atob(data.content.replace(/\s/g, ''));
-                Nexus.vfs.renderAccordion();
-                return `${path}: Pulled 📥`;
-            } catch (e) { return `Error: ${e.message}`; }
-        },
-
-        'pull-all': async () => {
-            const token = Nexus.state.prefs.ghToken;
-            const repo = Nexus.state.prefs.ghRepo;
-            const url = `https://api.github.com/repos/${repo}/contents/`;
-            try {
-                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
-                const items = await res.json();
-                let count = 0;
-                for (const item of items) {
-                    if (item.type === "file") {
-                        const fRes = await fetch(item.url, { headers: { "Authorization": `token ${token}` } });
-                        const fData = await fRes.json();
-                        Nexus.state.vfs[item.path] = atob(fData.content.replace(/\s/g, ''));
-                        count++;
-                    }
-                }
-                Nexus.vfs.renderAccordion();
-                return `Synced ${count} files ✅`;
-            } catch (e) { return `Sync failed: ${e.message}`; }
-        },
-    'push': async (args) => {
-    const path = args[0] || Nexus.state.activeFile;
-    if (!path) return "Error: No file specified.";
-
-    // 1. Setup dynamic commit message 💬
-    const commitMsg = args.slice(1).join(' ') || `Update ${path} via Nexus Prime`;
-    
-    const token = Nexus.state.prefs.ghToken;
-    const repo = Nexus.state.prefs.ghRepo;
-    const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-    
-    const content = Nexus.state.vfs[path];
-    if (content === undefined) return `Error: '${path}' not found in Vortex.`;
-
-    try {
-        // 2. Fetch the current 'sha' from GitHub 🆔
-        const getRes = await fetch(url, {
-            headers: { "Authorization": `token ${token}` }
-        });
-        
-        let sha = "";
-        if (getRes.ok) {
-            const getData = await getRes.json();
-            sha = getData.sha;
-        }
-
-        // 3. Prepare and Send the Payload 📦
-        const payload = {
-            message: commitMsg,
-            content: btoa(unescape(encodeURIComponent(content))), 
-            sha: sha 
-        };
-
-        const putRes = await fetch(url, {
-            method: "PUT", // Use PUT to update/create
-            headers: {
-                "Authorization": `token ${token}`,
-                "Content-Type": "application/json"
+  
+    shell: {
+        commands: {
+            'pull': async (args) => {
+                const path = args[0];
+                if (!path) return "Error: Specify a file to pull.";
+                const repo = Nexus.state.prefs.ghRepo;
+                const token = Nexus.state.prefs.ghToken;
+                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+                try {
+                    const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+                    if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
+                    const data = await res.json();
+                    const content = decodeURIComponent(escape(atob(data.content)));
+                    Nexus.state.vfs[path] = content;
+                    return `${path}: Pulled from GitHub ✅`;
+                } catch (e) { return `Pull failed: ${e.message} ❌`; }
             },
-            body: JSON.stringify(payload)
-        });
-
-        if (!putRes.ok) {
-            const errData = await putRes.json();
-            throw new Error(errData.message || "Upload failed");
-        }
-
-        return `${path}: Pushed to GitHub ✅`;
-    } catch (e) {
-        return `Push failed: ${e.message} ❌`;
-    }
-}
- 
-    },
-
-    async exec(cmdStr) {
-shell: {
-    // 🗄️ Registered commands for GitHub integration
-    commands: {
-        'pull': async (args) => {
-            const path = args[0];
-            if (!path) return "Error: Specify a file to pull.";
-            
-            const repo = Nexus.state.prefs.ghRepo;
-            const token = Nexus.state.prefs.ghToken;
-            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-            
-            try {
-                const res = await fetch(url, {
-                    headers: { "Authorization": `token ${token}` }
-                });
-                if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
-                
-                const data = await res.json();
-                // Decode from Base64 to UTF-8 string 🔓
-                const content = decodeURIComponent(escape(atob(data.content)));
-                
-                Nexus.state.vfs[path] = content;
-                return `${path}: Pulled from GitHub ✅`;
-            } catch (e) {
-                return `Pull failed: ${e.message} ❌`;
+            'push': async (args) => {
+                const path = args[0] || Nexus.state.activeFile;
+                if (!path) return "Error: No file specified.";
+                const commitMsg = args.slice(1).join(' ') || `Update ${path} via Nexus Prime`;
+                const repo = Nexus.state.prefs.ghRepo;
+                const token = Nexus.state.prefs.ghToken;
+                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+                const content = Nexus.state.vfs[path];
+                if (content === undefined) return `Error: '${path}' not found locally.`;
+                try {
+                    const getRes = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+                    let sha = getRes.ok ? (await getRes.json()).sha : "";
+                    const payload = {
+                        message: commitMsg,
+                        content: btoa(unescape(encodeURIComponent(content))),
+                        sha: sha
+                    };
+                    const putRes = await fetch(url, {
+                        method: "PUT",
+                        headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!putRes.ok) throw new Error("Upload failed");
+                    return `${path}: Pushed to GitHub ✅`;
+                } catch (e) { return `Push failed: ${e.message} ❌`; }
+            },
+            'config': (args) => {
+                const [action, key, value] = args;
+                if (action === 'set' && (key === 'ghToken' || key === 'ghRepo') && value) {
+                    Nexus.state.prefs[key] = value;
+                    Nexus.vfs.save();
+                    return `Success: ${key} updated ⚙️`;
+                }
+                return "Usage: config set [ghToken|ghRepo] [value]";
             }
         },
-
-        'push': async (args) => {
-            const path = args[0] || Nexus.state.activeFile;
-            if (!path) return "Error: No file specified.";
-
-            const commitMsg = args.slice(1).join(' ') || `Update ${path} via Nexus Prime`;
-            const repo = Nexus.state.prefs.ghRepo;
-            const token = Nexus.state.prefs.ghToken;
-            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-            
-            const content = Nexus.state.vfs[path];
-            if (content === undefined) return `Error: '${path}' not found locally.`;
-
+        async exec(cmdStr) {
+            const parts = cmdStr.trim().split(/\s+/);
+            const cmdName = parts[0].toLowerCase();
+            const args = parts.slice(1);
+            const action = this.commands[cmdName];
             try {
-                // Get current SHA to authorize the update 🆔
-                const getRes = await fetch(url, {
-                    headers: { "Authorization": `token ${token}` }
-                });
-                let sha = "";
-                if (getRes.ok) {
-                    const getData = await getRes.json();
-                    sha = getData.sha;
+                if (action) {
+                    const result = await action(args); 
+                    Nexus.ui.injectChar(`\n/* $ ${cmdStr} */\n/* -> ${result} */\n`);
+                    return result;
+                } else {
+                    return eval(cmdStr);
                 }
-
-                const payload = {
-                    message: commitMsg,
-                    content: btoa(unescape(encodeURIComponent(content))),
-                    sha: sha
-                };
-
-                const putRes = await fetch(url, {
-                    method: "PUT",
-                    headers: {
-                        "Authorization": `token ${token}`,
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!putRes.ok) {
-                    const errData = await putRes.json();
-                    throw new Error(errData.message || "Upload failed");
-                }
-
-                return `${path}: Pushed to GitHub ✅`;
-            } catch (e) {
-                return `Push failed: ${e.message} ❌`;
-            }
-        },
-
-        'config': (args) => {
-            const [action, key, value] = args;
-            if (action === 'set' && (key === 'ghToken' || key === 'ghRepo') && value) {
-                Nexus.state.prefs[key] = value;
-                return `Success: ${key} updated ⚙️`;
-            }
-            return "Usage: config set [ghToken|ghRepo] [value]";
+            } catch (e) { return `Shell Fault: ${e.message}`; }
         }
     },
-
-    // ⚡ The shell execution engine
-    async exec(cmdStr) {
-        const parts = cmdStr.trim().split(/\s+/);
-        const cmdName = parts[0].toLowerCase();
-        const args = parts.slice(1);
-        const action = this.commands[cmdName];
-
-        try {
-            if (action) {
-                const result = await action(args); 
-                Nexus.ui.injectChar(`\n/* $ ${cmdStr} */\n/* -> ${result} */\n`);
-                return result;
-            } else {
-                // Fallback to raw JS evaluation 🏃‍♂️
-                return eval(cmdStr);
-            }
-        } catch (e) {
-            return `Shell Fault: ${e.message}`;
-        }
-    }
-},
 
 
 ui: {
