@@ -3662,52 +3662,69 @@ writer: {
         }, 1500);
     }
 },
+shell: {
+    commands: {
+        ls: () => {
+            return Object.keys(Nexus.state.vfs).join('\n') || "Vortex empty.";
+        },
+        
+        touch: (args) => {
+            const path = args[0];
+            if (!path) return "Error: Specify a path.";
+            if (Nexus.state.vfs[path]) return `Error: '${path}' already exists.`;
+            
+            // Path Integrity Scan 🛡️
+            const ancestors = path.split('/').slice(0, -1);
+            let currentPath = "";
+            for (const part of ancestors) {
+                currentPath = currentPath === "" ? part : `${currentPath}/${part}`;
+                if (Nexus.state.vfs[currentPath]) {
+                    return `Error: '${currentPath}' is a file, cannot be a folder.`;
+                }
+            }
+            
+            Nexus.state.vfs[path] = "";
+            Nexus.state.originals[path] = ""; 
+            Nexus.vfs.renderAccordion();
+            return `Created: ${path}`;
+        },
 
-  
-    shell: {
-        commands: {
-            'pull': async (args) => {
-                const path = args[0];
-                if (!path) return "Error: Specify a file to pull.";
-                const repo = Nexus.state.prefs.ghRepo;
-                const token = Nexus.state.prefs.ghToken;
-                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-                try {
-                    const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
-                    if (!res.ok) throw new Error(`Fetch failed: ${res.statusText}`);
-                    const data = await res.json();
-                    const content = decodeURIComponent(escape(atob(data.content)));
-                    Nexus.state.vfs[path] = content;
-                    return `${path}: Pulled from GitHub ✅`;
-                } catch (e) { return `Pull failed: ${e.message} ❌`; }
-            },
-            'push': async (args) => {
-                const path = args[0] || Nexus.state.activeFile;
-                if (!path) return "Error: No file specified.";
-                const commitMsg = args.slice(1).join(' ') || `Update ${path} via Nexus Prime`;
-                const repo = Nexus.state.prefs.ghRepo;
-                const token = Nexus.state.prefs.ghToken;
-                const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-                const content = Nexus.state.vfs[path];
-                if (content === undefined) return `Error: '${path}' not found locally.`;
-                try {
-                    const getRes = await fetch(url, { headers: { "Authorization": `token ${token}` } });
-                    let sha = getRes.ok ? (await getRes.json()).sha : "";
-                    const payload = {
-                        message: commitMsg,
-                        content: btoa(unescape(encodeURIComponent(content))),
-                        sha: sha
-                    };
-                    const putRes = await fetch(url, {
-                        method: "PUT",
-                        headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!putRes.ok) throw new Error("Upload failed");
-                    return `${path}: Pushed to GitHub ✅`;
-                } catch (e) { return `Push failed: ${e.message} ❌`; }
-            },
-            'config': (args) => {
+        rm: (args) => {
+            const path = args[0];
+            if (!path || !Nexus.state.vfs[path]) return "Error: File not found.";
+            
+            delete Nexus.state.vfs[path];
+            delete Nexus.state.originals[path];
+            if (Nexus.state.activeFile === path) Nexus.state.activeFile = null;
+            Nexus.vfs.renderAccordion();
+            return `Deleted: ${path}`;
+        },
+
+        'delete-folder': (args) => {
+            const folderPath = args[0].endsWith('/') ? args[0] : `${args[0]}/`;
+            const allFiles = Object.keys(Nexus.state.vfs);
+            const toDelete = allFiles.filter(p => p.startsWith(folderPath));
+
+            if (toDelete.length === 0) return `Error: No files in '${folderPath}'`;
+
+            if (toDelete.includes(Nexus.state.activeFile)) {
+                Nexus.state.activeFile = null;
+            }
+
+            toDelete.forEach(p => {
+                delete Nexus.state.vfs[p];
+                delete Nexus.state.originals[p];
+            });
+
+            Nexus.vfs.renderAccordion();
+            return `Deleted ${toDelete.length} files from ${folderPath} 🗑️`;
+        },
+
+        cat: (args) => {
+            const path = args[0];
+            return Nexus.state.vfs[path] || "Error: File not found.";
+        },
+'config': (args) => {
                 const [action, key, value] = args;
                 if (action === 'set' && (key === 'ghToken' || key === 'ghRepo') && value) {
                     Nexus.state.prefs[key] = value;
@@ -3717,24 +3734,126 @@ writer: {
                 return "Usage: config set [ghToken|ghRepo] [value]";
             }
         },
-        async exec(cmdStr) {
-            const parts = cmdStr.trim().split(/\s+/);
-            const cmdName = parts[0].toLowerCase();
-            const args = parts.slice(1);
-            const action = this.commands[cmdName];
+        'change-repo': (args) => {
+            const repo = args[0];
+            if (!repo) return "Usage: change-repo [user/repo]";
+            Nexus.settings.update('ghRepo', repo);
+            return `Target switched to: ${repo} 🔄`;
+        },
+
+        pull: async (args) => {
+            const path = args[0];
+            const token = Nexus.state.prefs.ghToken;
+            const repo = Nexus.state.prefs.ghRepo;
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
             try {
-                if (action) {
-                    const result = await action(args); 
-                    Nexus.ui.injectChar(`\n/* $ ${cmdStr} */\n/* -> ${result} */\n`);
-                    return result;
-                } else {
-                    return eval(cmdStr);
+                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+                if (!res.ok) throw new Error("File not found.");
+                const data = await res.json();
+                Nexus.state.vfs[path] = atob(data.content.replace(/\s/g, ''));
+                Nexus.vfs.renderAccordion();
+                return `${path}: Pulled 📥`;
+            } catch (e) { return `Error: ${e.message}`; }
+        },
+
+        'pull-all': async () => {
+            const token = Nexus.state.prefs.ghToken;
+            const repo = Nexus.state.prefs.ghRepo;
+            const url = `https://api.github.com/repos/${repo}/contents/`;
+            try {
+                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+                const items = await res.json();
+                let count = 0;
+                for (const item of items) {
+                    if (item.type === "file") {
+                        const fRes = await fetch(item.url, { headers: { "Authorization": `token ${token}` } });
+                        const fData = await fRes.json();
+                        Nexus.state.vfs[item.path] = atob(fData.content.replace(/\s/g, ''));
+                        count++;
+                    }
                 }
-            } catch (e) { return `Shell Fault: ${e.message}`; }
+                Nexus.vfs.renderAccordion();
+                return `Synced ${count} files ✅`;
+            } catch (e) { return `Sync failed: ${e.message}`; }
+        },
+    'push': async (args) => {
+    const path = args[0] || Nexus.state.activeFile;
+    if (!path) return "Error: No file specified.";
+
+    // 1. Setup dynamic commit message 💬
+    const commitMsg = args.slice(1).join(' ') || `Update ${path} via Nexus Prime`;
+    
+    const token = Nexus.state.prefs.ghToken;
+    const repo = Nexus.state.prefs.ghRepo;
+    const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+    
+    const content = Nexus.state.vfs[path];
+    if (content === undefined) return `Error: '${path}' not found in Vortex.`;
+
+    try {
+        // 2. Fetch the current 'sha' from GitHub 🆔
+        const getRes = await fetch(url, {
+            headers: { "Authorization": `token ${token}` }
+        });
+        
+        let sha = "";
+        if (getRes.ok) {
+            const getData = await getRes.json();
+            sha = getData.sha;
         }
+
+        // 3. Prepare and Send the Payload 📦
+        const payload = {
+            message: commitMsg,
+            content: btoa(unescape(encodeURIComponent(content))), 
+            sha: sha 
+        };
+
+        const putRes = await fetch(url, {
+            method: "PUT", // Use PUT to update/create
+            headers: {
+                "Authorization": `token ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!putRes.ok) {
+            const errData = await putRes.json();
+            throw new Error(errData.message || "Upload failed");
+        }
+
+        return `${path}: Pushed to GitHub ✅`;
+    } catch (e) {
+        return `Push failed: ${e.message} ❌`;
+    }
+}
+ 
     },
 
+    async exec(cmdStr) {
+        const parts = cmdStr.trim().split(/\s+/);
+        const cmdName = parts[0].toLowerCase();
+        const args = parts.slice(1);
+        const action = this.commands[cmdName];
 
+        try {
+            if (action) {
+                const result = await action(args); // Handled as async
+                Nexus.ui.injectChar(`\n/* $ ${cmdStr} */\n/* -> ${result} */\n`);
+                return result;
+            } else {
+                return eval(cmdStr);
+            }
+        } catch (e) {
+            return `Shell Fault: ${e.message}`;
+        }
+    }
+},  
+
+            
+      
+ 
 ui: {
     // Update your boot function to be non-blocking
 async boot() { 
