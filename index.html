@@ -2264,90 +2264,105 @@ intel: {
  compressor: {
     async run(level) {
         const ed = document.getElementById('raw-terminal');
-        if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("LORTEX LOCKED");
+        if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("VORTEX LOCKED");
 
+        // 1. Sync payload from current engine state
         let code = Nexus.editorCore.isCM6 && Nexus.editorCore.view 
             ? Nexus.editorCore.view.state.doc.toString() 
             : ed.value;
         
         const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        let compressed = "";
 
         try {
-            let compressed = "";
-            
             if (ext === 'html') {
-                // 1. Deep Scrub: Strip HTML Comments
+                // Strip HTML comments first
                 code = code.replace(//g, '');
 
                 const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
                 const scripts = [];
                 
+                // Extract scripts and leave markers
                 let htmlSkeleton = code.replace(scriptRegex, (match, innerJS) => {
                     scripts.push({ full: match, js: innerJS });
                     return `___NEXUS_SCRIPT_${scripts.length - 1}___`;
                 });
 
-                // 2. Process Skeleton
+                // Compress HTML Shell
                 if (level === 'lean') {
                     htmlSkeleton = htmlSkeleton.replace(/^[ \t]+/gm, '').replace(/\n\s*\n/g, '\n'); 
                 } else {
                     htmlSkeleton = htmlSkeleton.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
                 }
 
-                // 3. Process and Re-inject Scripts (AST naturally ignores JS comments)
+                // Re-inject processed scripts using a function to avoid "$" replacement issues
                 compressed = htmlSkeleton.replace(/___NEXUS_SCRIPT_(\d+)___/g, (match, idx) => {
                     const sc = scripts[idx];
                     if (!sc.js.trim() || sc.full.includes('src=')) return sc.full; 
                     
                     try {
-                        const ast = acorn.parse(sc.js, { ecmaVersion: 2022, sourceType: 'module' });
+                        const ast = acorn.parse(sc.js, { 
+                            ecmaVersion: 2022, 
+                            sourceType: 'script', 
+                            allowReturnOutsideFunction: true 
+                        });
+                        
                         let minJS = astring.generate(ast, { 
                             indent: level === 'lean' ? '  ' : '', 
                             lineEnd: level === 'lean' ? '\n' : '' 
                         });
-                        return sc.full.replace(sc.js, (level === 'lean' ? `\n${minJS}\n` : minJS));
-                    } catch (e) { return sc.full; }
+                        
+                        // Using a function as the second argument prevents "$" mangling
+                        return sc.full.replace(sc.js, () => (level === 'lean' ? `\n${minJS}\n` : minJS));
+                    } catch (e) { 
+                        return sc.full; // Failsafe: return original if script is invalid
+                    }
                 });
 
             } else if (ext === 'css') {
-                // Strip CSS comments
+                // Strip CSS comments and minify
                 compressed = code.replace(/\/\*[\s\S]*?\*\//g, '');
                 if (level === 'lean') {
                     compressed = compressed.replace(/^[ \t]+/gm, '').replace(/\n\s*\n/g, '\n');
                 } else {
                     compressed = compressed.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
                 }
+
             } else if (ext === 'js') {
-                // AST parsing inherently ignores comments unless explicitly preserved
-                const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-                if (level === 'lean') {
-                    compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
-                } else {
-                    compressed = astring.generate(ast, { indent: '', lineEnd: '' });
-                }
+                // Strict AST-based compression for raw JS sectors
+                const ast = acorn.parse(code, { 
+                    ecmaVersion: 2022, 
+                    sourceType: 'script', 
+                    allowReturnOutsideFunction: true 
+                });
+                
+                compressed = astring.generate(ast, { 
+                    indent: level === 'lean' ? '  ' : '', 
+                    lineEnd: level === 'lean' ? '\n' : '' 
+                });
             }
 
-            // Sync UI and VFS
+            // 2. Commit back to VFS and UI
             if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
                 Nexus.editorCore.view.dispatch({ 
                     changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: compressed } 
                 });
             } else {
                 ed.value = compressed;
+                Nexus.ui.updateGutter();
             }
             
             Nexus.state.vfs[Nexus.state.activeFile] = compressed;
-            Nexus.ui.updateGutter();
             Nexus.vfs.save();
             Nexus.ui.closeModal('compressor');
             
         } catch (e) {
-            alert("Compression Fault: " + e.message);
+            console.error("Compression Engine Failure:", e);
+            alert("Matrix Fault: " + e.message);
         }
     }
 },
 
-    
                     async toggleEditor() {
             const rawTerm = document.getElementById('raw-terminal');
             const gutter = document.getElementById('gutter');
