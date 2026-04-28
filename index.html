@@ -2264,13 +2264,11 @@ intel: {
  compressor: {
     async run(level) {
         const ed = document.getElementById('raw-terminal');
-        if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("LOCKED");
+        if (!Nexus.state.activeFile || ed.hasAttribute('readonly')) return alert("LORTEX LOCKED");
 
-        // 1. Sync from CM6 or Vanilla
-        let code = ed.value;
-        if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-            code = Nexus.editorCore.view.state.doc.toString();
-        }
+        let code = Nexus.editorCore.isCM6 && Nexus.editorCore.view 
+            ? Nexus.editorCore.view.state.doc.toString() 
+            : ed.value;
         
         const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
 
@@ -2278,56 +2276,62 @@ intel: {
             let compressed = "";
             
             if (ext === 'html') {
-                // THE FIX: Safe HTML Compression via Script Isolation
+                // 1. Deep Scrub: Strip HTML Comments
+                code = code.replace(//g, '');
+
                 const scriptRegex = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
                 const scripts = [];
                 
-                // Extract scripts and leave placeholder markers
                 let htmlSkeleton = code.replace(scriptRegex, (match, innerJS) => {
                     scripts.push({ full: match, js: innerJS });
                     return `___NEXUS_SCRIPT_${scripts.length - 1}___`;
                 });
 
-                // Compress the HTML Shell
+                // 2. Process Skeleton
                 if (level === 'lean') {
-                    htmlSkeleton = htmlSkeleton.replace(/^[ \t]+/gm, ''); 
+                    htmlSkeleton = htmlSkeleton.replace(/^[ \t]+/gm, '').replace(/\n\s*\n/g, '\n'); 
                 } else {
                     htmlSkeleton = htmlSkeleton.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
                 }
 
-                // Compress and Re-inject Scripts
+                // 3. Process and Re-inject Scripts (AST naturally ignores JS comments)
                 compressed = htmlSkeleton.replace(/___NEXUS_SCRIPT_(\d+)___/g, (match, idx) => {
                     const sc = scripts[idx];
-                    // Skip empty scripts or external scripts with src=
                     if (!sc.js.trim() || sc.full.includes('src=')) return sc.full; 
                     
                     try {
                         const ast = acorn.parse(sc.js, { ecmaVersion: 2022, sourceType: 'module' });
-                        let minJS = "";
-                        if (level === 'lean') minJS = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
-                        else if (level === 'functional') minJS = ast.body.map(n => astring.generate(n, { indent: '', lineEnd: '' })).join('\n');
-                        else minJS = astring.generate(ast, { indent: '', lineEnd: '' });
-                        
-                        return sc.full.replace(sc.js, `\n${minJS}\n`);
-                    } catch (e) {
-                        return sc.full; // If AST fails on incomplete code, safely leave it uncompressed
-                    }
+                        let minJS = astring.generate(ast, { 
+                            indent: level === 'lean' ? '  ' : '', 
+                            lineEnd: level === 'lean' ? '\n' : '' 
+                        });
+                        return sc.full.replace(sc.js, (level === 'lean' ? `\n${minJS}\n` : minJS));
+                    } catch (e) { return sc.full; }
                 });
 
             } else if (ext === 'css') {
-                if (level === 'lean') compressed = code.replace(/^[ \t]+/gm, ''); 
-                else compressed = code.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
-            } else {
-                // Strict AST compression for raw .js files
+                // Strip CSS comments
+                compressed = code.replace(/\/\*[\s\S]*?\*\//g, '');
+                if (level === 'lean') {
+                    compressed = compressed.replace(/^[ \t]+/gm, '').replace(/\n\s*\n/g, '\n');
+                } else {
+                    compressed = compressed.replace(/\n+/g, ' ').replace(/[ \t]{2,}/g, ' ').trim();
+                }
+            } else if (ext === 'js') {
+                // AST parsing inherently ignores comments unless explicitly preserved
                 const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-                if (level === 'lean') compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
-                else if (level === 'functional') compressed = ast.body.map(node => astring.generate(node, { indent: '', lineEnd: '' })).join('\n');
-                else if (level === 'nuclear') compressed = astring.generate(ast, { indent: '', lineEnd: '' });
+                if (level === 'lean') {
+                    compressed = astring.generate(ast, { indent: '  ', lineEnd: '\n' });
+                } else {
+                    compressed = astring.generate(ast, { indent: '', lineEnd: '' });
+                }
             }
 
-            // 2. Sync UI and VFS
+            // Sync UI and VFS
             if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: compressed } });
+                Nexus.editorCore.view.dispatch({ 
+                    changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: compressed } 
+                });
             } else {
                 ed.value = compressed;
             }
@@ -2337,11 +2341,8 @@ intel: {
             Nexus.vfs.save();
             Nexus.ui.closeModal('compressor');
             
-            const st = document.getElementById('foot-status');
-            st.innerText = `COMPRESSED: ${level.toUpperCase()}`;
-            st.style.color = "var(--success)";
         } catch (e) {
-            alert("Compression Error: " + e.message);
+            alert("Compression Fault: " + e.message);
         }
     }
 },
