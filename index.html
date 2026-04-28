@@ -4527,7 +4527,6 @@ initInfiniteRibbon() {
             gutter.scrollTop = ed.scrollTop;
         },
 
-     
      runSandbox() { 
     const f = document.getElementById('sandbox-frame');
     const c = document.getElementById('ghost-console'); 
@@ -4535,54 +4534,76 @@ initInfiniteRibbon() {
     
     c.innerHTML = ""; 
 
-    // 1. Check for Active File FIRST
+    // 1. Memory Management: Revoke old Blob URLs to prevent Pixel 7 memory leaks
+    if (this.sandboxBlobs) {
+        this.sandboxBlobs.forEach(url => URL.revokeObjectURL(url));
+    }
+    this.sandboxBlobs = [];
+
     if(!Nexus.state.activeFile) {
         c.innerHTML = "<div style='color:var(--danger)'>&gt; Error: No active sector found in the Vortex.</div>";
         return;
     }
     
-    // 2. The Sovereign Source: Always pull from VFS State (Safe for CM6 and Vanilla)
+    // 2. Map the entire VFS to temporary Blob URLs
+    const vfsMap = {};
+    Object.entries(Nexus.state.vfs).forEach(([name, content]) => {
+        const ext = name.split('.').pop().toLowerCase();
+        let type = 'text/plain';
+        if (ext === 'js') type = 'application/javascript';
+        else if (ext === 'css') type = 'text/css';
+        else if (ext === 'html') type = 'text/html';
+        
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        vfsMap[name] = url;
+        this.sandboxBlobs.push(url);
+    });
+
+    // 3. Virtualization Regex: Re-routes imports/links to the Blob Map
+    const virtualize = (code) => {
+        let processed = code;
+        Object.keys(vfsMap).forEach(filename => {
+            // Matches: "file.js", "./file.js", and "/file.js" within quotes
+            const escapedName = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(['"])(?:\\.\\/|\\/)?${escapedName}(['"])`, 'g');
+            processed = processed.replace(regex, `$1${vfsMap[filename]}$2`);
+        });
+        return processed;
+    };
+
     const activeCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
-    
-    // 3. The Diagnostic Interceptor (Your Console Hook)
+    const activeExt = Nexus.state.activeFile.split('.').pop().toLowerCase();
+
+    // 4. The Diagnostic Interceptor
     const inj = "<scr" + "ipt>\n" +
         "const send = (msg, col) => {\n" +
             "const d = document.createElement('div');\n" +
-            "d.style.color = col;\n" +
-            "d.style.padding = '4px 0';\n" +
-            "d.style.borderBottom = '1px solid rgba(255,255,255,0.05)';\n" +
+            "d.style.cssText = `color:${col}; padding:4px 8px; border-bottom:1px solid rgba(255,255,255,0.05); font-family:monospace; font-size:11px;`;\n" +
             "d.innerText = '> ' + msg;\n" +
             "const container = window.parent.document.getElementById('ghost-console');\n" +
             "if(container) { container.appendChild(d); d.scrollIntoView({ behavior: 'smooth' }); }\n" +
         "};\n" +
         "console.log = (...args) => send(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#3fb950');\n" +
         "console.error = (...args) => send('[ERR] ' + args.join(' '), '#f85149');\n" +
-        "console.warn = (...args) => send('[WARN] ' + args.join(' '), '#d29922');\n" +
-        "window.onerror = (msg, url, line, col, err) => {\n" +
-            "send('Crash at line ' + line + ': ' + msg, '#f85149');\n" +
-            "return false;\n" +
-        "};\n" +
+        "window.onerror = (msg, url, ln, col, err) => { send(`Crash at line ${ln}: ${msg}`, '#f85149'); return false; };\n" +
     "</scr" + "ipt>\n"; 
     
-    const isHtml = Nexus.state.activeFile.toLowerCase().endsWith('.html');
-    
-    if (isHtml) {
-        let htmlCode = activeCode;
-        // Inject into <head> for early interception
-        if (htmlCode.includes('<head>')) {
-            htmlCode = htmlCode.replace('<head>', '<head>\n' + inj);
-        } else {
-            htmlCode = inj + htmlCode;
-        }
+    // 5. Final Assembly & Injection
+    if (activeExt === 'html') {
+        let htmlCode = virtualize(activeCode);
+        htmlCode = htmlCode.includes('<head>') ? htmlCode.replace('<head>', '<head>\n' + inj) : inj + htmlCode;
         f.srcdoc = htmlCode;
-    } else {
-        // Safe wrap for raw JS (escaping internal scripts to prevent premature termination)
-        const safeJS = activeCode.replace(/<\/script>/gi, '<\\/script>'); 
-        f.srcdoc = inj + '<scr'+'ipt type="module">\n' + safeJS + '\n</scr'+'ipt>'; 
+    } else if (activeExt === 'js') {
+        const virtualJS = virtualize(activeCode).replace(/<\/script>/gi, '<\\/script>'); 
+        f.srcdoc = inj + '<scr'+'ipt type="module">\n' + virtualJS + '\n</scr'+'ipt>'; 
+    } else if (activeExt === 'css') {
+        const virtualCSS = virtualize(activeCode);
+        f.srcdoc = inj + `<style>${virtualCSS}</style><div style="padding:20px; color:#666;">Previewing CSS: ${Nexus.state.activeFile}</div>`;
     }
 },
 
-
+     
         async exportZIP() { 
             const status = document.getElementById('foot-status'); 
             status.innerText = "ARCHIVING..."; 
