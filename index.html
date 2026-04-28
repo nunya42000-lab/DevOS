@@ -278,7 +278,21 @@
     box-shadow: 0 10px 40px rgba(0,0,0,0.9); 
 }
 #widget-drop-menu.active { display: flex; }
- 
+ #format-drop-menu {
+    position: fixed;
+    top: 55px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px;
+    display: none;
+    flex-direction: column;
+    gap: 5px;
+    z-index: 10000;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.9);
+}
+#format-drop-menu.active { display: flex; }
+
     /* --- 3. SIDEBARS --- */
     .side-panel { 
         position: fixed; 
@@ -543,7 +557,11 @@
     <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar'); this.parentElement.classList.remove('active')">✍️ WRITE</button>
     <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith'); this.parentElement.classList.remove('active')">⌨ KEY</button>
  </div>
- 
+ <div id="format-drop-menu">
+    <button class="tool-btn" onclick="Nexus.ui.runPrettier(); this.parentElement.classList.remove('active')">Prettier</button>
+    <button class="tool-btn" onclick="Nexus.ui.runJSBeautify(); this.parentElement.classList.remove('active')">Beautify</button>
+</div>
+
  <canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
 
     <nav id="ribbon-container">
@@ -558,9 +576,7 @@
                        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('spotlight')">🔎</button>
             <button class="tool-btn" style="background:#8a2be2; color:#fff; border:none;" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
-            
-            <button class="tool-btn btn-gold" onclick="Nexus.ui.formatCode()">✨ FORMAT</button>
-         
+            <button id="format-drop-btn" class="tool-btn btn-gold" onclick="Nexus.ui.toggleFormatDrop(event)">✨ FORMAT ▾</button> 
             <button class="tool-btn btn-accent" onclick="Nexus.vfs.refreshCurrent()">🔄 REFRESH FILE</button>
             <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
             
@@ -1040,14 +1056,7 @@
                         <option value="2">2 Spaces</option>
                         <option value="4">4 Spaces</option>
                     </select>
-               <div class="item-row">
-    <span>Formatting Engine</span>
-    <select id="pref-formatter" onchange="Nexus.settings.update('formatter', this.value)" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
-        <option value="prettier">Prettier (Strict)</option>
-        <option value="beautify">JS-Beautify (Legacy)</option>
-    </select>
-               </div>
-                 
+               
                 </div>
              
                 
@@ -3356,8 +3365,7 @@ let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.
             if(document.getElementById('pref-util-mode')) document.getElementById('pref-util-mode').value = Nexus.state.prefs.utilDock || 'dock-right';
             if(document.getElementById('pref-writer-custom')) document.getElementById('pref-writer-custom').value = Nexus.state.prefs.customVocab || "";
             if(document.getElementById('pref-util-layout')) document.getElementById('pref-util-layout').value = Nexus.state.prefs.utilLayout || 'jump, up20, down20, color, undo, redo, tab';
-if(document.getElementById('pref-formatter')) document.getElementById('pref-formatter').value = Nexus.state.prefs.formatter || 'prettier';
-         
+  
             const util = document.getElementById('utility-bar');
             if (util) {
                 if(Nexus.state.prefs.utilDock === 'dock-right') {
@@ -4198,10 +4206,19 @@ async boot() {
         };
         setTimeout(() => document.addEventListener('click', closeMenu), 50);
     },
-    formatCode() {
-        if ((Nexus.state.prefs.formatter || 'prettier') === 'prettier') this.runPrettier();
-        else this.runJSBeautify();
+        toggleFormatDrop(e) {
+        const menu = document.getElementById('format-drop-menu');
+        const rect = e.target.getBoundingClientRect();
+        menu.style.left = rect.left + 'px';
+        menu.classList.toggle('active');
+        const closeMenu = (evt) => {
+            if (!menu.contains(evt.target) && evt.target !== e.target) {
+                menu.classList.remove('active'); document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 50);
     },
+
     async runPrettier() {
         if(!Nexus.state.activeFile) return;
         const ed = document.getElementById('raw-terminal');
