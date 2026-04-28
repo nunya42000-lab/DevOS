@@ -3189,20 +3189,23 @@ grab() {
     }
 },
 
-            
-   graph: {
+              
+graph: {
     analyze() {
         const files = Object.keys(Nexus.state.vfs);
         const deps = {};
         const incoming = {};
         files.forEach(f => { deps[f] = []; incoming[f] = 0; });
 
+        // Normalizes paths so "./utils", "utils.js", and "/utils" all map to the same file
         const normalizePath = (relative) => {
             let p = relative.replace(/['"]/g, '').trim();
             if (p.startsWith('./')) p = p.substring(2);
             if (p.startsWith('/')) p = p.substring(1);
-            if (!files.includes(p) && files.includes(p + '.js')) p += '.js';
-            if (!files.includes(p) && files.includes(p + '.css')) p += '.css';
+            if (!files.includes(p)) {
+                if (files.includes(p + '.js')) p += '.js';
+                else if (files.includes(p + '.css')) p += '.css';
+            }
             return p;
         };
 
@@ -3211,6 +3214,7 @@ grab() {
             let matches = [];
             let m;
 
+            // Universal Regex catching for JS Imports, HTML Scripts/Links, and CSS @imports
             const importRegex = /(?:import|export)\s+(?:.*?\s+from\s+)?['"]([^'"]+)['"]/gi;
             const htmlRegex = /<(?:script|link)[^>]+(?:src|href)=["']([^"']+)["']/gi;
             const cssRegex = /@import\s+(?:url\()?["']?([^"'\)]+)["']?\)?/gi;
@@ -3234,16 +3238,14 @@ grab() {
 
     render() {
         const { deps, incoming, files } = this.analyze();
-        let mainRoots = files.filter(f => incoming[f] === 0);
-        if (mainRoots.length === 0 && files.includes('index.html')) mainRoots = ['index.html'];
-
         const container = document.getElementById('graph-results');
         if (!container) return;
 
         let html = `<div style="font-family: monospace; font-size: 13px; line-height: 1.6; white-space: pre-wrap;">`;
-        html += `<h3 style="color:var(--success); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:0;">🌳 Active Matrix</h3>`;
+        html += `<h3 style="color:var(--success); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:0;">🌳 Application Matrix</h3>`;
         
-        const touched = new Set(); // The ultimate fix for circular ghost islands
+        // This Set tracks every single file the rendering loop touches.
+        const touched = new Set(); 
 
         const buildTree = (node, prefix, isLast, visited) => {
             touched.add(node);
@@ -3261,37 +3263,50 @@ grab() {
             return line;
         };
 
-        if (mainRoots.length > 0) {
-            mainRoots.forEach(r => {
-                html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.vfs.switchFile('${r}'); Nexus.ui.closeModal('graph');">${r}</span></div>`;
-                touched.add(r);
-                const children = deps[r] || [];
-                for (let i = 0; i < children.length; i++) {
-                    html += buildTree(children[i], '', i === children.length - 1, new Set([r]));
-                }
-            });
+        // 1. FORCE THE SOVEREIGN ROOT
+        let rootNode = null;
+        if (files.includes('index.html')) {
+            rootNode = 'index.html';
+        } else if (files.includes('main.js')) {
+            rootNode = 'main.js';
+        } else if (files.includes('app.js')) {
+            rootNode = 'app.js';
         } else {
-            html += `<div style="color:var(--danger); opacity:0.8;">No entry points detected. Create an index.html.</div>`;
+            // Failsafe: If no standard root exists, just grab the first file with 0 incoming connections
+            const possibleRoots = files.filter(f => incoming[f] === 0);
+            if (possibleRoots.length > 0) rootNode = possibleRoots[0];
         }
 
-        // Orphans are simply files that the rendering loop never touched
+        // 2. RENDER THE ACTIVE TREE
+        if (rootNode) {
+            html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.vfs.switchFile('${rootNode}'); Nexus.ui.closeModal('graph');">${rootNode}</span></div>`;
+            touched.add(rootNode);
+            const children = deps[rootNode] || [];
+            for (let i = 0; i < children.length; i++) {
+                html += buildTree(children[i], '', i === children.length - 1, new Set([rootNode]));
+            }
+        } else {
+            html += `<div style="color:var(--danger); opacity:0.8;">No entry point (index.html) detected in VFS.</div>`;
+        }
+
+        // 3. FLAG THE DEAD SECTORS
+        // Anything not in the 'touched' Set is dead to the application, regardless of local imports
         const orphans = files.filter(f => !touched.has(f));
 
-        html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors</h3>`;
+        html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors (Unlinked)</h3>`;
         if (orphans.length > 0) {
             orphans.forEach(o => {
                 html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onclick="Nexus.vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
             });
         } else {
-            html += `<div style="color:var(--success); opacity:0.8;">System clean. 100% of files are linked.</div>`;
+            html += `<div style="color:var(--success); opacity:0.8;">System clean. All VFS files linked to entry point.</div>`;
         }
 
         html += `</div>`;
         container.innerHTML = html;
     }
 },
-    
-    
+
                     settings: {
         async boot() { 
             const saved = await localforage.getItem('nexus_prefs_v42'); 
