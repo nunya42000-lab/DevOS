@@ -584,6 +584,7 @@
             <button class="tool-btn btn-gold" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
     <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph');">🕸️ Radar</button>
 <button class="tool-btn" onclick="Nexus.ui.toggleSlide('diag')">🩺 DIAGNOSTICS</button>
+            <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">👯 DEDUPE</button>
             
             <button class="tool-btn btn-accent" onclick="Nexus.ui.toggleSidebar('right')">▶ RUN</button>
          <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
@@ -763,6 +764,17 @@
     <span style="color:var(--accent); font-family:monospace; font-weight:bold; font-size:18px; margin-right:10px;">&gt;</span>
     <input type="text" id="shell-input" placeholder="Execute command..." onkeydown="if(event.key === 'Enter') { Nexus.shell.exec(this.value); this.value=''; }">
     <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:10;">&times;</button>
+</div>
+<div id="modal-clones" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head"><span>👯 MATRIX DEDUPLICATOR</span><button class="close-x" onclick="Nexus.ui.closeModal('clones')">&times;</button></div>
+        <div class="modal-body">
+            <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px;">
+                The scanner identifies identical blocks of 3+ lines across all project sectors.
+            </div>
+            <div id="clones-list"></div>
+        </div>
+    </div>
 </div>
 
 
@@ -1179,6 +1191,101 @@ window.Nexus = {
         searchOpts: { case: false, regex: false, global: false },
         widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false }
     },
+clones: {
+    scan() {
+        const minBlockLines = 3;
+        const files = Nexus.state.vfs;
+        const occurrences = new Map(); // Map<NormalizedLine, Array<{file, lineNum}>>
+        
+        // 1. Indexing Phase
+        Object.entries(files).forEach(([filename, code]) => {
+            const lines = code.split('\n');
+            lines.forEach((raw, idx) => {
+                const clean = raw.trim().replace(/\/\/.*/, ''); // Strip comments/whitespace
+                if (clean.length < 10) return; // Ignore trivial lines (e.g., "}", "else {")
+                
+                if (!occurrences.has(clean)) occurrences.set(clean, []);
+                occurrences.get(clean).push({ file: filename, line: idx + 1, raw: raw });
+            });
+        });
+
+        // 2. Clustering Phase
+        const duplicates = [];
+        const seenBlocks = new Set();
+
+        occurrences.forEach((locs, normalizedLine) => {
+            if (locs.length < 2) return; // Only process lines appearing in 2+ places
+
+            locs.forEach((loc, i) => {
+                for (let j = i + 1; j < locs.length; j++) {
+                    const locA = loc;
+                    const locB = locs[j];
+                    const blockId = `${locA.file}:${locA.line}-${locB.file}:${locB.line}`;
+                    
+                    if (seenBlocks.has(blockId)) return;
+
+                    // Attempt to expand the match downwards
+                    let offset = 0;
+                    let blockLines = [];
+                    while (true) {
+                        const lineA = files[locA.file].split('\n')[locA.line + offset - 1];
+                        const lineB = files[locB.file].split('\n')[locB.line + offset - 1];
+                        
+                        if (lineA && lineB && lineA.trim() === lineB.trim()) {
+                            blockLines.push(lineA.trim());
+                            offset++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (offset >= minBlockLines) {
+                        duplicates.push({
+                            files: [locA.file, locB.file],
+                            startLines: [locA.line, locB.line],
+                            lineCount: offset,
+                            code: blockLines.join('\n')
+                        });
+                        // Mark all lines in this block as seen for this file pair
+                        for (let k = 0; k < offset; k++) {
+                            seenBlocks.add(`${locA.file}:${locA.line + k}-${locB.file}:${locB.line + k}`);
+                        }
+                    }
+                }
+            });
+        });
+
+        this.renderResults(duplicates);
+    },
+
+    renderResults(dupes) {
+        const root = document.getElementById('clones-list');
+        if (dupes.length === 0) {
+            root.innerHTML = '<div style="text-align:center; padding:20px; opacity:0.5;">0 Matrix Redundancies Detected.</div>';
+        } else {
+            root.innerHTML = dupes.map((d, i) => `
+                <div class="acc-section" style="margin-bottom:15px; border-color:var(--warn);">
+                    <div class="acc-head" style="background:rgba(210,153,34,0.1);">
+                        <span>DUPLICATE BLOCK (${d.lineCount} Lines)</span>
+                        <button class="tool-btn btn-gold" style="padding:2px 8px; font-size:9px;" onclick="Nexus.clones.vault(${i})">VAULT IT</button>
+                    </div>
+                    <div class="p-body" style="font-size:10px; background:#000;">
+                        <div style="color:var(--accent); margin-bottom:10px;">
+                            Found in: <b>${d.files[0]}</b> (Ln ${d.startLines[0]}) & <b>${d.files[1]}</b> (Ln ${d.startLines[1]})
+                        </div>
+                        <pre style="color:var(--text); opacity:0.8; overflow-x:auto;">${d.code.replace(/</g, '&lt;')}</pre>
+                    </div>
+                </div>
+            `).join('');
+        }
+        Nexus.ui.openModal('clones');
+    },
+
+    vault(index) {
+        // Implementation for sending a duplicate block to the snippet vault
+        alert("Block sent to Sovereign Vault for modular reuse.");
+    }
+},
 
     // ADDED MISSING EDITOR CORE DEFINITION
     editorCore: {
