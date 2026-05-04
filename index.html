@@ -219,6 +219,48 @@
     transition: all 0.2s;
     opacity: 0.6;
 }
+ .slab {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+.mini-console {
+    background: #000;
+    color: var(--success);
+    font-family: monospace;
+    font-size: 10px;
+    padding: 8px;
+    height: 100px;
+    overflow-y: auto;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+}
+
+/* Segmented Buttons */
+.seg-btn {
+    flex: 1;
+    background: var(--surface);
+    border: none;
+    color: var(--text);
+    padding: 10px;
+    font-size: 11px;
+    font-weight: 900;
+    border-radius: 6px;
+    opacity: 0.5;
+}
+.seg-btn.active {
+    background: var(--accent);
+    color: #fff;
+    opacity: 1;
+}
+
+.sb-page { display: none; flex: 1; overflow: hidden; }
+.sb-page.active { display: flex; flex-direction: column; }
+ 
 .stab.active {
     background: var(--surface);
     color: var(--accent);
@@ -720,15 +762,13 @@
                 <input type="file" id="load-trigger" multiple style="display:none;" onchange="Nexus.vfs.loadFiles(this.files)">
                 <input type="file" id="zip-trigger" accept=".zip" style="display:none;" onchange="Nexus.vfs.importZIP(this.files[0])">
             </div>
-<div class="section-label">Matrix Operations</div>
-<div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-    <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
-    <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">👯 COMPARE</button>
-</div>
+
 
             <div class="section-label">Matrix Operations</div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom: 8px;">
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE</button>
+              <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
+    <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">👯 COMPARE</button>
+             <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.bundleToHTML()">⚡ BUNDLE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.mergeAllJS()">⚡ MERGE JS</button>
                 <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.vfs.splitJSFile()">✂️ SPLIT JS</button>
@@ -748,60 +788,53 @@
             <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.ui.exportZIP()">📦 BUNDLE PROJECT (ZIP)</button>
         </div>
     </aside>
-       <aside id="panel-right" class="side-panel right-p">
-    <div class="p-head" style="flex-direction: column; align-items: stretch; height: auto; gap: 10px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-            <span>WORKSTATION</span>
-            <button class="close-x" onclick="Nexus.ui.toggleSidebar('right')">&times;</button>
-        </div>
-        <div class="side-tabs" style="display: flex; gap: 2px; background: var(--bg); padding: 2px; border-radius: 6px;">
-            <button class="stab active" onclick="Nexus.ui.switchSideTab('format')">✨</button>
-            <button class="stab" onclick="Nexus.ui.switchSideTab('diag')">🩺</button>
-            <button class="stab" onclick="Nexus.ui.switchSideTab('info')">ℹ️</button>
-            <button class="stab" onclick="Nexus.ui.switchSideTab('inject')">💉</button>
-        </div>
+<aside id="panel-right" class="side-panel right-p">
+    <div class="p-head">
+        <span>COMMAND HUB</span>
+        <button class="close-x" onclick="Nexus.ui.toggleSidebar('right')">&times;</button>
     </div>
 
-    <div id="stab-format" class="side-tab-content active">
-        <div class="section-label">Engine Formatting</div>
-        <button class="tool-btn" style="width:100%; margin-bottom:5px;" onclick="Nexus.ui.runPrettier()">✨ PRETTIER (STRICT)</button>
-        <button class="tool-btn" style="width:100%; margin-bottom:15px;" onclick="Nexus.ui.runJSBeautify()">💅 BEAUTIFY (SOFT)</button>
+    <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 20px;">
         
-        <div class="section-label">Compression Aggression</div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">
-            <button class="tool-btn" onclick="Nexus.compressor.run('lean')">LEAN</button>
-            <button class="tool-btn" onclick="Nexus.compressor.run('functional')">FUNC</button>
-            <button class="tool-btn btn-danger" onclick="Nexus.compressor.run('nuclear')">NUKE</button>
+        <div class="slab">
+            <div class="section-label">Optimization</div>
+            <div class="grid-2">
+                <button class="tool-btn" onclick="Nexus.ui.runPrettier()">✨ Prettier</button>
+                <button class="tool-btn" onclick="Nexus.ui.runJSBeautify()">💅 Beautify</button>
+            </div>
+            <div class="grid-3" style="margin-top:8px;">
+                <button class="tool-btn" onclick="Nexus.compressor.run('lean')">Lean</button>
+                <button class="tool-btn" onclick="Nexus.compressor.run('functional')">Func</button>
+                <button class="tool-btn btn-danger" onclick="Nexus.compressor.run('nuclear')">Nuke</button>
+            </div>
         </div>
-    </div>
 
-    <div id="stab-diag" class="side-tab-content">
-        <div class="section-label">Neural Sentinel</div>
-        <button class="tool-btn btn-danger" style="width:100%; margin-bottom:10px;" onclick="Nexus.Sentinel.runLint()">🩺 FULL SYSTEM SCAN</button>
-        <div id="diag-out" style="background:#000; height: 300px; overflow-y: auto; font-family: monospace; font-size: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 8px;">
-            [SENTINEL IDLE]
+        <div class="slab">
+            <div class="section-label">Diagnostics</div>
+            <button class="tool-btn btn-danger" style="width:100%;" onclick="Nexus.Sentinel.runLint()">🩺 Run Sentinel Scan</button>
+            <button class="tool-btn btn-gold" style="width:100%; margin-top:8px;" onclick="Nexus.intel.scan()">🧠 Intel Analysis</button>
+            <div id="diag-out" class="mini-console" style="margin-top:10px;">[System Standby]</div>
         </div>
-    </div>
 
-    <div id="stab-info" class="side-tab-content">
-        <div class="section-label">Matrix Intelligence</div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-            <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
-            <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
-            <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph')">🕸️ RADAR</button>
-            <button class="tool-btn" onclick="Nexus.clones.scan()">👯 DEDUPE</button>
+        <div class="slab">
+            <div class="section-label">Mapping</div>
+            <div class="grid-2">
+                <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ Outline</button>
+                <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph')">🕸️ Radar</button>
+            </div>
         </div>
-    </div>
 
-    <div id="stab-inject" class="side-tab-content">
-        <div class="section-label">Sovereign Vault</div>
-        <div id="side-vault-mini" style="margin-bottom:15px;">
-             <button class="tool-btn btn-gold" style="width:100%;" onclick="Nexus.ui.openModal('vault')">📂 OPEN FULL VAULT</button>
+        <div class="slab">
+            <div class="section-label">Injection</div>
+            <div class="grid-2">
+                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('vault')">💾 Vault</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('dreamer')">🌙 Dreamer</button>
+            </div>
         </div>
-        <div class="section-label">Dreamer Architect</div>
-        <button class="tool-btn btn-accent" style="width:100%;" onclick="Nexus.ui.openModal('dreamer')">🌙 LAUNCH ARCHITECT</button>
+
     </div>
 </aside>
+
 
 
 
@@ -843,44 +876,31 @@
     </div>
 </div>
 <div id="modal-sandbox" class="modal-overlay">
-    <div class="modal-content" style="width: 95%; height: 90%;">
-        <div class="p-head" style="flex-direction: column; height: auto; padding: 10px;">
-            <div style="display:flex; justify-content: space-between; width: 100%;">
-                <span>PROVING GROUNDS</span>
-                <button class="close-x" onclick="Nexus.ui.closeModal('sandbox')">&times;</button>
-            </div>
-            <div class="sandbox-tabs" style="display: flex; gap: 5px; margin-top: 10px; width: 100%;">
-                <button class="stab active" style="flex:1" onclick="Nexus.ui.switchSandboxTab('test')">🧪 VIEW</button>
-                <button class="stab" style="flex:1" onclick="Nexus.ui.switchSandboxTab('opts')">⚙️ CONF</button>
-                <button class="stab" style="flex:1" onclick="Nexus.ui.switchSandboxTab('logs')">📋 LOGS</button>
-            </div>
+    <div class="modal-content" style="width: 96%; height: 92%; border-radius: 12px;">
+        <div class="sandbox-nav" style="padding: 10px; background: var(--panel); display: flex; gap: 4px;">
+            <button class="seg-btn active" onclick="Nexus.ui.segSandbox('test')">VIEW</button>
+            <button class="seg-btn" onclick="Nexus.ui.segSandbox('opts')">OPTS</button>
+            <button class="seg-btn" onclick="Nexus.ui.segSandbox('logs')">LOGS</button>
+            <button class="close-x" style="margin-left: auto;" onclick="Nexus.ui.closeModal('sandbox')">&times;</button>
         </div>
 
-        <div id="sandbox-test" class="sandbox-tab-content active" style="flex:1; background:#fff;">
-            <iframe id="sandbox-frame" style="width:100%; height:100%; border:none;"></iframe>
+        <div id="sb-test" class="sb-page active">
+            <iframe id="sandbox-frame" style="width:100%; height:100%; border:none; background:#fff;"></iframe>
         </div>
 
-        <div id="sandbox-opts" class="sandbox-tab-content" style="padding: 20px;">
-            <div class="section-label">Performance & Simulation</div>
-            <div class="item-row">
-                <span>Resolution</span>
-                <select class="sleek-input" id="sb-res">
-                    <option value="native">Native (Pixel 7 Pro)</option>
-                    <option value="1080">1080p Desktop</option>
-                </select>
-            </div>
-            <div class="item-row">
-                <span>FPS Limit</span>
-                <input type="number" value="60" class="sleek-input" style="width: 60px;">
-            </div>
-            <button class="tool-btn btn-accent" style="width:100%; margin-top:20px;" onclick="Nexus.ui.runSandbox()">▶ REFRESH PROCESS</button>
+        <div id="sb-opts" class="sb-page" style="padding:20px;">
+            <div class="section-label">Engine Config</div>
+            <div class="item-row"><span>Refresh Rate</span><input type="number" id="sb-fps" value="60" class="sleek-input"></div>
+            <div class="item-row"><span>Mobile Preview</span><input type="checkbox" checked></div>
+            <button class="tool-btn btn-accent" style="width:100%; margin-top:20px;" onclick="Nexus.ui.runSandbox()">REBOOT PROCESS</button>
         </div>
 
-        <div id="sandbox-logs" class="sandbox-tab-content" style="background:#000; padding:10px; overflow-y: auto;">
+        <div id="sb-logs" class="sb-page" style="background:#000; padding:10px;">
             <div id="ghost-console"></div>
         </div>
     </div>
 </div>
+
 
 
     <div id="modal-manual" class="modal-overlay">
@@ -4228,144 +4248,74 @@ switchSandboxTab(tabId) {
     document.getElementById('sandbox-' + tabId).classList.add('active');
 },
   
-  // New Selection & Navigation Tools
 tools: {
-  expandBlock() {
-    const ed = document.getElementById('raw-terminal');
-    const isCM6 = Nexus.editorCore.isCM6;
-    let start, end, code;
-
-    // 1. Get current selection state
-    if (isCM6) {
-        const range = Nexus.editorCore.view.state.selection.main;
-        start = range.from; end = range.to;
-        code = Nexus.editorCore.view.state.doc.toString();
-    } else {
-        start = ed.selectionStart; end = ed.selectionEnd;
-        code = ed.value;
-    }
-
-    try {
-        const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', ranges: true });
-        let targetNode = null;
-        let parentNode = null;
-
-        // 2. Walk AST to find the node matching current selection
-        Nexus.Sentinel.engine.traverse(ast, (node, parent) => {
-            const [nStart, nEnd] = node.range;
-            
-            // Check if this node exactly matches the current selection
-            if (nStart === start && nEnd === end) {
-                parentNode = parent;
-            }
-            // Check if this node contains the current selection but is the "smallest" one to do so
-            if (nStart <= start && nEnd >= end && nStart !== nEnd) {
-                if (!targetNode || (nEnd - nStart < targetNode.range[1] - targetNode.range[0])) {
-                    targetNode = node;
-                    parentNode = parent;
-                }
-            }
-        });
-
-        // 3. Determine the next expansion target
-        let newStart, newEnd;
-        if (targetNode && (targetNode.range[0] !== start || targetNode.range[1] !== end)) {
-            // If the cursor is inside a node, select that node first
-            [newStart, newEnd] = targetNode.range;
-        } else if (parentNode && parentNode.range) {
-            // If the node is already selected, select its parent
-            [newStart, newEnd] = parentNode.range;
-        } else {
-            return; // At the root
-        }
-
-        // 4. Apply new selection
-        if (isCM6) {
-            Nexus.editorCore.view.dispatch({
-                selection: { anchor: newStart, head: newEnd },
-                scrollIntoView: true
-            });
-        } else {
-            ed.focus();
-            ed.setSelectionRange(newStart, newEnd);
-        }
-    } catch (e) {
-        console.warn("AST Expansion Failed: ", e.message);
-        // Fallback: simple line expansion if syntax is broken
-        const lStart = code.lastIndexOf('\n', start - 1) + 1;
-        const lEnd = code.indexOf('\n', end);
-        ed.setSelectionRange(lStart, lEnd === -1 ? code.length : lEnd);
-    }
-  },
-  
-    tools: {
     // Navigation
     warp(dir) {
         const ed = document.getElementById('raw-terminal');
         if (dir === 'top') Nexus.ui.jumpPrompt(1);
-        if (dir === 'bottom') {
-            const lineCount = (Nexus.editorCore.isCM6) ? 
-                Nexus.editorCore.view.state.doc.lines : ed.value.split('\n').length;
-            Nexus.ui.jumpPrompt(lineCount);
+        else if (dir === 'bottom') {
+            const lines = Nexus.editorCore.isCM6 ? Nexus.editorCore.view.state.doc.lines : ed.value.split('\n').length;
+            Nexus.ui.jumpPrompt(lines);
         }
     },
-    jump100(dir) { Nexus.ui.jumpRelative(dir * 100); },
-
-    // Selection
-    selectAll() {
-        const ed = document.getElementById('raw-terminal');
+    
+    // Logic Selection: Line to Line
+    selectLineRange() {
+        const start = parseInt(prompt("Start Line:"));
+        const end = parseInt(prompt("End Line:"));
+        if (isNaN(start) || isNaN(end)) return;
+        
         if (Nexus.editorCore.isCM6) {
-            Nexus.editorCore.view.dispatch({ selection: { anchor: 0, head: Nexus.editorCore.view.state.doc.length } });
+            const doc = Nexus.editorCore.view.state.doc;
+            const from = doc.line(Math.max(1, start)).from;
+            const to = doc.line(Math.min(doc.lines, end)).to;
+            Nexus.editorCore.view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
         } else {
-            ed.focus(); ed.setSelectionRange(0, ed.value.length);
+            const ed = document.getElementById('raw-terminal');
+            const lines = ed.value.split('\n');
+            let startPos = 0, endPos = 0;
+            for (let i = 0; i < start - 1; i++) startPos += lines[i].length + 1;
+            for (let i = 0; i < end; i++) endPos += lines[i].length + 1;
+            ed.focus(); ed.setSelectionRange(startPos, endPos - 1);
         }
     },
-    
-    // Clipboard
-    async clipboard(action) {
-        const ed = document.getElementById('raw-terminal');
-        if (action === 'copy' || action === 'cut') {
-            const text = (Nexus.editorCore.isCM6) ? 
-                Nexus.editorCore.view.state.sliceDoc(Nexus.editorCore.view.state.selection.main.from, Nexus.editorCore.view.state.selection.main.to) :
-                ed.value.substring(ed.selectionStart, ed.selectionEnd);
+
+    // Block Selection (AST Level)
+    expandBlock() {
+        const code = Nexus.editorCore.isCM6 ? Nexus.editorCore.view.state.doc.toString() : document.getElementById('raw-terminal').value;
+        const curRange = Nexus.editorCore.isCM6 ? Nexus.editorCore.view.state.selection.main : { from: document.getElementById('raw-terminal').selectionStart, to: document.getElementById('raw-terminal').selectionEnd };
+        
+        try {
+            const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', ranges: true });
+            let target = null;
             
-            await navigator.clipboard.writeText(text);
-            if (action === 'cut') Nexus.ui.injectChar(""); // Deletes selection
-        } else if (action === 'paste') {
-            const text = await navigator.clipboard.readText();
-            Nexus.ui.injectChar(text);
-        }
+            // Recursive walk to find the next logical scope
+            const walk = (node) => {
+                if (node.start <= curRange.from && node.end >= curRange.to) {
+                    if (!target || (node.end - node.start > curRange.to - curRange.from)) {
+                        if (node.end - node.start > curRange.to - curRange.from) target = node;
+                    }
+                }
+                Object.keys(node).forEach(k => {
+                    if (node[k] && typeof node[k] === 'object') {
+                        if (Array.isArray(node[k])) node[k].forEach(walk);
+                        else if (node[k].type) walk(node[k]);
+                    }
+                });
+            };
+            walk(ast);
+            if (target) {
+                if (Nexus.editorCore.isCM6) {
+                    Nexus.editorCore.view.dispatch({ selection: { anchor: target.start, head: target.end } });
+                } else {
+                    const ed = document.getElementById('raw-terminal');
+                    ed.focus(); ed.setSelectionRange(target.start, target.end);
+                }
+            }
+        } catch(e) { console.warn("AST expansion failed, syntax may be broken."); }
     }
 },
-    
-    selectRange() {
-        const start = prompt("Start Line:");
-        const end = prompt("End Line:");
-        if (!start || !end) return;
-        
-        const ed = document.getElementById('raw-terminal');
-        const lines = ed.value.split('\n');
-        let startPos = 0, endPos = 0;
-        
-        for (let i = 0; i < Math.min(start - 1, lines.length); i++) startPos += lines[i].length + 1;
-        for (let i = 0; i < Math.min(end, lines.length); i++) endPos += lines[i].length + 1;
-        
-        ed.focus();
-        ed.setSelectionRange(startPos, endPos - 1);
-    },
-
-    
-
-    clipboard(action) {
-        const ed = document.getElementById('raw-terminal');
-        ed.focus();
-        if (action === 'copy') document.execCommand('copy');
-        if (action === 'cut') document.execCommand('cut');
-        if (action === 'paste') navigator.clipboard.readText().then(t => Nexus.ui.injectChar(t));
-        if (action === 'all') ed.setSelectionRange(0, ed.value.length);
-    }
-},
-
+                     
         explodeVortex() {
             const isExploded = document.body.classList.toggle('vortex-active');
             const root = document.getElementById('app-root');
