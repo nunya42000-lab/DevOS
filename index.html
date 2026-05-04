@@ -2178,81 +2178,39 @@ intel: {
         } catch (e) {
             Nexus.shell.out(`Compression Fault: ${e.message}`, "error");
             console.error(e);
-        }
-    },
-crush: {
+       } 
+ },
+ crush: {
     stats: { original: 0, crushed: 0, saved: 0 },
 
     run(code, level = 'tactical') {
         this.stats.original = code.length;
-        const blocks = { JS: [], CSS: [] };
         
-        // Lookup table to map our internal types to HTML tags
-        const registry = { 
-            JS: { tag: 'script', proc: (c) => this.processJS(c, level) },
-            CSS: { tag: 'style', proc: (c) => this.processCSS(c, level) }
-        };
+        // SIMPLEST POSSIBLE LOGIC: 
+        // 1. Trim line edges (Tactical)
+        // 2. Collapse double-newlines (Nuclear)
+        let result = code.split('\n')
+            .map(line => line.trimEnd())
+            .filter(line => level === 'nuclear' ? line.trim().length > 0 : true)
+            .join('\n');
 
-        // 1. ISOLATION & DATA CAPTURE
-        const html = code.replace(/<(script|style)\b[^>]*>([\s\S]*?)<\/\1>/gi, (match, tag, content) => {
-            if (match.toLowerCase().includes('src=')) return match;
-            
-            const type = tag.toUpperCase() === 'SCRIPT' ? 'JS' : 'CSS';
-            let payload = content.trim();
-            
-            // Semicolon Guard: Force-close statements before flattening
-            if (type === 'JS' && payload && !payload.endsWith(';')) payload += ';';
-            
-            const id = blocks[type].length;
-            blocks[type].push(registry[type].proc(payload));
-            
-            return ``; 
-        });
-
-        // 2. SEGMENTED ASSEMBLY (The No-If Version)
-        const assembled = html.split(/()/g).map(seg => {
-            const match = seg.match(//);
-            
-            // If it's a placeholder, use the registry to rebuild it. 
-            // Otherwise, it's a raw HTML segment—crush the shell.
-            return match 
-                ? `<${registry[match[1]].tag}>${blocks[match[1]][match[2]]}</${registry[match[1]].tag}>` 
-                : this.processHTML(seg, level);
-        }).join('');
-
-        this.stats.crushed = assembled.length;
+        // Telemetry
+        this.stats.crushed = result.length;
         this.stats.saved = this.stats.original - this.stats.crushed;
-        if (navigator.vibrate) navigator.vibrate(20);
         
-        return assembled;
-    },
-
-    processHTML(seg, level) {
-        if (level !== 'nuclear') return seg.replace(/^[ \t]+/gm, '');
-        return seg
-            .replace(/>\s+</g, '><')
-            .replace(/\s+/g, ' ')
-            .replace(//g, '')
-            .replace(/\n/g, '');
-    },
-
-    processJS(code, level) {
-        let res = code.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1').trim();
-        return (level === 'nuclear') 
-            ? res.replace(/\n/g, ' ').replace(/\s+/g, ' ').replace(/\s?([;{},()\[\]])\s?/g, '$1') 
-            : res;
-    },
-
-    processCSS(code, level) {
-        let res = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s*([{}|:;,])\s*/g, '$1').replace(/\s{2,}/g, ' ').trim();
-        return (level === 'nuclear') ? res.replace(/\n/g, '') : res;
+        // Haptic pulse for the Pixel 7 Pro
+        if (navigator.vibrate) navigator.vibrate(10);
+        
+        return result;
     }
- }
- 
-    
-
+},
 
     
+
+    
+        
+     
+      
                     async toggleEditor() {
             const rawTerm = document.getElementById('raw-terminal');
             const gutter = document.getElementById('gutter');
@@ -2910,9 +2868,9 @@ Nexus.editorCore.currentExtensions = [
             // Inject HTML and auto-wrap JS/CSS for the blueprint
             const payload = [
                 ``,
-                `<style>${component.css()}</style>`,
+                `<style>${component.css()}<\/style>`,
                 component.html(label, id),
-                `<script>${component.js(id)}</script>`,
+                `<script>${component.js(id)}<\/script>`,
                 ``
             ].join('\n');
             
@@ -3213,7 +3171,7 @@ Nexus.editorCore.currentExtensions = [
                 .catch(err => console.error('Forge Error:', err));
         });
     }
-</script>
+<\/script>
 `;
 
         // 4. THE SURGICAL INSERT
@@ -4193,7 +4151,7 @@ graph: {
                 html: [
                     {d: '<>', i: '<*#>'}, {d: 'div', i: '<div>*#</div>'}, 
                     {d: 'class', i: 'class="*#"'}, {d: 'id', i: 'id="*#"'},
-                    {d: 'script', i: '<script>\n  *#\n</script>'}
+                    {d: 'script', i: '<script>\n  *#\n<\/script>'}
                 ],
                 css: [
                     {d: '{}', i: '{\n  *#\n}'}, {d: 'var', i: 'var(--*#)'}, 
@@ -5195,7 +5153,7 @@ tools: {
     Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
     Nexus.vfs.save();
     this.updateGutter();
-}
+},
       
 
                 jumpPrompt(directLine) {
@@ -5564,7 +5522,7 @@ initInfiniteRibbon() {
         // Delay ensures the keyboard doesn't "jitter" the slide animation
         setTimeout(() => document.getElementById('shell-input').focus(), 350);
     }
-}
+},
 
         openModal(id) { 
             if (id === 'dreamer') Nexus.dreamer.updatePreview(); 
@@ -5617,7 +5575,7 @@ initInfiniteRibbon() {
     gutter.innerHTML = nums;
     gutter.dataset.lastCount = lineCount;
     gutter.scrollTop = ed.scrollTop;
-}
+},
      runSandbox() { 
     const f = document.getElementById('sandbox-frame');
     const c = document.getElementById('ghost-console'); 
@@ -5690,7 +5648,7 @@ initInfiniteRibbon() {
         f.srcdoc = inj + '<scr'+'ipt type="module">\n' + virtualJS + '\n</scr'+'ipt>'; 
     } else if (activeExt === 'css') {
         const virtualCSS = virtualize(activeCode);
-        f.srcdoc = inj + `<style>${virtualCSS}</style><div style="padding:20px; color:#666;">Previewing CSS: ${Nexus.state.activeFile}</div>`;
+        f.srcdoc = inj + `<style>${virtualCSS}<\/style><div style="padding:20px; color:#666;">Previewing CSS: ${Nexus.state.activeFile}</div>`;
     }
 },
 
@@ -5728,7 +5686,7 @@ initInfiniteRibbon() {
             }
         }
     } // Closes the "ui" object literal
-}; // Closes the "window.Nexus" object literal
+}}; // Closes the "window.Nexus" object literal
 
 /* --- GLOBAL LISTENERS & ENGINE HOOKS --- */
 const editor = document.getElementById('raw-terminal');
