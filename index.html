@@ -2183,110 +2183,117 @@ intel: {
 
     // --- CRUSH ENGINES ---
 
-    crushJS(code, level) {
-        if (!code.trim()) return "";
-        const strat = this.strategies[level];
-        // Acorn parse to ensure syntax validity before we crush
-        const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
-        return astring.generate(ast, { 
-            indent: strat.indent, 
-            lineEnd: strat.lineEnd 
-        });
-    },
-
-    crushCSS(code, level) {
-        let css = code
-            .replace(/\/\*[\s\S]*?\*\//g, "") // Strip comments
-            .replace(/\s+/g, " ")             // Standardize whitespace
-            .trim();
-        
-        if (level === 'lean') return css.replace(/}/g, "}\n").replace(/{/g, " {\n  ");
-        if (level === 'nuclear') return css.replace(/\s*([{}|:;,])\s*/g, "$1");
-        return css;
-    },
-
-    crush: {
+    /**
+ * Nexus Prime Molecular Crusher v3.0
+ * Uses Tokenized Assembly to prevent "Unexpected end of input"
+ */
+const MolecularCrusher = {
     stats: { original: 0, crushed: 0, saved: 0 },
 
-    /**
-     * Molecularly compresses HTML, JS, and CSS while preserving functional integrity.
-     * @param {string} code - The raw source matrix.
-     * @param {string} level - 'standard' | 'tactical' | 'nuclear'
-     */
-    html(code, level = 'tactical') {
+    crush(code, level = 'tactical') {
         this.stats.original = code.length;
         let html = code;
         const blocks = { script: [], style: [] };
 
-        // 1. TACTICAL ISOLATION (Internal JS)
-        // Uses a non-greedy sentinel to capture script content without breaking on attributes
+        Nexus.shell.out(`Crushing Sector: ${level.toUpperCase()} protocol...`, "accent");
+
+        // 1. ISOLATE SCRIPTS (With Semicolon Guard)
         html = html.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gi, (match, content) => {
-            if (match.toLowerCase().includes('src=')) return match; // Skip external links
-            try {
-                const crushed = this.js(content, level);
-                const id = blocks.script.length;
-                blocks.script.push(crushed);
-                return `<script>/*#JS_${id}#*/</script>`;
-            } catch (e) { 
-                Nexus.shell.out(`Crush Fault [JS]: ${e.message}`, "error");
-                return match; 
-            }
+            if (match.toLowerCase().includes('src=')) return match;
+            
+            // Fix: Force a semicolon to prevent ASI breakage during flattening
+            let safeJS = content.trim();
+            if (safeJS && !safeJS.endsWith(';')) safeJS += ';';
+            
+            const crushedJS = this.processJS(safeJS, level);
+            const id = blocks.script.length;
+            blocks.script.push(crushedJS);
+            return ``; 
         });
 
-        // 2. TACTICAL ISOLATION (Internal CSS)
+        // 2. ISOLATE STYLES
         html = html.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (match, content) => {
-            const crushed = this.css(content, level);
+            const crushedCSS = this.processCSS(content, level);
             const id = blocks.style.length;
-            blocks.style.push(crushed);
-            return `<style>/*#CSS_${id}#*/</style>`;
+            blocks.style.push(crushedCSS);
+            return ``;
         });
 
-        // 3. ATOMIC SHELL COMPRESSION
-        if (level === 'nuclear') {
-            html = html
-                .replace(/>\s+</g, '><') // Remove whitespace between tags
-                .replace(/\s{2,}/g, ' ') // Collapse multiple spaces
-                .replace(//g, '') // Purge all comments
-                .replace(/\n/g, '');     // Flatten to a single logic line
-        } else {
-            // Tactical: Keep single newlines for readability but trim margins
-            html = html.replace(/^[ \t]+/gm, '');
-        }
+        // 3. THE ASSEMBLY BUFFER (Immune to Escape Characters)
+        // Split by our placeholders to create a Token Array
+        const segments = html.split(/()/g);
 
-        // 4. MOLECULAR RE-INJECTION
-        html = html.replace(/\/\*#JS_(\d+)#\*\//g, (_, id) => blocks.script[id]);
-        html = html.replace(/\/\*#CSS_(\d+)#\*\//g, (_, id) => blocks.style[id]);
+        const assembled = segments.map(seg => {
+            // Check if this segment is a JS Placeholder
+            const jsMatch = seg.match(//);
+            if (jsMatch) {
+                return `<script>${blocks.script[jsMatch[1]]}</script>`;
+            }
 
-        this.stats.crushed = html.length;
+            // Check if this segment is a CSS Placeholder
+            const cssMatch = seg.match(//);
+            if (cssMatch) {
+                return `<style>${blocks.style[cssMatch[1]]}</style>`;
+            }
+
+            // 4. ATOMIC HTML COMPRESSION (Only hits the HTML segments)
+            if (level === 'nuclear') {
+                return seg
+                    .replace(/>\s+</g, '><')            // Remove whitespace between tags
+                    .replace(/\s+/g, ' ')               // Collapse whitespace
+                    .replace(//g, '') // Purge comments (ignore our placeholders)
+                    .replace(/\n/g, '');                // Flatten
+            }
+            
+            return seg.replace(/^[ \t]+/gm, ''); // Tactical: Just trim margins
+        }).join('');
+
+        // 5. TELEMETRY PULSE
+        this.stats.crushed = assembled.length;
         this.stats.saved = this.stats.original - this.stats.crushed;
+        const savedPct = ((this.stats.saved / this.stats.original) * 100).toFixed(1);
         
-        return html;
+        Nexus.shell.out(`Crush Success. Weight Reduced: ${savedPct}%`, "success");
+        if (navigator.vibrate) navigator.vibrate(20);
+
+        return assembled;
     },
 
-    /** * JS Crusher: Strips comments and unnecessary whitespace 
+    /**
+     * JS Processing: Strips comments and collapses logic
      */
-    js(code, level) {
-        let crushed = code
+    processJS(code, level) {
+        let result = code
             .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1') // Strip comments
-            .replace(/\s+/g, ' ') // Collapse whitespace
             .trim();
         
         if (level === 'nuclear') {
-            crushed = crushed.replace(/([;{}])\s/g, '$1'); // Aggressive semi-colon trim
+            result = result
+                .replace(/\n/g, ' ') // Space-flatten to prevent ASI merge
+                .replace(/\s+/g, ' ') 
+                .replace(/\s?([;{},()\[\]])\s?/g, '$1'); // Tighten around tokens
         }
-        return crushed;
+        return result;
     },
 
-    /** * CSS Crusher: Standard minification logic 
+    /**
+     * CSS Processing: Minifies selector blocks
      */
-    css(code, level) {
-        return code
+    processCSS(code, level) {
+        let result = code
             .replace(/\/\*[\s\S]*?\*\//g, '') // Strip comments
-            .replace(/\s*([{}|:;,])\s*/g, '$1') // Tighten around symbols
+            .replace(/\s*([{}|:;,])\s*/g, '$1') // Tighten symbols
             .replace(/\s{2,}/g, ' ')
             .trim();
+        
+        if (level === 'nuclear') {
+            result = result.replace(/\n/g, '');
+        }
+        return result;
     }
 },
+
+    
 
 
     
