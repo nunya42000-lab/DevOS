@@ -706,6 +706,8 @@
                 <div style="display:flex; flex-direction:column; gap:8px; width:45px;">
                     <button class="sleek-btn" style="flex:1; font-size:18px; padding:0;" onclick="Nexus.search.findNext(-1)">↑</button>
                     <button class="sleek-btn" style="flex:1; font-size:18px; padding:0;" onclick="Nexus.search.findNext(1)">↓</button>
+              <button class="sleek-btn" style="width: 100%; background: var(--warn); color: #000; margin-top: 10px;" onclick="Nexus.refactor.renameGlobal()">🔄 GLOBAL RENAME (AST)</button>
+                
                 </div>
             </div>
         </div>
@@ -804,7 +806,17 @@
             </div>
             <div id="diag-out" class="mini-console" style="margin-top:10px; height: 180px;">[System Standby]</div>
         </div>
-
+<div class="slab">
+    <div class="section-label">Matrix Operations</div>
+    <div class="grid-2">
+        <button class="tool-btn btn-danger" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
+        <button class="tool-btn btn-gold" onclick="Nexus.pwa.forge()">🔨 FORGE PWA</button>
+        <button class="tool-btn" onclick="Nexus.defrag.runJS()">🧹 DEFRAG JS</button>
+        <button class="tool-btn" onclick="Nexus.defrag.sequenceHTML()">🧹 DEFRAG HTML</button>
+    </div>
+    <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.dreamer.startNightCycle()">🌙 RUN NIGHT CYCLE</button>
+</div>
+     
         <div class="slab">
             <div class="section-label">Heuristics</div>
             <div class="grid-2">
@@ -1014,10 +1026,15 @@
         <div class="modal-content">
             <div class="p-head"><span>💾 SOVEREIGN VAULT</span><button class="close-x" onclick="Nexus.ui.closeModal('vault')">&times;</button></div>
             <div class="modal-body">
-                <div style="display:flex; gap:10px; margin-bottom:20px;">
-                    <input type="text" id="vault-search" placeholder="Search..." style="flex:1; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;" oninput="Nexus.vault.render(this.value)">
-                    <button class="tool-btn btn-accent" onclick="Nexus.vault.grab()">+ GRAB HIGHLIGHT</button>
-                </div>
+                <div style="display:flex; flex-wrap: wrap; gap:10px; margin-bottom:20px;">
+    <input type="text" id="vault-search" placeholder="Search..." style="flex:1; min-width: 150px; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;" oninput="Nexus.vault.render(this.value)">
+    <button class="tool-btn btn-accent" onclick="Nexus.vault.grab()">+ GRAB</button>
+    <button class="tool-btn btn-warn" onclick="Nexus.vault.cutFile()">✂️ CUT FILE</button>
+    <button class="tool-btn" onclick="Nexus.vault.copyFile()">📄 COPY FILE</button>
+    <button class="tool-btn btn-gold" onclick="document.getElementById('asset-upload').click()">📦 ENCODE</button>
+    <input type="file" id="asset-upload" style="display:none;" onchange="Nexus.assetMatrix.encode(this.files[0])">
+</div>
+
                 <div id="vault-content"></div>
             </div>
         </div>
