@@ -3938,7 +3938,25 @@ shell: {
         ls: () => {
             return Object.keys(Nexus.state.vfs).join('\n') || "Vortex empty.";
         },
-        
+                explode: () => { 
+            Nexus.ui.explodeVortex(); 
+            return "Dimensional perspective shifted."; 
+        },
+        rename: () => { 
+            Nexus.refactor.renameGlobal(); 
+            return "Global AST rename initiated."; 
+        },
+        nightcycle: () => { 
+            Nexus.dreamer.startNightCycle(); 
+            return "Night cycle stress test engaged."; 
+        },
+        defrag: () => {
+            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+            if (ext === 'js') Nexus.defrag.runJS();
+            else if (ext === 'html') Nexus.defrag.sequenceHTML();
+            return `Defragmentation complete for ${ext.toUpperCase()}`;
+        },
+     
         touch: (args) => {
             const path = args[0];
             if (!path) return "Error: Specify a path.";
