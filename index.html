@@ -219,26 +219,26 @@
     transition: all 0.2s;
     opacity: 0.6;
 }
- .slab {
+.slab {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
 }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-
 .mini-console {
     background: #000;
     color: var(--success);
-    font-family: monospace;
+    font-family: 'Courier New', monospace;
     font-size: 10px;
-    padding: 8px;
-    height: 100px;
+    padding: 10px;
+    border-radius: 8px;
     overflow-y: auto;
-    border-radius: 6px;
     border: 1px solid var(--border);
 }
+
+
 
 /* Segmented Buttons */
 .seg-btn {
@@ -794,46 +794,36 @@
         <button class="close-x" onclick="Nexus.ui.toggleSidebar('right')">&times;</button>
     </div>
 
-    <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 20px;">
-        
-        <div class="slab">
-            <div class="section-label">Optimization</div>
-            <div class="grid-2">
-                <button class="tool-btn" onclick="Nexus.ui.runPrettier()">✨ Prettier</button>
-                <button class="tool-btn" onclick="Nexus.ui.runJSBeautify()">💅 Beautify</button>
-            </div>
-            <div class="grid-3" style="margin-top:8px;">
-                <button class="tool-btn" onclick="Nexus.compressor.run('lean')">Lean</button>
-                <button class="tool-btn" onclick="Nexus.compressor.run('functional')">Func</button>
-                <button class="tool-btn btn-danger" onclick="Nexus.compressor.run('nuclear')">Nuke</button>
-            </div>
-        </div>
-
+    <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 15px;">
         <div class="slab">
             <div class="section-label">Diagnostics</div>
-            <button class="tool-btn btn-danger" style="width:100%;" onclick="Nexus.Sentinel.runLint()">🩺 Run Sentinel Scan</button>
-            <button class="tool-btn btn-gold" style="width:100%; margin-top:8px;" onclick="Nexus.intel.scan()">🧠 Intel Analysis</button>
-            <div id="diag-out" class="mini-console" style="margin-top:10px;">[System Standby]</div>
+            <button class="tool-btn btn-danger" style="width:100%;" onclick="Nexus.Sentinel.runLint()">🩺 RUN DEEP LINT</button>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
+                <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicAST()">🏗️ REBUILD AST</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicString()">🧼 SCRUB STRING</button>
+            </div>
+            <div id="diag-out" class="mini-console" style="margin-top:10px; height: 180px;">[System Standby]</div>
         </div>
 
         <div class="slab">
-            <div class="section-label">Mapping</div>
+            <div class="section-label">Heuristics</div>
             <div class="grid-2">
-                <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ Outline</button>
-                <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph')">🕸️ Radar</button>
+                <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
+                <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
             </div>
+            <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph')">🕸️ PROJECT RADAR</button>
         </div>
 
         <div class="slab">
-            <div class="section-label">Injection</div>
+            <div class="section-label">Injection Vault</div>
             <div class="grid-2">
-                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('vault')">💾 Vault</button>
-                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('dreamer')">🌙 Dreamer</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
             </div>
         </div>
-
     </div>
 </aside>
+
 
 
 
@@ -4249,70 +4239,60 @@ switchSandboxTab(tabId) {
 },
   
 tools: {
-    // Navigation
     warp(dir) {
-        const ed = document.getElementById('raw-terminal');
         if (dir === 'top') Nexus.ui.jumpPrompt(1);
         else if (dir === 'bottom') {
+            const ed = document.getElementById('raw-terminal');
             const lines = Nexus.editorCore.isCM6 ? Nexus.editorCore.view.state.doc.lines : ed.value.split('\n').length;
             Nexus.ui.jumpPrompt(lines);
         }
     },
-    
-    // Logic Selection: Line to Line
-    selectLineRange() {
-        const start = parseInt(prompt("Start Line:"));
-        const end = parseInt(prompt("End Line:"));
-        if (isNaN(start) || isNaN(end)) return;
-        
-        if (Nexus.editorCore.isCM6) {
-            const doc = Nexus.editorCore.view.state.doc;
-            const from = doc.line(Math.max(1, start)).from;
-            const to = doc.line(Math.min(doc.lines, end)).to;
-            Nexus.editorCore.view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
-        } else {
-            const ed = document.getElementById('raw-terminal');
-            const lines = ed.value.split('\n');
-            let startPos = 0, endPos = 0;
-            for (let i = 0; i < start - 1; i++) startPos += lines[i].length + 1;
-            for (let i = 0; i < end; i++) endPos += lines[i].length + 1;
-            ed.focus(); ed.setSelectionRange(startPos, endPos - 1);
-        }
+
+    jump100(dir) {
+        Nexus.ui.jumpRelative(dir * 100);
     },
 
-    // Block Selection (AST Level)
     expandBlock() {
-        const code = Nexus.editorCore.isCM6 ? Nexus.editorCore.view.state.doc.toString() : document.getElementById('raw-terminal').value;
-        const curRange = Nexus.editorCore.isCM6 ? Nexus.editorCore.view.state.selection.main : { from: document.getElementById('raw-terminal').selectionStart, to: document.getElementById('raw-terminal').selectionEnd };
-        
+        Nexus.Sentinel.initEngine();
+        const code = Nexus.state.vfs[Nexus.state.activeFile];
+        const ed = document.getElementById('raw-terminal');
+        const cur = ed.selectionStart;
+
         try {
-            const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', ranges: true });
-            let target = null;
-            
-            // Recursive walk to find the next logical scope
-            const walk = (node) => {
-                if (node.start <= curRange.from && node.end >= curRange.to) {
-                    if (!target || (node.end - node.start > curRange.to - curRange.from)) {
-                        if (node.end - node.start > curRange.to - curRange.from) target = node;
+            const { ast } = Nexus.Sentinel.engine.analyze(code);
+            let smallestNode = null;
+
+            Nexus.Sentinel.engine.traverse(ast, (node) => {
+                if (node.start <= cur && node.end >= cur) {
+                    if (!smallestNode || (node.end - node.start < smallestNode.end - smallestNode.start)) {
+                        // Ensure we aren't just selecting the same thing
+                        if (node.start !== ed.selectionStart || node.end !== ed.selectionEnd) {
+                            smallestNode = node;
+                        }
                     }
                 }
-                Object.keys(node).forEach(k => {
-                    if (node[k] && typeof node[k] === 'object') {
-                        if (Array.isArray(node[k])) node[k].forEach(walk);
-                        else if (node[k].type) walk(node[k]);
-                    }
-                });
-            };
-            walk(ast);
-            if (target) {
-                if (Nexus.editorCore.isCM6) {
-                    Nexus.editorCore.view.dispatch({ selection: { anchor: target.start, head: target.end } });
-                } else {
-                    const ed = document.getElementById('raw-terminal');
-                    ed.focus(); ed.setSelectionRange(target.start, target.end);
-                }
+            });
+
+            if (smallestNode) {
+                ed.focus();
+                ed.setSelectionRange(smallestNode.start, smallestNode.end);
             }
-        } catch(e) { console.warn("AST expansion failed, syntax may be broken."); }
+        } catch (e) { console.warn("AST Select Failed: " + e.message); }
+    },
+
+    clipboard(action) {
+        const ed = document.getElementById('raw-terminal');
+        if (action === 'all') {
+            ed.setSelectionRange(0, ed.value.length);
+        } else if (action === 'copy') {
+            document.execCommand('copy');
+        } else if (action === 'cut') {
+            document.execCommand('cut');
+            Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+            Nexus.vfs.save();
+        } else if (action === 'paste') {
+            navigator.clipboard.readText().then(text => Nexus.ui.injectChar(text));
+        }
     }
 },
                      
