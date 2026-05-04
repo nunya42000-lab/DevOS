@@ -2181,119 +2181,75 @@ intel: {
         }
     },
 
-    // --- CRUSH ENGINES ---
+    /
+        crush: {
+        stats: { original: 0, crushed: 0, saved: 0 },
 
-    /**
- * Nexus Prime Molecular Crusher v3.0
- * Uses Tokenized Assembly to prevent "Unexpected end of input"
- */
-const MolecularCrusher = {
-    stats: { original: 0, crushed: 0, saved: 0 },
+        run(code, level = 'tactical') {
+            this.stats.original = code.length;
+            const blocks = { JS: [], CSS: [] };
+            const tagMap = { JS: 'script', CSS: 'style' };
 
-    crush(code, level = 'tactical') {
-        this.stats.original = code.length;
-        let html = code;
-        const blocks = { script: [], style: [] };
+            // 1. ISOLATE (With Semicolon Guard)
+            const html = code.replace(/<(script|style)\b[^>]*>([\s\S]*?)<\/\1>/gi, (match, tag, content) => {
+                if (match.toLowerCase().includes('src=')) return match;
+                
+                const type = tag.toUpperCase() === 'SCRIPT' ? 'JS' : 'CSS';
+                let safeContent = content.trim();
+                
+                // Semicolon Guard for JS
+                if (type === 'JS' && safeContent && !safeContent.endsWith(';')) safeContent += ';';
+                
+                const processed = (type === 'JS') ? this.processJS(safeContent, level) : this.processCSS(safeContent, level);
+                const id = blocks[type].length;
+                blocks[type].push(processed);
+                
+                return ``; 
+            });
 
-        Nexus.shell.out(`Crushing Sector: ${level.toUpperCase()} protocol...`, "accent");
+            // 2. THE FLAT DISPATCHER (No 'if' statements)
+            const segments = html.split(/()/g);
 
-        // 1. ISOLATE SCRIPTS (With Semicolon Guard)
-        html = html.replace(/<script\b[^>]*>([\s\S]*?)<\/script>/gi, (match, content) => {
-            if (match.toLowerCase().includes('src=')) return match;
+            const assembled = segments.map(seg => {
+                // Destructure the match: [FullMatch, Type, ID]
+                const [,, type, id] = seg.match(//) || [];
+                
+                // If 'type' exists, resolve via registry. Otherwise, compress as HTML.
+                return type 
+                    ? `<${tagMap[type]}>${blocks[type][id]}</${tagMap[type]}>` 
+                    : this.processHTML(seg, level);
+            }).join('');
+
+            // 3. TELEMETRY
+            this.stats.crushed = assembled.length;
+            this.stats.saved = this.stats.original - this.stats.crushed;
+            if (navigator.vibrate) navigator.vibrate(20);
             
-            // Fix: Force a semicolon to prevent ASI breakage during flattening
-            let safeJS = content.trim();
-            if (safeJS && !safeJS.endsWith(';')) safeJS += ';';
-            
-            const crushedJS = this.processJS(safeJS, level);
-            const id = blocks.script.length;
-            blocks.script.push(crushedJS);
-            return ``; 
-        });
+            return assembled;
+        },
 
-        // 2. ISOLATE STYLES
-        html = html.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (match, content) => {
-            const crushedCSS = this.processCSS(content, level);
-            const id = blocks.style.length;
-            blocks.style.push(crushedCSS);
-            return ``;
-        });
+        processHTML(seg, level) {
+            if (level !== 'nuclear') return seg.replace(/^[ \t]+/gm, '');
+            return seg
+                .replace(/>\s+</g, '><')
+                .replace(/\s+/g, ' ')
+                .replace(//g, '')
+                .replace(/\n/g, '');
+        },
 
-        // 3. THE ASSEMBLY BUFFER (Immune to Escape Characters)
-        // Split by our placeholders to create a Token Array
-        const segments = html.split(/()/g);
+        processJS(code, level) {
+            let res = code.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1').trim();
+            return (level === 'nuclear') 
+                ? res.replace(/\n/g, ' ').replace(/\s+/g, ' ').replace(/\s?([;{},()\[\]])\s?/g, '$1') 
+                : res;
+        },
 
-        const assembled = segments.map(seg => {
-            // Check if this segment is a JS Placeholder
-            const jsMatch = seg.match(//);
-            if (jsMatch) {
-                return `<script>${blocks.script[jsMatch[1]]}</script>`;
-            }
-
-            // Check if this segment is a CSS Placeholder
-            const cssMatch = seg.match(//);
-            if (cssMatch) {
-                return `<style>${blocks.style[cssMatch[1]]}</style>`;
-            }
-
-            // 4. ATOMIC HTML COMPRESSION (Only hits the HTML segments)
-            if (level === 'nuclear') {
-                return seg
-                    .replace(/>\s+</g, '><')            // Remove whitespace between tags
-                    .replace(/\s+/g, ' ')               // Collapse whitespace
-                    .replace(//g, '') // Purge comments (ignore our placeholders)
-                    .replace(/\n/g, '');                // Flatten
-            }
-            
-            return seg.replace(/^[ \t]+/gm, ''); // Tactical: Just trim margins
-        }).join('');
-
-        // 5. TELEMETRY PULSE
-        this.stats.crushed = assembled.length;
-        this.stats.saved = this.stats.original - this.stats.crushed;
-        const savedPct = ((this.stats.saved / this.stats.original) * 100).toFixed(1);
-        
-        Nexus.shell.out(`Crush Success. Weight Reduced: ${savedPct}%`, "success");
-        if (navigator.vibrate) navigator.vibrate(20);
-
-        return assembled;
-    },
-
-    /**
-     * JS Processing: Strips comments and collapses logic
-     */
-    processJS(code, level) {
-        let result = code
-            .replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1') // Strip comments
-            .trim();
-        
-        if (level === 'nuclear') {
-            result = result
-                .replace(/\n/g, ' ') // Space-flatten to prevent ASI merge
-                .replace(/\s+/g, ' ') 
-                .replace(/\s?([;{},()\[\]])\s?/g, '$1'); // Tighten around tokens
+        processCSS(code, level) {
+            let res = code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s*([{}|:;,])\s*/g, '$1').replace(/\s{2,}/g, ' ').trim();
+            return (level === 'nuclear') ? res.replace(/\n/g, '') : res;
         }
-        return result;
     },
-
-    /**
-     * CSS Processing: Minifies selector blocks
-     */
-    processCSS(code, level) {
-        let result = code
-            .replace(/\/\*[\s\S]*?\*\//g, '') // Strip comments
-            .replace(/\s*([{}|:;,])\s*/g, '$1') // Tighten symbols
-            .replace(/\s{2,}/g, ' ')
-            .trim();
-        
-        if (level === 'nuclear') {
-            result = result.replace(/\n/g, '');
-        }
-        return result;
-    }
-},
-
-    
+ 
 
 
     
