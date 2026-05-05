@@ -4479,7 +4479,7 @@ graph: {
     }
 },
 
-    search: {
+search: {
     // Throttled result state for UI feedback
     lastMatchCount: 0,
 
@@ -4515,6 +4515,7 @@ graph: {
         const regex = this.buildRegex();
         if (!regex) return;
 
+        // CM6 or Raw Text Support
         const text = Nexus.state.isCM6 ? Nexus.editorCore.view.state.doc.toString() : ed.value;
         const matches = [...text.matchAll(regex)].map(m => ({ index: m.index, length: m[0].length }));
 
@@ -4547,16 +4548,16 @@ graph: {
         ed.focus();
         ed.setSelectionRange(start, start + len);
 
-        // Better scroll logic: Get line index to center the view
+        // Kinetic Centering: Adjusted for mobile UI
         const linesBefore = ed.value.substring(0, start).split('\n').length;
-        const lineHeight = 22; // Adjusted for your mobile UI
+        const lineHeight = 22; 
         const scrollTarget = (linesBefore * lineHeight) - (ed.clientHeight / 2);
         
         ed.scrollTo({ top: scrollTarget, behavior: 'smooth' });
     },
 
     /**
-     * Cross-Sector Search: Warps the Matrix to the next file containing the term
+     * Cross-Sector Search: Warps the Matrix to the next file
      */
     cycleFileForSearch(dir) {
         const files = Object.keys(Nexus.state.vfs);
@@ -4573,9 +4574,8 @@ graph: {
                 break;
             }
 
-            if (regex.test(Nexus.state.vfs[currentFile])) {
+            if (regex && regex.test(Nexus.state.vfs[currentFile])) {
                 Nexus.vfs.switchFile(currentFile);
-                // Position cursor for the next find operation
                 const newEd = document.getElementById('raw-terminal');
                 newEd.selectionStart = newEd.selectionEnd = dir === 1 ? 0 : newEd.value.length;
                 
@@ -4596,15 +4596,17 @@ graph: {
 
         if (!term || ed.hasAttribute('readonly')) return;
 
+        const baseRegex = this.buildRegex(term);
+        if (!baseRegex) return; // Safety Shield: Stop the 'Missing' crash
+
         const selection = ed.value.substring(ed.selectionStart, ed.selectionEnd);
-        const regex = new RegExp(`^${this.buildRegex(term).source}$`, Nexus.state.searchOpts.case ? '' : 'i');
+        const regex = new RegExp(`^${baseRegex.source}$`, Nexus.state.searchOpts.case ? '' : 'i');
 
         if (regex.test(selection)) {
-            // Preservation Strategy: Use injectChar to keep Undo history
             Nexus.ui.injectChar(replacement);
-            this.findNext(1); // Move to the next instance automatically
+            this.findNext(1); 
         } else {
-            this.findNext(1); // Not on a match? Find the next one first.
+            this.findNext(1); 
         }
     },
 
@@ -4616,8 +4618,10 @@ graph: {
         const replacement = document.getElementById('replace-input').value;
         if (!term) return;
 
-        Nexus.history.record(true); // Safety first
         const regex = this.buildRegex();
+        if (!regex) return;
+
+        Nexus.history.record(true); 
         let sectorsAffected = 0;
 
         const targetFiles = global ? Object.keys(Nexus.state.vfs) : [Nexus.state.activeFile];
@@ -4635,10 +4639,12 @@ graph: {
         if (sectorsAffected > 0) {
             Nexus.vfs.save();
             Nexus.vfs.switchFile(Nexus.state.activeFile);
-            Nexus.shell.out(`Replaced all instances in ${sectorsAffected} sectors.`, "success");
+            Nexus.shell.out(`Replaced all in ${sectorsAffected} sectors.`, "success");
         }
     }
 },
+    
+        
 
 writer: {
     // --- 1. BLUEPRINT REGISTRY (SMART SNIPPETS) ---
