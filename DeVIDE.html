@@ -1484,7 +1484,12 @@
     </footer>
 </div>
 <script>
-    /* ==========================================
+   
+
+    
+
+    
+/* ==========================================
    GENESIS: Database & State Initialization
    ========================================== */
 const db = new Dexie('NexusCodexDB');
@@ -1513,177 +1518,7 @@ Nexus.state = {
     },
     searchOpts: { case: false, regex: false, global: false },
     widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false }
-};
-
-/* ==========================================
-   MODULE: VFS (The Vortex Engine)
-   ========================================== */
-Nexus.vfs = {
-    async boot() {
-        try {
-            Nexus.shell.out("Vortex Engine: Initiating Sovereign Boot...", "accent");
-            
-            const files = await db.files.toArray();
-            if (files.length > 0) {
-                const contents = await db.contents.toArray();
-                const contentMap = new Map(contents.map(c => [c.fileId, c.content]));
-
-                files.forEach(f => {
-                    const code = contentMap.get(f.id) || "";
-                    Nexus.state.vfs[f.name] = code;
-                    Nexus.state.originals[f.name] = code;
-                });
-            } else {
-                // Legacy Migration or First Run
-                const legacy = typeof localforage !== 'undefined' ? await localforage.getItem('Nexus.state.vfs_v42') : null;
-                if (legacy) {
-                    Nexus.state.vfs = legacy;
-                    await this.syncToDexie(true); 
-                } else {
-                    // Start with Genesis file if totally empty
-                    Nexus.state.vfs["index.html"] = "\n<h1>System Online</h1>";
-                }
-            }
-
-            const lastFile = (typeof localforage !== 'undefined' && await localforage.getItem('nexus_last_active')) || Object.keys(Nexus.state.vfs)[0];
-            this.switchFile(lastFile);
-            
-            if (this.renderAccordion) this.renderAccordion();
-            Nexus.shell.out("Matrix Synchronized.", "success");
-
-        } catch (e) {
-            console.error("Vortex Critical Failure:", e);
-            Nexus.shell.out(`Vortex Critical Failure: ${e.message}`, "error");
-        }
-    },
-
-    async syncToDexie(force = false) {
-        const now = Date.now();
-        const filesToSync = [];
-        const contentToSync = [];
-
-        for (const [name, content] of Object.entries(Nexus.state.vfs)) {
-            if (force || content !== Nexus.state.originals[name]) {
-                let fileRec = await db.files.where('name').equals(name).first();
-                const ext = name.split('.').pop().toLowerCase();
-                
-                if (!fileRec) {
-                    const id = await db.files.add({ name, path: '/', extension: ext, lastModified: now });
-                    contentToSync.push({ fileId: id, content });
-                } else {
-                    filesToSync.push({ id: fileRec.id, name, path: '/', extension: ext, lastModified: now });
-                    const cRec = await db.contents.where('fileId').equals(fileRec.id).first();
-                    if (cRec) contentToSync.push({ id: cRec.id, fileId: fileRec.id, content });
-                }
-                Nexus.state.originals[name] = content;
-            }
-        }
-
-        if (filesToSync.length > 0 || contentToSync.length > 0) {
-            await db.transaction('rw', [db.files, db.contents], async () => {
-                if (filesToSync.length) await db.files.bulkPut(filesToSync);
-                if (contentToSync.length) await db.contents.bulkPut(contentToSync);
-            });
-        }
-    },
-
-    switchFile(fn) {
-        if (!fn || !Nexus.state.vfs[fn]) return;
-
-        Nexus.state.activeFile = fn;
-        if (typeof localforage !== 'undefined') localforage.setItem('nexus_last_active', fn);
-
-        const code = Nexus.state.vfs[fn];
-        const ed = document.getElementById('raw-terminal');
-
-        // Robust Editor Check
-        if (Nexus.state.isCM6 && Nexus.editorCore?.view) {
-            const state = Nexus.editorCore.modules.EditorState.create({
-                doc: code,
-                extensions: Nexus.editorCore.currentExtensions || []
-            });
-            Nexus.editorCore.view.setState(state);
-        } else if (ed) {
-            ed.value = code;
-        }
-
-        this.renderAccordion();
-        if (Nexus.ui?.syncStatus) Nexus.ui.syncStatus();
-    },
-
-    async touch(name) {
-        if (Nexus.state.vfs[name]) return Nexus.shell.out(`Conflict: ${name} exists.`, "error");
-        Nexus.state.vfs[name] = "";
-        Nexus.state.originals[name] = null; 
-        
-        await this.syncToDexie();
-        this.switchFile(name);
-        return `Sector ${name} initialized.`;
-    },
-
-    renderAccordion() {
-        const root = document.getElementById('accordion-root');
-        if (!root) return;
-
-        const groups = {};
-        Object.keys(Nexus.state.vfs).forEach(fn => {
-            const ext = fn.split('.').pop().toLowerCase();
-            if (!groups[ext]) groups[ext] = [];
-            groups[ext].push(fn);
-        });
-
-        root.innerHTML = Object.entries(groups).map(([ext, files]) => `
-            <div class="acc-section">
-                <div class="acc-head" onclick="this.nextElementSibling.classList.toggle('open')">
-                    <span>.${ext.toUpperCase()}</span>
-                    <span style="font-size:9px; opacity:0.5;">${files.length} SECTORS</span>
-                </div>
-                <div class="acc-content open">
-                    ${files.map(fn => `
-                        <div class="slab ${fn === Nexus.state.activeFile ? 'active-file' : ''}" 
-                             onclick="Nexus.vfs.switchFile('${fn}')">
-                            <span>${fn}</span>
-                            <div class="actions">
-                                <span onclick="event.stopPropagation(); Nexus.shell.exec('mv ${fn}')">✏️</span>
-                                <span class="del" onclick="event.stopPropagation(); Nexus.vfs.rm('${fn}')">×</span>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `).join('');
-    }
 },
-/* ==========================================
-   GENESIS: Database & State Initialization
-   ========================================== */
-const db = new Dexie('NexusCodexDB');
-db.version(1).stores({
-    files: '++id, name, path, extension, lastModified',
-    contents: '++id, fileId, content',
-    vault: '++id, title, category, content',
-    history: '++id, timestamp, fileId, content' 
-}); // Semicolon here is critical
-
-// Use this pattern to preserve modules already attached to Nexus
-window.Nexus = window.Nexus || {};
-Nexus.state = {
-    activeFileId: null,
-    activeFileName: "NONE",
-    activeFile: "",
-    isCM6: false,
-    vfs: {}, 
-    history: { past: [], future: [], isLocked: false },
-    originals: {}, 
-    vault: [], 
-    snapshots: [],
-    prefs: { 
-        fontSize: 14, tabWidth: 4, kbPos: 'bottom', kbRows: 3,
-        utilDock: 'dock-right', customVocab: "Your, custom, words, here"
-    },
-    searchOpts: { case: false, regex: false, global: false },
-    widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false }
-};
 
 /* ==========================================
    MODULE: VFS (The Vortex Engine)
@@ -1950,12 +1785,8 @@ Nexus.vfs = {
                     }
                 }
             }
-        };
-        console.log("✅ EditorCore Module Attached");
-    } catch (e) {
-        console.error("❌ EditorCore Module Failed:", e);
-    }
-})(),
+        },
+        
 /**
  * ============================================================================
  * MODULE: Widgets Engine (widgets.js)
@@ -2430,7 +2261,7 @@ Nexus.vfs = {
                     kb.style.bottom = '';
                 }
             }
-        };
+        },
 
         // Standardized reference bindings for fallback system interfaces
         Nexus.search = Nexus.widgets.search;
@@ -2438,11 +2269,7 @@ Nexus.vfs = {
         Nexus.kbEditor = Nexus.widgets.kbEditor;
         Nexus.widgetConfig = Nexus.widgets.config;
 
-        console.log("✅ Widgets Engine Fused & Initialized");
-    } catch (e) {
-        console.error("❌ Widgets Engine Failed to Attach:", e);
-    }
-})(),
+        
 /* ==========================================
    MODULE: Shell (Command Execution HUD)
    ========================================== */
@@ -2713,12 +2540,8 @@ Nexus.vfs = {
             out(msg, type = "info") {
                 this.logToHUD("SYSTEM", msg, type);
             }
-        };
-        console.log("✅ Shell Module Attached");
-    } catch (e) {
-        console.error("❌ Shell Module Failed:", e);
-    }
-})(),
+        },
+        
 /**
  * ============================================================================
  * MODULE: Nexus Engine, PWA Forge, & Global Listeners (nexus-engine.js)
@@ -3195,7 +3018,7 @@ Nexus.vfs = {
                     }, 1000);
                 }, 1200);
             };
-        }
+        },
 
         // Bridge namespaces onto global context for back-compat
         window.Nexus.refactor = window.NexusEngine.refactor;
@@ -3203,11 +3026,7 @@ Nexus.vfs = {
         window.Nexus.mergeEngine = window.NexusEngine.mergeEngine;
         window.Nexus.pwa = window.NexusEngine.pwa;
 
-        console.log("✅ NexusEngine Core, PWA, and Global Observers Connected");
-    } catch (e) {
-        console.error("❌ Core Engine Assembly Failed:", e);
-    }
-})(),
+        
 /* ==========================================
    MODULE: Analysis (Intel, Context, Neural & Spotlight)
    ========================================== */
@@ -4254,17 +4073,13 @@ Nexus.vfs = {
                     return Array.from(names);
                 }
             }
-        };
+        },
 
         // Standardized reference bindings for backwards-compatibility interfaces
         Nexus.clones = Nexus.sentinel.clones;
         Nexus.transformer = Nexus.sentinel.transformer;
 
-        console.log("✅ Sentinel, Clones & Transformer Fused");
-    } catch (e) {
-        console.error("❌ Consolidated Sentinel Module Failed:", e);
-    }
-})()
+        
 const NexusNavigationEngine = {
     outline: {
         /**
@@ -4329,7 +4144,7 @@ const NexusNavigationEngine = {
                                 }
                             }
                         }
-                    };
+                    },
 
                 traverse(ast, (node) => {
                     let entry = null;
@@ -4410,7 +4225,7 @@ const NexusNavigationEngine = {
                         </div>
                     `).join('')}
                 `;
-            };
+            },
 
             html += renderGroup("ARCHITECTURE", map.logic);
             html += renderGroup("BLUEPRINT", map.blueprint);
@@ -4751,7 +4566,7 @@ const NexusNavigationEngine = {
                     }
                 }
             }
-        };
+        },
 
         // ==========================================
         // 2. CHRONOS ENGINE (Web-Worker Sandbox & Benchmarking)
@@ -4864,7 +4679,7 @@ const NexusNavigationEngine = {
                     if (Nexus.shell?.out) Nexus.shell.out(`STRESS FAILED: ${result.error}`, "error");
                 }
             }
-        };
+        },
 
         // ==========================================
         // 3. THE SOVEREIGN VAULT (Snippet Cache)
@@ -5006,7 +4821,7 @@ const NexusNavigationEngine = {
                     this.render();
                 }
             }
-        };
+        },
 
         // ==========================================
         // 4. THE CHRONICLE (Macro Workspace Snapshots)
@@ -5122,13 +4937,9 @@ const NexusNavigationEngine = {
                     </div>
                 `).join('') || `<div style="text-align:center; opacity:0.3; padding:20px;">The Chronicle is empty.</div>`;
             }
-        };
+        },
 
-        console.log("✅ Chronicle Subsystems Attached");
-    } catch (e) {
-        console.error("❌ Chronicle Subsystems Boot Failure:", e);
-    }
-})(),
+        
 /* ==========================================
    MODULE: UI (User Interface & Window Manager)
    ========================================== */
@@ -5773,12 +5584,8 @@ const NexusNavigationEngine = {
                     }
                 }
             }
-        };
-        console.log("✅ UI Module Attached");
-    } catch (e) {
-        console.error("❌ UI Module Failed:", e);
-    }
-})(),
+        },
+        
 const NexusModules = {
     // --- 1. COMPONENT PORTAL & INJECTION ENGINE ---
     dreamer: {
