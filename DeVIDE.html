@@ -1518,7 +1518,7 @@ Nexus.state = {
     },
     searchOpts: { case: false, regex: false, global: false },
     widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false }
-},
+};
 
 /* ==========================================
    MODULE: VFS (The Vortex Engine)
@@ -5992,10 +5992,9 @@ editor.addEventListener('input', updateCursorPos);
 window.addEventListener('DOMContentLoaded', async () => { 
     console.log("Nexus Prime: Initiating Sovereign Bootloader...");
     // Merging our modules dynamically into the main namespace
-    Object.assign(Nexus, NexusModules);
+    Object.assign(Nexus, NexusModules, NexusNavigationEngine);
     await Nexus.ui.boot(); 
 });
-
 </script>
 </body>
 </html>
