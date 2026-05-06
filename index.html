@@ -278,20 +278,7 @@
     box-shadow: 0 10px 40px rgba(0,0,0,0.9); 
 }
 #widget-drop-menu.active { display: flex; }
- #format-drop-menu {
-    position: fixed;
-    top: 55px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px;
-    display: none;
-    flex-direction: column;
-    gap: 5px;
-    z-index: 10000;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.9);
-}
-#format-drop-menu.active { display: flex; }
+ }
 
     /* --- 3. SIDEBARS --- */
     .side-panel { 
@@ -439,6 +426,18 @@
         scroll-behavior: smooth; 
     }
 
+ /* Toggle Utility Class */
+.dpad-container.hidden {
+    display: none !important;
+}
+
+/* Active State for the Ribbon Trigger */
+.ribbon-btn.active {
+    background: var(--active-bg, #2c313c);
+    color: #61afef;
+    border-bottom: 2px solid #61afef;
+}
+ 
     /* --- 7. SVS-WIDGET STYLING --- */
     .floating-widget {
         position: fixed; 
@@ -556,11 +555,7 @@
     <button class="tool-btn" onclick="Nexus.ui.toggleWidget('search-bar'); this.parentElement.classList.remove('active')">🔍 FIND & REP</button>
     <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar'); this.parentElement.classList.remove('active')">✍️ WRITE</button>
     <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith'); this.parentElement.classList.remove('active')">⌨ KEY</button>
- </div>
- <div id="format-drop-menu">
-    <button class="tool-btn" onclick="Nexus.ui.runPrettier(); this.parentElement.classList.remove('active')">Prettier</button>
-    <button class="tool-btn" onclick="Nexus.ui.runJSBeautify(); this.parentElement.classList.remove('active')">Beautify</button>
-</div>
+ 
 
  <canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
 
@@ -572,6 +567,10 @@
           <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒 READ ONLY</button>
           <button class="tool-btn" style="background:#58a6ff; color:#000; border:none;" onclick="Nexus.toggleEditor()">🔄 ENGINE</button>
             <button id="widget-drop-btn" class="tool-btn" onclick="Nexus.ui.toggleWidgetDrop(event)">🧩 WIDGETS ▾</button>
+         <button class="ribbon-btn" id="btn-toggle-dpad" title="Toggle Navigation D-Pad">
+    <span class="icon">✛</span>
+    <span class="label">D-Pad</span>
+         </button>
          
                        <div style="width:1px; height:20px; background:var(--border); margin:0 4px;"></div>
             <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('spotlight')">🔎</button>
@@ -661,7 +660,24 @@
             </div>
         </div>
     </div>
-
+<div id="nexus-dpad" class="dpad-container hidden">
+    <div class="dpad-row">
+        <button class="dpad-btn dpad-toggle" id="dpad-line-lock" title="Toggle Line/Word Jump (Ctrl)">Line</button>
+        <button class="dpad-btn dpad-arrow" id="dpad-up" data-dir="Up">▲</button>
+        <button class="dpad-btn dpad-toggle" id="dpad-select-lock" title="Toggle Selection Lock (Shift)">Sel</button>
+    </div>
+    <div class="dpad-row">
+        <button class="dpad-btn dpad-arrow" id="dpad-left" data-dir="Left">◀</button>
+        <button class="dpad-btn dpad-center" id="dpad-drag-handle" title="Drag to Reposition">✛</button>
+        <button class="dpad-btn dpad-arrow" id="dpad-right" data-dir="Right">▶</button>
+    </div>
+    <div class="dpad-row">
+        <div class="dpad-spacer"></div>
+        <button class="dpad-btn dpad-arrow" id="dpad-down" data-dir="Down">▼</button>
+        <div class="dpad-spacer"></div>
+    </div>
+</div>
+  
         <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 280px;">
         <div class="drag-handle" onmousedown="Nexus.ui.handleHandleTap(event, 'writer-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'writer-bar')">⋯</div>
         <div class="sleek-bar-content" style="flex-direction: column; align-items: stretch; padding:10px;">
@@ -4644,7 +4660,32 @@ const editor = document.getElementById('raw-terminal');
 const gutter = document.getElementById('gutter');
 let saveDelayTimer = null;
 let visualResetTimer = null; // New timer to prevent race conditions
+// Dropdown Menu Toggle Integration
+const menuDpadToggle = document.getElementById('menu-toggle-dpad');
+const dpadContainer = document.getElementById('nexus-dpad');
+const dpadStatus = document.getElementById('dpad-status-indicator');
 
+if (menuDpadToggle && dpadContainer) {
+    menuDpadToggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation(); // Prevents immediate outer menu close conflicts
+        
+        // 1. Toggle visibility of the D-Pad container
+        const isHidden = dpadContainer.classList.toggle('hidden');
+        
+        // 2. Update visual indicator inside the dropdown menu
+        if (dpadStatus) {
+            dpadStatus.classList.toggle('active', !isHidden);
+        }
+
+        // 3. Keep focus inside the active editor instance
+        if (Nexus.editor && !isHidden) {
+            Nexus.editor.focus();
+        }
+    });
+}
+
+ 
 // Gutter Logic
 editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
 
