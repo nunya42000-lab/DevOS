@@ -483,31 +483,22 @@
     }
     #diag-hub.open { transform: translateY(0); }
 
-    #shell-slide { 
-        position: fixed; 
-        bottom: 0; left: 0; right: 0; 
-        height: 100px; 
-        background: var(--surface); 
-        border-top: 4px solid var(--accent); 
-        z-index: 4000; 
-        transform: translateY(105%); 
-        transition: transform 0.3s ease; 
-        display: flex; 
-        align-items: center; 
-        padding: 0 20px; 
-        box-shadow: 0 -10px 40px rgba(0,0,0,0.8); 
-    }
+    #shell-slide {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 40vh; /* Increased height for better visibility */
+    background: #0d1117;
+    border-top: 4px solid var(--accent);
+    z-index: 4000;
+    transform: translateY(105%);
+    transition: transform 0.3s ease;
+    padding: 5px; /* Reduced padding so terminal hits edges */
+    display: block; /* Important: xterm doesn't like flex centering */
+}
+
+
     #shell-slide.open { transform: translateY(0); }
-    #shell-input { 
-        flex: 1; 
-        background: transparent; 
-        border: none; 
-        color: var(--text); 
-        font-family: monospace; 
-        font-size: 18px; 
-        outline: none; 
-        user-select: text !important;
-    }
+    
 
     /* --- 5. MODALS --- */
     .modal-overlay { 
@@ -657,7 +648,10 @@
     #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
 
     #omni-canvas.active { pointer-events: auto; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); }
-
+#xterm-container {
+    width: 100%;
+    height: 100%;
+    }
     /* --- 8. XTERM BASE --- */
     .xterm { cursor: text; position: relative; user-select: none; -ms-user-select: none; -webkit-user-select: none; } 
     .xterm.focus, .xterm:focus { outline: none; } 
@@ -1105,12 +1099,12 @@
         </div>
         <div id="diag-out" class="p-body" style="background:#000; margin:15px; border-radius:10px; border:1px solid var(--border);">[SENTINEL ENGINE OFFLINE]</div>
     </div>
+<div id="shell-slide">
+    <div id="xterm-container" style="width: 100%; height: 100%;"></div>
+    
+    <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:100; background:rgba(0,0,0,0.5); border-radius:50%; width:30px; height:30px;">&times;</button>
+</div>
 
-    <div id="shell-slide">
-        <span style="color:var(--accent); font-family:monospace; font-weight:bold; font-size:18px; margin-right:10px;">&gt;</span>
-        <input type="text" id="shell-input" placeholder="Execute command..." onkeydown="if(event.key === 'Enter') { Nexus.shell.exec(this.value); this.value=''; }">
-        <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:10;">&times;</button>
-    </div>
 
     <div id="modal-clones" class="modal-overlay">
         <div class="modal-content">
@@ -4105,11 +4099,62 @@ writer: {
 },
 
 
+// Add this to your Nexus object
+Nexus.terminal = {
+    instance: null,
+    init() {
+        const container = document.getElementById('xterm-container');
+        if (!container) return;
+
+        this.instance = new Terminal({
+            cursorBlink: true,
+            theme: {
+                background: '#0d1117',
+                foreground: '#c9d1d9',
+                cursor: var(--accent)
+            },
+            fontFamily: 'monospace',
+            fontSize: 14,
+            convertEol: true
+        });
+
+        this.instance.open(container);
+        this.instance.writeln('\x1b[1;34mNexus Prime v40.20 Terminal\x1b[0m');
+        this.instance.write('\r\n$ ');
+
+        let buffer = '';
+        this.instance.onData(e => {
+            if (e === '\r') { // Enter
+                this.instance.write('\r\n');
+                if (buffer.trim()) {
+                    Nexus.shell.exec(buffer); // Uses your existing execution logic
+                }
+                buffer = '';
+                this.instance.write('$ ');
+            } else if (e === '\u007F') { // Backspace
+                if (buffer.length > 0) {
+                    buffer = buffer.slice(0, -1);
+                    this.instance.write('\b \b');
+                }
+            } else {
+                buffer += e;
+                this.instance.write(e);
+            }
+        });
+    }
+};
+
+
+
+
+
 shell: {
    commands: {
        ls: () => {
-           return Object.keys(Nexus.state.vfs).join('\n') || "Vortex empty.";
-       },
+    // Use \r\n for proper terminal alignment
+    return Object.keys(Nexus.state.vfs).join('\r\n') || "Vortex empty.";
+},
+
        
        touch: (args) => {
            const path = args[0];
@@ -4176,8 +4221,7 @@ shell: {
            }
            return "Usage: config set [ghToken|ghRepo] [value]";
        },
-
-       'change-repo': (args) => {
+'change-repo': (args) => {
            const repo = args[0];
            if (!repo) return "Usage: change-repo [user/repo]";
            Nexus.settings.update('ghRepo', repo);
@@ -4272,23 +4316,37 @@ shell: {
 
    async exec(cmdStr) {
        const parts = cmdStr.trim().split(/\s+/);
-       const cmdName = parts[0].toLowerCase();
-       const args = parts.slice(1);
-       const action = this.commands[cmdName];
+   async exec(cmdStr) {
+    // 1. Get the terminal instance we created earlier
+    const term = Nexus.terminal.instance;
+    const parts = cmdStr.trim().split(/\s+/);
+    const cmdName = parts[0].toLowerCase();
+    const args = parts.slice(1);
+    const action = this.commands[cmdName];
 
-       try {
-           if (action) {
-               const result = await action(args);
-               Nexus.ui.injectChar(`\n/* $ ${cmdStr} */\n/* -> ${result} */\n`);
-               return result;
-           } else {
-               return eval(cmdStr);
-           }
-       } catch (e) {
-           return `Shell Fault: ${e.message}`;
-       }
-   }
-}, // Ends shell object
+    try {
+        if (action) {
+            // 2. Run the command and wait for the result
+            const result = await action(args);
+            
+            // 3. Print to the Terminal instead of injecting into the code
+            if (term) {
+                term.writeln(`\r\n${result}`);
+            }
+            return result;
+        } else {
+            // 4. Fallback: Run as raw JavaScript if it's not a shell command
+            const evalResult = eval(cmdStr);
+            if (term) term.writeln(`\r\n${evalResult}`);
+            return evalResult;
+        }
+    } catch (e) {
+        if (term) term.writeln(`\r\n\x1b[31mShell Fault: ${e.message}\x1b[0m`);
+        return `Shell Fault: ${e.message}`;
+    }
+}
+
+}, // Ends shell object       
 
    
 
@@ -4865,10 +4923,19 @@ initInfiniteRibbon() {
        },
 
        toggleSlide(t) { 
-           const id = t === 'diag' ? 'diag-hub' : 'shell-slide';
-           document.getElementById(id).classList.toggle('open'); 
-       },
+    const id = t === 'diag' ? 'diag-hub' : 'shell-slide';
+    const el = document.getElementById(id);
+    el.classList.toggle('open'); 
 
+    // THE PATCH: If opening the shell and xterm isn't ready, wire it up.
+    if (t === 'shell' && el.classList.contains('open') && !Nexus.terminal.instance) {
+        // Small timeout ensures the DOM element is visible before xterm attaches
+        setTimeout(() => Nexus.terminal.init(), 50);
+    }
+},
+
+
+};
        openModal(id) { 
            if (id === 'dreamer') Nexus.dreamer.updatePreview(); 
            if (id === 'graph') Nexus.graph.render(); 
