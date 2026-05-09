@@ -1429,7 +1429,13 @@
             </div>
         </div>
     </div>
-
+<div id="audit-drawer" class="transform-drawer">
+    <div class="drawer-header">SYSTEM AUDIT</div>
+    <button class="sleek-btn" onclick="Nexus.auditor.findOrphanedIDs()">Scan for Dead IDs</button>
+    <button class="sleek-btn" onclick="Nexus.auditor.findUnusedCSS()">Scan for Dead CSS</button>
+    <div id="audit-results" style="font-size: 10px; margin-top: 10px; color: var(--gold);"></div>
+</div>
+    
     <div id="modal-settings" class="modal-overlay">
         <div class="modal-content">
             <div class="p-head"><span>⚙️ SETTINGS &amp; PERSISTENCE</span><button class="close-x" onclick="Nexus.ui.closeModal('settings')">&times;</button></div>
@@ -2946,6 +2952,39 @@ Nexus.editorCore.currentExtensions = [
            }
        }
    }, // <--- This now correctly closes the Refactor engine.
+auditor: {
+    findOrphanedIDs() {
+        const allElements = document.querySelectorAll('[id]');
+        const scriptContent = document.querySelector('script').innerHTML;
+        const orphans = [];
+
+        allElements.forEach(el => {
+            const id = el.id;
+            // Search for the ID string in the JS (checks for 'id', "id", or #id)
+            const regex = new RegExp(`['"#]${id}['"]`, 'g');
+            if (!regex.test(scriptContent)) {
+                orphans.push(id);
+            }
+        });
+
+        console.table(orphans.length ? orphans : "No orphaned IDs found.");
+    },
+
+    findUnusedCSS() {
+        const styleContent = document.querySelector('style').innerHTML;
+        const idMatches = styleContent.match(/#([a-zA-Z0-9_-]+)/g) || [];
+        const deadSelectors = [];
+
+        idMatches.forEach(selector => {
+            const id = selector.replace('#', '');
+            if (!document.getElementById(id)) {
+                deadSelectors.push(selector);
+            }
+        });
+
+        console.warn("CSS Selectors with no matching HTML element:", deadSelectors);
+    }
+},
 
    neural: {
        analyzeDelta(oldIssues, newIssues, oldGraphSize, newGraphSize) {
