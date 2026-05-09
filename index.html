@@ -886,6 +886,8 @@
         <div id="ribbon-track">
             <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁</button>
+          <button class="tool-btn btn-danger" onclick="Nexus.ui.checkSyntax()">💩</button>
+            
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒</button>
             <button class="tool-btn" onclick="Nexus.toggleEditor()">🔄</button>
             
@@ -3424,7 +3426,28 @@ grab() {
                </div>`).reverse().join('') || "No Snapshots."; 
        }
    },
-
+// Add this inside the Nexus.ui object
+checkSyntax: () => {
+    // 1. Get the code currently in your editor
+    const code = document.getElementById('raw-terminal').value; 
+    
+    try {
+        // 2. Acorn attempts a strict parse
+        acorn.parse(code, { ecmaVersion: 2022, sourceType: "module" });
+        alert("Structure is VALID. The terminal issue is likely a logic bug, not syntax.");
+    } catch (e) {
+        // 3. Catch the exact line/column where the browser is choking
+        const { line, column } = e.loc;
+        const errorMsg = `SYNTAX ERROR FOUND:\n\n"${e.message}"\nLine: ${line}, Col: ${column}`;
+        
+        console.error(errorMsg);
+        alert(errorMsg);
+        
+        // Optional: If you have a jump function, use it to go to the line
+        if(Nexus.ui.jumpToLine) Nexus.ui.jumpToLine(line);
+    }
+    },
+    
    mergeEngine: {
        s1: "", s2: "", hunks: [], hIdx: 0, finalStack: [],
        open() {
