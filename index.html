@@ -208,10 +208,7 @@
         color: var(--accent); 
         font-weight: bold; 
     }
-/* Axis Locking */
-.lock-x { overflow-x: hidden !important; }
-.lock-y { overflow-y: hidden !important; }
-    
+
     /* Help Modal Refined Styling */
     #modal-manual .modal-body {
         background: #0d1117; 
@@ -2875,43 +2872,7 @@ Nexus.editorCore.currentExtensions = [
            }
        },
  
- /* --- SCROLL AXIS LOCK ENGINE --- */
-let touchStartPos = { x: 0, y: 0 };
-let scrollLockMode = null; // 'v' for vertical, 'h' for horizontal
-const intentThreshold = 10; // Pixels to move before locking
-
-editor.addEventListener('touchstart', (e) => {
-    touchStartPos.x = e.touches[0].clientX;
-    touchStartPos.y = e.touches[0].clientY;
-    scrollLockMode = null; // Reset lock on every new touch
-}, { passive: true });
-
-editor.addEventListener('touchmove', (e) => {
-    // If we haven't decided on a lock yet, calculate intent
-    if (!scrollLockMode) {
-        const deltaX = Math.abs(e.touches[0].clientX - touchStartPos.x);
-        const deltaY = Math.abs(e.touches[0].clientY - touchStartPos.y);
-
-        if (deltaX > intentThreshold || deltaY > intentThreshold) {
-            if (deltaY > deltaX) {
-                // User is clearly scrolling UP/DOWN
-                scrollLockMode = 'v';
-                editor.classList.add('lock-x');
-            } else {
-                // User is clearly scrolling LEFT/RIGHT
-                scrollLockMode = 'h';
-                editor.classList.add('lock-y');
-            }
-        }
-    }
-}, { passive: true });
-
-editor.addEventListener('touchend', () => {
-    // Release the kraken (and the scroll)
-    scrollLockMode = null;
-    editor.classList.remove('lock-x', 'lock-y');
-}),
-    
+ 
        
    
    // --- ADVANCED ENGINES ADAPTED FOR THE MATRIX ---
