@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#282c34">
-    <title>DevOS Nexus Prime v40.20 - Codex Matrix</title>
+    <title>divIDE v0.7</title>
    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
@@ -23,6 +23,8 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/astring@1.8.1/dist/astring.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script>
        // 1. Instantly declare the Namespace
        window.Nexus = window.Nexus || {};
@@ -328,7 +330,11 @@
         line-height: 1; 
     }
     .tab-close:hover { opacity: 1; }
-
+.diff-line { display: block; min-height: 1.2em; word-break: break-all; }
+.diff-line.equal { color: #8b949e; opacity: 0.7; }
+.diff-line.added { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+.diff-line.removed { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+.diff-line.blank-pad { background: rgba(255,255,255,0.02); user-select: none; }
     #editor-view { 
         flex: 1; 
         display: flex; 
@@ -772,7 +778,28 @@
         opacity: 0.4;
         font-size: 9px;
     }
+/* Edge Handles */
+.transform-handle-zone {
+    position: fixed; left: 0; top: 25%; z-index: 8600; pointer-events: none; 
+    display: flex; flex-direction: column; gap: 15px;
+}
+.transform-handle {
+    background: var(--surface); border: 1px solid var(--border); border-left: none;
+    padding: 15px 10px; border-radius: 0 10px 10px 0; cursor: pointer; color: var(--gold);
+    font-size: 16px; box-shadow: 2px 0 10px rgba(0,0,0,0.5); pointer-events: auto;
+    transition: background 0.2s;
+}
+.transform-handle:active { background: var(--accent); color: #fff; }
 
+/* The Drawers */
+.transform-drawer {
+    position: fixed; left: 0; top: 20%; transform: translateX(-105%);
+    transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+    background: var(--panel); border: 1px solid var(--border); border-left: none;
+    border-radius: 0 16px 16px 0; z-index: 8500; padding: 15px; 
+    box-shadow: 10px 10px 40px rgba(0,0,0,0.9); max-width: 85vw;
+}
+.transform-drawer.open { transform: translateX(0); }
     /* --- B. THE GRAPH MATRIX (Visual Inter-file Imports & References) --- */
     .graph-viewport {
         flex: 1;
@@ -826,7 +853,25 @@
     .graph-canvas-container:active {
         cursor: grabbing;
     }
-
+.sleek-ribbon {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    padding: 6px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.sleek-ribbon::-webkit-scrollbar { display: none; }
+.sleek-ribbon .sleek-btn {
+    min-width: 40px;
+    height: 40px;
+    font-size: 18px;
+    border-radius: 6px;
+    background: var(--bg);
+}
+.sleek-btn.active { background: var(--accent); color: #fff; }
     /* Micro-Nodes inside the Graph view */
     .graph-node {
         position: absolute;
@@ -865,17 +910,167 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
     }
+    /* Unified Bottom Dock */
+    #nexus-dock {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 1000;
+    background-color: #282c34;
+    border-top: 1px solid #3e4451;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+    }
+    
+    /* Tier 1: Toolbar/D-pad Row */
+    .dock-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    gap: 8px;
+    background-color: #21252b;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Hide scrollbar for clean aesthetic */
+    .dock-toolbar::-webkit-scrollbar {
+    display: none;
+    }
+    
+    .dock-group {
+    display: flex;
+    gap: 4px;
+    }
+    
+    .dock-divider {
+    width: 1px;
+    height: 24px;
+    background-color: #3e4451;
+    margin: 0 4px;
+    }
+    /* --- devIDE: CM6 & SPOTLIGHT STYLES --- */
+    #spotlight-modal { 
+    display: none; position: fixed; inset: 0; 
+    background: rgba(0,0,0,0.85); z-index: 9999; 
+    justify-content: center; align-items: start; padding-top: 10vh; 
+    backdrop-filter: blur(5px);
+    }
+    #spotlight-modal.active { display: flex; }
+    .spotlight-box { 
+    width: 90%; max-width: 600px; background: var(--surface); 
+    border: 1px solid var(--accent); border-radius: 12px; 
+    padding: 20px; box-shadow: 0 15px 50px rgba(0,0,0,0.8); 
+    }
+    #spotlight-input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: #fff; padding: 15px; font-family: monospace; border-radius: 8px; outline: none;
+    }
+    #spotlight-results {
+    max-height: 50vh; overflow-y: auto; margin-top: 15px; display: flex; flex-direction: column; gap: 8px;
+    }
+    /* CodeMirror 6 Strict Dimensions */
+    .cm-editor { height: 100%; width: 100%; font-family: monospace; font-size: 14px; }
+    .cm-scroller { overflow: auto; }
+    /* Utility Touch Buttons */
+    .dock-btn {
+    background-color: #2c313c;
+    color: #abb2bf;
+    border: 1px solid #3e4451;
+    border-radius: 4px;
+    min-width: 40px;
+    height: 38px;
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    touch-action: manipulation;
+    }
+    
+    .dock-btn:active {
+    background-color: #4b5263;
+    color: #ffffff;
+    }
+    
+    .dock-btn.special {
+    background-color: #3e4451;
+    color: #61afef;
+    }
+    #xterm-container .terminal {
+    height: 100%;
+    }
+    /* Ensure the xterm scrollbar matches your Nexus theme */
+    #xterm-container .xterm-viewport::-webkit-scrollbar {
+    width: 6px;
+    }
+    #xterm-container .xterm-viewport::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+    }
+    /* Tier 2: Status Ribbon */
+    .dock-status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 12px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #5c6370;
+    background-color: #1e2227;
+    border-top: 1px solid #21252b;
+    }
+    /* --- NEXUS REGEX PLAYGROUND & MACRO STYLES --- */
+    #regex-slide { 
+    position: fixed; 
+    bottom: 0; left: 0; right: 0; 
+    height: 45vh; 
+    background: var(--surface); 
+    border-top: 4px solid #a371f7; /* Purple for Regex */
+    z-index: 5000; 
+    transform: translateY(105%); 
+    transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1); 
+    display: flex; 
+    flex-direction: column; 
+    padding: 15px; 
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.9); 
+    }
+    #regex-slide.open { transform: translateY(0); }
+    .regex-box { background: var(--bg); color: #fff; border: 1px solid var(--border); padding: 10px; font-family: monospace; border-radius: 6px; width: 100%; outline: none; }
+    .regex-results { flex: 1; overflow-y: auto; background: #000; color: var(--success); font-family: monospace; font-size: 12px; padding: 10px; border-radius: 6px; margin-top: 10px; }
+    .macro-recording { color: var(--danger); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    .status-indicator {
+    font-weight: bold;
+    color: #98c379; /* Green match for ready state */
+    }
+    #highlight-backdrop mark {
+    background: rgba(47, 129, 247, 0.4); /* Subtle blue highlight */
+    border-radius: 3px;
+    color: transparent;
+    }
+    /* Axis Locking */
+    .lock-x { overflow-x: hidden !important; }
+    .lock-y { overflow-y: hidden !important; }
 </style>
 
 </head>
 <body>
-
 <div id="app-root">
     <div id="widget-drop-menu">
         <button class="tool-btn" onclick="Nexus.ui.toggleWidget('utility-bar'); this.parentElement.classList.remove('active')">🛠 UTIL</button>
         <button class="tool-btn" onclick="Nexus.ui.toggleWidget('search-bar'); this.parentElement.classList.remove('active')">🔍 FIND & REP</button>
         <button class="tool-btn" onclick="Nexus.ui.toggleWidget('writer-bar'); this.parentElement.classList.remove('active')">✍️ WRITE</button>
         <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith'); this.parentElement.classList.remove('active')">⌨ KEY</button>
+        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('nexus-dpad'); this.parentElement.classList.remove('active')">🎮 D-PAD</button>
+    
     </div>
     
     <input type="color" id="color-picker-input" style="display:none;" onchange="Nexus.ui.injectChar(this.value)">
@@ -886,7 +1081,7 @@
         <div id="ribbon-track">
             <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁</button>
-          <button class="tool-btn btn-danger" onclick="Nexus.ui.checkSyntax()">💩</button>
+            <button class="tool-btn btn-danger" onclick="Nexus.ui.checkSyntax()">💩</button>
             
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒</button>
             <button class="tool-btn" onclick="Nexus.toggleEditor()">🔄</button>
@@ -894,7 +1089,7 @@
             <button class="tool-btn" onclick="Nexus.ui.toggleWidgetDrop(event)">🧩</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('spotlight')">🔎</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('right')">🧰</button>
-            
+          <button class="tool-btn" onclick="Nexus.Terminal.toggle()">📟 TERMINAL</button>  
             <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('sandbox')">▶️</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSlide('shell')">⌨️</button>
             <button class="tool-btn" onclick="Nexus.vfs.refreshCurrent()">♻️</button>
@@ -903,14 +1098,28 @@
             <button class="tool-btn" onclick="Nexus.ui.openModal('manual')">❓</button>
         </div>
     </nav>
-
+<div id="utility-ribbon" class="sleek-ribbon">
+    <button class="sleek-btn" onclick="Nexus.ui.toggleReadOnly()" title="Read Only Toggle">👁️</button>
+    <button class="sleek-btn" onclick="document.execCommand('insertText', false, '  ')" title="Insert Tab">⇥</button>
+    <button class="sleek-btn" onclick="Nexus.editorCore.outdent()" title="Remove Tab">⇤</button>
+    <button class="sleek-btn" id="util-select" onclick="Nexus.DpadEngine.toggleSelectLock()" title="Select Toggle">⬚</button>
+    <button class="sleek-btn" onclick="document.execCommand('copy')" title="Copy">©</button>
+    <button class="sleek-btn" onclick="document.execCommand('cut')" title="Cut">✂</button>
+    <button class="sleek-btn" onclick="navigator.clipboard.readText().then(t => document.execCommand('insertText', false, t))" title="Paste">📋</button>
+    <div style="flex:1;"></div>
+    <button class="sleek-btn btn-success" onclick="Nexus.codeRunner.execute()" title="Play/Run">▶</button>
+</div>
     <div id="workspace">
         <div id="file-tabs-bar"></div>
-        <div id="editor-view">
-            <div id="gutter">1</div>
-            <textarea id="raw-terminal" readonly spellcheck="false" autocomplete="off" placeholder="VORTEX EMPTY. Load or create a new file."></textarea>
-            <div id="cm6-container" style="display: none; flex: 1; overflow: auto; background: var(--bg); font-family: monospace; font-size: 14px;"></div>
-        </div>
+<div id="editor-view">
+    <div id="gutter">1</div>
+    <div style="position: relative; flex: 1; overflow: hidden; background: #000;">
+        <div id="highlight-backdrop" style="position: absolute; inset: 0; padding: 15px; padding-bottom: 50vh; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; white-space: pre-wrap; word-wrap: break-word; color: transparent; pointer-events: none; z-index: 0; overflow: hidden;"></div>
+        
+        <textarea id="raw-terminal" style="position: relative; z-index: 1; background: transparent; width: 100%; height: 100%;" readonly spellcheck="false" autocomplete="off" placeholder="VORTEX EMPTY. Load or create a new file."></textarea>
+    </div>
+    <div id="cm6-container" style="display: none; flex: 1; overflow: auto; background: var(--bg); font-family: monospace; font-size: 14px;"></div>
+</div>
     </div>
 
     <div id="utility-bar" class="floating-widget util-vertical">
@@ -935,6 +1144,48 @@
         </div>
     </div>
 
+<div class="transform-handle-zone">
+    <div class="transform-handle" onclick="Nexus.ui.toggleDrawer('search-drawer')">🔍</div>
+    <div class="transform-handle" onclick="Nexus.ui.toggleDrawer('writer-drawer')">✍️</div>
+    <div class="transform-handle" onclick="Nexus.ui.toggleDrawer('audit-drawer')">@️</div>
+</div>
+
+<div id="search-drawer" class="transform-drawer" style="width: 280px;">
+    <div style="display:flex; flex-direction:column; gap:6px;">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
+            <span style="font-size:10px; color:var(--accent); font-weight:bold;">FIND & REPLACE</span>
+            <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.ui.toggleDrawer('search-drawer')">&times;</span>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button class="sleek-btn" id="case-btn" onclick="Nexus.search.toggleOpt('case')" style="flex:1; padding:4px;">Aa</button>
+            <button class="sleek-btn" id="regex-btn" onclick="Nexus.search.toggleOpt('regex')" style="flex:1; padding:4px;">.*</button>
+            <button class="sleek-btn" id="global-btn" onclick="Nexus.search.toggleOpt('global')" style="flex:1; padding:4px;">/g</button>
+        </div>
+        <input type="text" id="find-input" class="sleek-input" placeholder="Find...">
+        <div style="display:flex; gap:6px;">
+            <input type="text" id="replace-input" class="sleek-input" placeholder="Replace...">
+            <button class="sleek-btn" onclick="Nexus.search.replace()" style="background:var(--accent); color:#fff;">REP</button>
+        </div>
+        <div style="display:flex; gap:6px;">
+            <button class="sleek-btn" style="flex:1;" onclick="Nexus.search.findNext(-1)">↑ PREV</button>
+            <button class="sleek-btn" style="flex:1;" onclick="Nexus.search.findNext(1)">↓ NEXT</button>
+        </div>
+    </div>
+</div>
+
+<div id="writer-drawer" class="transform-drawer" style="width: 260px;">
+     <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+         <span style="font-size:10px; color:var(--gold); font-weight:bold;">BOILERPLATE ARCHITECT</span>
+         <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.ui.toggleDrawer('writer-drawer')">&times;</span>
+     </div>
+     <select id="write-mode" class="sleek-input" style="padding:10px; font-size:12px; width:100%; margin-bottom:10px;">
+         <option value="fetch">🌐 Async Fetch API</option>
+         <option value="component">🧩 Web Component</option>
+         <option value="canvas">🎨 Canvas Render Loop</option>
+         <option value="express">⚙️ Express.js Server</option>
+     </select>
+     <button class="sleek-btn" style="background:var(--gold); color:#000; font-weight:bold; width:100%; padding:10px;" onclick="Nexus.writer.go()">⚡ INJECT</button>
+</div>
     <div id="search-bar" class="floating-widget" style="top: 140px; left: 10px; flex-direction: row; width: 320px; border-radius: 8px;">
        <div class="search-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'search-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'search-bar')">
            <div class="search-grip-x" onclick="Nexus.ui.toggleWidget('search-bar')">&times;</div>
@@ -961,7 +1212,12 @@
             </div>
         </div>
     </div>
-
+<div id="audit-drawer" class="transform-drawer">
+    <div class="drawer-header">SYSTEM AUDIT</div>
+    <button class="sleek-btn" onclick="Nexus.Auditor.findOrphanedIDs()">Scan for Dead IDs</button>
+    <button class="sleek-btn" onclick="Nexus.Auditor.findUnusedCSS()">Scan for Dead CSS</button>
+    <div id="audit-results" style="font-size: 10px; margin-top: 10px; color: var(--gold);"></div>
+</div>
     <div id="writer-bar" class="floating-widget" style="top: 220px; left: 10px; width: 280px;">
         <div class="drag-handle" onmousedown="Nexus.ui.handleHandleTap(event, 'writer-bar')" ontouchstart="Nexus.ui.handleHandleTap(event, 'writer-bar')">⋯</div>
         <div class="sleek-bar-content" style="flex-direction: column; align-items: stretch; padding:10px;">
@@ -982,6 +1238,21 @@
         </div>
     </div>
 
+<div id="nexus-dpad" class="floating-widget util-vertical" style="top: 200px; left: 10px; width: auto; background: var(--panel);">
+    <div id="dpad-drag-handle" class="util-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'nexus-dpad')" ontouchstart="Nexus.ui.handleHandleTap(event, 'nexus-dpad')"></div>
+    <div style="padding:10px; display:flex; flex-direction:column; gap:10px;">
+        <div style="display:flex; gap:5px;">
+            <button id="dpad-select-lock" class="sleek-btn" style="flex:1; background:var(--bg);">SEL</button>
+            <button id="dpad-line-lock" class="sleek-btn" style="flex:1; background:var(--bg);">LINE</button>
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:5px;">
+            <div></div><button class="sleek-btn dpad-arrow" data-dir="Up" style="background:var(--bg);">↑</button><div></div>
+            <button class="sleek-btn dpad-arrow" data-dir="Left" style="background:var(--bg);">←</button>
+            <button class="sleek-btn dpad-arrow" data-dir="Down" style="background:var(--bg);">↓</button>
+            <button class="sleek-btn dpad-arrow" data-dir="Right" style="background:var(--bg);">→</button>
+        </div>
+    </div>
+</div>
     <div id="kb-monolith" class="floating-widget kb-pos-bottom">
         <div class="drag-handle" onmousedown="Nexus.ui.handleHandleTap(event, 'kb-monolith')" ontouchstart="Nexus.ui.handleHandleTap(event, 'kb-monolith')"></div>
         <div class="kb-header">
@@ -1002,6 +1273,8 @@
         <div class="kb-row-container" id="kb-rows-wrapper"></div>
     </div>
 
+
+
     <aside id="panel-left" class="side-panel left-p">
         <div class="p-head"><span>VORTEX EXPLORER</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('left')">&times;</button></div>
         <div class="p-body">
@@ -1016,8 +1289,9 @@
 
             <div class="section-label">Matrix Operations</div>
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom: 8px;">
-                <button class="tool-btn btn-gold" onclick="Nexus.mergeEngine.open()">📥 MERGE</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">👯 COMPARE</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('diff')">👯 COMPARE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.bundleToHTML()">⚡ BUNDLE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.mergeAllJS()">⚡ MERGE JS</button>
@@ -1028,7 +1302,7 @@
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin: 0 0 10px 0;">
                 <div class="section-label" style="margin:0;">Virtual File System</div>
-                <button class="tool-btn btn-accent" style="padding:5px 10px; font-size:9px;" onclick="Nexus.snapshots.create(); Nexus.ui.openModal('merger')">📸 SNAPSHOT</button>
+                <button class="tool-btn btn-accent" style="padding:5px 10px; font-size:9px;" onclick="Nexus.snapshots.create()">📸 SNAPSHOT</button>
             </div>
             
             <div id="accordion-root"></div>
@@ -1048,10 +1322,12 @@
         <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 15px;">
             <div class="slab">
                 <div class="section-label">Diagnostics</div>
-                <button class="tool-btn btn-danger" style="width:100%;" onclick="Nexus.Sentinel.runLint()">🩺 RUN DEEP LINT</button>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:8px;">
-                    <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicAST()">🏗️ REBUILD AST</button>
-                    <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicString()">🧼 SCRUB STRING</button>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding: 0 15px;">
+                     <button class="tool-btn btn-danger" onclick="Nexus.Sentinel.runLint()">1. DEEP LINT (16+ RULES)</button>
+                     <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicString()">2. MEDIC: STRING PATCH</button>
+                     <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicAST()">3. MEDIC: AST REBUILD</button>
+                     <button class="tool-btn btn-accent" onclick="Nexus.Sentinel.scanDeps()">4. SCAN IMPORTS</button>
+                     <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.ui.checkBrackets()">[ ] CHECK BRACKETS</button>          
                 </div>
                 <div id="diag-out" class="mini-console" style="margin-top:10px; height: 180px;">[System Standby]</div>
             </div>
@@ -1096,24 +1372,24 @@
             </div>
         </div>
     </aside>
-
-    <div id="diag-hub">
-        <div class="p-head"><span>SENTINEL DIAGNOSTICS</span><button class="close-x" onclick="Nexus.ui.toggleSlide('diag')">&times;</button></div>
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding: 0 15px;">
-            <button class="tool-btn btn-danger" onclick="Nexus.Sentinel.runLint()">1. DEEP LINT (16+ RULES)</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicString()">2. MEDIC: STRING PATCH</button>
-            <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicAST()">3. MEDIC: AST REBUILD</button>
-            <button class="tool-btn btn-accent" onclick="Nexus.Sentinel.scanDeps()">4. SCAN IMPORTS</button>
-        </div>
-        <div id="diag-out" class="p-body" style="background:#000; margin:15px; border-radius:10px; border:1px solid var(--border);">[SENTINEL ENGINE OFFLINE]</div>
-    </div>
-
+<canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9000; pointer-events:none; transition: background 0.2s;"></canvas>
     <div id="shell-slide">
         <span style="color:var(--accent); font-family:monospace; font-weight:bold; font-size:18px; margin-right:10px;">&gt;</span>
         <input type="text" id="shell-input" placeholder="Execute command..." onkeydown="if(event.key === 'Enter') { Nexus.shell.exec(this.value); this.value=''; }">
         <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:10;">&times;</button>
     </div>
-
+<div id="regex-slide">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <span style="color:#a371f7; font-weight:900; font-family:monospace; font-size:14px;">/.* REGEX PLAYGROUND .*/</span>
+        <button class="close-x" onclick="document.getElementById('regex-slide').classList.remove('open')">&times;</button>
+    </div>
+    <div style="display:flex; gap:10px;">
+        <input type="text" id="regex-pattern" class="regex-box" placeholder="Pattern (e.g., function\s+(\w+))" style="flex:3;">
+        <input type="text" id="regex-flags" class="regex-box" placeholder="Flags (g, i, m)" value="g" style="flex:1;">
+        <button class="tool-btn" style="background:#a371f7; color:#fff;" onclick="Nexus.tools.testRegex()">TEST</button>
+    </div>
+    <div id="regex-matches" class="regex-results">Awaiting pattern...</div>
+</div>
     <div id="modal-clones" class="modal-overlay">
         <div class="modal-content">
             <div class="p-head"><span>👯 MATRIX DEDUPLICATOR</span><button class="close-x" onclick="Nexus.ui.closeModal('clones')">&times;</button></div>
@@ -1131,7 +1407,7 @@
             <div class="p-head"><span>🛰️ PROJECT SPOTLIGHT</span><button class="close-x" onclick="Nexus.ui.closeModal('spotlight')">&times;</button></div>
             <div class="modal-body">
                 <input type="text" id="spotlight-input" class="sleek-input" placeholder="Search all project sectors..." oninput="Nexus.spotlight.search(this.value)">
-                <div id="spotlight-results" style="margin-top:15px; display:flex; flex-direction:column; gap:8px;"></div>
+<div id="spotlight-results" style="margin-top:15px; display:flex; flex-direction:column; gap:8px; max-height: 50vh; overflow-y: auto;"></div>
             </div>
         </div>
     </div>
@@ -1166,14 +1442,12 @@
         <div class="modal-content">
             <div class="p-head"><span>📖 NEXUS PRIME v40.20 - THE MASTER CODEX</span><button class="close-x" onclick="Nexus.ui.closeModal('manual')">&times;</button></div>
             <div class="modal-body" style="padding: 25px 35px; line-height: 1.6;">
-
                 <div style="text-align:center; margin-bottom:30px; border:1px solid var(--gold); padding:15px; background:rgba(210,153,34,0.05); border-radius:12px;">
                     <div style="font-size:11px; letter-spacing:3px; color:var(--gold); font-weight:900;">SOVEREIGN ARCHITECTURE</div>
                     <div style="font-size:13px; color:var(--text); opacity:0.8;">Nexus Prime is an AST-aware, mobile-native Integrated Development Environment.</div>
                 </div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-bottom:15px;">TIER I: THE KINETIC INTERFACE</div>
-                
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. The Infinite Ribbon</div>
                 <div class="man-p">The top navigation bar is a seamless loop. <b>Swipe horizontally</b> to access secondary tools (Vault, Radar, Settings). It will wrap around infinitely.</div>
 
@@ -1196,7 +1470,6 @@
                 </div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER II: VORTEX FILE SYSTEM (VFS)</div>
-
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. VFS Explorer</div>
                 <div class="man-p">Files are stored in the <b>Sovereign Database (Dexie.js)</b>. They persist even if you close the browser. Open the 📁 <b>VORTEX</b> panel to manage sectors.</div>
 
@@ -1211,14 +1484,11 @@
                 </div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER III: NEURAL ENGINES (DIAGNOSTICS)</div>
-
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Sentinel AST Medic</div>
-                <div class="man-p">Sentinel performs 16+ structural checks. It detects <b>Infinite Loops</b>, <b>XSS Vulnerabilities</b>, <b>Recursion Risks</b>, and <b>Zombies</b> (unused variables).
-                    <br><i>Action:</i> Click <b>FIX ALL</b> to apply bulk mutations to your code automatically.</div>
+                <div class="man-p">Sentinel performs 16+ structural checks. It detects <b>Infinite Loops</b>, <b>XSS Vulnerabilities</b>, <b>Recursion Risks</b>, and <b>Zombies</b> (unused variables).<br><i>Action:</i> Click <b>FIX ALL</b> to apply bulk mutations to your code automatically.</div>
 
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Neural Heuristics (Intel)</div>
-                <div class="man-p">A high-level analytical scan. It calculates "Code Health" based on payload size, security risks, and structural patterns.
-                    <br><i>Action:</i> Tap the large % Health number in the Intel modal to view <b>Deduction Logs</b>.</div>
+                <div class="man-p">A high-level analytical scan. It calculates "Code Health" based on payload size, security risks, and structural patterns.<br><i>Action:</i> Tap the large % Health number in the Intel modal to view <b>Deduction Logs</b>.</div>
 
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">3. Radar Graph</div>
                 <div class="man-p">A visual dependency map. It tracks how files are connected.
@@ -1229,7 +1499,6 @@
                 </div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER IV: TEMPORAL MECHANICS</div>
-
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. The Commander Deck (Merge Engine)</div>
                 <div class="man-p">When performing complex merges or restoring snapshots, use the <b>Merge Engine</b>. It provides a line-by-line diff. Select <b>Left</b>, <b>Right</b>, or <b>Both</b> for every conflict to assemble the final code.</div>
 
@@ -1237,7 +1506,6 @@
                 <div class="man-p">A persistent snippet library. Highlighting code and selecting <b>+ GRAB</b> stores the logic in your Vault. Vault items are available across all files and sessions.</div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER V: CMD & SHELL</div>
-                
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Native VFS Commands</div>
                 <div class="man-p">Type the following into the CMD slider for fast file manipulation:
                     <ul style="padding-left:20px; font-family:monospace; font-size:11px; margin-top:5px; background:var(--bg); padding:10px; border-radius:8px;">
@@ -1250,7 +1518,6 @@
                 </div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER VI: OMNI GESTURE LAYER</div>
-                
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">3-Finger Gesture Activation</div>
                 <div class="man-p">Touch the screen with 3 fingers to activate the <b>Omni Layer</b>. Draw a path to trigger commands:
                     <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
@@ -1296,6 +1563,21 @@
         </div>
     </div>
 
+    <div id="modal-diff" class="modal-overlay">
+        <div class="modal-content" style="width: 90%; height: 85%;">
+            <div class="p-head"><span>👯 MATRIX DIFF (COMPARE)</span><button class="close-x" onclick="Nexus.ui.closeModal('diff')">&times;</button></div>
+            <div class="modal-body" style="display:flex; flex-direction:column; padding:15px; gap:10px; overflow: hidden;">
+                <select id="diff-file-selector" class="sleek-input" onchange="Nexus.ui.runDiff(this.value)">
+                    <option value="">Select file to compare...</option>
+                </select>
+                <div style="display:flex; flex:1; gap:10px; overflow:hidden;">
+                    <div id="diff-scroll-left" style="flex:1; background:#0d1117; color:#fff; overflow:auto; padding:10px; font-family:monospace; font-size:12px; white-space:pre-wrap; border:1px solid var(--border); border-radius:8px;"><div id="diff-content-left"></div></div>
+                    <div id="diff-scroll-right" style="flex:1; background:#0d1117; color:#fff; overflow:auto; padding:10px; font-family:monospace; font-size:12px; white-space:pre-wrap; border:1px solid var(--border); border-radius:8px;"><div id="diff-content-right"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-compressor" class="modal-overlay">
         <div class="modal-content">
             <div class="p-head"><span>🗜️ CODE COMPRESSOR</span><button class="close-x" onclick="Nexus.ui.closeModal('compressor')">&times;</button></div>
@@ -1320,51 +1602,32 @@
         </div>
     </div>
     
-    <div id="modal-merger" class="modal-overlay">
-        <div class="modal-content">
-            <div class="p-head"><span>COMMANDER DECK (MERGE RESOLUTION)</span><button class="close-x" onclick="Nexus.ui.closeModal('merger')">&times;</button></div>
-            
-            <div id="merger-selector" style="padding:20px;">
-                <div class="section-label">Select Source for Merge into <span id="merge-target-lbl" style="color:var(--accent);"></span></div>
-                <input type="file" id="merge-file-input" style="width:100%; margin-bottom:20px; padding:10px; background:var(--bg); color:#fff; border:1px solid var(--border);">
-                <div style="font-size:10px; opacity:0.5; margin-bottom:10px;">OR Select Snapshot:</div>
-                <div id="merge-snapshot-list"></div>
+<div id="modal-merge" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head">
+            <span>MATRIX MERGE ENGINE</span>
+            <button class="close-x" onclick="Nexus.ui.closeModal('merge')">×</button>
+        </div>
+        <div class="p-body">
+            <div style="display:flex; gap:10px; margin-bottom:15px; background:var(--surface); padding:10px; border-radius:12px;">
+                <select id="merge-left-sel" class="sleek-input" style="flex:1;"></select>
+                <div style="align-self:center; color:var(--gold); font-weight:900;">VS</div>
+                <select id="merge-right-sel" class="sleek-input" style="flex:1;"></select>
+                <button class="tool-btn btn-accent" onclick="Nexus.merge.start()">COMPARE</button>
             </div>
-
-            <div class="modal-body" id="diff-workspace" style="display:none; flex-direction:column; padding:0;">
-                 <div style="background: #090c10; padding: 10px; border-bottom: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;">
-                    <div id="prog-stat" style="font-size: 11px; color: var(--gold); text-align:center; font-weight:bold; letter-spacing:1px;">0 / 0 CONFLICTS RESOLVED</div>
-                    
-                    <div style="display: flex; gap: 10px; width: 100%;">
-                        <div style="flex: 1; background: var(--panel); border: 2px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; height: 180px;">
-                            <div style="font-size: 9px; padding: 4px 8px; background: #21262d; font-weight: bold; color: #8b949e;">LEFT (CURRENT CODE)</div>
-                            <div id="body-l" style="padding: 10px; font-size: 12px; white-space: pre-wrap; overflow-y: auto; flex: 1; color: #fff; font-family:monospace;"></div>
-                            <button class="tool-btn btn-danger" style="width: 100%; border-radius: 0; justify-content:center; padding:10px;" onclick="Nexus.mergeEngine.pick('l')">KEEP OLD</button>
-                        </div>
-                        <div style="flex: 1; background: var(--panel); border: 2px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; height: 180px;">
-                            <div style="font-size: 9px; padding: 4px 8px; background: #21262d; font-weight: bold; color: #8b949e;">RIGHT (INCOMING)</div>
-                            <div id="body-r" style="padding: 10px; font-size: 12px; white-space: pre-wrap; overflow-y: auto; flex: 1; color: #fff; font-family:monospace;"></div>
-                            <button class="tool-btn btn-success" style="width: 100%; border-radius: 0; justify-content:center; padding:10px;" onclick="Nexus.mergeEngine.pick('r')">TAKE NEW</button>
-                        </div>
-                    </div>
-                    
-                    <div style="display:flex; gap:8px; width: 100%; margin-top:5px;">
-                        <button class="tool-btn" style="flex:1; justify-content:center; background:#30363d;" onclick="Nexus.mergeEngine.pick('both')">KEEP BOTH</button>
-                        <button class="tool-btn" style="flex:1; justify-content:center; background:#30363d;" onclick="Nexus.mergeEngine.undo()">UNDO LAST</button>
-                    </div>
+            <div id="merge-diff-view" style="flex:1; overflow-y:auto; font-family:monospace; font-size:12px; background:#000; border-radius:8px; border:1px solid var(--border);">
                 </div>
-                
-                <div style="flex:1; background:var(--bg); overflow-y:auto; padding:15px; font-family:monospace; font-size:12px;">
-                    <div style="font-size: 10px; font-weight: bold; color: var(--accent); margin-bottom: 10px;">FINAL ASSEMBLY PREVIEW</div>
-                    <div id="vf" style="white-space:pre; color:var(--text); line-height:1.5;"></div>
-                </div>
-                
-                <div style="padding:15px; background:var(--panel); border-top:1px solid var(--border); display:flex;">
-                    <button id="commit-merge-btn" class="tool-btn btn-accent" style="flex:1; justify-content:center; padding:15px; font-size:14px;" onclick="Nexus.mergeEngine.finalize()" disabled>COMMIT TO VFS</button>
-                </div>
+        </div>
+        <div id="merge-controls" class="p-head" style="display:none; background:var(--bg); border-top:1px solid var(--border);">
+            <span id="merge-progress">Conflict 0 of 0</span>
+            <div style="display:flex; gap:10px;">
+                <button class="tool-btn btn-danger" onclick="Nexus.merge.choose('left')">TAKE LEFT</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.merge.choose('both')">KEEP BOTH</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.merge.choose('right')">TAKE RIGHT</button>
             </div>
         </div>
     </div>
+</div>
 
     <div id="modal-dreamer" class="modal-overlay">
         <div class="modal-content">
@@ -1524,17 +1787,50 @@
             <button class="sleek-btn" style="width: calc(100% - 40px); margin: 0 20px 20px 20px; padding: 15px;" onclick="Nexus.ui.closeModal('graph')">Close Scanner</button>
         </div>
     </div>
-
-    <footer id="footer">
-        <div id="foot-file">NO FILES OPEN</div>
-        <div style="margin-left:auto; display:flex; gap:25px;">
-            <span id="foot-pos">LN 1, COL 1</span>
-            <span id="foot-status" style="letter-spacing:1px; transition: color 0.3s; color:var(--danger)">LOCKED</span>
+<div id="panel-terminal" class="side-panel right-p">
+    <div class="p-head">
+        <span>MATRIX TERMINAL</span>
+        <button class="close-x" onclick="Nexus.Terminal.toggle()">×</button>
+    </div>
+    <div id="xterm-container" style="flex: 1; background: #0d1117; padding: 10px; overflow: hidden;"></div>
+</div>
+<footer id="nexus-dock">
+    <div class="dock-toolbar">
+        <div class="dock-group dpad-group">
+<button class="sleek-btn" onclick="Nexus.ui.openSuggestions()">💡</button>
+<button class="sleek-btn dpad-arrow" data-dir="Left">←</button>
+<button class="sleek-btn dpad-arrow" data-dir="Down">↓</button>
+<button class="sleek-btn dpad-arrow" data-dir="Up">↑</button>
+<button class="sleek-btn dpad-arrow" data-dir="Right">→</button>
+        <button id="ribbon-select-btn" class="sleek-btn" onclick="Nexus.DpadEngine.toggleSelectLock()">SEL</button>
+        <button id="ribbon-dpad-toggle" class="sleek-btn" onclick="Nexus.ui.toggleRibbonDpad()">🎮</button>
+        <button id="row-toggle-btn" class="sleek-btn" onclick="Nexus.ui.toggleKeyboardRows()">↕️</button>
         </div>
-    </footer>
+        
+        <div class="dock-divider"></div>
+        
+        <div class="dock-group key-group">
+            <button class="dock-btn special" onclick="Nexus.actions.insertText('\t')">TAB</button>
+            <button class="dock-btn" onclick="Nexus.actions.insertText('<')">&lt;</button>
+            <button class="dock-btn" onclick="Nexus.actions.insertText('>')">&gt;</button>
+            <button class="dock-btn" onclick="Nexus.actions.insertText('/')">/</button>
+            <button class="dock-btn" onclick="Nexus.actions.insertText('&quot;')">"</button>
+            <button class="dock-btn" onclick="Nexus.actions.insertText(';')">;</button>
+        </div>
+    </div>
+
+    <div class="dock-status-bar">
+        <span id="foot-status" class="status-indicator">READY (FULL)</span>
+        <span id="foot-pos" class="position-indicator">LN 1, COL 1</span>
+    </div>
+</footer>
 </div>
 
+
+
+
 <script>
+
 /* --- 1. SOVEREIGN DATABASE (Dexie.js) --- */
 const db = new Dexie('NexusCodexDB');
 db.version(1).stores({
@@ -1568,7 +1864,7 @@ window.Nexus = {
            ghRepo: ""
        },
        searchOpts: { case: false, regex: false, global: false },
-       widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false }
+       widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false, 'nexus-dpad': false }
    },
 
    // ADDED MISSING EDITOR CORE DEFINITION
@@ -1578,8 +1874,289 @@ window.Nexus = {
        view: null,
        modules: {}
 },
+ICONS: {
+    readonly: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
+    orient: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>`,
+    copy: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`,
+    paste: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>`,
+    cut: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>`,
+    dpad: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4M8 10v4M15 11v.01M18 13v.01"/></svg>`
+},
+    // =================================================================
+    // NEXUS COMMAND REGISTRY (CR) & TOOLBOX
+    // =================================================================
+    CR: {
+    registry: {},
+    add(cmd, handler, desc = "No desc") { this.registry[cmd.toLowerCase()] = { handler, desc }; },
     
+    async parse(str) {
+    if (!str) return;
+    const [cmd, ...args] = str.split(/\s+/);
+    if (!cmd) return;
+    
+    // Route to Macro Recorder if active
+    if (Nexus.tools.macros.recording && cmd.toLowerCase() !== 'macro') {
+    Nexus.tools.macros.current.push(str);
+    }
+    
+    const command = this.registry[cmd.toLowerCase()];
+    if (command) {
+    try { return await command.handler(args); } 
+    catch (e) { return `CR Error: ${e.message}`; }
+    } else {
+    // Fallback to legacy shell if command doesn't exist in CR
+    if(Nexus.shell && Nexus.shell.commands[cmd.toLowerCase()]) {
+    return Nexus.shell.exec(str);
+    }
+    return `Unrecognized command: '${cmd}'. Type 'help'.`;
+    }
+    },
+    
+    init() {
+    // --- 1. TELEPORTATION ENGINE (Warp) ---
+    this.add('warp', (args) => {
+    const line = parseInt(args[0]);
+    if (!line) return "Specify line (e.g., warp 500)";
+    Nexus.ui.jumpPrompt(line); // Uses your existing jump logic
+    return `Warped to LN ${line}`;
+    }, "Jump to line.");
+    
+    this.add('mark', (args) => {
+    const name = args[0] || 'default';
+    const ed = document.getElementById('raw-terminal');
+    Nexus.state.bookmarks[name] = ed.selectionStart;
+    return `Bookmark '${name}' locked.`;
+    }, "Set navigational marker.");
+    
+    this.add('return', (args) => {
+    const name = args[0] || 'default';
+    const pos = Nexus.state.bookmarks[name];
+    if (pos !== undefined) {
+    const ed = document.getElementById('raw-terminal');
+    ed.focus(); ed.setSelectionRange(pos, pos);
+    return `Returned to '${name}'.`;
+    }
+    return `Marker '${name}' not found.`;
+    }, "Return to marker.");
+    
+    // --- 2. BASE64 CONVERTER ---
+    this.add('b64', (args) => {
+    const mode = args[0]; // 'enc' or 'dec'
+    const str = args.slice(1).join(' ');
+    if (mode === 'enc') return btoa(str);
+    if (mode === 'dec') return atob(str);
+    return "Usage: b64 [enc/dec] [string]";
+    }, "Base64 Encoder/Decoder");
+    
+    // --- 3. VFS STORAGE AUDITOR ---
+    this.add('audit-vfs', () => {
+    let report = "VFS STORAGE AUDIT:\r\n";
+    let total = 0;
+    Object.keys(Nexus.state.vfs).forEach(file => {
+    const size = new Blob([Nexus.state.vfs[file]]).size;
+    total += size;
+    report += `- ${file.padEnd(20)} | ${(size/1024).toFixed(2)} KB\r\n`;
+    });
+    report += `\r\nTOTAL VORTEX MASS: ${(total/1024).toFixed(2)} KB`;
+    return report;
+    }, "Checks VFS memory limits.");
+    
+    // --- 4. KEYSTROKE MACRO RECORDER ---
+    this.add('macro', (args) => {
+    const action = args[0];
+    const name = args[1] || 'm1';
+    
+    if (action === 'start') {
+    Nexus.tools.macros.recording = true;
+    Nexus.tools.macros.current = [];
+    document.getElementById('foot-status').innerHTML = "<span class='macro-recording'>● RECORDING</span>";
+    return "Macro recording started...";
+    }
+    if (action === 'stop') {
+    Nexus.tools.macros.recording = false;
+    Nexus.tools.macros.store[name] = Nexus.tools.macros.current;
+    Nexus.ui.syncStatus(); // Reset footer
+    return `Macro saved as '${name}'. Contains ${Nexus.tools.macros.current.length} steps.`;
+    }
+    if (action === 'play') {
+    const sequence = Nexus.tools.macros.store[name];
+    if (!sequence) return `Macro '${name}' empty.`;
+    sequence.forEach(cmd => Nexus.CR.parse(cmd));
+    return `Macro '${name}' executed.`;
+    }
+    return "Usage: macro [start/stop/play] [name]";
+    }, "Record and play command sequences.");
+    
+    // --- 5. DEPENDENCY VISUALIZER ---
+    this.add('deps', () => {
+    if(Nexus.graph) {
+    Nexus.graph.render();
+    Nexus.ui.openModal('graph');
+    return "Project Radar initialized.";
+    }
+    return "Graph module missing.";
+    }, "Opens Dependency Matrix.");
+    
+    // --- 6. REGEX PLAYGROUND ---
+    this.add('regex', () => {
+    document.getElementById('regex-slide').classList.add('open');
+    return "Regex Playground Opened.";
+    }, "Opens Regex tester.");
+    
+    // --- 7. SYMBOL NAVIGATOR ---
+    this.add('symbols', () => {
+    if(Nexus.outline) {
+    Nexus.outline.scan();
+    return "Symbol Map Generated.";
+    }
+    return "Outline module missing.";
+    }, "Lists file symbols and functions.");
+    }
+    },
+    
+    // Nexus Tools Logic Object
+    tools: {
+    macros: { recording: false, current: [], store: {} },
+    
+    testRegex() {
+    const pattern = document.getElementById('regex-pattern').value;
+    const flags = document.getElementById('regex-flags').value;
+    const out = document.getElementById('regex-matches');
+    const code = document.getElementById('raw-terminal').value; // Test against active file
+    
+    if (!pattern) return out.innerText = "Error: Provide a pattern.";
+    
+    try {
+    const rx = new RegExp(pattern, flags);
+    const matches = [...code.matchAll(rx)];
+    if (matches.length === 0) return out.innerHTML = "<span style='color:var(--warn)'>No matches found.</span>";
+    
+    out.innerHTML = matches.map((m, i) => 
+    `[Match ${i+1}] Index: ${m.index} -> <span style="color:#fff;">${m[0].replace(/</g, '&lt;')}</span>`
+    ).join('<br><br>');
+    } catch (e) {
+    out.innerHTML = `<span style="color:var(--danger)">Syntax Error: ${e.message}</span>`;
+    }
+    }
+    },
+ Auditor:{
+ findOrphanedIDs() {
+ const allElements = document.querySelectorAll('[id]');
+ const scriptContent = document.querySelector('script').innerHTML;
+ const orphans = [];
  
+ allElements.forEach(el => {
+ const id = el.id;
+ // Search for the ID string in the JS (checks for 'id', "id", or #id)
+ const regex = new RegExp(`['"#]${id}['"]`, 'g');
+ if (!regex.test(scriptContent)) {
+ orphans.push(id);
+ }
+ });
+ 
+ console.table(orphans.length ? orphans : "No orphaned IDs found.");
+ },
+ 
+ findUnusedCSS() {
+ const styleContent = document.querySelector('style').innerHTML;
+ const idMatches = styleContent.match(/#([a-zA-Z0-9_-]+)/g) || [];
+ const deadSelectors = [];
+ 
+ idMatches.forEach(selector => {
+ const id = selector.replace('#', '');
+ if (!document.getElementById(id)) {
+ deadSelectors.push(selector);
+ }
+ });
+ 
+ console.warn("CSS Selectors with no matching HTML element:", deadSelectors);
+ }
+ },
+   Terminal:{
+   instance: null,
+   fitAddon: null,
+   commandBuffer: '',
+   
+   init() {
+   if (this.instance) return;
+   
+   // 1. Initialize xterm
+   this.instance = new Terminal({
+   theme: {
+   background: '#0d1117',
+   foreground: '#c9d1d9',
+   cursor: '#d29922', // Gold cursor to match Nexus
+   selection: 'rgba(47, 129, 247, 0.3)'
+   },
+   fontFamily: 'monospace',
+   fontSize: 13,
+   cursorBlink: true,
+   allowProposedApi: true
+   });
+   
+   // 2. Load Fit Addon
+   this.fitAddon = new FitAddon.FitAddon();
+   this.instance.loadAddon(this.fitAddon);
+   
+   // 3. Open in container
+   this.instance.open(document.getElementById('xterm-container'));
+   this.fitAddon.fit();
+   
+   // 4. Welcome Message
+   this.instance.writeln('\x1b[1;34m» NEXUS MATRIX TERMINAL v1.0\x1b[0m');
+   this.instance.writeln('Type \x1b[33mhelp\x1b[0m for system commands.');
+   this.instance.write('\r\n$ ');
+   
+   // 5. Input Handler
+   this.instance.onData(e => {
+   switch (e) {
+   case '\r': // Enter
+   this.instance.write('\r\n');
+   this.processCommand(this.commandBuffer);
+   this.commandBuffer = '';
+   this.instance.write('$ ');
+   break;
+   case '\u007f': // Backspace
+   if (this.commandBuffer.length > 0) {
+   this.commandBuffer = this.commandBuffer.slice(0, -1);
+   this.instance.write('\b \b');
+   }
+   break;
+   default:
+   if (e.length === 1) { // Normal typing
+   this.commandBuffer += e;
+   this.instance.write(e);
+   }
+   }
+   });
+   },
+   
+   processCommand(cmd) {
+   if (!cmd.trim()) return;
+   
+   try {
+   // Route command through your existing shell logic
+   const result = Nexus.shell.exec(cmd);
+   if (result !== undefined) {
+   this.instance.writeln(String(result));
+   }
+   } catch (err) {
+   this.instance.writeln(`\x1b[31mError: ${err.message}\x1b[0m`);
+   }
+   },
+   
+   toggle() {
+   const panel = document.getElementById('panel-terminal');
+   const isOpen = panel.classList.toggle('open');
+   
+   if (isOpen) {
+   this.init();
+   // Small delay to allow the drawer animation to finish before fitting
+   setTimeout(() => this.fitAddon.fit(), 400);
+   }
+   }
+   },
+   
    vfs: {
     // --- 1. LIFECYCLE & PERSISTENCE ---
     async boot() {
@@ -1982,7 +2559,34 @@ BracketCartographer: {
 DpadEngine: {
     selectLock: false,
     lineLock: false,
+    setupFastHold() {
+    document.querySelectorAll('.dpad-arrow').forEach(btn => {
+    let holdTimer, repeatTimer;
     
+    const startMove = (e) => {
+    e.preventDefault(); // Stop screen scrolling
+    this.navigate(btn.dataset.dir); // Initial single move
+    
+    // Wait 400ms, then trigger turbo mode
+    holdTimer = setTimeout(() => {
+    repeatTimer = setInterval(() => {
+    this.navigate(btn.dataset.dir);
+    }, 40); // 40ms interval = REALLY fast
+    }, 400); 
+    };
+    
+    const stopMove = () => {
+    clearTimeout(holdTimer);
+    clearInterval(repeatTimer);
+    };
+    
+    btn.addEventListener('touchstart', startMove, {passive: false});
+    btn.addEventListener('touchend', stopMove);
+    btn.addEventListener('mousedown', startMove);
+    btn.addEventListener('mouseup', stopMove);
+    btn.addEventListener('mouseleave', stopMove); // Catch if finger/mouse slides off
+    });
+    },
     init() {
         const dpad = document.getElementById('nexus-dpad');
         const selToggle = document.getElementById('dpad-select-lock');
@@ -2026,9 +2630,9 @@ DpadEngine: {
         dragHandle.addEventListener('pointerup', stopDrag);
         dragHandle.addEventListener('pointercancel', stopDrag);
     },
-
-    navigate(dir) {
-        const view = Nexus.editor; if (!view) return;
+navigate(dir) {
+    if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+        const view = Nexus.editorCore.view;
         let commandName = "";
         
         if (this.selectLock) {
@@ -2044,6 +2648,158 @@ DpadEngine: {
         import("https://esm.sh/@codemirror/commands").then((m) => {
             if (m[commandName]) { m[commandName](view); view.focus(); }
         });
+    } else {
+        // Fallback for vanilla text-area mode
+        const ed = document.getElementById('raw-terminal');
+        let pos = ed.selectionStart;
+        if(dir === 'Left') pos = Math.max(0, pos - 1);
+        if(dir === 'Right') pos = Math.min(ed.value.length, pos + 1);
+        ed.setSelectionRange(pos, pos);
+        editor.focus();
+    }
+},
+setupFastHold() {
+    document.querySelectorAll('.dpad-arrow').forEach(btn => {
+        let holdTimer, repeatTimer;
+        
+        const startMove = (e) => {
+            e.preventDefault(); // Stop screen scrolling
+            this.navigate(btn.dataset.dir); // Initial single move
+            
+            // Wait 400ms, then trigger turbo mode
+            holdTimer = setTimeout(() => {
+                repeatTimer = setInterval(() => {
+                    this.navigate(btn.dataset.dir);
+                }, 40); // 40ms interval = REALLY fast
+            }, 400); 
+        };
+        
+        const stopMove = () => {
+            clearTimeout(holdTimer);
+            clearInterval(repeatTimer);
+        };
+        
+        btn.addEventListener('touchstart', startMove, {passive: false});
+        btn.addEventListener('touchend', stopMove);
+        btn.addEventListener('mousedown', startMove);
+        btn.addEventListener('mouseup', stopMove);
+        btn.addEventListener('mouseleave', stopMove); // Catch if finger/mouse slides off
+    });
+}
+},
+clones: {
+    THRESHOLD: 4,
+    MIN_CHAR: 12,
+    lastResults: [],
+
+    async scan() {
+        const vfs = Nexus.state?.vfs || {};
+        const cache = {}; 
+        const signatureMap = new Map(); 
+        const redundancies = [];
+
+        Nexus.shell.out("Echo Sentinel: Analyzing structural overlaps...", "accent");
+
+        Object.entries(vfs).forEach(([file, code]) => {
+            cache[file] = code.split('\n');
+            cache[file].forEach((raw, idx) => {
+                const clean = raw.trim();
+                if (clean.length < this.MIN_CHAR) return;
+                
+                if (!signatureMap.has(clean)) signatureMap.set(clean, []);
+                signatureMap.get(clean).push({ file, idx });
+            });
+        });
+
+        const processed = new Set(); 
+
+        signatureMap.forEach((occurrences, signature) => {
+            if (occurrences.length < 2) return;
+
+            occurrences.forEach((base, i) => {
+                const baseId = `${base.file}:${base.idx}`;
+                if (processed.has(baseId)) return;
+
+                for (let j = i + 1; j < occurrences.length; j++) {
+                    const target = occurrences[j];
+                    const targetId = `${target.file}:${target.idx}`;
+                    if (processed.has(targetId)) continue;
+
+                    let offset = 0;
+                    let block = [];
+
+                    while (true) {
+                        const lineA = cache[base.file][base.idx + offset];
+                        const lineB = cache[target.file][target.idx + offset];
+
+                        if (lineA !== undefined && lineB !== undefined && lineA.trim() === lineB.trim()) {
+                            block.push(lineA);
+                            offset++;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (offset >= this.THRESHOLD) {
+                        redundancies.push({
+                            instances: [
+                                { file: base.file, start: base.idx + 1 },
+                                { file: target.file, start: target.idx + 1 }
+                            ],
+                            length: offset,
+                            code: block.join('\n')
+                        });
+
+                        for (let k = 0; k < offset; k++) {
+                            processed.add(`${base.file}:${base.idx + k}`);
+                            processed.add(`${target.file}:${target.idx + k}`);
+                        }
+                    }
+                }
+            });
+        });
+
+        this.lastResults = redundancies;
+        this.render(redundancies);
+        return `Scan complete. Found ${redundancies.length} logical echoes.`;
+    },
+
+    render(dupes) {
+        const root = document.getElementById('clones-list');
+        if (!root) return;
+
+        if (dupes.length === 0) {
+            root.innerHTML = `<div class="slab" style="text-align:center; padding:20px; opacity:0.5;">MATRIX STABLE: No echoes detected.</div>`;
+            return;
+        }
+
+        root.innerHTML = dupes.map((d, i) => `
+            <div class="slab" style="margin-bottom:12px; border-left:3px solid var(--gold);">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:10px; font-weight:900; color:var(--gold);">REDUNDANT BLOCK [${d.length} LINES]</span>
+                    <button class="tool-btn btn-accent" style="font-size:9px; padding:4px 8px;" onclick="Nexus.sentinel.clones.vault(${i})">STASH TO VAULT</button>
+                </div>
+                <div style="font-size:9px; color:var(--accent); margin-bottom:8px; opacity:0.6;">
+                    Found in: <b>${d.instances[0].file}</b> vs <b>${d.instances[1].file}</b>
+                </div>
+                <pre style="background:var(--bg-dark); padding:10px; border-radius:6px; font-size:10px; overflow-x:auto; margin:0; border:1px solid var(--border);">${d.code.replace(/</g, '&lt;')}</pre>
+            </div>
+        `).join('');
+
+        if(Nexus.ui?.openModal) Nexus.ui.openModal('clones');
+    },
+
+    async vault(index) {
+        const item = this.lastResults[index];
+        if (!item) return Nexus.shell.out("Clone index lost.", "error");
+
+        const name = `SHARED_${Date.now().toString().slice(-4)}`;
+        if (Nexus.vault?.store) {
+            await Nexus.vault.store(name, item.code, 'shared');
+            Nexus.shell.out(`Echo stashed as '${name}'.`, "success");
+        } else {
+            Nexus.shell.out("Vault module not initialized.", "warn");
+        }
     }
 },
 
@@ -2578,7 +3334,7 @@ intel: {
        if (ext === 'html') {
            // Grabs all scripts EXCEPT those with a 'src' attribute
            const scriptMatches = [...code.matchAll(/<script(?![^>]*src=)[^>]*>([\s\S]*?)<\/script>/gi)];
-           jsPayload = scriptMatches.map(m => m[1]).join('\n');
+           jsPayload =  dth => m[1].join('\n');
        } else if (ext === 'js') {
            jsPayload = code;
        }
@@ -2776,104 +3532,117 @@ compressor: {
                Nexus.ui.updateGutter();
                document.getElementById('foot-status').innerText = "ENGINE: VANILLA";
            } else {
-               // --- SWITCH TO CM6 ---
-               document.getElementById('foot-status').innerText = "ENGINE: CM6 LOADING...";
-               
-               try {
-                   if (!Nexus.editorCore.isLoaded) {
-                       // FIX 1: Stripped version numbers. 
-                       // ESM.sh will now resolve a perfectly matched, conflict-free dependency tree.
-                                               // Added the cmLang import at the bottom
-                       const [cm6, cmState, cmView, cmJS, cmTheme, cmLang] = await Promise.all([
-                           import("https://esm.sh/codemirror"),
-                           import("https://esm.sh/@codemirror/state"),
-                           import("https://esm.sh/@codemirror/view"),
-                           import("https://esm.sh/@codemirror/lang-javascript"),
-                           import("https://esm.sh/@codemirror/theme-one-dark"),
-                           import("https://esm.sh/@codemirror/language") 
-                       ]);
-                       
-                       Nexus.editorCore.modules = {
-                           basicSetup: cm6.basicSetup,
-                           EditorView: cmView.EditorView,
-                           EditorState: cmState.EditorState,
-                           javascript: cmJS.javascript,
-                           oneDark: cmTheme.oneDark,
-                           foldAll: cmLang.foldAll,       // Extracted fold command
-                           unfoldAll: cmLang.unfoldAll    // Extracted unfold command
-                       };
+// --- SWITCH TO CM6 ---
+document.getElementById('foot-status').innerText = "ENGINE: CM6 LOADING...";
 
-                       Nexus.editorCore.isLoaded = true;
-                   }
+try {
+    // Resolve explicit element bindings directly from your HTML layout
+    const actualCmContainer = document.getElementById('cm6-container');
+    const actualRawTerminal = document.getElementById('raw-terminal');
+    const actualGutter = document.getElementById('gutter');
+    const actualBackdrop = document.getElementById('highlight-backdrop');
 
-                   const { EditorState, EditorView, basicSetup, javascript, oneDark } = Nexus.editorCore.modules;
-                   
-                   rawTerm.style.display = 'none';
-                   gutter.style.display = 'none';
-                   
-                   // FIX 2: Change container to flex to respect parent dimensions
-                   cmContainer.style.display = 'flex';
-                   cmContainer.style.flexDirection = 'column';
+    if (!Nexus.editorCore.isLoaded) {
+        // FIX 1: Stripped version numbers. 
+        // ESM.sh will now resolve a perfectly matched, conflict-free dependency tree.
+        const [cm6, cmState, cmView, cmJS, cmTheme, cmLang] = await Promise.all([
+            import("https://esm.sh/codemirror"),
+            import("https://esm.sh/@codemirror/state"),
+            import("https://esm.sh/@codemirror/view"),
+            import("https://esm.sh/@codemirror/lang-javascript"),
+            import("https://esm.sh/@codemirror/theme-one-dark"),
+            import("https://esm.sh/@codemirror/language") 
+        ]);
+        
+        Nexus.editorCore.modules = {
+            basicSetup: cm6.basicSetup,
+            EditorView: cmView.EditorView,
+            EditorState: cmState.EditorState,
+            javascript: cmJS.javascript,
+            oneDark: cmTheme.oneDark,
+            foldAll: cmLang.foldAll,       
+            unfoldAll: cmLang.unfoldAll    
+        };
 
-                   // FIX 3: Inject an explicit CSS Theme to prevent height collapse
-                   const fixedHeight = EditorView.theme({
-                       "&": { height: "100%", width: "100%", flex: 1 },
-                       ".cm-scroller": { overflow: "auto" }
-                   });
-// Add this so we can reuse your exact CM6 setup when switching files
-Nexus.editorCore.currentExtensions = [
-   basicSetup, 
-   javascript(), 
-   oneDark,
-   fixedHeight,
-   EditorView.updateListener.of((update) => {
-       if (update.docChanged && update.userEvent) { // Added userEvent check to prevent infinite loops
-           Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
-           Nexus.vfs.save();
-       }
-   })
-];
-                
-                   Nexus.editorCore.view = new EditorView({
-                       state: EditorState.create({
-                           doc: currentCode,
-                           extensions: [
-                               basicSetup, 
-                               javascript(), 
-                               oneDark,
-                               fixedHeight, // Apply the height fix
-                               EditorView.updateListener.of((update) => {
-                                   if (update.docChanged) {
-                                       Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
-                                       Nexus.vfs.save();
-                                   }
-                               })
-                           ]
-                       }),
-                       parent: cmContainer
-                   });
+        Nexus.editorCore.isLoaded = true;
+    }
 
-                   Nexus.editorCore.isCM6 = true;
-                   Nexus.state.isCM6 = true;
-                   document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
-                   
-               } catch (e) {
-                   // FIX 4: The try/catch now covers instantiation. 
-                   // If it crashes, it will tell you EXACTLY why instead of blanking out.
-                   document.getElementById('foot-status').innerText = "ENGINE: VANILLA (FAIL)";
-                   console.error("CM6 Ignition Fault:", e);
-                   alert("Engine Swap Crashed.\n\n" + e.message);
-                   
-                   // Failsafe revert to Vanilla UI
-                   cmContainer.style.display = 'none';
-                   gutter.style.display = 'block';
-                   rawTerm.style.display = 'block';
+    const { EditorState, EditorView, basicSetup, javascript, oneDark } = Nexus.editorCore.modules;
+    
+    // CRITICAL FIX: Hide the parent wrapper element containing the vanilla editor assets
+    if (actualRawTerminal && actualRawTerminal.parentElement) {
+        actualRawTerminal.parentElement.style.display = 'none';
+    }
+    if (actualGutter) actualGutter.style.display = 'none';
+    
+    // Isolate and reveal the CM6 container matching your exact layout ID
+    if (actualCmContainer) {
+        actualCmContainer.style.display = 'flex';
+        actualCmContainer.style.flexDirection = 'column';
+    }
+
+    // Inject an explicit CSS Theme to prevent height collapse
+    const fixedHeight = EditorView.theme({
+        "&": { height: "100%", width: "100%", flex: 1 },
+        ".cm-scroller": { overflow: "auto" }
+    });
+
+    Nexus.editorCore.currentExtensions = [
+       basicSetup, 
+       javascript(), 
+       oneDark,
+       fixedHeight,
+       EditorView.updateListener.of((update) => {
+           if (update.docChanged && update.userEvent) { 
+               Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
+               Nexus.vfs.save();
+           }
+           if (update.selectionSet) {
+               const pos = update.state.selection.main.head;
+               const lineObj = update.state.doc.lineAt(pos);
+               const footPos = document.getElementById('foot-pos');
+               if (footPos) {
+                   footPos.innerText = `LN ${lineObj.number}, COL ${pos - lineObj.from + 1}`;
                }
            }
+       })
+    ];
+ 
+    if (Nexus.editorCore.view) {
+        Nexus.editorCore.view.destroy();
+    }
+
+    Nexus.editorCore.view = new EditorView({
+        state: EditorState.create({
+            doc: currentCode,
+            extensions: Nexus.editorCore.currentExtensions 
+        }),
+        parent: actualCmContainer
+    });
+
+    Nexus.editorCore.isCM6 = true;
+    Nexus.state.isCM6 = true;
+    document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
+    
+} catch (e) {
+    document.getElementById('foot-status').innerText = "ENGINE: VANILLA (FAIL)";
+    console.error("CM6 Ignition Fault:", e);
+    alert("Engine Swap Crashed.\n\n" + e.message);
+    
+    // Failsafe revert to Vanilla UI mapping
+    const actualCmContainer = document.getElementById('cm6-container');
+    const actualRawTerminal = document.getElementById('raw-terminal');
+    const actualGutter = document.getElementById('gutter');
+
+    if (actualRawTerminal && actualRawTerminal.parentElement) {
+        actualRawTerminal.parentElement.style.display = 'block';
+    }
+    if (actualCmContainer) actualCmContainer.style.display = 'none';
+    if (actualGutter) actualGutter.style.display = 'block';
+}
+           }
        },
- 
- 
-       
+
    
    // --- ADVANCED ENGINES ADAPTED FOR THE MATRIX ---
    context: {
@@ -3429,89 +4198,85 @@ grab() {
 // Add this inside the Nexus.ui object
 
     
-   mergeEngine: {
-       s1: "", s2: "", hunks: [], hIdx: 0, finalStack: [],
-       open() {
-           document.getElementById('merge-target-lbl').innerText = Nexus.state.activeFile;
-           document.getElementById('merger-selector').style.display = 'block';
-           document.getElementById('diff-workspace').style.display = 'none';
-           Nexus.ui.openModal('merger');
-       },
-       initiate(incomingData) {
-           if(typeof Diff === 'undefined') return alert("jsdiff library not loaded.");
-           this.s1 = Nexus.state.vfs[Nexus.state.activeFile] || "";
-           this.s2 = incomingData;
-           this.hunks = [];
-           this.finalStack = [];
-           const diff = Diff.diffLines(this.s1, this.s2);
-           let i = 0;
-           while (i < diff.length) {
-               if (!diff[i].added && !diff[i].removed) { 
-                   this.finalStack.push({ type: 'match', val: diff[i].value }); 
-                   i++; 
-               } else {
-                   let hunk = { l: "", r: "" };
-                   if (diff[i].removed) {
-                       hunk.l = diff[i].value;
-                       if (diff[i+1] && diff[i+1].added) { hunk.r = diff[i+1].value; i += 2; }
-                       else i++;
-                   } else { hunk.r = diff[i].value; i++; }
-                   this.hunks.push(hunk);
-               }
-           }
-           document.getElementById('merger-selector').style.display = 'none';
-           document.getElementById('diff-workspace').style.display = 'flex';
-           this.hIdx = 0;
-           this.updateUI();
-       },
-       updateUI() {
-           const btn = document.getElementById('commit-merge-btn');
-           const prog = document.getElementById('prog-stat');
-           if (this.hIdx >= this.hunks.length) {
-               prog.innerHTML = "<span style='color:var(--success);'>✓ ASSEMBLY COMPLETE</span>";
-               document.getElementById('body-l').textContent = "";
-               document.getElementById('body-r').textContent = "";
-               btn.disabled = false;
-           } else {
-               prog.innerText = `CONFLICT ${this.hIdx + 1} OF ${this.hunks.length}`;
-               document.getElementById('body-l').textContent = this.hunks[this.hIdx].l || "--- NONE ---";
-               document.getElementById('body-r').textContent = this.hunks[this.hIdx].r || "--- NONE ---";
-               btn.disabled = true;
-           }
-           this.renderPreview();
-       },
-       renderPreview() {
-           const vf = document.getElementById('vf');
-           vf.innerHTML = this.finalStack.map(s => {
-               const clean = s.val.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-               return s.type === 'choice' ? `<span style="color:var(--accent); background:rgba(88,166,255,0.1);">${clean}</span>` : clean;
-           }).join('');
-           vf.scrollTop = vf.scrollHeight;
-       },
-       pick(choice) {
-           if (this.hIdx >= this.hunks.length) return;
-           const h = this.hunks[this.hIdx];
-           let val = (choice === 'l') ? h.l : (choice === 'r') ? h.r : h.l + h.r;
-           this.finalStack.push({ type: 'choice', val: val, idx: this.hIdx });
-           this.hIdx++;
-           this.updateUI();
-       },
-       undo() {
-           if (this.finalStack.length === 0) return;
-           const last = this.finalStack.pop();
-           if (last.type === 'match') return this.undo();
-           this.hIdx = last.idx;
-           this.updateUI();
-       },
-       finalize() {
-           const assembledCode = this.finalStack.map(s => s.val).join('');
-           Nexus.state.vfs[Nexus.state.activeFile] = assembledCode;
-           Nexus.vfs.save();
-           Nexus.vfs.switchFile(Nexus.state.activeFile); 
-           Nexus.ui.closeModal('merger');
-           alert("Assembly committed to Virtual File System.");
-       }
-   },
+merge: {
+    hunks: [],
+    hIdx: 0,
+    finalCode: [],
+    
+    open() {
+        // Populate selectors with all VFS files
+        const files = Object.keys(Nexus.state.vfs);
+        const lSel = document.getElementById('merge-left-sel');
+        const rSel = document.getElementById('merge-right-sel');
+        
+        const options = files.map(f => `<option value="${f}">${f}</option>`).join('');
+        lSel.innerHTML = options;
+        rSel.innerHTML = options;
+        
+        Nexus.ui.openModal('merge');
+    },
+
+    start() {
+        const leftFile = document.getElementById('merge-left-sel').value;
+        const rightFile = document.getElementById('merge-right-sel').value;
+        
+        const leftText = Nexus.state.vfs[leftFile];
+        const rightText = Nexus.state.vfs[rightFile];
+        
+        // Generate line-by-line diff using jsdiff
+        this.hunks = Diff.diffLines(leftText, rightText);
+        this.hIdx = 0;
+        this.finalCode = [];
+        this.renderDiff();
+    },
+
+    renderDiff() {
+        const view = document.getElementById('merge-diff-view');
+        const controls = document.getElementById('merge-controls');
+        
+        view.innerHTML = this.hunks.map((h, i) => {
+            let color = h.added ? 'var(--success)' : (h.removed ? 'var(--danger)' : 'var(--text)');
+            let bg = i === this.hIdx ? 'rgba(210, 153, 34, 0.2)' : 'transparent';
+            let prefix = h.added ? '+ ' : (h.removed ? '- ' : '  ');
+            return `<div style="background:${bg}; color:${color}; padding:2px 10px; white-space:pre-wrap;">${prefix}${h.value}</div>`;
+        }).join('');
+
+        // Show/Hide controls based on whether there is a conflict at current hIdx
+        const current = this.hunks[this.hIdx];
+        if (current && (current.added || current.removed)) {
+            controls.style.display = 'flex';
+            document.getElementById('merge-progress').innerText = `Conflict at Hunk ${this.hIdx + 1}/${this.hunks.length}`;
+        } else if (this.hIdx < this.hunks.length) {
+            // If it's a "normal" hunk (no change), auto-keep it and move on
+            this.finalCode.push(current.value);
+            this.hIdx++;
+            this.renderDiff();
+        } else {
+            this.finish();
+        }
+    },
+
+    choose(side) {
+        const current = this.hunks[this.hIdx];
+        if (side === 'left' && current.removed) this.finalCode.push(current.value);
+        if (side === 'right' && current.added) this.finalCode.push(current.value);
+        if (side === 'both') this.finalCode.push(current.value);
+        
+        this.hIdx++;
+        this.renderDiff();
+    },
+
+    finish() {
+        const mergedName = prompt("Merge complete. Save as:", "merged_result.js");
+        if (!mergedName) return;
+        
+        Nexus.state.vfs[mergedName] = this.finalCode.join('');
+        Nexus.vfs.save();
+        Nexus.vfs.renderAccordion();
+        Nexus.ui.closeModal('merge');
+        alert("Success: Master file created in VFS.");
+    }
+},
  
           outline: {
    scan() {
@@ -4303,9 +5068,10 @@ async boot() {
    await Nexus.vault.boot(); 
    await Nexus.snapshots.boot(); 
    await Nexus.settings.boot(); 
-   
+   Nexus.DpadEngine.init();
    Nexus.omni.init();
-   
+   Nexus.CR.init();
+   Nexus.Terminal.init();
    // Check if element exists before updating preview
    if (document.getElementById('dreamer-type')) {
        Nexus.dreamer.updatePreview(); 
@@ -4639,7 +5405,15 @@ async boot() {
                'redo': `<button class="sleek-btn" onclick="Nexus.history.redo()"><span style="font-size:18px;">↷</span><span class="util-lbl">Redo</span></button>`,
                'tab': `<button class="sleek-btn" onclick="Nexus.ui.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
               'fold': `<button class="sleek-btn" onclick="Nexus.ui.collapseAll()"><span style="font-size:18px;">≥≤</span><span class="util-lbl">Fold</span></button>`,
-               'unfold': `<button class="sleek-btn" onclick="Nexus.ui.expandAll()"><span style="font-size:18px;">≤≥</span><span class="util-lbl">Unfold</span></button>`
+               'unfold': `<button class="sleek-btn" onclick="Nexus.ui.expandAll()"><span style="font-size:18px;">≤≥</span><span class="util-lbl">Unfold</span></button>`,
+           'readonly': `<button class="sleek-btn" onclick="Nexus.ui.toggleEditMode()" title="Read Only">${Nexus.ICONS.readonly}️</button>`,
+           'intab': `<button class="sleek-btn" onclick="document.execCommand('insertText', false, '  ')" title="Insert Tab">⇥</button>`,
+           'outtab': `<button class="sleek-btn" onclick="document.execCommand('delete')" title="Remove Tab">⇤</button>`,
+           'select': `<button class="sleek-btn" id="util-select" onclick="Nexus.DpadEngine.selectLock = !Nexus.DpadEngine.selectLock; this.classList.toggle('active')" title="Select">⬚</button>`,
+           'copy': `<button class="sleek-btn" onclick="document.execCommand('copy')" title="Copy">©</button>`,
+           'cut': `<button class="sleek-btn" onclick="document.execCommand('cut')" title="Cut">✂</button>`,
+           'paste': `<button class="sleek-btn" onclick="navigator.clipboard.readText().then(t => document.execCommand('insertText', false, t))" title="Paste">📋</button>`,
+           'orient': `<button class="sleek-btn" onclick="Nexus.ui.toggleUtilOrientation()" title="Toggle Orientation">🔄</button>`,
            };
            
            const container = document.querySelector('#utility-bar .sleek-bar-content');
@@ -4649,6 +5423,12 @@ async boot() {
                    .map(k => tools[k])
                    .join('');
            }
+       },
+       toggleUtilOrientation() {
+       const current = Nexus.state.prefs.utilDock;
+       // Toggle between horizontal float and vertical dock
+       const next = current === 'float' ? 'dock-right' : 'float';
+       Nexus.settings.update('utilDock', next);
        },
        toggleWidgetDrop(e) {
        const menu = document.getElementById('widget-drop-menu');
@@ -4727,7 +5507,27 @@ async boot() {
            alert("Prettier Error:\n" + e.message); 
        }
    },
+  checkBrackets() {
+  if(!Nexus.state.activeFile) return;
+  const code = Nexus.state.vfs[Nexus.state.activeFile];
+  const result = Nexus.BracketCartographer.mapStructure(code);
+  const out = document.getElementById('diag-out');
   
+  let html = `<div style="color:var(--accent); margin-bottom:5px; font-weight:bold;">BRACKET SCANNER</div>`;
+  if (result.errors.length === 0) {
+  html += `<div style="color:var(--success);">✅ All structure brackets match.</div>`;
+  } else {
+  html += `<div style="color:var(--danger);">❌ ${result.errors.length} Unmatched Brackets:</div>`;
+  result.errors.forEach(e => {
+  html += `<div style="font-size:11px; margin-top:4px; border-left:2px solid var(--danger); padding-left:8px;">Ln ${e.line + 1}, Col ${e.col}: <b>${e.char}</b></div>`;
+  });
+  }
+  out.innerHTML = html;
+  },
+  runDiff(target) {
+  if(!target) return;
+  Nexus.DiffEngine.generateDiff(Nexus.state.vfs[Nexus.state.activeFile] || "", Nexus.state.vfs[target] || "");
+  },
    runJSBeautify() {
        if(!Nexus.state.activeFile) return;
        const ed = document.getElementById('raw-terminal');
@@ -4896,6 +5696,13 @@ initInfiniteRibbon() {
            if (id === 'dreamer') Nexus.dreamer.updatePreview(); 
            if (id === 'graph') Nexus.graph.render(); 
            if (id === 'settings') Nexus.settings.calcStorage(); 
+           if (id === 'diff') {
+           const sel = document.getElementById('diff-file-selector');
+           sel.innerHTML = `<option value="">Compare ${Nexus.state.activeFile} with...</option>` + 
+           Object.keys(Nexus.state.vfs).filter(f => f !== Nexus.state.activeFile).map(f => `<option value="${f}">${f}</option>`).join('');
+           document.getElementById('diff-content-left').innerHTML = '';
+           document.getElementById('diff-content-right').innerHTML = '';
+           };
            if (id === 'combine') {
                const list = document.getElementById('combine-list');
                list.innerHTML = Object.keys(Nexus.state.vfs).map(f => `
@@ -4950,7 +5757,24 @@ initInfiniteRibbon() {
            }
            gutter.scrollTop = ed.scrollTop;
        },
-
+// Inside your gutter click handler
+onGutterClick(lineNumber) {
+    // 1. Auto-turn on Select Mode
+    Nexus.DpadEngine.selectLock = true;
+    document.getElementById('ribbon-select-btn').classList.add('active');
+    document.getElementById('util-select').classList.add('active');
+    
+    // 2. Select the whole line
+    const lines = editor.value.split('\n');
+    let startPos = 0;
+    for(let i = 0; i < lineNumber - 1; i++) {
+        startPos += lines[i].length + 1; // +1 for the newline
+    }
+    const endPos = startPos + lines[lineNumber - 1].length;
+    
+    editor.setSelectionRange(startPos, endPos);
+    editor.focus();
+},
     runSandbox() { 
    const f = document.getElementById('sandbox-frame');
    const c = document.getElementById('ghost-console'); 
@@ -5052,7 +5876,33 @@ initInfiniteRibbon() {
                status.innerText = "FAULT"; 
            } 
        },
-
+toggleDrawer(id) {
+    // Close other drawers automatically so they don't overlap
+    document.querySelectorAll('.transform-drawer').forEach(el => {
+        if (el.id !== id) el.classList.remove('open');
+    });
+    document.getElementById(id).classList.toggle('open');
+},
+toggleRibbonDpad() {
+    const specialKeys = document.getElementById('special-keys-scroll');
+    const dpadArrows = document.getElementById('dpad-container');
+    const btn = document.getElementById('ribbon-dpad-toggle');
+    
+    if (dpadArrows.style.display === 'none') {
+        specialKeys.style.display = 'none';
+        dpadArrows.style.display = 'flex';
+        btn.classList.add('active');
+        // Initialize the fast-hold listeners if not already done
+        if(!this.dpadInitialized) {
+            Nexus.DpadEngine.setupFastHold();
+            this.dpadInitialized = true;
+        }
+    } else {
+        specialKeys.style.display = 'flex';
+        dpadArrows.style.display = 'none';
+        btn.classList.remove('active');
+    }
+},
              nuke() { 
            if (confirm("☢ FACTORY RESET: All files and settings will be permanently erased. Proceed?")) { 
                localforage.clear().then(() => {
@@ -5064,11 +5914,55 @@ initInfiniteRibbon() {
 }; // Closes the "window.Nexus" object literal
 
 /* --- GLOBAL LISTENERS & ENGINE HOOKS --- */
+
 const editor = document.getElementById('raw-terminal');
 const gutter = document.getElementById('gutter');
 let saveDelayTimer = null;
 let visualResetTimer = null; // New timer to prevent race conditions
+let editorTouchStart = 0;
+let longPressTimer;
 
+editor.addEventListener('touchstart', (e) => {
+    // Give the browser a split second to update cursor position from the touch
+    setTimeout(() => {
+        editorTouchStart = editor.selectionStart;
+        
+        longPressTimer = setTimeout(() => {
+            // Long press detected (600ms)
+            Nexus.TextSelectionEngine.expandSelectionFrom(editorTouchStart);
+        }, 600);
+    }, 50);
+});
+
+editor.addEventListener('touchend', () => clearTimeout(longPressTimer));
+editor.addEventListener('touchmove', () => clearTimeout(longPressTimer));
+
+// The Engine logic
+Nexus.TextSelectionEngine = {
+    expandSelectionFrom(pos) {
+        const text = editor.value;
+        
+        // 1. Auto-turn on Select Mode
+        Nexus.DpadEngine.selectLock = true;
+        document.getElementById('ribbon-select-btn').classList.add('active');
+        
+        // 2. Use BracketCartographer (or simple regex) to find boundaries
+        // Let's assume we are selecting between nearest curly braces or tags
+        let start = pos;
+        let end = pos;
+        
+        // Walk backwards to find opening { or <
+        while(start > 0 && !/[{<]/.test(text[start])) { start--; }
+        
+        // Walk forwards to find closing } or >
+        while(end < text.length && !/[}>]/.test(text[end])) { end++; }
+        
+        if (start >= 0 && end < text.length) {
+            editor.setSelectionRange(start, end + 1);
+            navigator.vibrate(50); // Haptic feedback on successful long-press
+        }
+    }
+};
 // Gutter Logic
 editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
 
@@ -5115,6 +6009,115 @@ editor.onkeydown = (e) => {
        Nexus.state.vfs[Nexus.state.activeFile] = editor.value;
        Nexus.ui.updateGutter();
    } 
+};
+const backdrop = document.getElementById('highlight-backdrop');
+
+// Sync scroll exactly
+editor.addEventListener('scroll', () => {
+    if (backdrop) backdrop.scrollTop = editor.scrollTop;
+});
+
+// The Highlight Engine
+document.addEventListener('selectionchange', () => {
+    if(document.activeElement !== editor || !backdrop) return;
+    
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const len = end - start;
+    
+    // Only trigger if selecting a word (2 to 50 chars)
+    if (len > 1 && len < 50) {
+        const word = editor.value.substring(start, end);
+        
+        // Ensure it's alphanumeric (no weird space highlighting)
+        if (/^\w+$/.test(word)) { 
+            const safeWord = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\b${safeWord}\\b`, 'g');
+            
+            // Escape HTML in the terminal to match rendering
+            const escapedText = editor.value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            backdrop.innerHTML = escapedText.replace(regex, `<mark>${word}</mark>`);
+            backdrop.scrollTop = editor.scrollTop; // Force scroll sync
+            return;
+        }
+    }
+    
+    // Clear highlights if no word selected
+    if (backdrop.innerHTML !== '') backdrop.innerHTML = '';
+});
+// Initialize namespace hooks if not present
+if (!window.Nexus) window.Nexus = {};
+Nexus.actions = Nexus.actions || {};
+
+// High-Efficiency Character Insertion (Dual-Engine Compatible)
+Nexus.actions.insertText = (text) => {
+    if (!Nexus.state.activeFile) return;
+
+    // --- CM6 ENGINE ROUTING ---
+    if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+        const view = Nexus.editorCore.view;
+        const mainSel = view.state.selection.main;
+        view.dispatch({
+            changes: { from: mainSel.from, to: mainSel.to, insert: text },
+            selection: { anchor: mainSel.from + text.length },
+            scrollIntoView: true
+        });
+        view.focus();
+        return;
+    }
+
+    // --- VANILLA TEXTAREA ROUTING ---
+    const ed = document.getElementById('raw-terminal');
+    if (!ed || ed.hasAttribute('readonly')) return;
+
+    const start = ed.selectionStart;
+    const end = ed.selectionEnd;
+    const value = ed.value;
+
+    ed.value = value.substring(0, start) + text + value.substring(end);
+    ed.selectionStart = ed.selectionEnd = start + text.length;
+    
+    // Sync to Virtual File System
+    if (Nexus.state && Nexus.state.vfs) {
+        Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+    }
+    
+    ed.focus();
+    if (typeof updateCursorPos === 'function') updateCursorPos();
+};
+
+// Tooldeck D-Pad Cursor Adjustments
+Nexus.actions.moveCursor = (direction) => {
+    // --- CM6 ENGINE ROUTING ---
+    if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+        const view = Nexus.editorCore.view;
+        // Uses built-in commands or shifts index relative to character paths
+        if (direction === 'Left')  view.dispatch({ selection: { anchor: Math.max(0, view.state.selection.main.head - 1) } });
+        if (direction === 'Right') view.dispatch({ selection: { anchor: Math.min(view.state.doc.length, view.state.selection.main.head + 1) } });
+        if (direction === 'Up' && typeof Nexus.actions.jumpRelative === 'function') Nexus.actions.jumpRelative(-1);
+        if (direction === 'Down' && typeof Nexus.actions.jumpRelative === 'function') Nexus.actions.jumpRelative(1);
+        view.focus();
+        return;
+    }
+
+    // --- VANILLA TEXTAREA ROUTING ---
+    const ed = document.getElementById('raw-terminal');
+    if (!ed) return;
+
+    let pos = ed.selectionStart;
+    if (direction === 'Left' && pos > 0) {
+        ed.selectionStart = ed.selectionEnd = pos - 1;
+    } else if (direction === 'Right' && pos < ed.value.length) {
+        ed.selectionStart = ed.selectionEnd = pos + 1;
+    } else if (direction === 'Up' && typeof Nexus.actions.jumpRelative === 'function') {
+        Nexus.actions.jumpRelative(-1); // Reuses your robust custom line jumper math
+    } else if (direction === 'Down' && typeof Nexus.actions.jumpRelative === 'function') {
+        Nexus.actions.jumpRelative(1);
+    }
+    
+    ed.focus();
+    if (typeof updateCursorPos === 'function') updateCursorPos();
 };
 
 const updateCursorPos = () => {
