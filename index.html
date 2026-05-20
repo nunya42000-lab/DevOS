@@ -1347,10 +1347,6 @@
         </div>
     </div>
 
-<div class="transform-handle-zone">
-    <div class="transform-handle" onclick="Nexus.ui.toggleDrawer('search-drawer')">🔍</div>
-    <div class="transform-handle" onclick="Nexus.ui.toggleDrawer('writer-drawer')">✍️</div>
-</div>
 
 <div id="search-drawer" class="transform-drawer" style="width: 280px;">
     <div style="display:flex; flex-direction:column; gap:6px;">
@@ -2020,15 +2016,15 @@
         
         <div class="dock-divider"></div>
         
-        <div class="dock-group key-group">
-            <button class="dock-btn special" onclick="Nexus.actions.insertText('\t')">TAB</button>
-            <button class="dock-btn" onclick="Nexus.actions.insertText('<')">&lt;</button>
-            <button class="dock-btn" onclick="Nexus.actions.insertText('>')">&gt;</button>
-            <button class="dock-btn" onclick="Nexus.actions.insertText('/')">/</button>
-            <button class="dock-btn" onclick="Nexus.actions.insertText('&quot;')">"</button>
-            <button class="dock-btn" onclick="Nexus.actions.insertText(';')">;</button>
-        </div>
+<div id="ribbon-drawer-controls" style="display: flex; gap: 6px; padding-left: 4px; padding-right: 6px; align-items: center;">
+    <button class="sleek-btn" onclick="Nexus.ui.toggleDrawer('search-drawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);">🔍</button>
+    <button class="sleek-btn" onclick="Nexus.ui.toggleDrawer('writer-drawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);">✍️</button>
+</div>
     </div>
+
+
+
+
 
     <!-- 3. Native Application Status Bar -->
     <div class="dock-status-bar">
