@@ -1295,7 +1295,7 @@
           <button class="tool-btn" onclick="Nexus.Terminal.toggle()">📟 TERMINAL</button>  
             <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('sandbox')">▶️</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSlide('shell')">⌨️</button>
-            <button class="tool-btn" onclick="Nexus.vfs.refreshCurrent()">♻️</button>
+            <button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()">♻️</button>
             <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️</button>
             <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢️</button>
             <button class="tool-btn" onclick="Nexus.ui.openModal('manual')">❓</button>
@@ -1409,12 +1409,12 @@
         <div class="p-head"><span>VORTEX EXPLORER</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('left')">&times;</button></div>
         <div class="p-body">
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
-                <button class="tool-btn btn-accent" onclick="Nexus.vfs.newFile()">+ NEW FILE</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.Vfs.newFile()">+ NEW FILE</button>
                 <button class="tool-btn btn-gold" onclick="document.getElementById('load-trigger').click()">📂 LOAD</button>
                 <button class="tool-btn" style="background:#58a6ff; color:#000; border:none;" onclick="document.getElementById('zip-trigger').click()">📦 ZIP IN</button>
                 
-                <input type="file" id="load-trigger" multiple style="display:none;" onchange="Nexus.vfs.loadFiles(this.files)">
-                <input type="file" id="zip-trigger" accept=".zip" style="display:none;" onchange="Nexus.vfs.importZIP(this.files[0])">
+                <input type="file" id="load-trigger" multiple style="display:none;" onchange="Nexus.Vfs.loadFiles(this.files)">
+                <input type="file" id="zip-trigger" accept=".zip" style="display:none;" onchange="Nexus.Vfs.importZIP(this.files[0])">
             </div>
 
             <div class="section-label">Matrix Operations</div>
@@ -1423,12 +1423,12 @@
                 <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
                 <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('diff')">👯 COMPARE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE</button>
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.bundleToHTML()">⚡ BUNDLE</button>
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.vfs.mergeAllJS()">⚡ MERGE JS</button>
-                <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.vfs.splitJSFile()">✂️ SPLIT JS</button>
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.Vfs.bundleToHTML()">⚡ BUNDLE</button>
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
+                <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
             </div>
             
-            <button class="tool-btn btn-danger" style="width:100%; justify-content:center; margin-bottom: 25px;" onclick="Nexus.vfs.clearAll()">🗑️ CLEAR VORTEX</button>
+            <button class="tool-btn btn-danger" style="width:100%; justify-content:center; margin-bottom: 25px;" onclick="Nexus.Vfs.clearAll()">🗑️ CLEAR VORTEX</button>
             
             <div style="display:flex; justify-content:space-between; align-items:center; margin: 0 0 10px 0;">
                 <div class="section-label" style="margin:0;">Virtual File System</div>
@@ -1438,7 +1438,7 @@
             <div id="accordion-root"></div>
 
             <div class="section-label" style="margin-top:25px;">Project Export</div>
-            <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.vfs.exportToTXT()">📄 EXPORT TO TXT</button>
+            <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.Vfs.exportToTXT()">📄 EXPORT TO TXT</button>
             <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.ui.exportZIP()">📦 BUNDLE PROJECT (ZIP)</button>
         </div>
     </aside>
@@ -1650,8 +1650,8 @@
                     </ul>
                 </div>
 
-                <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER II: VORTEX FILE SYSTEM (VFS)</div>
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. VFS Explorer</div>
+                <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER II: VORTEX FILE SYSTEM (Vfs)</div>
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Vfs Explorer</div>
                 <div class="man-p">Files are stored in the <b>Sovereign Database (Dexie.js)</b>. They persist even if you close the browser. Open the 📁 <b>VORTEX</b> panel to manage sectors.</div>
 
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Matrix Build Operations</div>
@@ -1687,7 +1687,7 @@
                 <div class="man-p">A persistent snippet library. Highlighting code and selecting <b>+ GRAB</b> stores the logic in your Vault. Vault items are available across all files and sessions.</div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TIER V: CMD & SHELL</div>
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Native VFS Commands</div>
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Native Vfs Commands</div>
                 <div class="man-p">Type the following into the CMD slider for fast file manipulation:
                     <ul style="padding-left:20px; font-family:monospace; font-size:11px; margin-top:5px; background:var(--bg); padding:10px; border-radius:8px;">
                         <li><b>ls</b> - List all project sectors.</li>
@@ -1722,7 +1722,7 @@
                 <span style="font-size:11px; color:var(--text);">Select multiple files to merge. All project imports will be updated.</span>
                 <div id="combine-list" style="max-height: 200px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:10px; border-radius:8px; display:flex; flex-direction:column; gap:8px;"></div>
                 <input type="text" id="combine-name" class="sleek-input" placeholder="New Filename (e.g., bundle.js)" style="padding:15px; font-size:14px; background:var(--bg); border:1px solid var(--border);">
-                <button class="tool-btn btn-accent" style="padding:15px; width:100%; justify-content:center;" onclick="Nexus.vfs.combineFiles()">⚡ MERGE &amp; RE-ROUTE</button>
+                <button class="tool-btn btn-accent" style="padding:15px; width:100%; justify-content:center;" onclick="Nexus.Vfs.combineFiles()">⚡ MERGE &amp; RE-ROUTE</button>
             </div>
         </div>
     </div>
@@ -1929,7 +1929,7 @@
                 </div>
 
                 <div class="section-label">Vortex Storage Metrics</div>
-                <div class="item-row"><span>VFS Payload:</span> <span id="metric-vfs">0 KB</span></div>
+                <div class="item-row"><span>Vfs Payload:</span> <span id="metric-Vfs">0 KB</span></div>
                 <div class="item-row"><span>Vault Payload:</span> <span id="metric-vault">0 KB</span></div>
                 <div class="item-row"><span>Snapshots Active:</span> <span id="metric-snaps">0</span></div>
                 
@@ -2056,7 +2056,7 @@ window.Nexus = {
        activeFileName: "NONE",
        activeFile: "",
        isCM6: false,
-       vfs: {}, 
+       Vfs: {}, 
        history: { past: [], future: [], isLocked: false },
        originals: {}, 
        vault: [], 
@@ -2171,18 +2171,18 @@ ICONS: {
     return "Usage: b64 [enc/dec] [string]";
     }, "Base64 Encoder/Decoder");
     
-    // --- 3. VFS STORAGE AUDITOR ---
-    this.add('audit-vfs', () => {
-    let report = "VFS STORAGE AUDIT:\r\n";
+    // --- 3. Vfs STORAGE AUDITOR ---
+    this.add('audit-Vfs', () => {
+    let report = "Vfs STORAGE AUDIT:\r\n";
     let total = 0;
-    Object.keys(Nexus.state.vfs).forEach(file => {
-    const size = new Blob([Nexus.state.vfs[file]]).size;
+    Object.keys(Nexus.state.Vfs).forEach(file => {
+    const size = new Blob([Nexus.state.Vfs[file]]).size;
     total += size;
     report += `- ${file.padEnd(20)} | ${(size/1024).toFixed(2)} KB\r\n`;
     });
     report += `\r\nTOTAL VORTEX MASS: ${(total/1024).toFixed(2)} KB`;
     return report;
-    }, "Checks VFS memory limits.");
+    }, "Checks Vfs memory limits.");
     
     // --- 4. KEYSTROKE MACRO RECORDER ---
     this.add('macro', (args) => {
@@ -2532,7 +2532,7 @@ alert(`Fuzzy Audit Finished: Found ${reports.length} casing issues.`);
              // Skip if it's an exact authorized match
              if (word === core) return;
  
-             // Case A: Case-sensitivity collision (e.g., vfs vs Vfs)
+             // Case A: Case-sensitivity collision (e.g., Vfs vs Vfs)
              const isCaseCollision = word.toLowerCase() === core.toLowerCase();
              
              // Case B: Subtle typo mutation (Distance of 1 or 2 characters)
@@ -2708,22 +2708,22 @@ Vfs: {
     async boot() {
         try {
             // Migration-aware boot: Checks v42 primary, falls back to v41
-            let vfs = await localforage.getItem('Nexus.state.vfs_v42') || await localforage.getItem('Nexus.state.vfs_v41');
+            let Vfs = await localforage.getItem('Nexus.state.Vfs_v42') || await localforage.getItem('Nexus.state.Vfs_v41');
             let orig = await localforage.getItem('nexus_originals_v42') || await localforage.getItem('nexus_originals_v41');
             
-            if (vfs && Object.keys(vfs).length > 0) {
-                Nexus.state.vfs = vfs;
+            if (Vfs && Object.keys(Vfs).length > 0) {
+                Nexus.state.Vfs = Vfs;
                 Nexus.state.originals = orig || {};
             } else {
                 return this.setEmptyState();
             }
 
-            // Integrity Check: Ensure every VFS entry has a 'Sovereign Original' backup
-            Object.keys(Nexus.state.vfs).forEach(fn => { 
-                if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.vfs[fn]; 
+            // Integrity Check: Ensure every Vfs entry has a 'Sovereign Original' backup
+            Object.keys(Nexus.state.Vfs).forEach(fn => { 
+                if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.Vfs[fn]; 
             });
 
-            const files = Object.keys(Nexus.state.vfs);
+            const files = Object.keys(Nexus.state.Vfs);
             if (!Nexus.state.activeFile || !files.includes(Nexus.state.activeFile)) {
                 Nexus.state.activeFile = files[0];
             }
@@ -2738,7 +2738,7 @@ Vfs: {
 
     async save() {
         // Persist using v42 keys to maintain migration integrity
-        await localforage.setItem('Nexus.state.vfs_v42', Nexus.state.vfs);
+        await localforage.setItem('Nexus.state.Vfs_v42', Nexus.state.Vfs);
         await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
     },
 setEmptyState() {
@@ -2779,9 +2779,9 @@ setEmptyState() {
     newFile() {
         const name = prompt("Enter filename (e.g., index.html or script.js):");
         if (!name) return;
-        if (Nexus.state.vfs[name] !== undefined) return alert("CONFLICT: File already exists.");
+        if (Nexus.state.Vfs[name] !== undefined) return alert("CONFLICT: File already exists.");
 
-        Nexus.state.vfs[name] = ""; 
+        Nexus.state.Vfs[name] = ""; 
         Nexus.state.originals[name] = "";
         
         this.renderAccordion();
@@ -2797,10 +2797,10 @@ setEmptyState() {
     },
 
     switchFile(fn) {
-        if (!fn || (Nexus.state.vfs[fn] === undefined)) return;
+        if (!fn || (Nexus.state.Vfs[fn] === undefined)) return;
 
         Nexus.state.activeFile = fn;
-        const code = Nexus.state.vfs[fn];
+        const code = Nexus.state.Vfs[fn];
         const footFile = document.getElementById('foot-file');
         if (footFile) footFile.innerText = "FILE: " + fn.toUpperCase();
 
@@ -2830,11 +2830,11 @@ setEmptyState() {
 
     renameFile(oldName) {
         const newName = prompt("Rename file to:", oldName);
-        if (!newName || newName === oldName || Nexus.state.vfs[newName] !== undefined) return;
+        if (!newName || newName === oldName || Nexus.state.Vfs[newName] !== undefined) return;
         
-        Nexus.state.vfs[newName] = Nexus.state.vfs[oldName];
+        Nexus.state.Vfs[newName] = Nexus.state.Vfs[oldName];
         Nexus.state.originals[newName] = Nexus.state.originals[oldName];
-        delete Nexus.state.vfs[oldName];
+        delete Nexus.state.Vfs[oldName];
         delete Nexus.state.originals[oldName];
         
         if (Nexus.state.activeFile === oldName) Nexus.state.activeFile = newName;
@@ -2846,9 +2846,9 @@ setEmptyState() {
 
     deleteFile(fn) {
         if (confirm(`☢ Delete ${fn}?`)) { 
-            delete Nexus.state.vfs[fn]; 
+            delete Nexus.state.Vfs[fn]; 
             delete Nexus.state.originals[fn]; 
-            const remaining = Object.keys(Nexus.state.vfs);
+            const remaining = Object.keys(Nexus.state.Vfs);
             remaining.length > 0 ? this.switchFile(remaining[0]) : this.setEmptyState();
             this.save(); 
         }
@@ -2858,7 +2858,7 @@ setEmptyState() {
         const fn = Nexus.state.activeFile;
         if(!fn) return;
         if (confirm(`🔄 Restore ${fn} to original state?`)) { 
-            Nexus.state.vfs[fn] = Nexus.state.originals[fn]; 
+            Nexus.state.Vfs[fn] = Nexus.state.originals[fn]; 
             this.switchFile(fn); 
             this.save(); 
         }
@@ -2870,10 +2870,10 @@ renderAccordion() {
     const root = document.getElementById('file-accordion');
     if (!root) return; // Exit gracefully if the DOM frame isn't painted yet
 
-    // 2. Build the groups dictionary dynamically from Nexus.state.vfs
+    // 2. Build the groups dictionary dynamically from Nexus.state.Vfs
     const groups = {};
-    if (Nexus.state && Nexus.state.vfs) {
-        Object.keys(Nexus.state.vfs).forEach(fn => {
+    if (Nexus.state && Nexus.state.Vfs) {
+        Object.keys(Nexus.state.Vfs).forEach(fn => {
             // Extract the extension (e.g., 'script.js' -> 'js', default to 'raw' if no extension)
             const parts = fn.split('.');
             const ext = parts.length > 1 ? parts.pop().toLowerCase() : 'raw';
@@ -2895,7 +2895,7 @@ renderAccordion() {
 
         files.forEach(fn => {
             const activeClass = (fn === Nexus.state.activeFile) ? 'active-file' : '';
-            // Fixed lowercase 'vfs' references to uppercase 'Vfs' to match core architecture
+            // Fixed lowercase 'Vfs' references to uppercase 'Vfs' to match core architecture
             htmlOut += '        <div class="item-row ' + activeClass + '" onclick="Nexus.Vfs.switchFile(\'' + fn + '\')">';
             htmlOut += '            <span>' + fn + '</span>';
             htmlOut += '            <div style="display:flex; align-items:center; gap:12px;">';
@@ -2909,7 +2909,7 @@ renderAccordion() {
         htmlOut += '</div>';
     });
 
-    // Fallback display if the VFS is perfectly fresh and empty
+    // Fallback display if the Vfs is perfectly fresh and empty
     if (htmlOut === "") {
         htmlOut = '<div style="padding:16px; text-align:center; color:var(--danger); font-size:13px; letter-spacing:1px;">WORKSPACE VACANT</div>';
     }
@@ -2928,7 +2928,7 @@ loadFiles(fileList) {
     Array.from(fileList).forEach(file => {
         const r = new FileReader();
         r.onload = (e) => { 
-            Nexus.state.vfs[file.name] = e.target.result; 
+            Nexus.state.Vfs[file.name] = e.target.result; 
             Nexus.state.originals[file.name] = e.target.result; 
             this.renderAccordion(); 
             if (!Nexus.state.activeFile) this.switchFile(file.name);
@@ -2949,7 +2949,7 @@ async importZIP(file) {
                 const content = await entry.async("string");
                 const fn = relativePath.split('/').pop(); 
                 if (fn && !fn.startsWith(".")) {
-                    Nexus.state.vfs[fn] = content;
+                    Nexus.state.Vfs[fn] = content;
                     Nexus.state.originals[fn] = content;
                     imported++;
                 }
@@ -2967,14 +2967,14 @@ async importZIP(file) {
 exportToTXT() {
     let b = "/* NEXUS FLAT BUNDLE | GENERATED: " + new Date().toLocaleString() + " */\n";
     
-    Object.entries(Nexus.state.vfs).forEach(([fn, content]) => {
+    Object.entries(Nexus.state.Vfs).forEach(([fn, content]) => {
         b += "\n/* FILE: " + fn + " */\n" + content + "\n";
     });
     
     const blob = new Blob([b], { type: "text/plain;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = "Nexus_VFS_Backup.txt";
+    a.download = "Nexus_Vfs_Backup.txt";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -2986,9 +2986,9 @@ combineFiles() {
     if(selected.length < 2 || !newName) return alert("Select 2+ files and provide a name.");
     
     let combinedCode = "// Combined Matrix: " + selected.join(', ') + "\n\n";
-    selected.forEach(f => { combinedCode += "// --- " + f + " ---\n" + (Nexus.state.vfs[f] || '') + "\n\n"; });
+    selected.forEach(f => { combinedCode += "// --- " + f + " ---\n" + (Nexus.state.Vfs[f] || '') + "\n\n"; });
 
-    Nexus.state.vfs[newName] = combinedCode;
+    Nexus.state.Vfs[newName] = combinedCode;
     Nexus.state.originals[newName] = combinedCode;
     
     const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -2999,15 +2999,15 @@ combineFiles() {
         new RegExp("(href=['\"])(\\.\\/)?(?:" + escapedNames + ")(['\"])", 'g')
     ];
 
-    Object.keys(Nexus.state.vfs).forEach(file => {
+    Object.keys(Nexus.state.Vfs).forEach(file => {
         if (selected.includes(file)) return; 
-        let code = Nexus.state.vfs[file];
+        let code = Nexus.state.Vfs[file];
         let changed = false;
         regexes.forEach(rx => { if (rx.test(code)) { changed = true; code = code.replace(rx, "$1$2" + newName + "$3"); } });
-        if(changed) { Nexus.state.vfs[file] = code; Nexus.state.originals[file] = code; }
+        if(changed) { Nexus.state.Vfs[file] = code; Nexus.state.originals[file] = code; }
     });
     
-    selected.forEach(f => { if(f !== newName) { delete Nexus.state.vfs[f]; delete Nexus.state.originals[f]; } });
+    selected.forEach(f => { if(f !== newName) { delete Nexus.state.Vfs[f]; delete Nexus.state.originals[f]; } });
     this.save();
     this.renderAccordion();
     this.switchFile(newName);
@@ -3063,7 +3063,7 @@ undo() {
     const prev = historyState.past.pop();
     ed.value = prev;
 
-    Nexus.state.vfs[Nexus.state.activeFile] = prev;
+    Nexus.state.Vfs[Nexus.state.activeFile] = prev;
     Nexus.ui.updateGutter();
     historyState.isLocked = false;
 },
@@ -3084,7 +3084,7 @@ redo() {
     const next = historyState.future.pop();
     ed.value = next;
 
-    Nexus.state.vfs[Nexus.state.activeFile] = next;
+    Nexus.state.Vfs[Nexus.state.activeFile] = next;
     Nexus.ui.updateGutter();
     historyState.isLocked = false;
 }
@@ -3273,14 +3273,14 @@ clones: {
     lastResults: [],
 
     async scan() {
-        const vfs = Nexus.state?.vfs || {};
+        const Vfs = Nexus.state?.Vfs || {};
         const cache = {}; 
         const signatureMap = new Map(); 
         const redundancies = [];
 
         Nexus.shell.out("Echo Sentinel: Analyzing structural overlaps...", "accent");
 
-        Object.entries(vfs).forEach(([file, code]) => {
+        Object.entries(Vfs).forEach(([file, code]) => {
             cache[file] = code.split('\n');
             cache[file].forEach((raw, idx) => {
                 const clean = raw.trim();
@@ -3456,7 +3456,7 @@ Sentinel : {
        this.initEngine(); // Lazy-load Acorn engine
 
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-       let code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+       let code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
        let pre = "", post = "", isHtml = false;
 
        // Isolate JS inside HTML if necessary
@@ -3519,7 +3519,7 @@ Sentinel : {
        const issue = this.lastIssues[idx];
        if (!issue || !issue.mutate) return;
 
-       this.mutateActiveVFS((code) => {
+       this.mutateActiveVfs((code) => {
            const { ast } = this.engine.analyzeAndMutate(code, 'LINT');
            this.engine.traverse(ast, (node) => {
                if (node.type === issue.nodeType && node.start === issue.range[0] && node.end === issue.range[1]) {
@@ -3533,7 +3533,7 @@ Sentinel : {
    },
 
    applyAllFixes() {
-       this.mutateActiveVFS((code) => {
+       this.mutateActiveVfs((code) => {
            const { ast } = this.engine.analyzeAndMutate(code, 'LINT');
            this.engine.traverse(ast, (node) => {
                this.lastIssues.forEach(issue => {
@@ -3550,9 +3550,9 @@ Sentinel : {
    },
 
    // 5. HELPER: The Sovereign Mutation Pipeline
-   mutateActiveVFS(mutationFn) {
+   mutateActiveVfs(mutationFn) {
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-       let fullCode = Nexus.state.vfs[Nexus.state.activeFile];
+       let fullCode = Nexus.state.Vfs[Nexus.state.activeFile];
        let targetCode = fullCode;
        let pre = "", post = "";
 
@@ -3577,8 +3577,8 @@ Sentinel : {
            document.getElementById('raw-terminal').value = finalCode;
        }
 
-       Nexus.state.vfs[Nexus.state.activeFile] = finalCode;
-       Nexus.vfs.save();
+       Nexus.state.Vfs[Nexus.state.activeFile] = finalCode;
+       Nexus.Vfs.save();
        Nexus.ui.updateGutter();
    },
    
@@ -3821,9 +3821,9 @@ Sentinel : {
            code = code.replace(/\n*$/, '\n');
            
            ed.value = code;
-           Nexus.state.vfs[Nexus.state.activeFile] = code;
+           Nexus.state.Vfs[Nexus.state.activeFile] = code;
            Nexus.ui.updateGutter();
-           Nexus.vfs.save();
+           Nexus.Vfs.save();
            
            this.log("[MEDIC STRING] Deep string scrub complete. Whitespace optimized.", "success"); 
        },
@@ -3847,9 +3847,9 @@ Sentinel : {
                const rebuiltCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
                
                ed.value = rebuiltCode;
-               Nexus.state.vfs[Nexus.state.activeFile] = rebuiltCode;
+               Nexus.state.Vfs[Nexus.state.activeFile] = rebuiltCode;
                Nexus.ui.updateGutter();
-               Nexus.vfs.save();
+               Nexus.Vfs.save();
                
                this.log(`[MEDIC AST] Matrix reconstructed. Applied ${issues.length} structural mutation(s).`, "success");
            } catch(e) {
@@ -3860,7 +3860,7 @@ Sentinel : {
        
        scanDeps() { 
            if(!Nexus.state.activeFile) return; 
-           const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+           const code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
            const deps = code.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g);
            
            if (!deps || deps.length === 0) {
@@ -3906,7 +3906,7 @@ Sentinel : {
 intel: {
    scan() {
        if(!Nexus.state.activeFile) return alert("No active file to scan.");
-       const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+       const code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
        
        const loc = code.split('\n').length;
@@ -4072,16 +4072,16 @@ compressor: {
                else if (level === 'nuclear') compressed = astring.generate(ast, { indent: '', lineEnd: '' });
            }
 
-           // 2. Sync UI and VFS
+           // 2. Sync UI and Vfs
            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
                Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: compressed } });
            } else {
                ed.value = compressed;
            }
            
-           Nexus.state.vfs[Nexus.state.activeFile] = compressed;
+           Nexus.state.Vfs[Nexus.state.activeFile] = compressed;
            Nexus.ui.updateGutter();
-           Nexus.vfs.save();
+           Nexus.Vfs.save();
            Nexus.ui.closeModal('compressor');
            
            const st = document.getElementById('foot-status');
@@ -4100,7 +4100,7 @@ compressor: {
            const cmContainer = document.getElementById('cm6-container');
            
            if (!Nexus.state.activeFile) return alert("VORTEX EMPTY: Load a file first.");
-           const currentCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
+           const currentCode = Nexus.state.Vfs[Nexus.state.activeFile] || "";
 
            if (Nexus.editorCore.isCM6) {
                // --- BACK TO VANILLA ---
@@ -4182,8 +4182,8 @@ try {
        fixedHeight,
        EditorView.updateListener.of((update) => {
            if (update.docChanged && update.userEvent) { 
-               Nexus.state.vfs[Nexus.state.activeFile] = update.state.doc.toString();
-               Nexus.vfs.save();
+               Nexus.state.Vfs[Nexus.state.activeFile] = update.state.doc.toString();
+               Nexus.Vfs.save();
            }
            if (update.selectionSet) {
                const pos = update.state.selection.main.head;
@@ -4269,10 +4269,10 @@ try {
            if (!newName) return;
 
            let filesModified = 0;
-           const files = Object.keys(Nexus.state.vfs);
+           const files = Object.keys(Nexus.state.Vfs);
 
            files.forEach(filename => {
-               let code = Nexus.state.vfs[filename];
+               let code = Nexus.state.Vfs[filename];
                if (!filename.endsWith('.js')) return;
 
                try {
@@ -4289,7 +4289,7 @@ try {
 
                    if (changed) {
                        const newCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
-                       Nexus.state.vfs[filename] = newCode;
+                       Nexus.state.Vfs[filename] = newCode;
                        Nexus.state.originals[filename] = newCode;
                        filesModified++;
                    }
@@ -4297,8 +4297,8 @@ try {
            });
 
            if (filesModified > 0) {
-               Nexus.vfs.switchFile(Nexus.state.activeFile);
-               Nexus.vfs.save();
+               Nexus.Vfs.switchFile(Nexus.state.activeFile);
+               Nexus.Vfs.save();
                alert(`SUCCESS: Refactored '${oldName}' -> '${newName}' across ${filesModified} sectors.`);
            }
        }
@@ -4384,8 +4384,8 @@ URL.revokeObjectURL(workerUrl);
                const q = query.toLowerCase();
                const matches = [];
                
-               Object.keys(Nexus.state.vfs).forEach(file => {
-                   const content = Nexus.state.vfs[file] || "";
+               Object.keys(Nexus.state.Vfs).forEach(file => {
+                   const content = Nexus.state.Vfs[file] || "";
                    const lines = content.split('\n');
                    
                    lines.forEach((lineText, index) => {
@@ -4406,7 +4406,7 @@ URL.revokeObjectURL(workerUrl);
                
                res.innerHTML = matches.map(m => `
                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; margin-bottom:5px; display:flex; flex-direction:column; align-items:flex-start;" 
-                        onclick="Nexus.vfs.switchFile('${m.file}'); setTimeout(() => Nexus.ui.jumpPrompt(${m.line}), 100); Nexus.ui.closeModal('spotlight');">
+                        onclick="Nexus.Vfs.switchFile('${m.file}'); setTimeout(() => Nexus.ui.jumpPrompt(${m.line}), 100); Nexus.ui.closeModal('spotlight');">
                        <div style="display:flex; justify-content:space-between; width:100%;">
                            <span style="font-family:monospace; font-size:13px; color:var(--gold); font-weight:bold;">${m.file}</span>
                            <span style="font-size:11px; color:var(--accent);">Line ${m.line}</span>
@@ -4491,7 +4491,7 @@ inject() {
            Nexus.Sentinel.log("[DREAMER] Initiating Background Stress Test...", "accent");
            const testPromises = [];
            
-           for (const [filename, code] of Object.entries(Nexus.state.vfs)) {
+           for (const [filename, code] of Object.entries(Nexus.state.Vfs)) {
                if (!filename.endsWith('.js')) continue;
                try {
                    const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
@@ -4613,12 +4613,12 @@ inject() {
            const sw = "self.addEventListener('fetch', (e) => { e.respondWith(fetch(e.request).catch(() => new Response('Offline'))); });";
            const inject = `\n<link rel="manifest" href="${mURI}">\n<meta name="theme-color" content="${color}">\n<script>\nif ('serviceWorker' in navigator) { window.addEventListener('load', () => {\n  const blob = new Blob([\`${sw}\`], { type: 'application/javascript' });\n  navigator.serviceWorker.register(URL.createObjectURL(blob));\n}); }\n<\/script>\n`;
            
-           let code = Nexus.state.vfs[Nexus.state.activeFile];
+           let code = Nexus.state.Vfs[Nexus.state.activeFile];
            code = code.includes('</head>') ? code.replace('</head>', inject + '</head>') : inject + code;
            
-           Nexus.state.vfs[Nexus.state.activeFile] = code; 
-           Nexus.vfs.save(); 
-           Nexus.vfs.switchFile(Nexus.state.activeFile); 
+           Nexus.state.Vfs[Nexus.state.activeFile] = code; 
+           Nexus.Vfs.save(); 
+           Nexus.Vfs.switchFile(Nexus.state.activeFile); 
            alert("FORGED.");
        }
    },
@@ -4644,7 +4644,7 @@ inject() {
        runJS() {
            if (!Nexus.state.activeFile.endsWith('.js')) return alert("Select .js file.");
            try {
-               const ast = acorn.parse(Nexus.state.vfs[Nexus.state.activeFile], { ecmaVersion: 2022, sourceType: 'module' });
+               const ast = acorn.parse(Nexus.state.Vfs[Nexus.state.activeFile], { ecmaVersion: 2022, sourceType: 'module' });
                const b = { imp: [], var: [], cls: [], fun: [], exe: [] };
                ast.body.forEach(n => {
                    if (n.type === 'ImportDeclaration') b.imp.push(n);
@@ -4654,18 +4654,18 @@ inject() {
                    else b.exe.push(n);
                });
                ast.body = [...b.imp, ...b.var, ...b.cls, ...b.fun, ...b.exe];
-               Nexus.state.vfs[Nexus.state.activeFile] = js_beautify(astring.generate(ast), { indent_size: Nexus.state.prefs.tabWidth });
-               Nexus.vfs.save(); 
-               Nexus.vfs.switchFile(Nexus.state.activeFile);
+               Nexus.state.Vfs[Nexus.state.activeFile] = js_beautify(astring.generate(ast), { indent_size: Nexus.state.prefs.tabWidth });
+               Nexus.Vfs.save(); 
+               Nexus.Vfs.switchFile(Nexus.state.activeFile);
            } catch (e) { alert("AST Syntax Fault: " + e.message); }
        },
        sequenceHTML() {
-           const doc = new DOMParser().parseFromString(Nexus.state.vfs[Nexus.state.activeFile], 'text/html');
+           const doc = new DOMParser().parseFromString(Nexus.state.Vfs[Nexus.state.activeFile], 'text/html');
            doc.querySelectorAll('style').forEach(s => doc.head.appendChild(s));
            doc.querySelectorAll('script').forEach(s => doc.body.appendChild(s));
-           Nexus.state.vfs[Nexus.state.activeFile] = html_beautify(doc.documentElement.outerHTML, { indent_size: Nexus.state.prefs.tabWidth });
-           Nexus.vfs.save(); 
-           Nexus.vfs.switchFile(Nexus.state.activeFile);
+           Nexus.state.Vfs[Nexus.state.activeFile] = html_beautify(doc.documentElement.outerHTML, { indent_size: Nexus.state.prefs.tabWidth });
+           Nexus.Vfs.save(); 
+           Nexus.Vfs.switchFile(Nexus.state.activeFile);
        }
    },
    vault: {
@@ -4719,8 +4719,8 @@ grab() {
            if (ed.hasAttribute('readonly')) return alert("LOCKED"); 
            const pos = ed.selectionStart; 
            ed.value = ed.value.substring(0, pos) + Nexus.state.vault[i].code + ed.value.substring(ed.selectionEnd); 
-           Nexus.state.vfs[Nexus.state.activeFile] = ed.value; 
-           Nexus.vfs.save(); 
+           Nexus.state.Vfs[Nexus.state.activeFile] = ed.value; 
+           Nexus.Vfs.save(); 
            Nexus.ui.closeModal('vault'); 
        },
        cutFile() {
@@ -4730,8 +4730,8 @@ grab() {
            if (confirm(`✂ Strip all code from ${Nexus.state.activeFile} and archive to Vault?`)) { 
                Nexus.state.vault.push({ name: Nexus.state.activeFile + ' (Cut)', code: ed.value });
                ed.value = "";
-               Nexus.state.vfs[Nexus.state.activeFile] = "";
-               Nexus.vfs.save(); this.save(); this.render();
+               Nexus.state.Vfs[Nexus.state.activeFile] = "";
+               Nexus.Vfs.save(); this.save(); this.render();
            } 
        },
        copyFile() { 
@@ -4769,7 +4769,7 @@ grab() {
        create() { 
            Nexus.state.snapshots.push({ 
                time: new Date().toLocaleTimeString(), 
-               data: JSON.parse(JSON.stringify(Nexus.state.vfs)) 
+               data: JSON.parse(JSON.stringify(Nexus.state.Vfs)) 
            }); 
            if (Nexus.state.snapshots.length > 10) Nexus.state.snapshots.shift(); 
            this.save(); this.render(); 
@@ -4792,8 +4792,8 @@ merge: {
     finalCode: [],
     
     open() {
-        // Populate selectors with all VFS files
-        const files = Object.keys(Nexus.state.vfs);
+        // Populate selectors with all Vfs files
+        const files = Object.keys(Nexus.state.Vfs);
         const lSel = document.getElementById('merge-left-sel');
         const rSel = document.getElementById('merge-right-sel');
         
@@ -4808,8 +4808,8 @@ merge: {
         const leftFile = document.getElementById('merge-left-sel').value;
         const rightFile = document.getElementById('merge-right-sel').value;
         
-        const leftText = Nexus.state.vfs[leftFile];
-        const rightText = Nexus.state.vfs[rightFile];
+        const leftText = Nexus.state.Vfs[leftFile];
+        const rightText = Nexus.state.Vfs[rightFile];
         
         // Generate line-by-line diff using jsdiff
         this.hunks = Diff.diffLines(leftText, rightText);
@@ -4858,18 +4858,18 @@ merge: {
         const mergedName = prompt("Merge complete. Save as:", "merged_result.js");
         if (!mergedName) return;
         
-        Nexus.state.vfs[mergedName] = this.finalCode.join('');
-        Nexus.vfs.save();
-        Nexus.vfs.renderAccordion();
+        Nexus.state.Vfs[mergedName] = this.finalCode.join('');
+        Nexus.Vfs.save();
+        Nexus.Vfs.renderAccordion();
         Nexus.ui.closeModal('merge');
-        alert("Success: Master file created in VFS.");
+        alert("Success: Master file created in Vfs.");
     }
 },
  
           outline: {
    scan() {
        if (!Nexus.state.activeFile) return alert("No active file.");
-       const code = Nexus.state.vfs[Nexus.state.activeFile] || "";
+       const code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
        let out = [];
 
@@ -4950,7 +4950,7 @@ merge: {
              
 graph: {
    analyze() {
-       const files = Object.keys(Nexus.state.vfs);
+       const files = Object.keys(Nexus.state.Vfs);
        const deps = {};
        const incoming = {};
        files.forEach(f => { deps[f] = []; incoming[f] = 0; });
@@ -4968,7 +4968,7 @@ graph: {
        };
 
        files.forEach(file => {
-           const code = Nexus.state.vfs[file] || "";
+           const code = Nexus.state.Vfs[file] || "";
            let matches = [];
            let m;
 
@@ -5012,7 +5012,7 @@ graph: {
            }
            visited.add(node);
            
-           let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.vfs.switchFile('${node}'); Nexus.ui.closeModal('graph');">${node}</span></div>`;
+           let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.Vfs.switchFile('${node}'); Nexus.ui.closeModal('graph');">${node}</span></div>`;
            
            const children = deps[node] || [];
            for (let i = 0; i < children.length; i++) {
@@ -5037,14 +5037,14 @@ graph: {
 
        // 2. RENDER THE ACTIVE TREE
        if (rootNode) {
-           html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.vfs.switchFile('${rootNode}'); Nexus.ui.closeModal('graph');">${rootNode}</span></div>`;
+           html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.Vfs.switchFile('${rootNode}'); Nexus.ui.closeModal('graph');">${rootNode}</span></div>`;
            touched.add(rootNode);
            const children = deps[rootNode] || [];
            for (let i = 0; i < children.length; i++) {
                html += buildTree(children[i], '', i === children.length - 1, new Set([rootNode]));
            }
        } else {
-           html += `<div style="color:var(--danger); opacity:0.8;">No entry point (index.html) detected in VFS.</div>`;
+           html += `<div style="color:var(--danger); opacity:0.8;">No entry point (index.html) detected in Vfs.</div>`;
        }
 
        // 3. FLAG THE DEAD SECTORS
@@ -5054,10 +5054,10 @@ graph: {
        html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors (Unlinked)</h3>`;
        if (orphans.length > 0) {
            orphans.forEach(o => {
-               html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onclick="Nexus.vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
+               html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onclick="Nexus.Vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
            });
        } else {
-           html += `<div style="color:var(--success); opacity:0.8;">System clean. All VFS files linked to entry point.</div>`;
+           html += `<div style="color:var(--success); opacity:0.8;">System clean. All Vfs files linked to entry point.</div>`;
        }
 
        html += `</div>`;
@@ -5156,7 +5156,7 @@ settings: {
 
     calcStorage() { 
         const getK = (obj) => (JSON.stringify(obj).length / 1024).toFixed(2) + " KB"; 
-        if(document.getElementById('metric-vfs')) document.getElementById('metric-vfs').innerText = getK(Nexus.state.vfs); 
+        if(document.getElementById('metric-Vfs')) document.getElementById('metric-Vfs').innerText = getK(Nexus.state.Vfs); 
         if(document.getElementById('metric-vault')) document.getElementById('metric-vault').innerText = getK(Nexus.state.vault); 
         if(document.getElementById('metric-snaps')) document.getElementById('metric-snaps').innerText = Nexus.state.snapshots.length; 
     }
@@ -5319,7 +5319,7 @@ kb: {
            try { return new RegExp(searchStr, flags); } catch(e) { return null; }
        },
        cycleFileForSearch(dir) {
-           const files = Object.keys(Nexus.state.vfs);
+           const files = Object.keys(Nexus.state.Vfs);
            let idx = files.indexOf(Nexus.state.activeFile);
            const startIdx = idx;
            const regex = this.buildRegex();
@@ -5332,11 +5332,11 @@ kb: {
                
                if (idx === startIdx) break; 
 
-               const fileCode = Nexus.state.vfs[files[idx]];
+               const fileCode = Nexus.state.Vfs[files[idx]];
                regex.lastIndex = 0; 
                if (regex.test(fileCode)) {
-                   // Logic Routing Fix: Call .vfs not .state.vfs
-                   Nexus.vfs.switchFile(files[idx]);
+                   // Logic Routing Fix: Call .Vfs not .state.Vfs
+                   Nexus.Vfs.switchFile(files[idx]);
                    const ed = document.getElementById('raw-terminal');
                    ed.selectionStart = ed.selectionEnd = dir === 1 ? 0 : ed.value.length;
                    this.findNext(dir, true);
@@ -5410,8 +5410,8 @@ kb: {
    if (currentSelection && matcher.test(currentSelection)) {
        ed.value = ed.value.substring(0, selStart) + rep + ed.value.substring(selEnd);
        ed.setSelectionRange(selStart, selStart + rep.length);
-       Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
-       Nexus.vfs.save();
+       Nexus.state.Vfs[Nexus.state.activeFile] = ed.value;
+       Nexus.Vfs.save();
        Nexus.ui.updateGutter();
    }
    this.findNext(1);
@@ -5451,43 +5451,43 @@ writer: {
 shell: {
    commands: {
        ls: () => {
-           return Object.keys(Nexus.state.vfs).join('\n') || "Vortex empty.";
+           return Object.keys(Nexus.state.Vfs).join('\n') || "Vortex empty.";
        },
        
        touch: (args) => {
            const path = args[0];
            if (!path) return "Error: Specify a path.";
-           if (Nexus.state.vfs[path]) return `Error: '${path}' already exists.`;
+           if (Nexus.state.Vfs[path]) return `Error: '${path}' already exists.`;
            
            const ancestors = path.split('/').slice(0, -1);
            let currentPath = "";
            for (const part of ancestors) {
                currentPath = currentPath === "" ? part : `${currentPath}/${part}`;
-               if (Nexus.state.vfs[currentPath]) {
+               if (Nexus.state.Vfs[currentPath]) {
                    return `Error: '${currentPath}' is a file, cannot be a folder.`;
                }
            }
            
-           Nexus.state.vfs[path] = "";
+           Nexus.state.Vfs[path] = "";
            Nexus.state.originals[path] = ""; 
-           Nexus.vfs.renderAccordion();
+           Nexus.Vfs.renderAccordion();
            return `Created: ${path}`;
        },
 
        rm: (args) => {
            const path = args[0];
-           if (!path || !Nexus.state.vfs[path]) return "Error: File not found.";
+           if (!path || !Nexus.state.Vfs[path]) return "Error: File not found.";
            
-           delete Nexus.state.vfs[path];
+           delete Nexus.state.Vfs[path];
            delete Nexus.state.originals[path];
            if (Nexus.state.activeFile === path) Nexus.state.activeFile = null;
-           Nexus.vfs.renderAccordion();
+           Nexus.Vfs.renderAccordion();
            return `Deleted: ${path}`;
        },
 
        'delete-folder': (args) => {
            const folderPath = args[0].endsWith('/') ? args[0] : `${args[0]}/`;
-           const allFiles = Object.keys(Nexus.state.vfs);
+           const allFiles = Object.keys(Nexus.state.Vfs);
            const toDelete = allFiles.filter(p => p.startsWith(folderPath));
 
            if (toDelete.length === 0) return `Error: No files in '${folderPath}'`;
@@ -5497,24 +5497,24 @@ shell: {
            }
 
            toDelete.forEach(p => {
-               delete Nexus.state.vfs[p];
+               delete Nexus.state.Vfs[p];
                delete Nexus.state.originals[p];
            });
 
-           Nexus.vfs.renderAccordion();
+           Nexus.Vfs.renderAccordion();
            return `Deleted ${toDelete.length} files from ${folderPath} 🗑️`;
        },
 
        cat: (args) => {
            const path = args[0];
-           return Nexus.state.vfs[path] || "Error: File not found.";
+           return Nexus.state.Vfs[path] || "Error: File not found.";
        },
 
        'config': (args) => {
            const [action, key, value] = args;
            if (action === 'set' && (key === 'ghToken' || key === 'ghRepo') && value) {
                Nexus.state.prefs[key] = value;
-               Nexus.vfs.save();
+               Nexus.Vfs.save();
                return `Success: ${key} updated ⚙️`;
            }
            return "Usage: config set [ghToken|ghRepo] [value]";
@@ -5536,8 +5536,8 @@ shell: {
                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
                if (!res.ok) throw new Error("File not found.");
                const data = await res.json();
-               Nexus.state.vfs[path] = atob(data.content.replace(/\s/g, ''));
-               Nexus.vfs.renderAccordion();
+               Nexus.state.Vfs[path] = atob(data.content.replace(/\s/g, ''));
+               Nexus.Vfs.renderAccordion();
                return `${path}: Pulled 📥`;
            } catch (e) { return `Error: ${e.message}`; }
        },
@@ -5554,11 +5554,11 @@ shell: {
                    if (item.type === "file") {
                        const fRes = await fetch(item.url, { headers: { "Authorization": `token ${token}` } });
                        const fData = await fRes.json();
-                       Nexus.state.vfs[item.path] = atob(fData.content.replace(/\s/g, ''));
+                       Nexus.state.Vfs[item.path] = atob(fData.content.replace(/\s/g, ''));
                        count++;
                    }
                }
-               Nexus.vfs.renderAccordion();
+               Nexus.Vfs.renderAccordion();
                return `Synced ${count} files ✅`;
            } catch (e) { return `Sync failed: ${e.message}`; }
        },
@@ -5572,7 +5572,7 @@ shell: {
            const repo = Nexus.state.prefs.ghRepo;
            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
            
-           const content = Nexus.state.vfs[path];
+           const content = Nexus.state.Vfs[path];
            if (content === undefined) return `Error: '${path}' not found in Vortex.`;
 
            try {
@@ -5643,7 +5643,7 @@ ui: {
     async boot() { 
         console.log("Nexus Prime: Executing UI sub-system allocations...");
 
-        // 1. Core VFS Initialization (Fixed Case Sensitivity)
+        // 1. Core Vfs Initialization (Fixed Case Sensitivity)
         if (Nexus.Vfs && typeof Nexus.Vfs.boot === 'function') {
             await Nexus.Vfs.boot(); 
         } else {
@@ -5841,7 +5841,7 @@ toggleKeyboardRows() {
            el.style.display = isHidden ? 'flex' : 'none';
            Nexus.state.widgets[id] = isHidden;
            // Ensure UI state is saved
-           Nexus.vfs.save();
+           Nexus.Vfs.save();
        },
 
        explodeVortex() {
@@ -5908,8 +5908,8 @@ toggleKeyboardRows() {
            });
        }
        
-       Nexus.state.vfs[Nexus.state.activeFile] = view.state.doc.toString();
-       Nexus.vfs.save();
+       Nexus.state.Vfs[Nexus.state.activeFile] = view.state.doc.toString();
+       Nexus.Vfs.save();
        Nexus.history.record();
        return; 
    }
@@ -5927,9 +5927,9 @@ toggleKeyboardRows() {
        ed.setSelectionRange(start + cursorOffset, start + cursorOffset);
    }
    
-   Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+   Nexus.state.Vfs[Nexus.state.activeFile] = ed.value;
    this.updateGutter();
-   Nexus.vfs.save();
+   Nexus.Vfs.save();
    Nexus.history.record();
 },
 
@@ -6140,9 +6140,9 @@ toggleKeyboardRows() {
                ed.value = formatted;
            }
            
-           Nexus.state.vfs[Nexus.state.activeFile] = formatted;
+           Nexus.state.Vfs[Nexus.state.activeFile] = formatted;
            this.updateGutter(); 
-           Nexus.vfs.save();
+           Nexus.Vfs.save();
            
            const st = document.getElementById('foot-status');
            st.innerText = "PRETTIFIED (STRICT)"; 
@@ -6154,7 +6154,7 @@ toggleKeyboardRows() {
    },
 checkBrackets() {
   if(!Nexus.state.activeFile) return;
-  const code = Nexus.state.vfs[Nexus.state.activeFile];
+  const code = Nexus.state.Vfs[Nexus.state.activeFile];
   const result = Nexus.BracketCartographer.mapStructure(code);
   const out = document.getElementById('diag-out');
   
@@ -6184,7 +6184,7 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
 
 runDiff(target) {
   if(!target) return;
-  Nexus.DiffEngine.generateDiff(Nexus.state.vfs[Nexus.state.activeFile] || "", Nexus.state.vfs[target] || "");
+  Nexus.DiffEngine.generateDiff(Nexus.state.Vfs[Nexus.state.activeFile] || "", Nexus.state.Vfs[target] || "");
 },
 
    runJSBeautify() {
@@ -6223,9 +6223,9 @@ runDiff(target) {
                ed.value = code;
            }
 
-           Nexus.state.vfs[Nexus.state.activeFile] = code;
+           Nexus.state.Vfs[Nexus.state.activeFile] = code;
            this.updateGutter();
-           Nexus.vfs.save();
+           Nexus.Vfs.save();
            
            const st = document.getElementById('foot-status');
            st.innerText = "BEAUTIFIED";
@@ -6256,10 +6256,10 @@ runDiff(target) {
            const bar = document.getElementById('file-tabs-bar');
            if (!bar) return;
            
-           bar.innerHTML = Object.keys(Nexus.state.vfs).map(fn => `
-               <div class="file-tab ${fn === Nexus.state.activeFile ? 'active' : ''}" onclick="Nexus.vfs.switchFile('${fn}')">
+           bar.innerHTML = Object.keys(Nexus.state.Vfs).map(fn => `
+               <div class="file-tab ${fn === Nexus.state.activeFile ? 'active' : ''}" onclick="Nexus.Vfs.switchFile('${fn}')">
                    ${fn}
-                   <span class="tab-close" onclick="event.stopPropagation(); Nexus.vfs.deleteFile('${fn}')">&times;</span>
+                   <span class="tab-close" onclick="event.stopPropagation(); Nexus.Vfs.deleteFile('${fn}')">&times;</span>
                </div>
            `).join('');
            
@@ -6358,13 +6358,13 @@ initInfiniteRibbon() {
            if (id === 'diff') {
            const sel = document.getElementById('diff-file-selector');
            sel.innerHTML = `<option value="">Compare ${Nexus.state.activeFile} with...</option>` + 
-           Object.keys(Nexus.state.vfs).filter(f => f !== Nexus.state.activeFile).map(f => `<option value="${f}">${f}</option>`).join('');
+           Object.keys(Nexus.state.Vfs).filter(f => f !== Nexus.state.activeFile).map(f => `<option value="${f}">${f}</option>`).join('');
            document.getElementById('diff-content-left').innerHTML = '';
            document.getElementById('diff-content-right').innerHTML = '';
            };
            if (id === 'combine') {
                const list = document.getElementById('combine-list');
-               list.innerHTML = Object.keys(Nexus.state.vfs).map(f => `
+               list.innerHTML = Object.keys(Nexus.state.Vfs).map(f => `
                    <label style="display:flex; align-items:center; gap:10px; padding:12px; color:#fff; cursor:pointer; background:var(--surface); border-radius:8px; margin-bottom:5px;">
                        <input type="checkbox" value="${f}" class="combine-cb" style="width:18px; height:18px;"> 
                        <span style="font-family:monospace; font-size:12px;">${f}</span>
@@ -6452,9 +6452,9 @@ onGutterClick(lineNumber) {
        return;
    }
    
-   // 2. Map the entire VFS to temporary Blob URLs
-   const vfsMap = {};
-   Object.entries(Nexus.state.vfs).forEach(([name, content]) => {
+   // 2. Map the entire Vfs to temporary Blob URLs
+   const VfsMap = {};
+   Object.entries(Nexus.state.Vfs).forEach(([name, content]) => {
        const ext = name.split('.').pop().toLowerCase();
        let type = 'text/plain';
        if (ext === 'js') type = 'application/javascript';
@@ -6463,23 +6463,23 @@ onGutterClick(lineNumber) {
        
        const blob = new Blob([content], { type });
        const url = URL.createObjectURL(blob);
-       vfsMap[name] = url;
+       VfsMap[name] = url;
        this.sandboxBlobs.push(url);
    });
 
    // 3. Virtualization Regex: Re-routes imports/links to the Blob Map
    const virtualize = (code) => {
        let processed = code;
-       Object.keys(vfsMap).forEach(filename => {
+       Object.keys(VfsMap).forEach(filename => {
            // Matches: "file.js", "./file.js", and "/file.js" within quotes
            const escapedName = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
            const regex = new RegExp(`(['"])(?:\\.\\/|\\/)?${escapedName}(['"])`, 'g');
-           processed = processed.replace(regex, `$1${vfsMap[filename]}$2`);
+           processed = processed.replace(regex, `$1${VfsMap[filename]}$2`);
        });
        return processed;
    };
 
-   const activeCode = Nexus.state.vfs[Nexus.state.activeFile] || "";
+   const activeCode = Nexus.state.Vfs[Nexus.state.activeFile] || "";
    const activeExt = Nexus.state.activeFile.split('.').pop().toLowerCase();
 // 4. The Diagnostic Interceptor (Hardened against parent syntax bleeding)
 const inj = "<scr" + "ipt>\n" +
@@ -6517,7 +6517,7 @@ const inj = "<scr" + "ipt>\n" +
                const zip = new JSZip(); 
                const folder = zip.folder("Nexus_Project"); 
                
-               Object.entries(Nexus.state.vfs).forEach(([f, c]) => {
+               Object.entries(Nexus.state.Vfs).forEach(([f, c]) => {
                    folder.file(f, c);
                });
 
@@ -6626,7 +6626,7 @@ editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
 
 editor.oninput = () => { 
    if(!Nexus.state.activeFile) return;
-   Nexus.state.vfs[Nexus.state.activeFile] = editor.value; 
+   Nexus.state.Vfs[Nexus.state.activeFile] = editor.value; 
    Nexus.ui.updateGutter(); 
    Nexus.Sentinel.pulse(); 
    
@@ -6638,7 +6638,7 @@ editor.oninput = () => {
    clearTimeout(visualResetTimer); // Kill any pending visual resets if typing resumes
    
    saveDelayTimer = setTimeout(() => {
-       Nexus.vfs.save(); 
+       Nexus.Vfs.save(); 
        st.innerText = "SAVED";
        st.style.color = "var(--success)";
        
@@ -6664,7 +6664,7 @@ editor.onkeydown = (e) => {
        // Preserve Undo/Redo history by using execCommand instead of mutating editor.value
        document.execCommand('insertText', false, tabSpaces);
        
-       Nexus.state.vfs[Nexus.state.activeFile] = editor.value;
+       Nexus.state.Vfs[Nexus.state.activeFile] = editor.value;
        Nexus.ui.updateGutter();
    } 
 };
@@ -6737,8 +6737,8 @@ Nexus.actions.insertText = (text) => {
     ed.selectionStart = ed.selectionEnd = start + text.length;
     
     // Sync to Virtual File System
-    if (Nexus.state && Nexus.state.vfs) {
-        Nexus.state.vfs[Nexus.state.activeFile] = ed.value;
+    if (Nexus.state && Nexus.state.Vfs) {
+        Nexus.state.Vfs[Nexus.state.activeFile] = ed.value;
     }
     
     ed.focus();
@@ -6796,7 +6796,7 @@ const updateCursorPos = () => {
 window.addEventListener('DOMContentLoaded', async () => { 
    console.log("Nexus Prime: Initiating Sovereign Bootloader...");
    
-   // Boot the core UI & VFS state first
+   // Boot the core UI & Vfs state first
    await Nexus.ui.boot(); 
    
    // Safely bind listeners after DOM and Nexus boot routines finish
