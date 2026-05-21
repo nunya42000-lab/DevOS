@@ -1369,6 +1369,15 @@
  </select>
      <button class="sleek-btn" style="background:var(--gold); color:#000; font-weight:bold; width:100%; padding:10px;" onclick="Nexus.writer.go()">⚡ INJECT</button>
 </div>
+    <div id="suggestions-drawer" class="transform-drawer" style="width: 280px; z-index: 8700;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+    <span style="font-size:10px; color:var(--success); font-weight:bold;">INTELLISENSE & SNIPPETS</span>
+    <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.UI.toggleDrawer('suggestions-drawer')">&times;</span>
+    </div>
+    <input type="text" id="suggest-filter" class="sleek-input" placeholder="Filter suggestions..." style="margin-bottom:10px;" oninput="Nexus.UI.populateSuggestions(this.value)">
+    <div id="suggest-list" style="display:flex; flex-direction:column; gap:6px; max-height: 60vh; overflow-y: auto; padding-right: 5px;">
+    </div>
+    </div>
     
 <div id="nexus-dpad" class="floating-widget util-vertical" style="top: 200px; left: 10px; width: auto; background: var(--panel);">
     <div id="dpad-drag-handle" class="util-grip" onmousedown="Nexus.UI.handleHandleTap(event, 'nexus-dpad')" ontouchstart="Nexus.UI.handleHandleTap(event, 'nexus-dpad')"></div>
@@ -1580,6 +1589,7 @@
     <div id="modal-sandbox" class="modal-overlay">
         <div class="modal-content" style="width: 96%; height: 92%; border-radius: 12px;">
             <div class="sandbox-nav" style="padding: 10px; background: var(--panel); display: flex; gap: 4px;">
+                <button class="tool-btn btn-accent" onclick="Nexus.UI.runSandbox();">▶️</button>
                 <button class="seg-btn active" onclick="Nexus.UI.segSandbox('test')">VIEW</button>
                 <button class="seg-btn" onclick="Nexus.UI.segSandbox('opts')">OPTS</button>
                 <button class="seg-btn" onclick="Nexus.UI.segSandbox('logs')">LOGS</button>
@@ -1638,8 +1648,8 @@
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Vfs Explorer</div>
                 <div class="man-p">Files are stored in the <b>Sovereign Database (Dexie.js)</b>. They persist even if you close the browser. Open the 📁 <b>VORTEX</b> panel to manage sectors.</div>
 
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Matrix BUIld Operations</div>
-                <div class="man-p">Located in the Vortex panel, these are high-level bUIld commands:
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Matrix build Operations</div>
+                <div class="man-p">Located in the Vortex panel, these are high-level build commands:
                     <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
                         <li><b>⚡ BUNDLE:</b> Compiles the entire project (HTML+CSS+JS) into a single standalone HTML file. Escapes internal tags to prevent breakage.</li>
                         <li><b>⚡ MERGE JS:</b> Concatenates all <code>.js</code> files into a single production script.</li>
@@ -1858,74 +1868,93 @@
         </div>
     </div>
 
-    <div id="modal-settings" class="modal-overlay">
-        <div class="modal-content">
-            <div class="p-head"><span>⚙️ SETTINGS &amp; PERSISTENCE</span><button class="close-x" onclick="Nexus.UI.closeModal('settings')">&times;</button></div>
-            <div class="modal-body">
-                <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:20px;" onclick="Nexus.kbEditor.open()">🛠️ KEYBOARD BUILDER GUI</button>
+<div id="modal-settings" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head"><span>⚙️ SYSTEM PREFERENCES</span><button class="close-x" onclick="Nexus.UI.closeModal('settings')">&times;</button></div>
+        <div class="modal-body" style="display: flex; flex-direction: column; gap: 15px;">
+            
+            <button class="tool-btn btn-gold" style="width:100%; padding:15px; font-weight: 900; letter-spacing: 1px;" onclick="Nexus.kbEditor.open()">
+                🛠️ LAUNCH KEYBOARD BUILDER GUI
+            </button>
 
-                <div class="section-label">Editor Environment</div>
-                <div class="item-row">
-                    <span>Font Size (px)</span>
-                    <input type="number" id="pref-font" onchange="Nexus.settings.update('fontSize', parseInt(this.value))" style="width:60px; background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
+            <div class="slab">
+                <div class="section-label" style="margin-top: 0;">Editor Environment</div>
+                <div class="grid-2">
+                    <div class="item-row" style="flex-direction: column; align-items: flex-start; gap: 8px; border: none; padding: 5px;">
+                        <span style="font-size: 11px; color: var(--gold);">Font Size (px)</span>
+                        <input type="number" id="pref-font" onchange="Nexus.settings.update('fontSize', parseInt(this.value))" class="sleek-input" style="width: 100%;">
+                    </div>
+                    <div class="item-row" style="flex-direction: column; align-items: flex-start; gap: 8px; border: none; padding: 5px;">
+                        <span style="font-size: 11px; color: var(--gold);">Tab Spacing</span>
+                        <select id="pref-tabs" onchange="Nexus.settings.update('tabWidth', parseInt(this.value))" class="sleek-input" style="width: 100%;">
+                            <option value="2">2 Spaces</option>
+                            <option value="4">4 Spaces</option>
+                        </select>
+                    </div>
                 </div>
-                <div class="item-row">
-                    <span>Tab Width (Spaces)</span>
-                    <select id="pref-tabs" onchange="Nexus.settings.update('tabWidth', parseInt(this.value))" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
-                        <option value="2">2 Spaces</option>
-                        <option value="4">4 Spaces</option>
-                    </select>
-                </div>
-                
-                <div class="section-label">Kinetic Widgets Config</div>
-                <div class="item-row" style="flex-direction:column; align-items:flex-start;">
-                    <span style="margin-bottom:10px;">Utility Tools (Comma separated)</span>
-                    <input type="text" id="pref-util-layout" onchange="Nexus.settings.update('utilLayout', this.value)" style="width:100%; background:var(--bg); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-size:11px;">
-                    <span style="font-size:9px; color:var(--gold); margin-top:5px;">Available: jump, up20, down20, color, undo, redo, tab, fold, unfold</span>
-                </div>
-
-                <div class="item-row">
-                    <span>Utility Bar Docking</span>
-                    <select id="pref-util-mode" onchange="Nexus.settings.update('utilDock', this.value)" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
-                        <option value="float">Float Horizontal</option>
-                        <option value="dock-right">Dock Vertical Right</option>
-                    </select>
-                </div>
-                <div class="item-row">
-                    <span>KB Position</span>
-                    <select id="pref-kb-pos" onchange="Nexus.settings.update('kbPos', this.value)" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
-                        <option value="bottom">Bottom</option>
-                        <option value="top">Top</option>
-                    </select>
-                </div>
-                <div class="item-row">
-                    <span>KB Visible Rows</span>
-                    <select id="pref-kb-rows" onchange="Nexus.settings.update('kbRows', parseInt(this.value))" style="background:var(--bg); border:1px solid var(--border); color:#fff; padding:5px;">
-                        <option value="1">1 Row</option>
-                        <option value="2">2 Rows</option>
-                        <option value="3">3 Rows</option>
-                    </select>
-                </div>
-                
-                <div class="item-row" style="flex-direction:column; align-items:flex-start;">
-                    <span style="margin-bottom:10px;">Writer 'Custom' Vocab (Comma separated)</span>
-                    <input type="text" id="pref-writer-custom" onchange="Nexus.settings.update('customVocab', this.value)" style="width:100%; background:var(--bg); border:1px solid var(--border); color:#fff; padding:10px; border-radius:6px; font-size:11px;">
-                </div>
-
-                <div class="section-label">Vortex Storage Metrics</div>
-                <div class="item-row"><span>Vfs Payload:</span> <span id="metric-Vfs">0 KB</span></div>
-                <div class="item-row"><span>Vault Payload:</span> <span id="metric-vault">0 KB</span></div>
-                <div class="item-row"><span>Snapshots Active:</span> <span id="metric-snaps">0</span></div>
-                
-                <div class="section-label" style="color:var(--danger)">Nuclear Authorization</div>
-                <button class="tool-btn btn-danger" style="width:100%; padding:18px; font-weight:900;" onclick="Nexus.UI.nuke()" title="Perform Factory Reset">☢ DATA WIPE (FACTORY RESET)</button>
             </div>
+
+            <div class="slab">
+                <div class="section-label" style="margin-top: 0;">Kinetic Widgets & Layout</div>
+                
+                <div class="grid-2" style="margin-bottom: 15px;">
+                    <div class="item-row" style="flex-direction: column; align-items: flex-start; gap: 8px; border: none; padding: 5px;">
+                        <span style="font-size: 11px; color: var(--gold);">Utility Dock</span>
+                        <select id="pref-util-mode" onchange="Nexus.settings.update('utilDock', this.value)" class="sleek-input" style="width: 100%;">
+                            <option value="float">Float Horizontal</option>
+                            <option value="dock-right">Dock Vertical</option>
+                        </select>
+                    </div>
+                    <div class="item-row" style="flex-direction: column; align-items: flex-start; gap: 8px; border: none; padding: 5px;">
+                        <span style="font-size: 11px; color: var(--gold);">KB Rows</span>
+                        <select id="pref-kb-rows" onchange="Nexus.settings.update('kbRows', parseInt(this.value))" class="sleek-input" style="width: 100%;">
+                            <option value="1">1 Row</option>
+                            <option value="2">2 Rows</option>
+                            <option value="3">3 Rows</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 8px; padding: 5px;">
+                    <span style="font-size: 11px; color: var(--gold);">Utility Tools (Comma separated)</span>
+                    <input type="text" id="pref-util-layout" onchange="Nexus.settings.update('utilLayout', this.value)" class="sleek-input">
+                    <span style="font-size:9px; opacity:0.6;">Available: jump, up20, down20, color, undo, redo, tab, fold, unfold</span>
+                </div>
+            </div>
+
+            <div class="slab">
+                <div class="section-label" style="margin-top: 0;">Storage Metrics</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center;">
+                    <div style="background: var(--bg); padding: 10px; border-radius: 8px;">
+                        <div style="font-size: 9px; opacity: 0.6; margin-bottom: 5px;">VFS PAYLOAD</div>
+                        <div id="metric-Vfs" style="font-weight: 900; color: var(--accent);">0 KB</div>
+                    </div>
+                    <div style="background: var(--bg); padding: 10px; border-radius: 8px;">
+                        <div style="font-size: 9px; opacity: 0.6; margin-bottom: 5px;">VAULT</div>
+                        <div id="metric-vault" style="font-weight: 900; color: var(--gold);">0 KB</div>
+                    </div>
+                    <div style="background: var(--bg); padding: 10px; border-radius: 8px;">
+                        <div style="font-size: 9px; opacity: 0.6; margin-bottom: 5px;">SNAPSHOTS</div>
+                        <div id="metric-snaps" style="font-weight: 900; color: var(--success);">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slab" style="border-color: rgba(248, 81, 73, 0.3); background: rgba(248, 81, 73, 0.05);">
+                <div class="section-label" style="margin-top: 0; color: var(--danger);">Nuclear Authorization</div>
+                <button class="tool-btn btn-danger" style="width:100%; padding:15px; font-weight:900;" onclick="Nexus.UI.nuke()">
+                    ☢ FACTORY RESET (WIPE ALL DATA)
+                </button>
+            </div>
+
         </div>
     </div>
+</div>
 
-    <div id="modal-kb-bUIlder" class="modal-overlay">
+
+    <div id="modal-kb-builder" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>⌨️ KEYBOARD BUILDER</span><button class="close-x" onclick="Nexus.UI.closeModal('kb-bUIlder')">&times;</button></div>
+            <div class="p-head"><span>⌨️ KEYBOARD BUILDER</span><button class="close-x" onclick="Nexus.UI.closeModal('kb-builder')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; padding:15px;">
                 <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px; line-height:1.5;">
                     Configure custom keys. Use <strong style="color:var(--accent)">*#</strong> for cursor placement.<br>
@@ -1933,12 +1962,12 @@
                     Use <strong style="color:var(--accent)">BACKSPACE</strong> as a Display name to delete characters.
                 </div>
                 <div style="display:flex; gap:5px; margin-bottom:15px;">
-                    <button class="tool-btn kb-bUIlder-tab btn-active" onclick="Nexus.kbEditor.switchLang('html')" style="flex:1;">HTML</button>
-                    <button class="tool-btn kb-bUIlder-tab" onclick="Nexus.kbEditor.switchLang('css')" style="flex:1;">CSS</button>
-                    <button class="tool-btn kb-bUIlder-tab" onclick="Nexus.kbEditor.switchLang('js')" style="flex:1;">JS</button>
-                    <button class="tool-btn kb-bUIlder-tab" onclick="Nexus.kbEditor.switchLang('qwerty')" style="flex:1;">QWERTY</button>
+                    <button class="tool-btn kb-builder-tab btn-active" onclick="Nexus.kbEditor.switchLang('html')" style="flex:1;">HTML</button>
+                    <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('css')" style="flex:1;">CSS</button>
+                    <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('js')" style="flex:1;">JS</button>
+                    <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('qwerty')" style="flex:1;">QWERTY</button>
                 </div>
-                <div id="kb-bUIlder-list" style="flex:1; overflow-y:auto; margin-bottom:15px; padding-right:5px;"></div>
+                <div id="kb-builder-list" style="flex:1; overflow-y:auto; margin-bottom:15px; padding-right:5px;"></div>
                 <button class="tool-btn btn-accent" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.kbEditor.add()">+ ADD NEW KEY</button>
                 <button class="tool-btn btn-gold" style="width:100%; padding:15px;" onclick="Nexus.kbEditor.save()">💾 SAVE &amp; APPLY</button>
             </div>
@@ -2659,19 +2688,23 @@ alert(`Fuzzy Audit Finished: Found ${reports.length} casing issues.`);
    });
    },
    
-   processCommand(cmd) {
-   if (!cmd.trim()) return;
-   
-   try {
-   // Route command through your existing shell logic
-   const result = Nexus.shell.exec(cmd);
-   if (result !== undefined) {
-   this.instance.writeln(String(result));
-   }
-   } catch (err) {
-   this.instance.writeln(`\x1b[31mError: ${err.message}\x1b[0m`);
-   }
-   },
+async processCommand(cmd) {
+    if (!cmd.trim()) return;
+    
+    try {
+        // AWAIT the shell execution so the terminal pauses for the result
+        const result = await Nexus.shell.exec(cmd);
+        
+        if (result !== undefined) {
+            // xterm.js requires \r\n for proper carriage returns
+            const formattedResult = String(result).replace(/\n/g, '\r\n');
+            this.instance.writeln(formattedResult);
+        }
+    } catch (err) {
+        this.instance.writeln(`\x1b[31mError: ${err.message}\x1b[0m`);
+    }
+},
+
    
    toggle() {
    const panel = document.getElementById('panel-terminal');
@@ -2853,7 +2886,7 @@ renderAccordion() {
     const root = document.getElementById('accordion-root');
     if (!root) return; // Exit gracefully if the DOM frame isn't painted yet
 
-    // 2. BUIld the groups dictionary dynamically from Nexus.state.Vfs
+    // 2. build the groups dictionary dynamically from Nexus.state.Vfs
     const groups = {};
     if (Nexus.state && Nexus.state.Vfs) {
         Object.keys(Nexus.state.Vfs).forEach(fn => {
@@ -3813,10 +3846,10 @@ Sentinel : {
        runMedicAST() { 
            if(!Nexus.state.activeFile) return; 
            const ed = document.getElementById('raw-terminal');
-           if (ed.hasAttribute('readonly')) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebUIld.", "danger");
+           if (ed.hasAttribute('readonly')) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebuild.", "danger");
            
            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-           if (ext !== 'js') return this.log("[MEDIC AST] Logic rebUIld only supports raw .js files.", "warn");
+           if (ext !== 'js') return this.log("[MEDIC AST] Logic rebuild only supports raw .js files.", "warn");
            
            this.initEngine(); 
            
@@ -4219,7 +4252,7 @@ try {
    context: {
        graph: new Map(),
        definitions: new Map(),
-       bUIld(code, filepath) {
+       build(code, filepath) {
            this.graph.clear(); 
            this.definitions.clear();
            try {
@@ -4988,7 +5021,7 @@ graph: {
        // This Set tracks every single file the rendering loop touches.
        const touched = new Set(); 
 
-       const bUIldTree = (node, prefix, isLast, visited) => {
+       const buildTree = (node, prefix, isLast, visited) => {
            touched.add(node);
            if (visited.has(node)) {
                return `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--danger)">🔄 ${node} (Circular Loop)</span></div>`;
@@ -4999,7 +5032,7 @@ graph: {
            
            const children = deps[node] || [];
            for (let i = 0; i < children.length; i++) {
-               line += bUIldTree(children[i], prefix + (isLast ? '    ' : '│   '), i === children.length - 1, new Set(visited));
+               line += buildTree(children[i], prefix + (isLast ? '    ' : '│   '), i === children.length - 1, new Set(visited));
            }
            return line;
        };
@@ -5024,7 +5057,7 @@ graph: {
            touched.add(rootNode);
            const children = deps[rootNode] || [];
            for (let i = 0; i < children.length; i++) {
-               html += bUIldTree(children[i], '', i === children.length - 1, new Set([rootNode]));
+               html += buildTree(children[i], '', i === children.length - 1, new Set([rootNode]));
            }
        } else {
            html += `<div style="color:var(--danger); opacity:0.8;">No entry point (index.html) detected in Vfs.</div>`;
@@ -5150,7 +5183,7 @@ kbEditor: {
        
        open() {
            this.tempLayout = JSON.parse(JSON.stringify(Nexus.state.prefs.kbLayouts));
-           Nexus.UI.openModal('kb-bUIlder');
+           Nexus.UI.openModal('kb-builder');
            this.render();
        },
        
@@ -5160,7 +5193,7 @@ kbEditor: {
        },
        
        render() {
-           const list = document.getElementById('kb-bUIlder-list');
+           const list = document.getElementById('kb-builder-list');
            const keys = this.tempLayout[this.currentLang] || [];
            
            list.innerHTML = keys.map((k, i) => `
@@ -5182,7 +5215,7 @@ kbEditor: {
                    </div>
                </div>`).join('');
            
-           document.querySelectorAll('.kb-bUIlder-tab').forEach(b => {
+           document.querySelectorAll('.kb-builder-tab').forEach(b => {
                b.classList.toggle('btn-active', b.innerText.toLowerCase() === this.currentLang);
            });
        },
@@ -5205,7 +5238,7 @@ kbEditor: {
        save() { 
            Nexus.state.prefs.kbLayouts = JSON.parse(JSON.stringify(this.tempLayout)); 
            Nexus.settings.update('kbLayouts', Nexus.state.prefs.kbLayouts); 
-           Nexus.UI.closeModal('kb-bUIlder'); 
+           Nexus.UI.closeModal('kb-builder'); 
        }
    },
 kb: {
@@ -5291,7 +5324,7 @@ kb: {
            Nexus.state.searchOpts[opt] = !Nexus.state.searchOpts[opt];
            document.getElementById(opt + '-btn').classList.toggle('active');
        },
-       bUIldRegex() {
+       buildRegex() {
            const term = document.getElementById('find-input').value;
            if (!term) return null;
            let searchStr = term;
@@ -5305,7 +5338,7 @@ kb: {
            const files = Object.keys(Nexus.state.Vfs);
            let idx = files.indexOf(Nexus.state.activeFile);
            const startIdx = idx;
-           const regex = this.bUIldRegex();
+           const regex = this.buildRegex();
            if (!regex) return;
 
            while(true) {
@@ -5329,7 +5362,7 @@ kb: {
        },
        findNext(dir, isRecursive = false) {
            const ed = document.getElementById('raw-terminal');
-           const regex = this.bUIldRegex();
+           const regex = this.buildRegex();
            if (!regex) return;
 
            const text = ed.value;
@@ -5435,6 +5468,24 @@ shell: {
    commands: {
        ls: () => {
            return Object.keys(Nexus.state.Vfs).join('\n') || "Vortex empty.";
+       },
+       help: () => {
+           return `
+       \x1b[33mNEXUS MATRIX SHELL COMMANDS\x1b[0m
+       ---------------------------
+       \x1b[36mls\x1b[0m                List all active sectors in the Vfs
+       \x1b[36mtouch [name]\x1b[0m      Create a new file (e.g., touch style.css)
+       \x1b[36mrm [name]\x1b[0m         Delete a specific file
+       \x1b[36mdelete-folder [d]\x1b[0m Delete all files starting with a folder path
+       \x1b[36mcat [name]\x1b[0m        Print file contents to terminal
+       \x1b[36mpush [name]\x1b[0m       Commit and push a file to GitHub
+       \x1b[36mpull [name]\x1b[0m       Pull a specific file from GitHub
+       \x1b[36mpull-all\x1b[0m          Sync the entire project from GitHub
+       \x1b[36mconfig\x1b[0m            Configure env variables (e.g., config set ghToken)
+       \x1b[36mchange-repo\x1b[0m       Switch GitHub repo target
+       \x1b[36mhelp\x1b[0m              Show this command list
+       
+       *Any unrecognized command will be evaluated as raw JavaScript.*`;
        },
        
        touch: (args) => {
@@ -6549,6 +6600,87 @@ toggleRibbonDpad() {
         btn.classList.remove('active');
     }
 },
+openSuggestions() {
+    // Clear previous filter and prepopulate the list
+    const filterInput = document.getElementById('suggest-filter');
+    if (filterInput) filterInput.value = '';
+    
+    this.populateSuggestions('');
+    this.toggleDrawer('suggestions-drawer');
+},
+
+populateSuggestions(filterTerm) {
+    const list = document.getElementById('suggest-list');
+    if (!list) return;
+
+    const term = (filterTerm || '').toLowerCase();
+    let items = [];
+    
+    // 1. Pull dynamic snippets from the Sovereign Vault
+    if (Nexus.state && Nexus.state.vault) {
+        Nexus.state.vault.forEach(v => {
+            items.push({ label: `💾 ${v.name}`, code: v.code });
+        });
+    }
+    
+    // 2. Add high-velocity standard templates (using your *# cursor logic)
+    const standardSnippets = [
+        { label: "⚡ console.log", code: "console.log(*#);" },
+        { label: "⚡ document.getElementById", code: "document.getElementById('*#')" },
+        { label: "⚡ querySelector", code: "document.querySelector('*#')" },
+        { label: "⚡ async function", code: "async function *#() {\n\t\n}" },
+        { label: "⚡ arrow function", code: "const *# = () => {\n\t\n};" },
+        { label: "⚡ event listener", code: "addEventListener('*#', (e) => {\n\t\n});" },
+        { label: "⚡ try / catch", code: "try {\n\t*#\n} catch (err) {\n\tconsole.error(err);\n}" },
+        { label: "⚡ div tag", code: "<div>*#</div>" },
+        { label: "⚡ span tag", code: "<span>*#</span>" }
+    ];
+    
+    items = items.concat(standardSnippets);
+    
+    // 3. Filter based on user input
+    if (term) {
+        items = items.filter(i => 
+            i.label.toLowerCase().includes(term) || 
+            i.code.toLowerCase().includes(term)
+        );
+    }
+    
+    // 4. Render to DOM
+    if (items.length === 0) {
+        list.innerHTML = `<div style="color:var(--text); opacity:0.5; font-size:11px; text-align:center; padding:10px;">No matches found.</div>`;
+        return;
+    }
+    
+    // Notice we encode the code block slightly to prevent HTML breakout in the onclick handler
+    list.innerHTML = items.map(item => {
+        const safeLabel = item.label.replace(/</g, '&lt;');
+        const safePreview = item.code.replace(/</g, '&lt;').replace(/\n/g, ' ');
+        const escapeQuotes = item.code.replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/\n/g, '\\n').replace(/\t/g, '\\t');
+
+        return `
+            <button class="sleek-btn" style="justify-content:flex-start; text-align:left; flex-direction:column; align-items:flex-start; background:var(--bg); border:1px solid var(--border); padding:10px;" 
+                    onclick="Nexus.UI.injectSuggestion('${escapeQuotes}')">
+                <span style="color:var(--accent); font-weight:bold; font-size:11px;">${safeLabel}</span>
+                <span style="font-size:9px; color:var(--text); opacity:0.6; font-family:monospace; margin-top:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%;">
+                    ${safePreview}
+                </span>
+            </button>
+        `;
+    }).join('');
+},
+
+injectSuggestion(codePayload) {
+    // 1. Close the drawer to return focus to the editor
+    this.toggleDrawer('suggestions-drawer');
+    
+    // 2. Decode the newline and tab characters back to raw strings
+    const formattedCode = codePayload.replace(/\\n/g, '\n').replace(/\\t/g, '\t');
+    
+    // 3. Route through your existing injection engine so it processes the *# cursor offset
+    this.injectChar(formattedCode);
+},
+
              nuke() { 
            if (confirm("☢ FACTORY RESET: All files and settings will be permanently erased. Proceed?")) { 
                localforage.clear().then(() => {
