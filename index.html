@@ -1271,6 +1271,8 @@
         <div id="ribbon-track">
             <button class="tool-btn" onclick="Nexus.UI.openModal('settings')">⚙️</button>
             <button class="tool-btn" onclick="Nexus.UI.toggleSidebar('left')">📁</button>
+		         <button class="tool-btn" onclick="Nexus.Vfs.save(); alert('File Saved to VFS');">💾</button>
+		         
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.UI.toggleEditMode()">🔒</button>
             <button class="tool-btn" onclick="Nexus.toggleEditor()">🔄</button>           
                     <button class="tool-btn" onclick="Nexus.UI.toggleWidget('utility-bar'); this.parentElement.classList.remove('active')">🛠</button>
@@ -2752,11 +2754,24 @@ Vfs: {
         }
     },
 
-    async save() {
-        // Persist using v42 keys to maintain migration integrity
-        await localforage.setItem('Nexus.state.Vfs_v42', Nexus.state.Vfs);
-        await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
-    },
+// Add this method to your Nexus.Vfs object
+async save() {
+    await localforage.setItem('Nexus.state.Vfs_v42', Nexus.state.Vfs);
+    await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
+    
+    // UI Feedback
+    const status = document.getElementById('foot-status');
+    if (status) {
+        const originalText = status.innerText;
+        status.innerText = "SAVED TO VFS";
+        status.style.color = "var(--success)";
+        setTimeout(() => {
+            status.innerText = originalText;
+            status.style.color = "";
+        }, 1500);
+    }
+},
+
 setEmptyState() {
     Nexus.state.activeFile = "";
     
