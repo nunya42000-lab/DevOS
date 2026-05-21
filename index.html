@@ -106,6 +106,7 @@
     /* --- 1. INFINITE RIBBON --- */
     #ribbon-container { 
         height: 55px; 
+        flex-shrink: 0;    
         background: var(--panel); 
         border-bottom: 1px solid var(--border); 
         overflow-x: scroll; 
@@ -981,6 +982,7 @@
     }
 .sleek-ribbon {
     display: flex;
+    flex-shrink: 0;
     flex-direction: row;
     gap: 4px;
     padding: 6px;
@@ -2058,152 +2060,26 @@ window.Nexus = {
        widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false, 'nexus-dpad': false }
    },
 compiler: {
-    isBuilding: false,
-    lastBuildTime: null,
-    errorLog: [],
-
+    // Translates your mobile macros into executable code
     preprocess(rawCode) {
         if (!rawCode) return "";
-        let compiled = rawCode.replace(/ZZ/g, '//');
-        return compiled;
-    },
-
-    buildProject() {
-        this.isBuilding = true;
-        this.errorLog = [];
         
-        try {
-            const htmlSrc = Nexus.state.Vfs["index.html"] || "";
-            const cssSrc = Nexus.state.Vfs["styles.css"] || "";
-            const jsSrc = Nexus.state.Vfs["script.js"] || "";
-
-            let combinedSource = htmlSrc;
-            const headClosingIdx = combinedSource.toLowerCase().lastIndexOf("</head>");
-            
-            const stylePayload = `\n<style id="nexus-injected-styles">\n${cssSrc}\n</style>\n`;
-            if (headClosingIdx !== -1) {
-                combinedSource = combinedSource.substring(0, headClosingIdx) + stylePayload + combinedSource.substring(headClosingIdx);
-            } else {
-                combinedSource = stylePayload + combinedSource;
-            }
-
-            const bodyClosingIdx = combinedSource.toLowerCase().lastIndexOf("</body>");
-            const scriptPayload = `\n<script id="nexus-injected-scripts">\n${jsSrc}\n<\/script>\n`;
-            if (bodyClosingIdx !== -1) {
-                combinedSource = combinedSource.substring(0, bodyClosingIdx) + scriptPayload + combinedSource.substring(bodyClosingIdx);
-            } else {
-                combinedSource = combinedSource + scriptPayload;
-            }
-
-            this.lastBuildTime = new Date().toISOString();
-            this.isBuilding = false;
-
-            const blob = new Blob([combinedSource], { type: "text/html" });
-            return URL.createObjectURL(blob);
-
-        } catch (err) {
-            this.isBuilding = false;
-            this.errorLog.push({ timestamp: new Date().toISOString(), message: err.message });
-            console.error("Nexus Compiler Execution Failure: ", err);
-            return "";
-        }
-    },
-
-    resetCompiler() {
-        this.isBuilding = false;
-        this.lastBuildTime = null;
-        this.errorLog = [];
+        // Replace 'ZZ' with '//' globally
+        let compiled = rawCode.replace(/ZZ/g, '//');
+        
+        // Optional: You can add other mobile shortcuts here later!
+        // e.g., replacing 'QQ' with a backslash if needed
+        
+        return compiled;
     }
 },
 
-editorCore: {
-    isCM6: false,
-    isLoaded: false,
-    view: null,
-    modules: {},
-    nativeEl: null,
-
-    init(textareaEl) {
-        this.nativeEl = textareaEl;
-        this.isLoaded = true;
-    },
-
-    indent() {
-        if (this.isCM6 && this.view) {
-            const { state, dispatch } = this.view;
-            const spaces = " ".repeat(Nexus.state.prefs.tabWidth || 4);
-            dispatch(state.changeByRange(range => {
-                return {
-                    changes: { from: range.from, insert: spaces },
-                    range: CodeMirror.EditorSelection.range(range.from + spaces.length, range.to + spaces.length)
-                };
-            }));
-        } else if (this.nativeEl) {
-            const start = this.nativeEl.selectionStart;
-            const end = this.nativeEl.selectionEnd;
-            const val = this.nativeEl.value;
-            const spaces = " ".repeat(Nexus.state.prefs.tabWidth || 4);
-
-            this.nativeEl.value = val.substring(0, start) + spaces + val.substring(end);
-            this.nativeEl.selectionStart = this.nativeEl.selectionEnd = start + spaces.length;
-            Nexus.state.Vfs[Nexus.state.activeFile] = this.nativeEl.value;
-        }
-    },
-
-    outdent() {
-        const tabSize = Nexus.state.prefs.tabWidth || 4;
-        if (this.isCM6 && this.view) {
-            const { state, dispatch } = this.view;
-            dispatch(state.changeByRange(range => {
-                const line = state.doc.lineAt(range.from);
-                let charsToRemove = 0;
-                for (let i = 0; i < tabSize; i++) {
-                    if (line.text[i] === " ") charsToRemove++;
-                    else break;
-                }
-                if (charsToRemove > 0) {
-                    return {
-                        changes: { from: line.from, to: line.from + charsToRemove, insert: "" },
-                        range: CodeMirror.EditorSelection.range(Math.max(line.from, range.from - charsToRemove), Math.max(line.from, range.to - charsToRemove))
-                    };
-                }
-                return { range };
-            }));
-        } else if (this.nativeEl) {
-            const start = this.nativeEl.selectionStart;
-            const end = this.nativeEl.selectionEnd;
-            const val = this.nativeEl.value;
-            const lineStartIdx = val.lastIndexOf("\n", start - 1) + 1;
-            let charsToRemove = 0;
-            
-            for (let i = 0; i < tabSize; i++) {
-                if (val[lineStartIdx + i] === " ") charsToRemove++;
-                else break;
-            }
-            
-            if (charsToRemove > 0) {
-                this.nativeEl.value = val.substring(0, lineStartIdx) + val.substring(lineStartIdx + charsToRemove);
-                this.nativeEl.selectionStart = Math.max(lineStartIdx, start - charsToRemove);
-                this.nativeEl.selectionEnd = Math.max(lineStartIdx, end - charsToRemove);
-                Nexus.state.Vfs[Nexus.state.activeFile] = this.nativeEl.value;
-            }
-        }
-    },
-
-    getContent() {
-        if (this.isCM6 && this.view) return this.view.state.doc.toString();
-        else if (this.nativeEl) return this.nativeEl.value;
-        return Nexus.state.Vfs[Nexus.state.activeFile] || "";
-    },
-
-    setContent(newContent) {
-        if (this.isCM6 && this.view) {
-            this.view.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: newContent } });
-        } else if (this.nativeEl) {
-            this.nativeEl.value = newContent;
-        }
-        Nexus.state.Vfs[Nexus.state.activeFile] = newContent;
-    }
+   // ADDED MISSING EDITOR CORE DEFINITION
+   editorCore: {
+       isCM6: false,
+       isLoaded: false,
+       view: null,
+       modules: {}
 },
 ICONS: {
     readonly: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
