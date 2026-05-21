@@ -46,7 +46,7 @@
         --warn: #d29922; 
         --danger: #f85149;
         --gold: #d29922; 
-        --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --font-UI: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         --sidebar-w: 88vw; 
         --sidebar-max: 450px;
     }
@@ -74,20 +74,13 @@
         height: 100vh; 
         background: var(--bg); 
         color: var(--text); 
-        font-family: var(--font-ui); 
+        font-family: var(--font-UI); 
         overflow: hidden; 
         overscroll-behavior: none; 
         /* UI is non-selectable, Editor will override this */
         user-select: none; 
     }
 
-    #app-root { 
-        display: flex; 
-        flex-direction: column; 
-        height: 100vh; 
-        width: 100vw; 
-        position: relative; 
-    }
 /* Apply this to the main parent wrapper holding both the editor and the footer */
 .app-master-layout {
     display: flex;
@@ -190,14 +183,38 @@
 .card-meta { font-size: 9px; opacity: 0.5; font-family: monospace; }
 
     /* --- 2. MAIN WORKSPACE & TABS --- */
-    #workspace { 
-        flex: 1; 
-        display: flex; 
-        flex-direction: column; 
-        position: relative; 
-        overflow: hidden; 
-        min-height: 0;
-    }
+#app-root { 
+    display: flex; 
+    flex-direction: column; 
+    height: 100dvh; /* dvh prevents mobile browser bars from hiding the footer */
+    width: 100vw; 
+    position: relative; 
+    overflow: hidden;
+}
+
+#workspace { 
+    flex: 1 1 auto; /* Allows workspace to absorb space but forces it to respect flex limits */
+    display: flex; 
+    flex-direction: column; 
+    position: relative; 
+    overflow: hidden; 
+    min-height: 0; /* Critical flexbox failsafe */
+}
+
+#nexus-dock {
+    flex-shrink: 0; /* Forces the dock to never compress, acting as a hard boundary */
+    position: relative; /* Remove fixed positioning so flexbox naturally stacks it */
+    width: 100%;
+    z-index: 1000;
+    background-color: #282c34;
+    border-top: 1px solid #3e4451;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
     
     #file-tabs-bar { 
         display: flex; 
@@ -402,20 +419,6 @@
     }
     #raw-terminal[readonly] { opacity: 0.4; user-select: none !important; }
 
-    #widget-drop-menu { 
-        position: fixed; 
-        top: 55px; 
-        background: var(--panel); 
-        border: 1px solid var(--border); 
-        border-radius: 8px; 
-        padding: 8px; 
-        display: none; 
-        flex-direction: column; 
-        gap: 5px; 
-        z-index: 10000; 
-        box-shadow: 0 10px 40px rgba(0,0,0,0.9); 
-    }
-    #widget-drop-menu.active { display: flex; }
 
     /* --- 3. SIDEBARS --- */
     .side-panel { 
@@ -1034,20 +1037,7 @@
         letter-spacing: 0.5px;
     }
     /* Unified Bottom Dock */
-    #nexus-dock {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    z-index: 1000;
-    background-color: #282c34;
-    border-top: 1px solid #3e4451;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    user-select: none;
-    -webkit-user-select: none;
-    }
+
     /* Container for the dynamic keyboard rows */
 /* 1. The Wrapper: Stacks the rows vertically (top to bottom) */
 #kb-rows-wrapper {
@@ -1269,43 +1259,35 @@
 </head>
 <body>
 <div id="app-root">
-    <div id="widget-drop-menu">
-        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('utility-bar'); this.parentElement.classList.remove('active')">🛠 UTIL</button>
-        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('kb-monolith'); this.parentElement.classList.remove('active')">⌨ KEY</button>
-        <button class="tool-btn" onclick="Nexus.ui.toggleWidget('nexus-dpad'); this.parentElement.classList.remove('active')">🎮 D-PAD</button>
+
     
-    </div>
-    
-    <input type="color" id="color-picker-input" style="display:none;" onchange="Nexus.ui.injectChar(this.value)">
+    <input type="color" id="color-picker-input" style="display:none;" onchange="Nexus.UI.injectChar(this.value)">
 
     <canvas id="omni-canvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
 
     <nav id="ribbon-container">
         <div id="ribbon-track">
-            <button class="tool-btn" onclick="Nexus.ui.openModal('settings')">⚙️</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('left')">📁</button>
-            <button class="tool-btn btn-danger" onclick="Nexus.ui.checkSyntax()">💩</button>
-            
-            <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.ui.toggleEditMode()">🔒</button>
-            <button class="tool-btn" onclick="Nexus.toggleEditor()">🔄</button>
-            
-            <button class="tool-btn" onclick="Nexus.ui.toggleWidgetDrop(event)">🧩</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('spotlight')">🔎</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSidebar('right')">🧰</button>
+            <button class="tool-btn" onclick="Nexus.UI.openModal('settings')">⚙️</button>
+            <button class="tool-btn" onclick="Nexus.UI.toggleSidebar('left')">📁</button>
+            <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.UI.toggleEditMode()">🔒</button>
+            <button class="tool-btn" onclick="Nexus.toggleEditor()">🔄</button>           
+                    <button class="tool-btn" onclick="Nexus.UI.toggleWidget('utility-bar'); this.parentElement.classList.remove('active')">🛠</button>
+            <button class="tool-btn" onclick="Nexus.UI.openModal('spotlight')">🔎</button>
+            <button class="tool-btn" onclick="Nexus.UI.toggleSidebar('right')">🧰</button>
           <button class="tool-btn" onclick="Nexus.Terminal.toggle()">📟 TERMINAL</button>  
-            <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('sandbox')">▶️</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSlide('shell')">⌨️</button>
+            <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sandbox')">▶️</button>
+            <button class="tool-btn" onclick="Nexus.UI.toggleSlide('shell')">⌨️</button>
             <button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()">♻️</button>
-            <button class="tool-btn" onclick="Nexus.ui.toggleSun()">☀️</button>
-            <button class="tool-btn btn-danger" onclick="Nexus.ui.nuke()">☢️</button>
-            <button class="tool-btn" onclick="Nexus.ui.openModal('manual')">❓</button>
+            <button class="tool-btn" onclick="Nexus.UI.toggleSun()">☀️</button>
+            <button class="tool-btn btn-danger" onclick="Nexus.UI.nuke()">☢️</button>
+            <button class="tool-btn" onclick="Nexus.UI.openModal('manual')">❓</button>
         </div>
     </nav>
 <div id="utility-ribbon" class="sleek-ribbon">
-    <button class="sleek-btn" onclick="Nexus.ui.toggleEditMode()" title="Read Only Toggle">👁️</button>
+    <button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only Toggle">👁️</button>
     <button class="sleek-btn" onclick="document.execCommand('insertText', false, '  ')" title="Insert Tab">⇥</button>
     <button class="sleek-btn" onclick="Nexus.editorCore.outdent()" title="Remove Tab">⇤</button>
-    <button class="sleek-btn" id="util-select" onclick="Nexus.DpadEngine.toggleSelectLock()" title="Select Toggle">⬚</button>
+    <button class="sleek-btn" id="util-select" onclick="Nexus.actions.selectAll()" title="Select All">⬚</button>
     <button class="sleek-btn" onclick="document.execCommand('copy')" title="Copy">©</button>
     <button class="sleek-btn" onclick="document.execCommand('cut')" title="Cut">✂</button>
     <button class="sleek-btn" onclick="document.execCommand('paste')" title="Paste">📋</button>
@@ -1326,24 +1308,24 @@
     </div>
 
     <div id="utility-bar" class="floating-widget util-vertical">
-        <div class="util-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'utility-bar')"></div>
+        <div class="util-grip" onmousedown="Nexus.UI.handleHandleTap(event, 'utility-bar')"></div>
         <div class="sleek-bar-content" style="overflow-y: auto; -webkit-overflow-scrolling: touch;">
-            <button class="sleek-btn" onclick="Nexus.ui.tools.warp('top')"><span class="util-lbl">TOP</span></button>
-            <button class="sleek-btn" onclick="Nexus.ui.tools.jump100(-1)"><span class="util-lbl">UP 100</span></button>
-            <button class="sleek-btn" onclick="Nexus.ui.tools.jump100(1)"><span class="util-lbl">DN 100</span></button>
-            <button class="sleek-btn" onclick="Nexus.ui.tools.warp('bottom')"><span class="util-lbl">END</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.warp('top')"><span class="util-lbl">TOP</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.jump100(-1)"><span class="util-lbl">UP 100</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.jump100(1)"><span class="util-lbl">DN 100</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.warp('bottom')"><span class="util-lbl">END</span></button>
 
             <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
 
-            <button class="sleek-btn" onclick="Nexus.ui.tools.expandBlock()"><span class="util-lbl">EXPAND</span></button>
-            <button class="sleek-btn" onclick="Nexus.ui.tools.selectAll()"><span class="util-lbl">ALL</span></button>
-            <button class="sleek-btn" onclick="Nexus.ui.tools.selectRange()"><span class="util-lbl">RANGE</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.expandBlock()"><span class="util-lbl">EXPAND</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.selectAll()"><span class="util-lbl">ALL</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.selectRange()"><span class="util-lbl">RANGE</span></button>
 
             <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
 
-            <button class="sleek-btn" onclick="Nexus.ui.tools.clipboard('cut')"><span class="util-lbl">CUT</span></button>
-            <button class="sleek-btn" onclick="Nexus.ui.tools.clipboard('copy')"><span class="util-lbl">COPY</span></button>
-            <button class="sleek-btn" onclick="Nexus.ui.tools.clipboard('paste')"><span class="util-lbl">PASTE</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.clipboard('cut')"><span class="util-lbl">CUT</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.clipboard('copy')"><span class="util-lbl">COPY</span></button>
+            <button class="sleek-btn" onclick="Nexus.UI.tools.clipboard('paste')"><span class="util-lbl">PASTE</span></button>
         </div>
     </div>
 
@@ -1352,7 +1334,7 @@
     <div style="display:flex; flex-direction:column; gap:6px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
             <span style="font-size:10px; color:var(--accent); font-weight:bold;">FIND & REPLACE</span>
-            <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.ui.toggleDrawer('search-drawer')">&times;</span>
+            <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.UI.toggleDrawer('search-drawer')">&times;</span>
         </div>
         <div style="display:flex; gap:6px;">
             <button class="sleek-btn" id="case-btn" onclick="Nexus.search.toggleOpt('case')" style="flex:1; padding:4px;">Aa</button>
@@ -1374,7 +1356,7 @@
 <div id="writer-drawer" class="transform-drawer" style="width: 260px;">
      <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
          <span style="font-size:10px; color:var(--gold); font-weight:bold;">BOILERPLATE ARCHITECT</span>
-         <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.ui.toggleDrawer('writer-drawer')">&times;</span>
+         <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.UI.toggleDrawer('writer-drawer')">&times;</span>
      </div>
      <select id="write-mode" class="sleek-input" style="padding:10px; font-size:12px; width:100%; margin-bottom:10px;">
          <option value="fetch">🌐 Async Fetch API</option>
@@ -1387,7 +1369,7 @@
 </div>
     
 <div id="nexus-dpad" class="floating-widget util-vertical" style="top: 200px; left: 10px; width: auto; background: var(--panel);">
-    <div id="dpad-drag-handle" class="util-grip" onmousedown="Nexus.ui.handleHandleTap(event, 'nexus-dpad')" ontouchstart="Nexus.ui.handleHandleTap(event, 'nexus-dpad')"></div>
+    <div id="dpad-drag-handle" class="util-grip" onmousedown="Nexus.UI.handleHandleTap(event, 'nexus-dpad')" ontouchstart="Nexus.UI.handleHandleTap(event, 'nexus-dpad')"></div>
     <div style="padding:10px; display:flex; flex-direction:column; gap:10px;">
         <div style="display:flex; gap:5px;">
             <button id="dpad-select-lock" class="sleek-btn" style="flex:1; background:var(--bg);">SEL</button>
@@ -1406,7 +1388,7 @@
 
 
     <aside id="panel-left" class="side-panel left-p">
-        <div class="p-head"><span>VORTEX EXPLORER</span><button class="close-x" onclick="Nexus.ui.toggleSidebar('left')">&times;</button></div>
+        <div class="p-head"><span>VORTEX EXPLORER</span><button class="close-x" onclick="Nexus.UI.toggleSidebar('left')">&times;</button></div>
         <div class="p-body">
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
                 <button class="tool-btn btn-accent" onclick="Nexus.Vfs.newFile()">+ NEW FILE</button>
@@ -1421,8 +1403,8 @@
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom: 8px;">
                 <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
                 <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.ui.openModal('diff')">👯 COMPARE</button>
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.ui.openCombineModal()">🔗 COMBINE</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.UI.openModal('diff')">👯 COMPARE</button>
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">🔗 COMBINE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.Vfs.bundleToHTML()">⚡ BUNDLE</button>
                 <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
                 <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
@@ -1439,14 +1421,14 @@
 
             <div class="section-label" style="margin-top:25px;">Project Export</div>
             <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.Vfs.exportToTXT()">📄 EXPORT TO TXT</button>
-            <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.ui.exportZIP()">📦 BUNDLE PROJECT (ZIP)</button>
+            <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.UI.exportZIP()">📦 BUNDLE PROJECT (ZIP)</button>
         </div>
     </aside>
 
 <aside id="panel-right" class="side-panel right-p">
     <div class="p-head">
         <span>COMMAND HUB</span>
-        <button class="close-x" onclick="Nexus.ui.toggleSidebar('right')">&times;</button>
+        <button class="close-x" onclick="Nexus.UI.toggleSidebar('right')">&times;</button>
     </div>
 
     <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 15px;">
@@ -1465,7 +1447,7 @@
                  <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicString()">2. MEDIC: STR PATCH</button>
                  <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicAST()">3. MEDIC: AST BUILD</button>
                  <button class="tool-btn btn-accent" onclick="Nexus.Sentinel.scanDeps()">4. SCAN IMPORTS</button>
-                 <button class="tool-btn btn-accent" style="grid-column: span 2; margin-top:4px;" onclick="Nexus.ui.checkBrackets()">[ ] CHECK BRACKETS</button>               
+                 <button class="tool-btn btn-accent" style="grid-column: span 2; margin-top:4px;" onclick="Nexus.UI.checkBrackets()">[ ] CHECK BRACKETS</button>               
             </div>
             <div id="diag-out" class="mini-console" style="margin-top:10px; height: 120px; overflow-y: auto;">[System Standby]</div>
         </div>
@@ -1487,7 +1469,7 @@
                 </div>
             </div>
             
-            <button class="tool-btn ui-audit-trigger" onclick="Nexus.auditor.runFuzzyAuditOnly()" style="width: 100%; margin-bottom: 10px; border-color: var(--warning); color: var(--warning); background: rgba(255, 193, 7, 0.05); font-weight: 700;">
+            <button class="tool-btn UI-audit-trigger" onclick="Nexus.auditor.runFuzzyAuditOnly()" style="width: 100%; margin-bottom: 10px; border-color: var(--warning); color: var(--warning); background: rgba(255, 193, 7, 0.05); font-weight: 700;">
                 🔍 RUN STANDALONE FUZZY NAME SCAN
             </button>
             
@@ -1517,7 +1499,7 @@
         <div class="slab">
             <div class="section-label">Matrix Operations</div>
             <div class="grid-2">
-                <button class="tool-btn btn-danger" onclick="Nexus.ui.openModal('compressor')">🗜️ COMPRESS</button>
+                <button class="tool-btn btn-danger" onclick="Nexus.UI.openModal('compressor')">🗜️ COMPRESS</button>
                 <button class="tool-btn btn-gold" onclick="Nexus.pwa.forge()">🔨 FORGE PWA</button>
                 <button class="tool-btn" onclick="Nexus.defrag.runJS()">🧹 DEFRAG JS</button>
                 <button class="tool-btn" onclick="Nexus.defrag.sequenceHTML()">🧹 DEFRAG HTML</button>
@@ -1528,8 +1510,8 @@
         <div class="slab">
             <div class="section-label">Code Formatting</div>
             <div class="grid-2">
-                <button class="tool-btn btn-accent" onclick="Nexus.ui.runPrettier()">✨ PRETTIER</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.ui.runJSBeautify()">🧼 BEAUTIFY</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.UI.runPrettier()">✨ PRETTIER</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.UI.runJSBeautify()">🧼 BEAUTIFY</button>
             </div>
         </div>
 
@@ -1539,14 +1521,14 @@
                 <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
                 <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
             </div>
-            <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.graph.render(); Nexus.ui.openModal('graph')">🕸️ PROJECT RADAR</button>
+            <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ PROJECT RADAR</button>
         </div>
 
         <div class="slab">
             <div class="section-label">Injection Vault</div>
             <div class="grid-2">
-                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('vault')">💾 VAULT</button>
-                <button class="tool-btn btn-accent" onclick="Nexus.ui.openModal('dreamer')">🌙 DREAMER</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('vault')">💾 VAULT</button>
+                <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('dreamer')">🌙 DREAMER</button>
             </div>
         </div>
     </div>
@@ -1557,7 +1539,7 @@
     <div id="shell-slide">
         <span style="color:var(--accent); font-family:monospace; font-weight:bold; font-size:18px; margin-right:10px;">&gt;</span>
         <input type="text" id="shell-input" placeholder="Execute command..." onkeydown="if(event.key === 'Enter') { Nexus.shell.exec(this.value); this.value=''; }">
-        <button class="close-x" onclick="Nexus.ui.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:10;">&times;</button>
+        <button class="close-x" onclick="Nexus.UI.toggleSlide('shell')" style="position:absolute; top:10px; right:15px; z-index:10;">&times;</button>
     </div>
 <div id="regex-slide">
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -1573,7 +1555,7 @@
 </div>
     <div id="modal-clones" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>👯 MATRIX DEDUPLICATOR</span><button class="close-x" onclick="Nexus.ui.closeModal('clones')">&times;</button></div>
+            <div class="p-head"><span>👯 MATRIX DEDUPLICATOR</span><button class="close-x" onclick="Nexus.UI.closeModal('clones')">&times;</button></div>
             <div class="modal-body">
                 <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px;">
                     The scanner identifies identical blocks of 3+ lines across all project sectors.
@@ -1585,7 +1567,7 @@
 
     <div id="modal-spotlight" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🛰️ PROJECT SPOTLIGHT</span><button class="close-x" onclick="Nexus.ui.closeModal('spotlight')">&times;</button></div>
+            <div class="p-head"><span>🛰️ PROJECT SPOTLIGHT</span><button class="close-x" onclick="Nexus.UI.closeModal('spotlight')">&times;</button></div>
             <div class="modal-body">
                 <input type="text" id="spotlight-input" class="sleek-input" placeholder="Search all project sectors..." oninput="Nexus.spotlight.search(this.value)">
 <div id="spotlight-results" style="margin-top:15px; display:flex; flex-direction:column; gap:8px; max-height: 50vh; overflow-y: auto;"></div>
@@ -1596,10 +1578,10 @@
     <div id="modal-sandbox" class="modal-overlay">
         <div class="modal-content" style="width: 96%; height: 92%; border-radius: 12px;">
             <div class="sandbox-nav" style="padding: 10px; background: var(--panel); display: flex; gap: 4px;">
-                <button class="seg-btn active" onclick="Nexus.ui.segSandbox('test')">VIEW</button>
-                <button class="seg-btn" onclick="Nexus.ui.segSandbox('opts')">OPTS</button>
-                <button class="seg-btn" onclick="Nexus.ui.segSandbox('logs')">LOGS</button>
-                <button class="close-x" style="margin-left: auto;" onclick="Nexus.ui.closeModal('sandbox')">&times;</button>
+                <button class="seg-btn active" onclick="Nexus.UI.segSandbox('test')">VIEW</button>
+                <button class="seg-btn" onclick="Nexus.UI.segSandbox('opts')">OPTS</button>
+                <button class="seg-btn" onclick="Nexus.UI.segSandbox('logs')">LOGS</button>
+                <button class="close-x" style="margin-left: auto;" onclick="Nexus.UI.closeModal('sandbox')">&times;</button>
             </div>
 
             <div id="sb-test" class="sb-page active">
@@ -1610,7 +1592,7 @@
                 <div class="section-label">Engine Config</div>
                 <div class="item-row"><span>Refresh Rate</span><input type="number" id="sb-fps" value="60" class="sleek-input"></div>
                 <div class="item-row"><span>Mobile Preview</span><input type="checkbox" checked></div>
-                <button class="tool-btn btn-accent" style="width:100%; margin-top:20px;" onclick="Nexus.ui.runSandbox()">REBOOT PROCESS</button>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:20px;" onclick="Nexus.UI.runSandbox()">REBOOT PROCESS</button>
             </div>
 
             <div id="sb-logs" class="sb-page" style="background:#000; padding:10px;">
@@ -1621,7 +1603,7 @@
 
     <div id="modal-manual" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>📖 NEXUS PRIME v40.20 - THE MASTER CODEX</span><button class="close-x" onclick="Nexus.ui.closeModal('manual')">&times;</button></div>
+            <div class="p-head"><span>📖 NEXUS PRIME v40.20 - THE MASTER CODEX</span><button class="close-x" onclick="Nexus.UI.closeModal('manual')">&times;</button></div>
             <div class="modal-body" style="padding: 25px 35px; line-height: 1.6;">
                 <div style="text-align:center; margin-bottom:30px; border:1px solid var(--gold); padding:15px; background:rgba(210,153,34,0.05); border-radius:12px;">
                     <div style="font-size:11px; letter-spacing:3px; color:var(--gold); font-weight:900;">SOVEREIGN ARCHITECTURE</div>
@@ -1654,8 +1636,8 @@
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">1. Vfs Explorer</div>
                 <div class="man-p">Files are stored in the <b>Sovereign Database (Dexie.js)</b>. They persist even if you close the browser. Open the 📁 <b>VORTEX</b> panel to manage sectors.</div>
 
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Matrix Build Operations</div>
-                <div class="man-p">Located in the Vortex panel, these are high-level build commands:
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">2. Matrix BUIld Operations</div>
+                <div class="man-p">Located in the Vortex panel, these are high-level bUIld commands:
                     <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
                         <li><b>⚡ BUNDLE:</b> Compiles the entire project (HTML+CSS+JS) into a single standalone HTML file. Escapes internal tags to prevent breakage.</li>
                         <li><b>⚡ MERGE JS:</b> Concatenates all <code>.js</code> files into a single production script.</li>
@@ -1717,7 +1699,7 @@
 
     <div id="modal-combine" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🔗 COMBINE FILES</span><button class="close-x" onclick="Nexus.ui.closeModal('combine')">&times;</button></div>
+            <div class="p-head"><span>🔗 COMBINE FILES</span><button class="close-x" onclick="Nexus.UI.closeModal('combine')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
                 <span style="font-size:11px; color:var(--text);">Select multiple files to merge. All project imports will be updated.</span>
                 <div id="combine-list" style="max-height: 200px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:10px; border-radius:8px; display:flex; flex-direction:column; gap:8px;"></div>
@@ -1729,7 +1711,7 @@
 
     <div id="modal-vault" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>💾 SOVEREIGN VAULT</span><button class="close-x" onclick="Nexus.ui.closeModal('vault')">&times;</button></div>
+            <div class="p-head"><span>💾 SOVEREIGN VAULT</span><button class="close-x" onclick="Nexus.UI.closeModal('vault')">&times;</button></div>
             <div class="modal-body">
                 <div style="display:flex; flex-wrap: wrap; gap:10px; margin-bottom:20px;">
                     <input type="text" id="vault-search" placeholder="Search..." style="flex:1; min-width: 150px; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;" oninput="Nexus.vault.render(this.value)">
@@ -1746,9 +1728,9 @@
 
     <div id="modal-diff" class="modal-overlay">
         <div class="modal-content" style="width: 90%; height: 85%;">
-            <div class="p-head"><span>👯 MATRIX DIFF (COMPARE)</span><button class="close-x" onclick="Nexus.ui.closeModal('diff')">&times;</button></div>
+            <div class="p-head"><span>👯 MATRIX DIFF (COMPARE)</span><button class="close-x" onclick="Nexus.UI.closeModal('diff')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; padding:15px; gap:10px; overflow: hidden;">
-                <select id="diff-file-selector" class="sleek-input" onchange="Nexus.ui.runDiff(this.value)">
+                <select id="diff-file-selector" class="sleek-input" onchange="Nexus.UI.runDiff(this.value)">
                     <option value="">Select file to compare...</option>
                 </select>
                 <div style="display:flex; flex:1; gap:10px; overflow:hidden;">
@@ -1761,7 +1743,7 @@
 
     <div id="modal-compressor" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🗜️ CODE COMPRESSOR</span><button class="close-x" onclick="Nexus.ui.closeModal('compressor')">&times;</button></div>
+            <div class="p-head"><span>🗜️ CODE COMPRESSOR</span><button class="close-x" onclick="Nexus.UI.closeModal('compressor')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
                 <p style="font-size:12px; opacity:0.7;">Select aggression level for <b>${Nexus.state.activeFile}</b>:</p>
                 
@@ -1787,7 +1769,7 @@
     <div class="modal-content">
         <div class="p-head">
             <span>MATRIX MERGE ENGINE</span>
-            <button class="close-x" onclick="Nexus.ui.closeModal('merge')">×</button>
+            <button class="close-x" onclick="Nexus.UI.closeModal('merge')">×</button>
         </div>
         <div class="p-body">
             <div style="display:flex; gap:10px; margin-bottom:15px; background:var(--surface); padding:10px; border-radius:12px;">
@@ -1812,7 +1794,7 @@
 
     <div id="modal-dreamer" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🌙 DREAMER ARCHITECT</span><button class="close-x" onclick="Nexus.ui.closeModal('dreamer')">&times;</button></div>
+            <div class="p-head"><span>🌙 DREAMER ARCHITECT</span><button class="close-x" onclick="Nexus.UI.closeModal('dreamer')">&times;</button></div>
             <div class="modal-body">
                 <select id="dreamer-type" style="width:100%; padding:15px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:#fff; margin-bottom:10px; font-size:14px;" onchange="Nexus.dreamer.updatePreview()">
                     <option value="btn-tactical">Tactical Button</option>
@@ -1844,7 +1826,7 @@
 
     <div id="modal-intel" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🧠 NEURAL HEURISTICS</span><button class="close-x" onclick="Nexus.ui.closeModal('intel')">&times;</button></div>
+            <div class="p-head"><span>🧠 NEURAL HEURISTICS</span><button class="close-x" onclick="Nexus.UI.closeModal('intel')">&times;</button></div>
             <div class="modal-body" id="intel-root">
                 <div style="text-align:center; padding:20px; background:rgba(0,0,0,0.2); border-radius:15px; margin-bottom:20px; border:1px solid var(--border);">
                     <div style="font-size:10px; color:var(--gold); letter-spacing:2px; margin-bottom:10px;">STRUCTURAL INTEGRITY</div>
@@ -1866,7 +1848,7 @@
 
     <div id="modal-outline" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🗺️ CODE OUTLINE (SYMBOL MAP)</span><button class="close-x" onclick="Nexus.ui.closeModal('outline')">&times;</button></div>
+            <div class="p-head"><span>🗺️ CODE OUTLINE (SYMBOL MAP)</span><button class="close-x" onclick="Nexus.UI.closeModal('outline')">&times;</button></div>
             <div class="modal-body">
                 <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px;">Tap a node to instantly warp to that line.</div>
                 <div id="outline-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -1876,7 +1858,7 @@
 
     <div id="modal-settings" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>⚙️ SETTINGS &amp; PERSISTENCE</span><button class="close-x" onclick="Nexus.ui.closeModal('settings')">&times;</button></div>
+            <div class="p-head"><span>⚙️ SETTINGS &amp; PERSISTENCE</span><button class="close-x" onclick="Nexus.UI.closeModal('settings')">&times;</button></div>
             <div class="modal-body">
                 <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:20px;" onclick="Nexus.kbEditor.open()">🛠️ KEYBOARD BUILDER GUI</button>
 
@@ -1934,14 +1916,14 @@
                 <div class="item-row"><span>Snapshots Active:</span> <span id="metric-snaps">0</span></div>
                 
                 <div class="section-label" style="color:var(--danger)">Nuclear Authorization</div>
-                <button class="tool-btn btn-danger" style="width:100%; padding:18px; font-weight:900;" onclick="Nexus.ui.nuke()" title="Perform Factory Reset">☢ DATA WIPE (FACTORY RESET)</button>
+                <button class="tool-btn btn-danger" style="width:100%; padding:18px; font-weight:900;" onclick="Nexus.UI.nuke()" title="Perform Factory Reset">☢ DATA WIPE (FACTORY RESET)</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-kb-builder" class="modal-overlay">
+    <div id="modal-kb-bUIlder" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>⌨️ KEYBOARD BUILDER</span><button class="close-x" onclick="Nexus.ui.closeModal('kb-builder')">&times;</button></div>
+            <div class="p-head"><span>⌨️ KEYBOARD BUILDER</span><button class="close-x" onclick="Nexus.UI.closeModal('kb-bUIlder')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; padding:15px;">
                 <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px; line-height:1.5;">
                     Configure custom keys. Use <strong style="color:var(--accent)">*#</strong> for cursor placement.<br>
@@ -1949,23 +1931,23 @@
                     Use <strong style="color:var(--accent)">BACKSPACE</strong> as a Display name to delete characters.
                 </div>
                 <div style="display:flex; gap:5px; margin-bottom:15px;">
-                    <button class="tool-btn kb-builder-tab btn-active" onclick="Nexus.kbEditor.switchLang('html')" style="flex:1;">HTML</button>
-                    <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('css')" style="flex:1;">CSS</button>
-                    <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('js')" style="flex:1;">JS</button>
-                    <button class="tool-btn kb-builder-tab" onclick="Nexus.kbEditor.switchLang('qwerty')" style="flex:1;">QWERTY</button>
+                    <button class="tool-btn kb-bUIlder-tab btn-active" onclick="Nexus.kbEditor.switchLang('html')" style="flex:1;">HTML</button>
+                    <button class="tool-btn kb-bUIlder-tab" onclick="Nexus.kbEditor.switchLang('css')" style="flex:1;">CSS</button>
+                    <button class="tool-btn kb-bUIlder-tab" onclick="Nexus.kbEditor.switchLang('js')" style="flex:1;">JS</button>
+                    <button class="tool-btn kb-bUIlder-tab" onclick="Nexus.kbEditor.switchLang('qwerty')" style="flex:1;">QWERTY</button>
                 </div>
-                <div id="kb-builder-list" style="flex:1; overflow-y:auto; margin-bottom:15px; padding-right:5px;"></div>
+                <div id="kb-bUIlder-list" style="flex:1; overflow-y:auto; margin-bottom:15px; padding-right:5px;"></div>
                 <button class="tool-btn btn-accent" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.kbEditor.add()">+ ADD NEW KEY</button>
                 <button class="tool-btn btn-gold" style="width:100%; padding:15px;" onclick="Nexus.kbEditor.save()">💾 SAVE &amp; APPLY</button>
             </div>
         </div>
     </div>
 
-    <div id="modal-graph" class="modal-overlay" onclick="if(event.target===this) Nexus.ui.closeModal('graph')">
+    <div id="modal-graph" class="modal-overlay" onclick="if(event.target===this) Nexus.UI.closeModal('graph')">
         <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto; background: var(--bg);">
             <h2 style="margin-top:0; color:var(--gold); padding: 20px 20px 0 20px;">Project Radar</h2>
             <div id="graph-results" style="background:var(--surface); margin: 0 20px 20px 20px; padding:15px; border-radius:8px;"></div>
-            <button class="sleek-btn" style="width: calc(100% - 40px); margin: 0 20px 20px 20px; padding: 15px;" onclick="Nexus.ui.closeModal('graph')">Close Scanner</button>
+            <button class="sleek-btn" style="width: calc(100% - 40px); margin: 0 20px 20px 20px; padding: 15px;" onclick="Nexus.UI.closeModal('graph')">Close Scanner</button>
         </div>
     </div>
 <div id="panel-terminal" class="side-panel right-p">
@@ -1997,7 +1979,7 @@
     <!-- 2. Main Active Toolbar Row -->
     <div class="dock-toolbar">
         <div class="dock-group dpad-group">
-            <button class="sleek-btn" onclick="Nexus.ui.openSuggestions()">💡</button>
+            <button class="sleek-btn" onclick="Nexus.UI.openSuggestions()">💡</button>
             
             <!-- Toggled Control Container (Arrow Keys, SEL, & CTRL) -->
             <div id="dpad-container" style="display: inline-flex; gap: inherit; align-items: center;">
@@ -2010,15 +1992,15 @@
             </div>
             
             <!-- Global Action Toggle Buttons -->
-            <button id="ribbon-dpad-toggle" class="sleek-btn" onclick="Nexus.ui.toggleDpadPanel()">🎮</button>
-            <button id="row-toggle-btn" class="sleek-btn" onclick="Nexus.ui.toggleKeyboardRows()">↕️</button>
+            <button id="ribbon-dpad-toggle" class="sleek-btn" onclick="Nexus.UI.toggleDpadPanel()">🎮</button>
+            <button id="row-toggle-btn" class="sleek-btn" onclick="Nexus.UI.toggleKeyboardRows()">↕️</button>
         </div>
         
         <div class="dock-divider"></div>
         
 <div id="ribbon-drawer-controls" style="display: flex; gap: 6px; padding-left: 4px; padding-right: 6px; align-items: center;">
-    <button class="sleek-btn" onclick="Nexus.ui.toggleDrawer('search-drawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);">🔍</button>
-    <button class="sleek-btn" onclick="Nexus.ui.toggleDrawer('writer-drawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);">✍️</button>
+    <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('search-drawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);">🔍</button>
+    <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('writer-drawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);">✍️</button>
 </div>
     </div>
 
@@ -2076,26 +2058,152 @@ window.Nexus = {
        widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false, 'nexus-dpad': false }
    },
 compiler: {
-    // Translates your mobile macros into executable code
+    isBuilding: false,
+    lastBuildTime: null,
+    errorLog: [],
+
     preprocess(rawCode) {
         if (!rawCode) return "";
-        
-        // Replace 'ZZ' with '//' globally
         let compiled = rawCode.replace(/ZZ/g, '//');
-        
-        // Optional: You can add other mobile shortcuts here later!
-        // e.g., replacing 'QQ' with a backslash if needed
-        
         return compiled;
+    },
+
+    buildProject() {
+        this.isBuilding = true;
+        this.errorLog = [];
+        
+        try {
+            const htmlSrc = Nexus.state.Vfs["index.html"] || "";
+            const cssSrc = Nexus.state.Vfs["styles.css"] || "";
+            const jsSrc = Nexus.state.Vfs["script.js"] || "";
+
+            let combinedSource = htmlSrc;
+            const headClosingIdx = combinedSource.toLowerCase().lastIndexOf("</head>");
+            
+            const stylePayload = `\n<style id="nexus-injected-styles">\n${cssSrc}\n</style>\n`;
+            if (headClosingIdx !== -1) {
+                combinedSource = combinedSource.substring(0, headClosingIdx) + stylePayload + combinedSource.substring(headClosingIdx);
+            } else {
+                combinedSource = stylePayload + combinedSource;
+            }
+
+            const bodyClosingIdx = combinedSource.toLowerCase().lastIndexOf("</body>");
+            const scriptPayload = `\n<script id="nexus-injected-scripts">\n${jsSrc}\n<\/script>\n`;
+            if (bodyClosingIdx !== -1) {
+                combinedSource = combinedSource.substring(0, bodyClosingIdx) + scriptPayload + combinedSource.substring(bodyClosingIdx);
+            } else {
+                combinedSource = combinedSource + scriptPayload;
+            }
+
+            this.lastBuildTime = new Date().toISOString();
+            this.isBuilding = false;
+
+            const blob = new Blob([combinedSource], { type: "text/html" });
+            return URL.createObjectURL(blob);
+
+        } catch (err) {
+            this.isBuilding = false;
+            this.errorLog.push({ timestamp: new Date().toISOString(), message: err.message });
+            console.error("Nexus Compiler Execution Failure: ", err);
+            return "";
+        }
+    },
+
+    resetCompiler() {
+        this.isBuilding = false;
+        this.lastBuildTime = null;
+        this.errorLog = [];
     }
 },
 
-   // ADDED MISSING EDITOR CORE DEFINITION
-   editorCore: {
-       isCM6: false,
-       isLoaded: false,
-       view: null,
-       modules: {}
+editorCore: {
+    isCM6: false,
+    isLoaded: false,
+    view: null,
+    modules: {},
+    nativeEl: null,
+
+    init(textareaEl) {
+        this.nativeEl = textareaEl;
+        this.isLoaded = true;
+    },
+
+    indent() {
+        if (this.isCM6 && this.view) {
+            const { state, dispatch } = this.view;
+            const spaces = " ".repeat(Nexus.state.prefs.tabWidth || 4);
+            dispatch(state.changeByRange(range => {
+                return {
+                    changes: { from: range.from, insert: spaces },
+                    range: CodeMirror.EditorSelection.range(range.from + spaces.length, range.to + spaces.length)
+                };
+            }));
+        } else if (this.nativeEl) {
+            const start = this.nativeEl.selectionStart;
+            const end = this.nativeEl.selectionEnd;
+            const val = this.nativeEl.value;
+            const spaces = " ".repeat(Nexus.state.prefs.tabWidth || 4);
+
+            this.nativeEl.value = val.substring(0, start) + spaces + val.substring(end);
+            this.nativeEl.selectionStart = this.nativeEl.selectionEnd = start + spaces.length;
+            Nexus.state.Vfs[Nexus.state.activeFile] = this.nativeEl.value;
+        }
+    },
+
+    outdent() {
+        const tabSize = Nexus.state.prefs.tabWidth || 4;
+        if (this.isCM6 && this.view) {
+            const { state, dispatch } = this.view;
+            dispatch(state.changeByRange(range => {
+                const line = state.doc.lineAt(range.from);
+                let charsToRemove = 0;
+                for (let i = 0; i < tabSize; i++) {
+                    if (line.text[i] === " ") charsToRemove++;
+                    else break;
+                }
+                if (charsToRemove > 0) {
+                    return {
+                        changes: { from: line.from, to: line.from + charsToRemove, insert: "" },
+                        range: CodeMirror.EditorSelection.range(Math.max(line.from, range.from - charsToRemove), Math.max(line.from, range.to - charsToRemove))
+                    };
+                }
+                return { range };
+            }));
+        } else if (this.nativeEl) {
+            const start = this.nativeEl.selectionStart;
+            const end = this.nativeEl.selectionEnd;
+            const val = this.nativeEl.value;
+            const lineStartIdx = val.lastIndexOf("\n", start - 1) + 1;
+            let charsToRemove = 0;
+            
+            for (let i = 0; i < tabSize; i++) {
+                if (val[lineStartIdx + i] === " ") charsToRemove++;
+                else break;
+            }
+            
+            if (charsToRemove > 0) {
+                this.nativeEl.value = val.substring(0, lineStartIdx) + val.substring(lineStartIdx + charsToRemove);
+                this.nativeEl.selectionStart = Math.max(lineStartIdx, start - charsToRemove);
+                this.nativeEl.selectionEnd = Math.max(lineStartIdx, end - charsToRemove);
+                Nexus.state.Vfs[Nexus.state.activeFile] = this.nativeEl.value;
+            }
+        }
+    },
+
+    getContent() {
+        if (this.isCM6 && this.view) return this.view.state.doc.toString();
+        else if (this.nativeEl) return this.nativeEl.value;
+        return Nexus.state.Vfs[Nexus.state.activeFile] || "";
+    },
+
+    setContent(newContent) {
+        if (this.isCM6 && this.view) {
+            this.view.dispatch({ changes: { from: 0, to: this.view.state.doc.length, insert: newContent } });
+        } else if (this.nativeEl) {
+            this.nativeEl.value = newContent;
+        }
+        Nexus.state.Vfs[Nexus.state.activeFile] = newContent;
+    }
 },
 ICONS: {
     readonly: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
@@ -2140,7 +2248,7 @@ ICONS: {
     this.add('warp', (args) => {
     const line = parseInt(args[0]);
     if (!line) return "Specify line (e.g., warp 500)";
-    Nexus.ui.jumpPrompt(line); // Uses your existing jump logic
+    Nexus.UI.jumpPrompt(line); // Uses your existing jump logic
     return `Warped to LN ${line}`;
     }, "Jump to line.");
     
@@ -2198,7 +2306,7 @@ ICONS: {
     if (action === 'stop') {
     Nexus.tools.macros.recording = false;
     Nexus.tools.macros.store[name] = Nexus.tools.macros.current;
-    Nexus.ui.syncStatus(); // Reset footer
+    Nexus.UI.syncStatus(); // Reset footer
     return `Macro saved as '${name}'. Contains ${Nexus.tools.macros.current.length} steps.`;
     }
     if (action === 'play') {
@@ -2214,7 +2322,7 @@ ICONS: {
     this.add('deps', () => {
     if(Nexus.graph) {
     Nexus.graph.render();
-    Nexus.ui.openModal('graph');
+    Nexus.UI.openModal('graph');
     return "Project Radar initialized.";
     }
     return "Graph module missing.";
@@ -2473,6 +2581,55 @@ runOrphanAudit() {
     reportBox.innerHTML = count > 0 ? `<div style="color:var(--gold); font-weight:bold; margin-bottom:4px;">ORPHANED IDS:</div><pre style="margin:0; white-space:pre-wrap; color:var(--text); opacity:0.9;">${log}</pre>` : `<div style="color: var(--success); font-weight: bold;">✔ All element IDs map to script functions.</div>`;
 },
 // Ensure this lives cleanly inside your Nexus.auditor = { ... } block
+runCssAudit() {
+    const reportBox = document.getElementById('auditor-report-box');
+    const counter = document.getElementById('audit-count-css');
+    document.getElementById('auditor-mode-title').innerText = "ACTIVE: CSS DEADBREAD SCAN";
+
+    const srcCode = this.getEditorContent();
+    if (!srcCode.trim()) return;
+
+    const doc = this.getVirtualDoc(srcCode);
+    let styleContent = '';
+    doc.querySelectorAll('style').forEach(st => styleContent += st.innerHTML);
+
+    // Clear out CSS comments safely
+    styleContent = styleContent.replace(/\/\*[\s\S]*?\*\//g, '');
+
+    // Match all hashtags
+    const allMatches = styleContent.match(/#([a-zA-Z0-9_-]+)/g) || [];
+    const uniqueSelectors = [...new Set(allMatches)];
+
+    let log = '';
+    let count = 0;
+
+    // Base framework elements to naturally greenlight
+    const baseSafeStyles = ['editor', 'panel-right', 'footer'];
+
+    uniqueSelectors.forEach(selector => {
+        const id = selector.replace('#', '');
+        
+        // 1. Safe Bypass check
+        if (baseSafeStyles.includes(id)) return;
+
+        // 2. HEX COLOR FILTER: If it's 3 or 6 characters and only contains hex digits (a-f, 0-9), ignore it!
+        if (/^[0-9a-fA-F]{3}$/.test(id) || /^[0-9a-fA-F]{6}$/.test(id)) {
+            return; 
+        }
+
+        // 3. Check if the element actually exists in the DOM tree
+        if (!doc.getElementById(id)) {
+            // Double check if it might be handled dynamically via a base panel prefix
+            if (doc.querySelector(`[id$="${id}"]`) || doc.querySelector(`[id*="${id}"]`)) return;
+
+            count++;
+            log += `• Selector: ${selector}\n`;
+        }
+    });
+
+    counter.innerText = count;
+    reportBox.innerHTML = count > 0 ? `<div style="color:var(--gold); font-weight:bold; margin-bottom:4px;">UNUSED SELECTORS:</div><pre style="margin:0; white-space:pre-wrap; color:var(--text); opacity:0.9;">${log}</pre>` : `<div style="color: var(--success); font-weight: bold;">✔ Clean compilation. 100% of defined styles map directly to active elements.</div>`;
+},
 runFuzzyAuditOnly() {
 const ed = document.getElementById('raw-terminal');
 if (!ed) return;
@@ -2501,7 +2658,7 @@ alert(`Fuzzy Audit Finished: Found ${reports.length} casing issues.`);
 
  auditFuzzyNames(code, reports) {
      // Our strict golden core tokens to enforce
-     const coreTokens = ["Nexus", "Vfs", "ui", "DpadEngine", "omni", "Terminal", "state"];
+     const coreTokens = ["Nexus", "Vfs", "UI", "DpadEngine", "omni", "Terminal", "state"];
      
      // Split code down into raw alphanumeric words
      const words = code.match(/\b[a-zA-Z_]\w*\b/g) || [];
@@ -2562,58 +2719,8 @@ alert(`Fuzzy Audit Finished: Found ${reports.length} casing issues.`);
          });
      });
 }   },
-// =======================================================
-// HARDENED CSS SELECTOR SCANNER (Filters out Hex Colors)
-// =======================================================
-runCssAudit() {
-    const reportBox = document.getElementById('auditor-report-box');
-    const counter = document.getElementById('audit-count-css');
-    document.getElementById('auditor-mode-title').innerText = "ACTIVE: CSS DEADBREAD SCAN";
 
-    const srcCode = this.getEditorContent();
-    if (!srcCode.trim()) return;
 
-    const doc = this.getVirtualDoc(srcCode);
-    let styleContent = '';
-    doc.querySelectorAll('style').forEach(st => styleContent += st.innerHTML);
-
-    // Clear out CSS comments safely
-    styleContent = styleContent.replace(/\/\*[\s\S]*?\*\//g, '');
-
-    // Match all hashtags
-    const allMatches = styleContent.match(/#([a-zA-Z0-9_-]+)/g) || [];
-    const uniqueSelectors = [...new Set(allMatches)];
-
-    let log = '';
-    let count = 0;
-
-    // Base framework elements to naturally greenlight
-    const baseSafeStyles = ['editor', 'panel-right', 'footer'];
-
-    uniqueSelectors.forEach(selector => {
-        const id = selector.replace('#', '');
-        
-        // 1. Safe Bypass check
-        if (baseSafeStyles.includes(id)) return;
-
-        // 2. HEX COLOR FILTER: If it's 3 or 6 characters and only contains hex digits (a-f, 0-9), ignore it!
-        if (/^[0-9a-fA-F]{3}$/.test(id) || /^[0-9a-fA-F]{6}$/.test(id)) {
-            return; 
-        }
-
-        // 3. Check if the element actually exists in the DOM tree
-        if (!doc.getElementById(id)) {
-            // Double check if it might be handled dynamically via a base panel prefix
-            if (doc.querySelector(`[id$="${id}"]`) || doc.querySelector(`[id*="${id}"]`)) return;
-
-            count++;
-            log += `• Selector: ${selector}\n`;
-        }
-    });
-
-    counter.innerText = count;
-    reportBox.innerHTML = count > 0 ? `<div style="color:var(--gold); font-weight:bold; margin-bottom:4px;">UNUSED SELECTORS:</div><pre style="margin:0; white-space:pre-wrap; color:var(--text); opacity:0.9;">${log}</pre>` : `<div style="color: var(--success); font-weight: bold;">✔ Clean compilation. 100% of defined styles map directly to active elements.</div>`;
-},
 
 
 
@@ -2768,8 +2875,8 @@ setEmptyState() {
     });
 
     this.renderAccordion();
-    if (Nexus.ui && typeof Nexus.ui.updateGutter === 'function') {
-        Nexus.ui.updateGutter();
+    if (Nexus.UI && typeof Nexus.UI.updateGutter === 'function') {
+        Nexus.UI.updateGutter();
     }
 },
 
@@ -2813,7 +2920,7 @@ setEmptyState() {
             const ed = document.getElementById('raw-terminal');
             if (ed) {
                 ed.value = code;
-                Nexus.ui.updateGutter();
+                Nexus.UI.updateGutter();
             }
         }
 
@@ -2867,10 +2974,10 @@ setEmptyState() {
 // --- 3. RENDERING ACCORDION ---
 renderAccordion() {
     // 1. Target the correct accordion container element safely
-    const root = document.getElementById('file-accordion');
+    const root = document.getElementById('accordion-root');
     if (!root) return; // Exit gracefully if the DOM frame isn't painted yet
 
-    // 2. Build the groups dictionary dynamically from Nexus.state.Vfs
+    // 2. BUIld the groups dictionary dynamically from Nexus.state.Vfs
     const groups = {};
     if (Nexus.state && Nexus.state.Vfs) {
         Object.keys(Nexus.state.Vfs).forEach(fn => {
@@ -2917,8 +3024,8 @@ renderAccordion() {
     root.innerHTML = htmlOut;
 
     // 4. Guard check the tabs render engine pass
-    if (Nexus.ui && typeof Nexus.ui.renderTabs === 'function') {
-        Nexus.ui.renderTabs();
+    if (Nexus.UI && typeof Nexus.UI.renderTabs === 'function') {
+        Nexus.UI.renderTabs();
     }
 },
 
@@ -3011,7 +3118,7 @@ combineFiles() {
     this.save();
     this.renderAccordion();
     this.switchFile(newName);
-    Nexus.ui.closeModal('combine');
+    Nexus.UI.closeModal('combine');
     alert("Sovereign Merge Complete.");
 }
 },
@@ -3064,7 +3171,7 @@ undo() {
     ed.value = prev;
 
     Nexus.state.Vfs[Nexus.state.activeFile] = prev;
-    Nexus.ui.updateGutter();
+    Nexus.UI.updateGutter();
     historyState.isLocked = false;
 },
 
@@ -3085,7 +3192,7 @@ redo() {
     ed.value = next;
 
     Nexus.state.Vfs[Nexus.state.activeFile] = next;
-    Nexus.ui.updateGutter();
+    Nexus.UI.updateGutter();
     historyState.isLocked = false;
 }
 },
@@ -3366,7 +3473,7 @@ clones: {
             </div>
         `).join('');
 
-        if(Nexus.ui?.openModal) Nexus.ui.openModal('clones');
+        if(Nexus.UI?.openModal) Nexus.UI.openModal('clones');
     },
 
     async vault(index) {
@@ -3579,7 +3686,7 @@ Sentinel : {
 
        Nexus.state.Vfs[Nexus.state.activeFile] = finalCode;
        Nexus.Vfs.save();
-       Nexus.ui.updateGutter();
+       Nexus.UI.updateGutter();
    },
    
    // ... initEngine and other existing Sentinel logic ...
@@ -3719,7 +3826,7 @@ Sentinel : {
                            while (tracer) {
                                if (['FunctionDeclaration', 'Program'].includes(tracer.type)) {
                                    if (this.findDeclarationsInScope(tracer, node.id.name, node)) {
-                                       return { id: 'SHADOW_VAR', message: `Ambiguity: '${node.id.name}' shadows an outer scope variable.`, severity: 'MEDIUM' };
+                                       return { id: 'SHADOW_VAR', message: `AmbigUIty: '${node.id.name}' shadows an outer scope variable.`, severity: 'MEDIUM' };
                                    }
                                }
                                tracer = tracer.parent;
@@ -3822,7 +3929,7 @@ Sentinel : {
            
            ed.value = code;
            Nexus.state.Vfs[Nexus.state.activeFile] = code;
-           Nexus.ui.updateGutter();
+           Nexus.UI.updateGutter();
            Nexus.Vfs.save();
            
            this.log("[MEDIC STRING] Deep string scrub complete. Whitespace optimized.", "success"); 
@@ -3830,10 +3937,10 @@ Sentinel : {
        runMedicAST() { 
            if(!Nexus.state.activeFile) return; 
            const ed = document.getElementById('raw-terminal');
-           if (ed.hasAttribute('readonly')) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebuild.", "danger");
+           if (ed.hasAttribute('readonly')) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebUIld.", "danger");
            
            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
-           if (ext !== 'js') return this.log("[MEDIC AST] Logic rebuild only supports raw .js files.", "warn");
+           if (ext !== 'js') return this.log("[MEDIC AST] Logic rebUIld only supports raw .js files.", "warn");
            
            this.initEngine(); 
            
@@ -3841,14 +3948,14 @@ Sentinel : {
                const { ast, issues } = this.engine.analyzeAndMutate(ed.value, 'AST_REBUILD');
                
                if (issues.length === 0) {
-                   return this.log("[MEDIC AST] Code structure optimal. No mutations required.", "success");
+                   return this.log("[MEDIC AST] Code structure optimal. No mutations reqUIred.", "success");
                }
                
-               const rebuiltCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
+               const rebUIltCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
                
-               ed.value = rebuiltCode;
-               Nexus.state.Vfs[Nexus.state.activeFile] = rebuiltCode;
-               Nexus.ui.updateGutter();
+               ed.value = rebUIltCode;
+               Nexus.state.Vfs[Nexus.state.activeFile] = rebUIltCode;
+               Nexus.UI.updateGutter();
                Nexus.Vfs.save();
                
                this.log(`[MEDIC AST] Matrix reconstructed. Applied ${issues.length} structural mutation(s).`, "success");
@@ -3861,7 +3968,7 @@ Sentinel : {
        scanDeps() { 
            if(!Nexus.state.activeFile) return; 
            const code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
-           const deps = code.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g);
+           const deps = code.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:reqUIre\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g);
            
            if (!deps || deps.length === 0) {
                this.log("SCAN IMPORTS: No external dependencies detected.", "success");
@@ -4005,7 +4112,7 @@ intel: {
            ? patterns.map(p => `<span style="background:rgba(47,129,247,0.15); border:1px solid var(--accent); color:var(--accent); padding:6px 12px; border-radius:6px; font-size:11px; font-weight:bold; letter-spacing:0.5px;">${p}</span>`).join('') 
            : '<span style="font-size:12px; color:var(--text); opacity:0.5; font-style:italic;">No patterns detected.</span>';
        
-       Nexus.ui.openModal('intel');
+       Nexus.UI.openModal('intel');
    }
 },
 compressor: {
@@ -4080,9 +4187,9 @@ compressor: {
            }
            
            Nexus.state.Vfs[Nexus.state.activeFile] = compressed;
-           Nexus.ui.updateGutter();
+           Nexus.UI.updateGutter();
            Nexus.Vfs.save();
-           Nexus.ui.closeModal('compressor');
+           Nexus.UI.closeModal('compressor');
            
            const st = document.getElementById('foot-status');
            st.innerText = `COMPRESSED: ${level.toUpperCase()}`;
@@ -4117,7 +4224,7 @@ compressor: {
                rawTerm.style.display = 'block';
                
                rawTerm.value = currentCode;
-               Nexus.ui.updateGutter();
+               Nexus.UI.updateGutter();
                document.getElementById('foot-status').innerText = "ENGINE: VANILLA";
            } else {
 // --- SWITCH TO CM6 ---
@@ -4236,7 +4343,7 @@ try {
    context: {
        graph: new Map(),
        definitions: new Map(),
-       build(code, filepath) {
+       bUIld(code, filepath) {
            this.graph.clear(); 
            this.definitions.clear();
            try {
@@ -4406,7 +4513,7 @@ URL.revokeObjectURL(workerUrl);
                
                res.innerHTML = matches.map(m => `
                    <div class="item-row" style="background:var(--surface); border-radius:8px; padding:12px; cursor:pointer; margin-bottom:5px; display:flex; flex-direction:column; align-items:flex-start;" 
-                        onclick="Nexus.Vfs.switchFile('${m.file}'); setTimeout(() => Nexus.ui.jumpPrompt(${m.line}), 100); Nexus.ui.closeModal('spotlight');">
+                        onclick="Nexus.Vfs.switchFile('${m.file}'); setTimeout(() => Nexus.UI.jumpPrompt(${m.line}), 100); Nexus.UI.closeModal('spotlight');">
                        <div style="display:flex; justify-content:space-between; width:100%;">
                            <span style="font-family:monospace; font-size:13px; color:var(--gold); font-weight:bold;">${m.file}</span>
                            <span style="font-size:11px; color:var(--accent);">Line ${m.line}</span>
@@ -4476,10 +4583,10 @@ inject() {
    if (payload) {
        // 3. The Sovereign Pipeline
        // We use injectChar so the Backspace logic and Dexie Auto-save trigger
-       Nexus.ui.injectChar(`\n${payload}\n`);
+       Nexus.UI.injectChar(`\n${payload}\n`);
        
-       Nexus.ui.closeModal('dreamer');
-       Nexus.ui.updateGutter();
+       Nexus.UI.closeModal('dreamer');
+       Nexus.UI.updateGutter();
        if (Nexus.Sentinel) {
    Nexus.Sentinel.log(`ARCHITECT: ${type} injected into ${ext.toUpperCase()} sector.`, "success");
        }
@@ -4577,7 +4684,7 @@ inject() {
            // Route gesture to active UI logic
            if (dirStr === 'DL') Nexus.Sentinel.runLint(); 
            if (dirStr === 'UDUD') Nexus.intel.scan();     
-           if (dirStr === 'DRUL') Nexus.ui.beautify();    
+           if (dirStr === 'DRUL') Nexus.UI.beautify();    
        }
    },
 
@@ -4596,7 +4703,7 @@ inject() {
 
    pwa: {
        forge() {
-           if (!Nexus.state.activeFile.endsWith('.html')) return alert("HTML Required.");
+           if (!Nexus.state.activeFile.endsWith('.html')) return alert("HTML ReqUIred.");
            const name = prompt("PWA Name:", "Nexus Tool");
            const color = prompt("Theme Color:", "#0d1117");
            if (!name || !color) return;
@@ -4721,7 +4828,7 @@ grab() {
            ed.value = ed.value.substring(0, pos) + Nexus.state.vault[i].code + ed.value.substring(ed.selectionEnd); 
            Nexus.state.Vfs[Nexus.state.activeFile] = ed.value; 
            Nexus.Vfs.save(); 
-           Nexus.ui.closeModal('vault'); 
+           Nexus.UI.closeModal('vault'); 
        },
        cutFile() {
            if(!Nexus.state.activeFile) return alert("No file active.");
@@ -4783,7 +4890,7 @@ grab() {
                </div>`).reverse().join('') || "No Snapshots."; 
        }
    },
-// Add this inside the Nexus.ui object
+// Add this inside the Nexus.UI object
 
     
 merge: {
@@ -4801,7 +4908,7 @@ merge: {
         lSel.innerHTML = options;
         rSel.innerHTML = options;
         
-        Nexus.ui.openModal('merge');
+        Nexus.UI.openModal('merge');
     },
 
     start() {
@@ -4861,7 +4968,7 @@ merge: {
         Nexus.state.Vfs[mergedName] = this.finalCode.join('');
         Nexus.Vfs.save();
         Nexus.Vfs.renderAccordion();
-        Nexus.ui.closeModal('merge');
+        Nexus.UI.closeModal('merge');
         alert("Success: Master file created in Vfs.");
     }
 },
@@ -4938,12 +5045,12 @@ merge: {
        } else {
            list.innerHTML = `<div style="text-align:center; padding:20px; color:var(--text); opacity:0.5;">No structural nodes detected.</div>`;
        }
-       Nexus.ui.openModal('outline');
+       Nexus.UI.openModal('outline');
    },
 
    jump(ln) {
-       Nexus.ui.closeModal('outline');
-       Nexus.ui.jumpPrompt(ln); 
+       Nexus.UI.closeModal('outline');
+       Nexus.UI.jumpPrompt(ln); 
    }
 },
 
@@ -5005,18 +5112,18 @@ graph: {
        // This Set tracks every single file the rendering loop touches.
        const touched = new Set(); 
 
-       const buildTree = (node, prefix, isLast, visited) => {
+       const bUIldTree = (node, prefix, isLast, visited) => {
            touched.add(node);
            if (visited.has(node)) {
                return `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--danger)">🔄 ${node} (Circular Loop)</span></div>`;
            }
            visited.add(node);
            
-           let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.Vfs.switchFile('${node}'); Nexus.ui.closeModal('graph');">${node}</span></div>`;
+           let line = `<div><span style="color:var(--border);">${prefix}${isLast ? '└── ' : '├── '}</span><span style="color:var(--text); cursor:pointer;" onmouseover="this.style.color='var(--gold)'" onmouseout="this.style.color='var(--text)'" onclick="Nexus.Vfs.switchFile('${node}'); Nexus.UI.closeModal('graph');">${node}</span></div>`;
            
            const children = deps[node] || [];
            for (let i = 0; i < children.length; i++) {
-               line += buildTree(children[i], prefix + (isLast ? '    ' : '│   '), i === children.length - 1, new Set(visited));
+               line += bUIldTree(children[i], prefix + (isLast ? '    ' : '│   '), i === children.length - 1, new Set(visited));
            }
            return line;
        };
@@ -5037,11 +5144,11 @@ graph: {
 
        // 2. RENDER THE ACTIVE TREE
        if (rootNode) {
-           html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.Vfs.switchFile('${rootNode}'); Nexus.ui.closeModal('graph');">${rootNode}</span></div>`;
+           html += `<div style="margin-top:10px;">📦 <span style="color:var(--gold); font-weight:bold; cursor:pointer;" onclick="Nexus.Vfs.switchFile('${rootNode}'); Nexus.UI.closeModal('graph');">${rootNode}</span></div>`;
            touched.add(rootNode);
            const children = deps[rootNode] || [];
            for (let i = 0; i < children.length; i++) {
-               html += buildTree(children[i], '', i === children.length - 1, new Set([rootNode]));
+               html += bUIldTree(children[i], '', i === children.length - 1, new Set([rootNode]));
            }
        } else {
            html += `<div style="color:var(--danger); opacity:0.8;">No entry point (index.html) detected in Vfs.</div>`;
@@ -5054,7 +5161,7 @@ graph: {
        html += `<h3 style="color:var(--danger); border-bottom:1px solid var(--border); padding-bottom:5px; margin-top:25px;">👻 Dead Sectors (Unlinked)</h3>`;
        if (orphans.length > 0) {
            orphans.forEach(o => {
-               html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onclick="Nexus.Vfs.switchFile('${o}'); Nexus.ui.closeModal('graph');">${o}</span></div>`;
+               html += `<div>💀 <span style="color:var(--text); opacity:0.6; cursor:pointer;" onclick="Nexus.Vfs.switchFile('${o}'); Nexus.UI.closeModal('graph');">${o}</span></div>`;
            });
        } else {
            html += `<div style="color:var(--success); opacity:0.8;">System clean. All Vfs files linked to entry point.</div>`;
@@ -5167,7 +5274,7 @@ kbEditor: {
        
        open() {
            this.tempLayout = JSON.parse(JSON.stringify(Nexus.state.prefs.kbLayouts));
-           Nexus.ui.openModal('kb-builder');
+           Nexus.UI.openModal('kb-bUIlder');
            this.render();
        },
        
@@ -5177,7 +5284,7 @@ kbEditor: {
        },
        
        render() {
-           const list = document.getElementById('kb-builder-list');
+           const list = document.getElementById('kb-bUIlder-list');
            const keys = this.tempLayout[this.currentLang] || [];
            
            list.innerHTML = keys.map((k, i) => `
@@ -5199,7 +5306,7 @@ kbEditor: {
                    </div>
                </div>`).join('');
            
-           document.querySelectorAll('.kb-builder-tab').forEach(b => {
+           document.querySelectorAll('.kb-bUIlder-tab').forEach(b => {
                b.classList.toggle('btn-active', b.innerText.toLowerCase() === this.currentLang);
            });
        },
@@ -5222,7 +5329,7 @@ kbEditor: {
        save() { 
            Nexus.state.prefs.kbLayouts = JSON.parse(JSON.stringify(this.tempLayout)); 
            Nexus.settings.update('kbLayouts', Nexus.state.prefs.kbLayouts); 
-           Nexus.ui.closeModal('kb-builder'); 
+           Nexus.UI.closeModal('kb-bUIlder'); 
        }
    },
 kb: {
@@ -5262,7 +5369,7 @@ kb: {
                 let specialClass = (k.d === 'BACKSPACE' || k.d === 'ENTER') ? 'style="background:var(--accent); color:#fff;"' : '';
                 if(k.d === 'SPACE') specialClass = 'style="width: 80px;"';
                 
-                return `<button class="kb-key" ${specialClass} onclick="Nexus.ui.injectChar('${iSafe}')">${dSafe}</button>`;
+                return `<button class="kb-key" ${specialClass} onclick="Nexus.UI.injectChar('${iSafe}')">${dSafe}</button>`;
             }).join('');
             
             // Loop pattern 5 times for smooth horizontal loop boundaries
@@ -5308,7 +5415,7 @@ kb: {
            Nexus.state.searchOpts[opt] = !Nexus.state.searchOpts[opt];
            document.getElementById(opt + '-btn').classList.toggle('active');
        },
-       buildRegex() {
+       bUIldRegex() {
            const term = document.getElementById('find-input').value;
            if (!term) return null;
            let searchStr = term;
@@ -5322,7 +5429,7 @@ kb: {
            const files = Object.keys(Nexus.state.Vfs);
            let idx = files.indexOf(Nexus.state.activeFile);
            const startIdx = idx;
-           const regex = this.buildRegex();
+           const regex = this.bUIldRegex();
            if (!regex) return;
 
            while(true) {
@@ -5346,7 +5453,7 @@ kb: {
        },
        findNext(dir, isRecursive = false) {
            const ed = document.getElementById('raw-terminal');
-           const regex = this.buildRegex();
+           const regex = this.bUIldRegex();
            if (!regex) return;
 
            const text = ed.value;
@@ -5412,7 +5519,7 @@ kb: {
        ed.setSelectionRange(selStart, selStart + rep.length);
        Nexus.state.Vfs[Nexus.state.activeFile] = ed.value;
        Nexus.Vfs.save();
-       Nexus.ui.updateGutter();
+       Nexus.UI.updateGutter();
    }
    this.findNext(1);
    }
@@ -5423,7 +5530,7 @@ writer: {
        'fetch': "async function fetchData(url) {\n\ttry {\n\t\tconst res = await fetch(url);\n\t\tif (!res.ok) throw new Error('Network fault');\n\t\tconst data = await res.json();\n\t\treturn data;\n\t} catch (err) {\n\t\tconsole.error('Fetch error:', err);\n\t\tthrow err;\n\t}\n}",
        'component': "class CustomMatrixElement extends HTMLElement {\n\tconstructor() {\n\t\tsuper();\n\t\tthis.attachShadow({ mode: 'open' });\n\t}\n\tconnectedCallback() {\n\t\tthis.shadowRoot.innerHTML = `\n\t\t\t<style>:host { display: block; padding: 10px; }</style>\n\t\t\t<div>Component Initialized</div>\n\t\t`;\n\t}\n}\ncustomElements.define('matrix-element', CustomMatrixElement);",
        'canvas': "const canvas = document.getElementById('omniCanvas');\nconst ctx = canvas.getContext('2d');\nfunction resize() {\n\tcanvas.width = window.innerWidth;\n\tcanvas.height = window.innerHeight;\n}\nwindow.addEventListener('resize', resize);\nresize();\n\nfunction animate() {\n\tctx.clearRect(0, 0, canvas.width, canvas.height);\n\t// Render logic here\n\trequestAnimationFrame(animate);\n}\nanimate();",
-       'express': "const express = require('express');\nconst app = express();\napp.use(express.json());\n\napp.get('/api/status', (req, res) => {\n\tres.json({ status: 'active', matrix: true });\n});\n\napp.listen(3000, () => console.log('DevOS Server running on 3000'));",
+       'express': "const express = reqUIre('express');\nconst app = express();\napp.use(express.json());\n\napp.get('/api/status', (req, res) => {\n\tres.json({ status: 'active', matrix: true });\n});\n\napp.listen(3000, () => console.log('DevOS Server running on 3000'));",
        'observer': "const observer = new IntersectionObserver((entries) => {\n\tentries.forEach(entry => {\n\t\tif (entry.isIntersecting) {\n\t\t\tentry.target.classList.add('visible');\n\t\t}\n\t});\n}, { threshold: 0.1 });\n\ndocument.querySelectorAll('.animate-on-scroll').forEach(el => observer.observe(el));"
    },
    go() {
@@ -5433,7 +5540,7 @@ writer: {
        const mode = document.getElementById('write-mode').value;
        const result = this.templates[mode];
 
-       Nexus.ui.injectChar(result + "\n");
+       Nexus.UI.injectChar(result + "\n");
 
        const statusEl = document.getElementById('writer-status');
        statusEl.innerText = "INJECTED";
@@ -5625,7 +5732,7 @@ async exec(cmdStr) {
     try {
         if (action) {
             const result = await action(args);
-            Nexus.ui.injectChar(`\n/* $ ${cleanCmdStr} */\n/* -> ${result} */\n`);
+            Nexus.UI.injectChar(`\n/* $ ${cleanCmdStr} */\n/* -> ${result} */\n`);
             return result;
         } else {
             return eval(cleanCmdStr); // Evaluates with proper slashes!
@@ -5638,18 +5745,23 @@ async exec(cmdStr) {
 }, 
 
    
-ui: {
+UI: {
     // Update your boot function to be completely non-blocking and guarded
+    // Inside Nexus.UI
     async boot() { 
         console.log("Nexus Prime: Executing UI sub-system allocations...");
-
-        // 1. Core Vfs Initialization (Fixed Case Sensitivity)
+    
+        // FIX: Manually ignite the UI engines for ribbon and swipes
+        if (typeof this.initSubSystems === 'function') this.initSubSystems();
+        if (typeof this.updateWidgets === 'function') this.updateWidgets();
+    
+        // 1. Core Vfs Initialization
         if (Nexus.Vfs && typeof Nexus.Vfs.boot === 'function') {
             await Nexus.Vfs.boot(); 
         } else {
             console.warn("VORTEX BOOT WARN: Nexus.Vfs core module missing or unparsed.");
         }
-
+    
         // 2. Safe Guarded Module Cascade
         if (Nexus.vault && typeof Nexus.vault.boot === 'function') await Nexus.vault.boot(); 
         if (Nexus.snapshots && typeof Nexus.snapshots.boot === 'function') await Nexus.snapshots.boot(); 
@@ -5667,8 +5779,8 @@ ui: {
         }
         
         console.log("Nexus Prime: Sub-systems online.");
-    }, 
-
+    },
+    
   // Fixed initialization block structure with explicit method wrapping and closing brace
   initSubSystems() {  
       if (typeof this.renderUtilBar === 'function') this.renderUtilBar();  
@@ -5706,19 +5818,19 @@ ui: {
           alert(errorMsg);
           
           // Optional: If you have a jump function, use it to go to the line
-          if(Nexus.ui && typeof Nexus.ui.jumpToLine === 'function') Nexus.ui.jumpToLine(line);
+          if(Nexus.UI && typeof Nexus.UI.jumpToLine === 'function') Nexus.UI.jumpToLine(line);
       }
   },
   
    handleHandleTap(e, id) {
    const now = Date.now();
-   if (Nexus.ui.lastTap && (now - Nexus.ui.lastTap < 300) && Nexus.ui.lastId === id) { 
-       Nexus.ui.toggleSnap(id); 
+   if (Nexus.UI.lastTap && (now - Nexus.UI.lastTap < 300) && Nexus.UI.lastId === id) { 
+       Nexus.UI.toggleSnap(id); 
        e.preventDefault(); 
        return; 
    }
-   Nexus.ui.lastTap = now; 
-   Nexus.ui.lastId = id;
+   Nexus.UI.lastTap = now; 
+   Nexus.UI.lastId = id;
        
        const el = document.getElementById(id);
        if (el.dataset.snapped === 'true') { 
@@ -5727,7 +5839,7 @@ ui: {
        }
        this.initDrag(e, id);
    },
-// --- Place these inside Nexus.ui ---
+// --- Place these inside Nexus.UI ---
 
 toggleDpadPanel() {
     const container = document.getElementById('dpad-container');
@@ -5851,7 +5963,7 @@ toggleKeyboardRows() {
 
 
            if (isExploded) {
-               // Perspective is required for Z-axis translation to work
+               // Perspective is reqUIred for Z-axis translation to work
                root.style.perspective = "1000px";
                root.style.overflow = "visible";
        root.style.transformStyle = "preserve-3d";        
@@ -6042,23 +6154,23 @@ toggleKeyboardRows() {
            const layoutStr = Nexus.state.prefs.utilLayout || 'jump, up20, down20, color, undo, redo, tab';
            const layout = layoutStr.split(',').map(s => s.trim());
            const tools = {
-               'jump': `<button class="sleek-btn" onclick="Nexus.ui.jumpPrompt()"><span style="font-size:16px;">|→</span><span class="util-lbl">Line</span></button>`,
-               'up20': `<button class="sleek-btn" onclick="Nexus.ui.jumpRelative(-20)"><span style="font-size:16px;">↑↑</span><span class="util-lbl">Up 20</span></button>`,
-               'down20': `<button class="sleek-btn" onclick="Nexus.ui.jumpRelative(20)"><span style="font-size:16px;">↓↓</span><span class="util-lbl">Dn 20</span></button>`,
+               'jump': `<button class="sleek-btn" onclick="Nexus.UI.jumpPrompt()"><span style="font-size:16px;">|→</span><span class="util-lbl">Line</span></button>`,
+               'up20': `<button class="sleek-btn" onclick="Nexus.UI.jumpRelative(-20)"><span style="font-size:16px;">↑↑</span><span class="util-lbl">Up 20</span></button>`,
+               'down20': `<button class="sleek-btn" onclick="Nexus.UI.jumpRelative(20)"><span style="font-size:16px;">↓↓</span><span class="util-lbl">Dn 20</span></button>`,
                'color': `<button class="sleek-btn" onclick="document.getElementById('color-picker-input').click()"><img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Color_circle_%28hue_sat%29.png" style="width:20px; border-radius:50%;"><span class="util-lbl">Picker</span></button>`,       
                'undo': `<button class="sleek-btn" onclick="Nexus.history.undo()"><span style="font-size:18px;">↶</span><span class="util-lbl">Undo</span></button>`,
                'redo': `<button class="sleek-btn" onclick="Nexus.history.redo()"><span style="font-size:18px;">↷</span><span class="util-lbl">Redo</span></button>`,
-               'tab': `<button class="sleek-btn" onclick="Nexus.ui.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
-              'fold': `<button class="sleek-btn" onclick="Nexus.ui.collapseAll()"><span style="font-size:18px;">≥≤</span><span class="util-lbl">Fold</span></button>`,
-               'unfold': `<button class="sleek-btn" onclick="Nexus.ui.expandAll()"><span style="font-size:18px;">≤≥</span><span class="util-lbl">Unfold</span></button>`,
-           'readonly': `<button class="sleek-btn" onclick="Nexus.ui.toggleEditMode()" title="Read Only">${Nexus.ICONS.readonly}️</button>`,
+               'tab': `<button class="sleek-btn" onclick="Nexus.UI.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
+              'fold': `<button class="sleek-btn" onclick="Nexus.UI.collapseAll()"><span style="font-size:18px;">≥≤</span><span class="util-lbl">Fold</span></button>`,
+               'unfold': `<button class="sleek-btn" onclick="Nexus.UI.expandAll()"><span style="font-size:18px;">≤≥</span><span class="util-lbl">Unfold</span></button>`,
+           'readonly': `<button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only">${Nexus.ICONS.readonly}️</button>`,
            'intab': `<button class="sleek-btn" onclick="document.execCommand('insertText', false, '  ')" title="Insert Tab">⇥</button>`,
            'outtab': `<button class="sleek-btn" onclick="document.execCommand('delete')" title="Remove Tab">⇤</button>`,
            'select': `<button class="sleek-btn" id="util-select" onclick="Nexus.DpadEngine.selectLock = !Nexus.DpadEngine.selectLock; this.classList.toggle('active')" title="Select">⬚</button>`,
            'copy': `<button class="sleek-btn" onclick="document.execCommand('copy')" title="Copy">©</button>`,
            'cut': `<button class="sleek-btn" onclick="document.execCommand('cut')" title="Cut">✂</button>`,
            'paste': `<button class="sleek-btn" onclick="navigator.clipboard.readText().then(t => document.execCommand('insertText', false, t))" title="Paste">📋</button>`,
-           'orient': `<button class="sleek-btn" onclick="Nexus.ui.toggleUtilOrientation()" title="Toggle Orientation">🔄</button>`,
+           'orient': `<button class="sleek-btn" onclick="Nexus.UI.toggleUtilOrientation()" title="Toggle Orientation">🔄</button>`,
            };
            
            const container = document.querySelector('#utility-bar .sleek-bar-content');
@@ -6147,7 +6259,7 @@ toggleKeyboardRows() {
            const st = document.getElementById('foot-status');
            st.innerText = "PRETTIFIED (STRICT)"; 
            st.style.color = "var(--success)";
-           setTimeout(() => Nexus.ui.syncStatus(), 2000);
+           setTimeout(() => Nexus.UI.syncStatus(), 2000);
        } catch(e) { 
            alert("Prettier Error:\n" + e.message); 
        }
@@ -6230,7 +6342,7 @@ runDiff(target) {
            const st = document.getElementById('foot-status');
            st.innerText = "BEAUTIFIED";
            st.style.color = "var(--success)";
-           setTimeout(() => Nexus.ui.syncStatus(), 2000);
+           setTimeout(() => Nexus.UI.syncStatus(), 2000);
        } catch(e) {
            alert("Beautify engine encountered an error: " + e.message);
        }
@@ -6568,7 +6680,7 @@ toggleRibbonDpad() {
                }); 
            }
        }
-   } // Closes the "ui" object literal
+   } // Closes the "UI" object literal
 };// Closes the "window.Nexus" object literal
 
 /* --- GLOBAL LISTENERS & ENGINE HOOKS --- */
@@ -6627,7 +6739,7 @@ editor.onscroll = () => { gutter.scrollTop = editor.scrollTop; };
 editor.oninput = () => { 
    if(!Nexus.state.activeFile) return;
    Nexus.state.Vfs[Nexus.state.activeFile] = editor.value; 
-   Nexus.ui.updateGutter(); 
+   Nexus.UI.updateGutter(); 
    Nexus.Sentinel.pulse(); 
    
    const st = document.getElementById('foot-status');
@@ -6665,7 +6777,7 @@ editor.onkeydown = (e) => {
        document.execCommand('insertText', false, tabSpaces);
        
        Nexus.state.Vfs[Nexus.state.activeFile] = editor.value;
-       Nexus.ui.updateGutter();
+       Nexus.UI.updateGutter();
    } 
 };
 const backdrop = document.getElementById('highlight-backdrop');
@@ -6707,6 +6819,54 @@ document.addEventListener('selectionchange', () => {
 // Initialize namespace hooks if not present
 if (!window.Nexus) window.Nexus = {};
 Nexus.actions = Nexus.actions || {};
+// Ensure these core actions are mapped to your top ribbon triggers
+Nexus.actions = {
+    // 1. Insert Tab at current cursor position
+    insertTab() {
+        Nexus.actions.insertText('\t');
+    },
+
+    // 2. Select All text inside the primary workspace textarea
+    selectAll() {
+        const ed = document.getElementById('raw-terminal');
+        if (!ed) return;
+        ed.focus();
+        ed.setSelectionRange(0, ed.value.length);
+        console.log("Nexus Prime: Workspace fully selected.");
+    },
+
+    // 3. Paste from System Clipboard natively
+    async pasteFromClipboard() {
+        const ed = document.getElementById('raw-terminal');
+        if (!ed) return;
+        try {
+            const text = await navigator.clipboard.readText();
+            Nexus.actions.insertText(text);
+        } catch (err) {
+            console.error("Clipboard blocked: Ensure PWA has clipboard permissions.", err);
+        }
+    }
+};
+
+// 4. FIX: Up and Down Navigator Arrow Event Listener
+// Since your arrows use data-dir="Up" and "Down", attach the listener dynamically:
+document.querySelectorAll('.dpad-arrow').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const direction = e.target.dataset.dir.toLowerCase(); // 'up', 'down', 'left', 'right'
+        
+        if (typeof Nexus.DpadEngine?.move === 'function') {
+            Nexus.DpadEngine.move(direction);
+        } else {
+            // Fallback manual cursor shifting if DpadEngine is sleeping
+            const ed = document.getElementById('raw-terminal');
+            if (!ed) return;
+            ed.focus();
+            // Up/Down reqUIres splitting lines, but shifting caret works for immediate verification
+            if (direction === 'left') ed.selectionStart = ed.selectionEnd -= 1;
+            if (direction === 'right') ed.selectionStart = ed.selectionEnd += 1;
+        }
+    });
+});
 
 // High-Efficiency Character Insertion (Dual-Engine Compatible)
 Nexus.actions.insertText = (text) => {
@@ -6750,7 +6910,7 @@ Nexus.actions.moveCursor = (direction) => {
     // --- CM6 ENGINE ROUTING ---
     if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
         const view = Nexus.editorCore.view;
-        // Uses built-in commands or shifts index relative to character paths
+        // Uses bUIlt-in commands or shifts index relative to character paths
         if (direction === 'Left')  view.dispatch({ selection: { anchor: Math.max(0, view.state.selection.main.head - 1) } });
         if (direction === 'Right') view.dispatch({ selection: { anchor: Math.min(view.state.doc.length, view.state.selection.main.head + 1) } });
         if (direction === 'Up' && typeof Nexus.actions.jumpRelative === 'function') Nexus.actions.jumpRelative(-1);
@@ -6794,20 +6954,6 @@ const updateCursorPos = () => {
 };
 
 window.addEventListener('DOMContentLoaded', async () => { 
-   console.log("Nexus Prime: Initiating Sovereign Bootloader...");
-   
-   // Boot the core UI & Vfs state first
-   await Nexus.ui.boot(); 
-   
-   // Safely bind listeners after DOM and Nexus boot routines finish
-   const ed = document.getElementById('raw-terminal');
-   if (ed) {
-       ed.addEventListener('keyup', updateCursorPos);
-       ed.addEventListener('click', updateCursorPos);
-       ed.addEventListener('input', updateCursorPos);
-   }
-});
-window.addEventListener('DOMContentLoaded', async () => { 
     console.log("Nexus Prime: Initiating Sovereign Bootloader...");
     
     // 1. Structural Sanity Check
@@ -6816,14 +6962,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         return;
     }
     
-    if (!Nexus.ui) {
-        console.error("VORTEX CRITICAL: 'Nexus.ui' is undefined! There is likely a missing comma or broken brace right above your ui: { ... } block.");
+    if (!Nexus.UI) {
+        console.error("VORTEX CRITICAL: 'Nexus.UI' is undefined! There is likely a missing comma or broken brace right above your UI: { ... } block.");
         return;
     }
 
     try {
         // 2. Safe execution of the UI Boot sequence
-        await Nexus.ui.boot(); 
+        await Nexus.UI.boot(); 
         
         // 3. Safely bind listeners after everything successfully initialised
         const ed = document.getElementById('raw-terminal');
