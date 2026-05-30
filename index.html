@@ -1271,8 +1271,6 @@
         <div id="ribbon-track">
             <button class="tool-btn" onclick="Nexus.UI.openModal('settings')">⚙️</button>
             <button class="tool-btn" onclick="Nexus.UI.toggleSidebar('left')">📁</button>
-		         <button class="tool-btn" onclick="Nexus.Vfs.save(); alert('File Saved to VFS');">💾</button>
-		         
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.UI.toggleEditMode()">🔒</button>
             <button class="tool-btn" onclick="Nexus.toggleEditor()">🔄</button>           
                     <button class="tool-btn" onclick="Nexus.UI.toggleWidget('utility-bar'); this.parentElement.classList.remove('active')">🛠</button>
@@ -1290,7 +1288,7 @@
 <div id="utility-ribbon" class="sleek-ribbon">
     <button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only Toggle">👁️</button>
     <button class="sleek-btn" onclick="document.execCommand('insertText', false, '  ')" title="Insert Tab">⇥</button>
-    <button class="sleek-btn" onclick="Nexus.editorCore.outdent()" title="Remove Tab">⇤</button>
+    <button class="sleek-btn" onclick="Nexus.UI.collapseAll()" title="fold">F</button>
     <button class="sleek-btn" id="util-select" onclick="Nexus.actions.selectAll()" title="Select All">⬚</button>
     <button class="sleek-btn" onclick="document.execCommand('copy')" title="Copy">©</button>
     <button class="sleek-btn" onclick="document.execCommand('cut')" title="Cut">✂</button>
@@ -2754,24 +2752,11 @@ Vfs: {
         }
     },
 
-// Add this method to your Nexus.Vfs object
-async save() {
-    await localforage.setItem('Nexus.state.Vfs_v42', Nexus.state.Vfs);
-    await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
-    
-    // UI Feedback
-    const status = document.getElementById('foot-status');
-    if (status) {
-        const originalText = status.innerText;
-        status.innerText = "SAVED TO VFS";
-        status.style.color = "var(--success)";
-        setTimeout(() => {
-            status.innerText = originalText;
-            status.style.color = "";
-        }, 1500);
-    }
-},
-
+    async save() {
+        // Persist using v42 keys to maintain migration integrity
+        await localforage.setItem('Nexus.state.Vfs_v42', Nexus.state.Vfs);
+        await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
+    },
 setEmptyState() {
     Nexus.state.activeFile = "";
     
@@ -7010,4 +6995,16 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 </script>
 </body>
+</html>EventListener('input', updateCursorPos);
+            console.log("Nexus Prime: Terminal listeners securely attached.");
+        }
+    } catch (bootError) {
+        console.error("VORTEX BOOT FAILURE EXCEPTION:", bootError);
+    }
+});
+
+
+</script>
+</body>
+</html>ody>
 </html>
