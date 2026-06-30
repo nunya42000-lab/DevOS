@@ -1303,7 +1303,7 @@
     <div style="position: relative; flex: 1; overflow: hidden; background: #000;">
         <div id="highlight-backdrop" style="position: absolute; inset: 0; padding: 15px; padding-bottom: 50vh; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; white-space: pre-wrap; word-wrap: break-word; color: transparent; pointer-events: none; z-index: 0; overflow: hidden;"></div>
         
-        <textarea id="raw-terminal" style="position: relative; z-index: 1; background: transparent; width: 100%; height: 100%;" readonly spellcheck="false" autocomplete="off" placeholder="VORTEX EMPTY. Load or create a new file."></textarea>
+        <textarea id="raw-terminal" style="position: relative; z-index: 1; background: transparent; width: 100%; height: 100%;" readonly inputmode="none" spellcheck="false" autocomplete="off" placeholder="VORTEX EMPTY. Load or create a new file."></textarea>
     </div>
     <div id="cm6-container" style="display: none; flex: 1; overflow: auto; background: var(--bg); font-family: monospace; font-size: 14px;"></div>
 </div>
@@ -2083,7 +2083,7 @@ window.Nexus = {
            kbLayouts: {},
            ghToken: "",
            ghRepo: "",
-           activeEngine: 'vanilla'
+           activeEngine: 'cm6'
        },
        searchOpts: { case: false, regex: false, global: false },
        widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false, 'nexus-dpad': false }
@@ -2819,7 +2819,11 @@ setEmptyState() {
     if (ed) {
         ed.value = "";
         ed.setAttribute('readonly', 'true');
-        ed.removeAttribute('inputmode');
+        ed.setAttribute('inputmode', 'none');
+    }
+    if (Nexus.editorCore && Nexus.editorCore.view && Nexus.editorCore.view.contentDOM) {
+        Nexus.editorCore.view.contentDOM.contentEditable = "false";
+        Nexus.editorCore.view.contentDOM.setAttribute('inputmode', 'none');
     }
 
     // Defensive guards stop the 'innerText' of null crash dead in its tracks
@@ -2869,6 +2873,13 @@ setEmptyState() {
 
     switchFile(fn) {
         if (!fn || (Nexus.state.Vfs[fn] === undefined)) return;
+
+        // Flush any pending debounced autosave from the file we're leaving
+        if (Nexus.editorCore && Nexus.editorCore._autosaveTimer) {
+            clearTimeout(Nexus.editorCore._autosaveTimer);
+            Nexus.editorCore._autosaveTimer = null;
+            this.save();
+        }
 
         Nexus.state.activeFile = fn;
         const code = Nexus.state.Vfs[fn];
@@ -3646,13 +3657,12 @@ Sentinel : {
 
        // Isolate JS inside HTML if necessary
        if (ext === 'html') {
-           const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-           if (match) {
+           const block = this.findMainScript(code);
+           if (block) {
                isHtml = true;
-               const start = code.indexOf(match[1]);
-               pre = code.substring(0, start);
-               post = code.substring(start + match[1].length);
-               code = match[1];
+               pre = block.pre;
+               post = block.post;
+               code = block.code;
            } else return this.log("Lint: No script tags found.", "warn");
        } else if (ext !== 'js') return this.log("Lint: Only JS/HTML supported.", "warn");
 
@@ -3736,6 +3746,9 @@ Sentinel : {
 
    // 5. HELPER: The Sovereign Mutation Pipeline
    mutateActiveVfs(mutationFn) {
+       if (!Nexus.state.activeFile) return this.log("Error: No active sector.", "danger");
+       if (this.isLocked()) return this.log("[SENTINEL] EDITOR LOCKED. Cannot apply fix.", "danger");
+
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
        let fullCode = Nexus.state.Vfs[Nexus.state.activeFile];
        let targetCode = fullCode;
@@ -3743,28 +3756,18 @@ Sentinel : {
 
        // Handle HTML Isolation
        if (ext === 'html') {
-           const match = fullCode.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-           if (match) {
-               const start = fullCode.indexOf(match[1]);
-               pre = fullCode.substring(0, start);
-               post = fullCode.substring(start + match[1].length);
-               targetCode = match[1];
+           const block = this.findMainScript(fullCode);
+           if (block) {
+               pre = block.pre;
+               post = block.post;
+               targetCode = block.code;
            }
        }
 
        const mutated = mutationFn(targetCode);
        const finalCode = pre + mutated + post;
 
-       // Sync to Editor & Disk
-       if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
-           Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: finalCode } });
-       } else {
-           document.getElementById('raw-terminal').value = finalCode;
-       }
-
-       Nexus.state.Vfs[Nexus.state.activeFile] = finalCode;
-       Nexus.Vfs.save();
-       Nexus.UI.updateGutter();
+       this.setLiveCode(finalCode);
    },
    
    // ... initEngine and other existing Sentinel logic ...
@@ -3995,27 +3998,71 @@ Sentinel : {
            }
            this.engine = new DevOSSentinelDual();
        },
+
+       // --- Engine-agnostic helpers ---
+       // The MEDIC/Lint fix tools used to read/write the hidden vanilla textarea
+       // directly, which goes stale and does nothing once the CM6 engine is active.
+       // These route through whichever engine is actually live.
+       isLocked() {
+           if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+               return Nexus.editorCore.view.contentDOM.contentEditable === "false";
+           }
+           const ed = document.getElementById('raw-terminal');
+           return !ed || ed.hasAttribute('readonly');
+       },
+       getLiveCode() {
+           if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+               return Nexus.editorCore.view.state.doc.toString();
+           }
+           const ed = document.getElementById('raw-terminal');
+           return ed ? ed.value : (Nexus.state.Vfs[Nexus.state.activeFile] || "");
+       },
+       setLiveCode(code) {
+           if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+               const view = Nexus.editorCore.view;
+               view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+           } else {
+               const ed = document.getElementById('raw-terminal');
+               if (ed) ed.value = code;
+           }
+           Nexus.state.Vfs[Nexus.state.activeFile] = code;
+           Nexus.Vfs.save();
+           Nexus.UI.updateGutter();
+       },
+       // Finds the largest inline <script> block (skipping empty/external <script src="...">
+       // tags) instead of blindly grabbing the first match, which used to pick up an
+       // empty external script tag ahead of the real inline code.
+       findMainScript(html) {
+           const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+           let best = null, m;
+           while ((m = re.exec(html)) !== null) {
+               if (!best || m[1].length > best.code.length) {
+                   best = { code: m[1], start: m.index + m[0].indexOf(m[1]), full: m[0] };
+               }
+           }
+           if (!best) return null;
+           return {
+               code: best.code,
+               pre: html.substring(0, best.start),
+               post: html.substring(best.start + best.code.length)
+           };
+       },
        runMedicString() { 
            if(!Nexus.state.activeFile) return; 
-           const ed = document.getElementById('raw-terminal');
-           if (ed.hasAttribute('readonly')) return this.log("[MEDIC] EDITOR LOCKED. Cannot apply patch.", "danger");
+           if (this.isLocked()) return this.log("[MEDIC] EDITOR LOCKED. Cannot apply patch.", "danger");
            
-           let code = ed.value;
+           let code = this.getLiveCode();
            code = code.replace(/[ \t]+$/gm, '');
            code = code.replace(/\n{3,}/g, '\n\n');
            code = code.replace(/\n*$/, '\n');
            
-           ed.value = code;
-           Nexus.state.Vfs[Nexus.state.activeFile] = code;
-           Nexus.UI.updateGutter();
-           Nexus.Vfs.save();
+           this.setLiveCode(code);
            
            this.log("[MEDIC STRING] Deep string scrub complete. Whitespace optimized.", "success"); 
        },
        runMedicAST() { 
            if(!Nexus.state.activeFile) return; 
-           const ed = document.getElementById('raw-terminal');
-           if (ed.hasAttribute('readonly')) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebuild.", "danger");
+           if (this.isLocked()) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebuild.", "danger");
            
            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
            if (ext !== 'js') return this.log("[MEDIC AST] Logic rebuild only supports raw .js files.", "warn");
@@ -4023,7 +4070,7 @@ Sentinel : {
            this.initEngine(); 
            
            try {
-               const { ast, issues } = this.engine.analyzeAndMutate(ed.value, 'AST_REBUILD');
+               const { ast, issues } = this.engine.analyzeAndMutate(this.getLiveCode(), 'AST_REBUILD');
                
                if (issues.length === 0) {
                    return this.log("[MEDIC AST] Code structure optimal. No mutations reqUIred.", "success");
@@ -4031,10 +4078,7 @@ Sentinel : {
                
                const rebUIltCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
                
-               ed.value = rebUIltCode;
-               Nexus.state.Vfs[Nexus.state.activeFile] = rebUIltCode;
-               Nexus.UI.updateGutter();
-               Nexus.Vfs.save();
+               this.setLiveCode(rebUIltCode);
                
                this.log(`[MEDIC AST] Matrix reconstructed. Applied ${issues.length} structural mutation(s).`, "success");
            } catch(e) {
@@ -4071,15 +4115,15 @@ Sentinel : {
     pulse() {
        if(!Nexus.state.activeFile) return;
        const st = document.getElementById('foot-status');
-       const code = document.getElementById('raw-terminal').value;
+       const code = Nexus.Sentinel.getLiveCode();
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
        
        try { 
            if (ext === 'js') {
                acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
            } else if (ext === 'html') {
-               const match = code.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-               if (match) acorn.parse(match[1], { ecmaVersion: 2022, sourceType: 'module' });
+               const block = Nexus.Sentinel.findMainScript(code);
+               if (block) acorn.parse(block.code, { ecmaVersion: 2022, sourceType: 'module' });
            }
            if (st.style.color === "var(--danger)") st.style.color = "var(--success)";
        } catch (e) { 
@@ -4376,7 +4420,8 @@ try {
        EditorView.updateListener.of((update) => {
            if (update.docChanged && update.userEvent) { 
                Nexus.state.Vfs[Nexus.state.activeFile] = update.state.doc.toString();
-               Nexus.Vfs.save();
+               clearTimeout(Nexus.editorCore._autosaveTimer);
+               Nexus.editorCore._autosaveTimer = setTimeout(() => Nexus.Vfs.save(), 400);
            }
            if (update.selectionSet) {
                const pos = update.state.selection.main.head;
@@ -4406,6 +4451,17 @@ try {
     document.getElementById('foot-status').innerText = "ENGINE: CM6 ACTIVE";
     // SAVE engine preference
     Nexus.settings.update('activeEngine', 'cm6');
+
+    // Sync the new CM6 surface to whatever lock state the editor was already in
+    const rawEd = document.getElementById('raw-terminal');
+    const cmDom = Nexus.editorCore.view.contentDOM;
+    if (rawEd && rawEd.hasAttribute('readonly')) {
+        cmDom.contentEditable = "false";
+        cmDom.setAttribute('inputmode', 'none');
+    } else if (rawEd && rawEd.getAttribute('inputmode') === 'none') {
+        cmDom.contentEditable = "true";
+        cmDom.setAttribute('inputmode', 'none');
+    }
     
 } catch (e) {
     document.getElementById('foot-status').innerText = "ENGINE: VANILLA (FAIL)";
@@ -6564,13 +6620,15 @@ initInfiniteRibbon() {
            const ed = document.getElementById('raw-terminal'); 
            const st = document.getElementById('foot-status'); 
            const btns = document.querySelectorAll('.edit-btn-trigger'); 
+           const cmDom = (Nexus.editorCore && Nexus.editorCore.view && Nexus.editorCore.view.contentDOM) || null;
            
            if(!Nexus.state.activeFile) return; 
 
            if (ed.hasAttribute('readonly')) { 
-               // Transition to UTIL MODE (No native keyboard)
+               // Transition to UTIL MODE (No native keyboard, but cursor placement/selection allowed)
                ed.removeAttribute('readonly'); 
                ed.setAttribute('inputmode', 'none'); 
+               if (cmDom) { cmDom.contentEditable = "true"; cmDom.setAttribute('inputmode', 'none'); }
                st.innerText = "UTIL MODE"; 
                st.style.color = "var(--accent)"; 
                btns.forEach(btn => { 
@@ -6580,6 +6638,7 @@ initInfiniteRibbon() {
            } else if (ed.getAttribute('inputmode') === 'none') { 
                // Transition to FULL EDIT (Native keyboard allowed)
                ed.removeAttribute('inputmode'); 
+               if (cmDom) { cmDom.contentEditable = "true"; cmDom.removeAttribute('inputmode'); }
                st.innerText = "READY (FULL)"; 
                st.style.color = "var(--success)"; 
                btns.forEach(btn => { 
@@ -6589,7 +6648,8 @@ initInfiniteRibbon() {
            } else {
                // Return to READ ONLY
                ed.setAttribute('readonly', 'true'); 
-               ed.removeAttribute('inputmode');
+               ed.setAttribute('inputmode', 'none');
+               if (cmDom) { cmDom.contentEditable = "false"; cmDom.setAttribute('inputmode', 'none'); }
                st.innerText = "LOCKED"; 
                st.style.color = "var(--danger)"; 
                btns.forEach(btn => { 
@@ -7209,6 +7269,18 @@ window.addEventListener('DOMContentLoaded', async () => {
             ed.addEventListener('keyup', updateCursorPos);
             ed.addEventListener('click', updateCursorPos);
             ed.addEventListener('input', updateCursorPos);
+
+            // Autosave: the CM6 engine already persists on every keystroke via its
+            // updateListener, but the vanilla textarea fallback had no equivalent,
+            // so edits typed there were silently lost on file switch / reload.
+            let autosaveTimer = null;
+            ed.addEventListener('input', () => {
+                if (ed.hasAttribute('readonly') || !Nexus.state.activeFile) return;
+                Nexus.state.Vfs[Nexus.state.activeFile] = ed.value;
+                clearTimeout(autosaveTimer);
+                autosaveTimer = setTimeout(() => Nexus.Vfs.save(), 400);
+            });
+
             console.log("Nexus Prime: Terminal listeners securely attached.");
         }
     } catch (bootError) {
