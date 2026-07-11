@@ -5,35 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
     <meta name="theme-color" content="#0d1117">
     <title>divIDE v0.8</title>
-    <!-- divIDE's own installability. NOTE: there's deliberately no
-         navigator.serviceWorker.register() call here — a service worker
-         script MUST be a real http(s) same-origin .js file per spec
-         (browsers reject blob:/data: URLs with "Script URL's scheme is not
-         'http' or 'https'"), so a literal single HTML file can never
-         self-register one. That's a hard platform limitation, not something
-         fixable with a script trick — see the PWA Forge fix elsewhere in
-         this file for the same constraint on exported projects. The
-         manifest+icon below still make "Add to Home Screen" available where
-         supported; full offline boot would need divIDE to be served
-         alongside a real sw.js, which is out of scope for a single file. -->
     <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22divIDE%22%2C%22short_name%22%3A%22divIDE%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%220d1117%22%2C%22theme_color%22%3A%222f81f7%22%7D">
-    <link rel="apple-touch-icon" href="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20fill%3D%22%232f81f7%22/%3E%3Ctext%20x%3D%2256%22%20y%3D%22380%22%20font-size%3D%22360%22%20font-family%3D%22system-ui%22%20fill%3D%22white%22%3E%F0%9F%92%BB%3C/text%3E%3C/svg%3E">
+    <link rel="apple-touch-icon" href="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20fill%3D%22%232f81f7%22/%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.33em%22%20text-anchor%3D%22middle%22%20font-family%3D%22Menlo%2CConsolas%2Cmonospace%22%20font-size%3D%22200%22%20font-weight%3D%22700%22%20fill%3D%22white%22%3E%F0%9F%92%BB%3C/text%3E%3C/svg%3E">
    
-    <!-- CodeMirror dependency de-duplication. Without this, dynamically
-         importing multiple separate @codemirror/* packages from esm.sh (see
-         toggleEditor() and DpadEngine.navigate()) lets EACH one independently
-         resolve its own transitive @codemirror/state — and those can silently
-         diverge to different actual versions, since esm.sh resolves each
-         top-level import's dependency tree separately. Two different module
-         instances of @codemirror/state then break CodeMirror's internal
-         instanceof checks with "Unrecognized extension value in extension
-         set ([object Object])" the moment EditorState.create() runs — this
-         is the actual cause of "engine swap not working." The `*` prefix
-         marks these as external so esm.sh leaves cross-references between
-         them as bare specifiers instead of pre-resolving them itself,
-         letting this import map force every reference — no matter which
-         package asks for it, no matter how deeply nested — through the
-         exact same URL, so there's only ever one instance of each. -->
     <script type="importmap">
     {
         "imports": {
@@ -68,7 +42,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <script>
-        // 1. Instantly declare the Namespace
         window.Nexus = window.Nexus || {};
         window.Nexus._queue = window.Nexus._queue || [];
         window.Nexus.boot = window.Nexus.boot || function(...args) {
@@ -78,22 +51,19 @@
     </script>
     <style>
         :root {
-            --bg: #0d1117; 
-            --panel: #161b22; 
+            --bg: #0d1117;
+            --panel: #161b22;
             --surface: #21262d;
-            --border: #30363d; 
-            --text: #c9d1d9; 
+            --border: #30363d;
+            --text: #c9d1d9;
             --accent: #2f81f7;
-            --success: #3fb950; 
-            --warn: #d29922; 
+            --success: #3fb950;
+            --warn: #d29922;
             --danger: #f85149;
-            --gold: #d29922; 
+            --gold: #d29922;
             --font-UI: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            --sidebar-w: 88vw; 
+            --sidebar-w: 88vw;
             --sidebar-max: 450px;
-            /* Dock/keyboard/floating-widget chrome — previously hardcoded dark
-               and unaffected by outdoor-mode, so switching themes left these
-               surfaces stuck dark while everything else went light. */
             --dock-bg: #282c34;
             --dock-border: #3e4451;
             --dock-text: #abb2bf;
@@ -106,11 +76,11 @@
         }
 
         body.outdoor-mode {
-            --bg: #ffffff; 
-            --panel: #f6f8fa; 
+            --bg: #ffffff;
+            --panel: #f6f8fa;
             --surface: #ffffff;
-            --border: #d0d7de; 
-            --text: #24292f; 
+            --border: #d0d7de;
+            --text: #24292f;
             --accent: #0969da;
             --gold: #9a6700;
             --dock-bg: #f6f8fa;
@@ -124,192 +94,235 @@
             --gutter-text: #57606a;
         }
 
-        * { 
-            box-sizing: border-box; 
-            -webkit-tap-highlight-color: transparent; 
-            outline: none; 
-        }
-        
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            width: 100vw; 
-            height: 100vh; 
-            background: var(--bg); 
-            color: var(--text); 
-            font-family: var(--font-UI); 
-            overflow: hidden; 
-            overscroll-behavior: none; 
-            /* UI is non-selectable, Editor will override this */
-            user-select: none; 
-        }
-
-        /* --- 1. INFINITE RIBBON --- */
-        #ribbon-container { 
-            height: 55px; 
-            flex-shrink: 0;    
-            background: var(--panel); 
-            border-bottom: 1px solid var(--border); 
-            overflow-x: scroll; 
-            white-space: nowrap; 
-            position: relative; 
-            z-index: 1000; 
-            display: flex; 
-            align-items: center; 
-            -webkit-overflow-scrolling: touch;
-        }
-        #ribbon-container::-webkit-scrollbar { display: none; }
-        #ribbon-track { display: inline-flex; padding: 0 10px; gap: 8px; }
-        .tool-btn { 
-            padding: 10px 18px; 
-            border-radius: 14px; 
-            background: var(--surface); 
-            color: var(--text); 
-            border: 1px solid var(--border); 
-            font-size: 11px; 
-            font-weight: 800; 
-            cursor: pointer; 
-            display: inline-flex; 
-            align-items: center; 
-            gap: 8px; 
-            letter-spacing: 0.5px; 
-            transition: all 0.2s ease; 
-            flex-shrink: 0; 
-        }
-        
-        .btn-edit-lock { color: var(--text); opacity: 0.5; }
-        .btn-edit-util { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(47, 129, 247, 0.3); }
-        .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
-        
-        .btn-gold { color: var(--gold); border-color: var(--gold); }
-        .btn-accent { background: var(--accent); color: #fff; border: none; }
-        .btn-danger { background: var(--danger); color: #fff; border: none; }
-
-        /* --- 2. MAIN WORKSPACE & TABS --- */
-        #app-root { 
-            display: flex; 
-            flex-direction: column; 
-            height: 100dvh; 
-            width: 100vw; 
-            position: relative; 
-            overflow: hidden;
-        }
-
-        #workspace { 
-            flex: 1 1 auto; 
-            display: flex; 
-            flex-direction: column; 
-            position: relative; 
-            overflow: hidden; 
-            min-height: 0; 
-        }
-
-        #nexus-dock {
-            flex-shrink: 0; 
-            position: relative; 
-            width: 100%;
-            z-index: 1000;
-            background-color: var(--dock-bg);
-            border-top: 1px solid var(--dock-border);
+        * {
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font-UI);
+            overflow: hidden;
+            overscroll-behavior: none;
+            user-select: none;
+        }
+
+        #app-root {
             display: flex;
             flex-direction: column;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        #file-tabs-bar { 
-            display: flex; 
-            overflow-x: auto; 
-            background: var(--panel); 
-            border-bottom: 1px solid var(--border); 
-            min-height: 38px; 
-            scroll-behavior: smooth; 
-            -webkit-overflow-scrolling: touch;
-        }
-        #file-tabs-bar::-webkit-scrollbar { display: none; }
-        
-        .file-tab { 
-            padding: 8px 15px; 
-            font-size: 12px; 
-            font-family: monospace; 
-            cursor: pointer; 
-            border-right: 1px solid var(--border); 
-            display: flex; 
-            align-items: center; 
-            gap: 10px; 
-            color: var(--text); 
-            white-space: nowrap; 
-            border-top: 2px solid transparent; 
-            background: var(--surface); 
-            transition: background 0.2s;
-        }
-        .file-tab.active { 
-            background: var(--bg); 
-            border-top: 2px solid var(--accent); 
-            color: var(--accent); 
-            font-weight: bold; 
-        }
-
-        /* --- 3. SIDEBARS --- */
-        .side-panel { 
-            position: fixed; 
-            top: 0; 
-            bottom: 0; 
-            width: var(--sidebar-w); 
-            max-width: var(--sidebar-max); 
-            background: var(--panel); 
-            border: 1px solid var(--border); 
-            z-index: 9000; 
-            transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); 
-            display: flex; 
-            flex-direction: column; 
-            box-shadow: 0 0 50px rgba(0,0,0,0.9); 
-        }
-        .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
-        .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
-        .side-panel.open { transform: translateX(0); }
-        
-        .p-head { 
-            padding: 20px; 
-            border-bottom: 1px solid var(--border); 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            font-weight: 900; 
-            font-size: 14px; 
-            color: var(--gold); 
-            letter-spacing: 1px; 
-        }
-        .p-body { 
-            flex: 1; 
-            padding: 15px; 
-            overflow-y: auto; 
-            font-family: monospace; 
-            -webkit-overflow-scrolling: touch; 
-        }
-
-        /* --- 4. EDITOR VIEW --- */
-        #editor-view { 
-            flex: 1; 
-            display: flex; 
-            background: var(--bg); 
-            position: relative; 
-            overflow: hidden; 
-            min-height: 0;    
-        }
-
-        /* --- B. THE GRAPH MATRIX (Visual Inter-file Imports & References) --- */
-        .graph-viewport {
-            flex: 1;
+            height: 100dvh;
+            width: 100vw;
             position: relative;
             overflow: hidden;
-            background: var(--bg);
+        }
+
+        #ribbon-container {
+            height: 55px;
+            flex-shrink: 0;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            overflow-x: scroll;
+            white-space: nowrap;
+            position: relative;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #ribbon-container::-webkit-scrollbar { display: none; }
+
+        #ribbon-track {
+            display: inline-flex;
+            padding: 0 10px;
+            gap: 8px;
+        }
+
+        .tool-btn {
+            padding: 10px 18px;
+            border-radius: 14px;
+            background: var(--surface);
+            color: var(--text);
             border: 1px solid var(--border);
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        #workspace {
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        #file-tabs-bar {
+            display: flex;
+            overflow-x: auto;
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            min-height: 38px;
+            scroll-behavior: smooth;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        #file-tabs-bar::-webkit-scrollbar { display: none; }
+
+        #editor-view {
+            flex: 1;
+            display: flex;
+            background: var(--bg);
+            position: relative;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        #gutter {
+            width: 45px;
+            background: var(--bg);
+            border-right: 1px solid var(--border);
+            color: var(--gutter-text);
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 22px;
+            text-align: right;
+            padding: 15px 10px 50vh 0;
+            cursor: pointer;
+            overflow: hidden;
+            height: 100%;
+            touch-action: manipulation;
+        }
+
+        #raw-terminal {
+            flex: 1;
+            background: transparent;
+            color: var(--text);
+            border: none;
+            padding: 15px;
+            padding-bottom: 50vh;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 22px;
+            outline: none;
+            resize: none;
+            white-space: pre;
+            overflow: auto;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+            touch-action: pan-y pan-x;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-content {
+            width: 90%;
+            height: 80%;
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 80px rgba(0,0,0,1);
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 25px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .p-head {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 900;
+            font-size: 14px;
+            color: var(--gold);
+            letter-spacing: 1px;
+        }
+
+        .close-x {
+            font-size: 32px;
+            cursor: pointer;
+            color: var(--text);
+            background: none;
+            border: none;
+            line-height: 1;
+            padding: 0 10px;
         }
     </style>
 </head>
 <body>
-    <!-- Page content will be generated by JavaScript -->
+    <div id="app-root">
+        <nav id="ribbon-container">
+            <div id="ribbon-track">
+                <button class="tool-btn">⚙️</button>
+                <button class="tool-btn">📁</button>
+                <button class="tool-btn">🔒</button>
+                <button class="tool-btn">🔄</button>
+                <button class="tool-btn">🔎</button>
+                <button class="tool-btn">▶️</button>
+            </div>
+        </nav>
+
+        <div id="workspace">
+            <div id="file-tabs-bar"></div>
+            <div id="editor-view">
+                <div id="gutter">1</div>
+                <textarea id="raw-terminal" readonly placeholder="Ready..."></textarea>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal-manual" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head">
+                <span>📖 divIDE v0.8</span>
+                <button class="close-x" onclick="this.closest('.modal-overlay').classList.remove('active')">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>divIDE is a mobile-first code editor built for your phone.</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        console.log("divIDE v0.8 loaded successfully");
+        if (window.Nexus && window.Nexus._queue) {
+            window.Nexus._queue.forEach(item => {
+                if (item.fn === 'boot') console.log("Pending boot:", item.args);
+            });
+        }
+    </script>
 </body>
 </html>
