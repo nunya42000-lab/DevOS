@@ -1498,17 +1498,6 @@
             
             <div id="accordion-root"></div>
 
-            <div class="section-label" style="margin-top:25px;">Project Tools</div>
-            <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">Compare, merge, and reshape files within the project.</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-bottom: 8px;">
-                <button class="tool-btn btn-gold" onclick="Nexus.UI.openModal('diff')">👯 COMPARE</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">🔗 COMBINE</button>
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
-                <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
-            </div>
-
             <div class="section-label" style="margin-top:25px;">Export</div>
             <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">Produces a new file to download — the project itself is untouched.</div>
             <button class="tool-btn btn-gold" style="width:100%; padding:15px; margin-bottom:10px;" onclick="Nexus.Vfs.exportToTXT()">📄 EXPORT TO TXT</button>
@@ -1535,10 +1524,6 @@
             <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">One tap checks lint, structure, syntax, CSS, orphaned IDs, and brackets together.</div>
 
             <button class="tool-btn btn-danger" style="width:100%; padding:14px; font-weight:800; margin-bottom:8px;" onclick="Nexus.auditor.runFullSweep()">🔍 RUN FULL DIAGNOSTIC SWEEP</button>
-
-            <button class="tool-btn UI-audit-trigger" onclick="Nexus.auditor.runFuzzyAuditOnly()" style="width: 100%; margin-bottom: 10px; border-color: var(--warning); color: var(--warning); background: rgba(255, 193, 7, 0.05); font-weight: 700;">
-                🔍 RUN FUZZY NAME SCAN
-            </button>
 
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom: 10px;">
                 <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runLintCard()">
@@ -1615,6 +1600,19 @@
         </div>
 
         <div class="slab">
+            <div class="section-label" style="margin-top: 0;">Project Tools</div>
+            <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">Compare, merge, and reshape files within the project.</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                <button class="tool-btn btn-gold" onclick="Nexus.UI.openModal('diff')">👯 COMPARE</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
+                <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">🔗 COMBINE</button>
+                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
+                <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
+            </div>
+        </div>
+
+        <div class="slab">
             <div class="section-label" style="margin-top: 0;">Fix &amp; Format</div>
             <div class="grid-2">
                 <button class="tool-btn btn-accent" onclick="Nexus.UI.runPrettier()">✨ PRETTIER</button>
@@ -1636,6 +1634,11 @@
                 <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('lower')">lower</button>
                 <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('title')">Title</button>
             </div>
+            <div class="grid-2" style="margin-top:8px;">
+                <button class="tool-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove every blank/whitespace-only line" aria-label="Remove blank lines">🧽 REMOVE BLANK LINES</button>
+                <button class="tool-btn" onclick="Nexus.Sentinel.alignLeft()" title="Strip all leading whitespace, flush every line to column 0" aria-label="Align everything to the left">⬅️ ALIGN LEFT</button>
+            </div>
+            <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.Sentinel.reindentByDepth()" title="1 tab per nesting level — matches whatever the editor's own folding considers nested" aria-label="Re-indent by nesting depth">📐 RE-INDENT BY DEPTH</button>
         </div>
 
         <div class="slab">
@@ -3344,12 +3347,43 @@ auditor: {
     
 // Pure detection logic, shared by the individual orphan-check button and the
 // unified full sweep below — returns orphans without touching the DOM.
+// Resolves a src="" / href="" path against the project's actual files.
+// Tries the path as-is (stripped of query/hash and a leading "./"), then
+// falls back to matching by filename alone, so "js/app.js" still finds an
+// "app.js" sitting at the project root.
+_resolveVfsPath(refPath) {
+    if (!refPath) return null;
+    const clean = refPath.split('?')[0].split('#')[0].replace(/^\.\//, '');
+    if (Nexus.state.Vfs[clean] !== undefined) return clean;
+    const basename = clean.split('/').pop();
+    return Object.keys(Nexus.state.Vfs).find(k => k === basename || k.endsWith('/' + basename)) || null;
+},
+
 _detectOrphanIssues(srcCode) {
     const doc = this.getVirtualDoc(srcCode);
     const allElements = doc.querySelectorAll('[id]');
 
+    // Gather every place this id could legitimately be referenced from:
+    // inline <script>/<style> in this file, PLUS any separately-linked
+    // .js/.css files that actually exist in the project. Checking only
+    // inline script content (as this used to) meant any id used purely for
+    // CSS styling, or any multi-file project at all, got flagged wholesale.
     let scriptContent = '';
-    doc.querySelectorAll('script').forEach(scr => scriptContent += scr.innerHTML);
+    let styleContent = '';
+    doc.querySelectorAll('script').forEach(scr => {
+        scriptContent += scr.innerHTML + '\n';
+        const resolved = this._resolveVfsPath(scr.getAttribute('src'));
+        if (resolved) scriptContent += Nexus.state.Vfs[resolved] + '\n';
+    });
+    doc.querySelectorAll('style').forEach(st => styleContent += st.innerHTML + '\n');
+    doc.querySelectorAll('link').forEach(link => {
+        const rel = (link.getAttribute('rel') || '').toLowerCase();
+        const href = link.getAttribute('href') || '';
+        if (rel === 'stylesheet' || /\.css$/i.test(href)) {
+            const resolved = this._resolveVfsPath(href);
+            if (resolved) styleContent += Nexus.state.Vfs[resolved] + '\n';
+        }
+    });
     scriptContent = scriptContent.replace(/\/\*[\s\S]*?\*\/|([^\\:]|^)\/\/.*$/gm, '$1');
 
     // Core Nexus structural elements that are targeted dynamically or via global UI loops
@@ -3373,8 +3407,12 @@ _detectOrphanIssues(srcCode) {
 
         const escapedId = id.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
         const wordRegex = new RegExp(`\\b${escapedId}\\b`);
+        const cssRegex = new RegExp(`#${escapedId}(?![\\w-])`);
 
-        if (!wordRegex.test(scriptContent)) {
+        const usedInScript = wordRegex.test(scriptContent);
+        const usedInStyle = cssRegex.test(styleContent);
+
+        if (!usedInScript && !usedInStyle) {
             // Find where this id is actually defined in the markup, to jump to it
             const defMatch = srcCode.match(new RegExp(`id=["']${escapedId}["']`));
             const line = defMatch ? srcCode.slice(0, defMatch.index).split('\n').length : null;
@@ -3479,125 +3517,7 @@ runCssAudit() {
     });
     reportBox.innerHTML = html;
 },
-runFuzzyAuditOnly() {
-if (!Nexus.state.activeFile) return;
-
-const code = this.getEditorContent();
-const reports = [];
-
-// SMART CHECK: Use 'this' so it targets the method inside Nexus.auditor
-if (typeof this.auditFuzzyNames === 'function') {
-this.auditFuzzyNames(code, reports);
-} else {
-console.error("VORTEX FAULT: auditFuzzyNames is missing from Nexus.auditor");
-return;
-}
-
-// Hand the results over to your visual console box instead of a generic alert
-if (typeof this.presentReport === 'function') {
-this.presentReport(reports);
-} else {
-// Fallback alert if your report presenter isn't unified yet
-alert(`Fuzzy Audit Finished: Found ${reports.length} casing issues.`);
-}
 },
-
-// This was referenced above (and previously never implemented, so every
-// fuzzy audit fell straight through to a bare alert with just a count).
-// Renders each finding as its own clickable card — tap it to jump straight
-// to that exact line and column in the editor.
-presentReport(reports) {
-    const box = document.getElementById('auditor-report-box');
-    if (!box) return;
-    document.getElementById('auditor-mode-title').innerText = "ACTIVE: FUZZY NAME SCAN";
-
-    if (reports.length === 0) {
-        box.innerHTML = `<div style="color:var(--success); font-weight:bold;">✔ No casing collisions or near-typos of core identifiers found.</div>`;
-        return;
-    }
-
-    const sevColor = { WARNING: 'var(--gold)', INFO: 'var(--accent)' };
-    let html = `<div style="color:var(--danger); font-weight:bold; margin-bottom:8px;">${reports.length} NAMING ISSUE${reports.length === 1 ? '' : 'S'}</div>`;
-    reports.forEach(r => {
-        const color = sevColor[r.severity] || 'var(--text)';
-        html += `<div onclick="Nexus.UI.jumpToLine(${r.line}, ${r.col})" style="cursor:pointer; background:var(--surface); padding:8px 10px; margin-bottom:5px; border-left:3px solid ${color}; border-radius:4px;">`
-            + `<div style="display:flex; justify-content:space-between; align-items:center;">`
-            + `<span style="color:${color}; font-size:10px; font-weight:bold;">${r.type} | LN ${r.line}</span>`
-            + `<span style="font-size:9px; opacity:0.6;">TAP TO JUMP →</span>`
-            + `</div>`
-            + `<div style="font-size:11px; margin-top:4px; opacity:0.9;">${r.message}</div>`
-            + `</div>`;
-    });
-    box.innerHTML = html;
-},
-
- auditFuzzyNames(code, reports) {
-     // Our strict golden core tokens to enforce
-     const coreTokens = ["Nexus", "Vfs", "UI", "DpadEngine", "omni", "Terminal", "state"];
-     
-     // Split code down into raw alphanumeric words
-     const words = code.match(/\b[a-zA-Z_]\w*\b/g) || [];
-     // Unique the list to keep scanning lightning fast on your phone
-     const uniqueWords = [...new Set(words)];
- 
-     // Fast Levenshtein distance calculator
-     const getDistance = (s, t) => {
-         if (!s.length) return t.length;
-         if (!t.length) return s.length;
-         const arr = [];
-         for (let i = 0; i <= t.length; i++) arr[i] = [i];
-         for (let j = 0; j <= s.length; j++) arr[0][j] = j;
-         for (let i = 1; i <= t.length; i++) {
-             for (let j = 1; j <= s.length; j++) {
-                 arr[i][j] = t[i - 1] === s[j - 1] 
-                     ? arr[i - 1][j - 1] 
-                     : Math.min(arr[i - 1][j - 1] + 1, Math.min(arr[i][j - 1] + 1, arr[i - 1][j] + 1));
-             }
-         }
-         return arr[t.length][s.length];
-     };
- 
-     const lines = code.split('\n');
- 
-     uniqueWords.forEach(word => {
-         coreTokens.forEach(core => {
-             // Skip if it's an exact authorized match
-             if (word === core) return;
- 
-             // Case A: Case-sensitivity collision (e.g., Vfs vs Vfs)
-             const isCaseCollision = word.toLowerCase() === core.toLowerCase();
-             
-             // Case B: Subtle typo mutation (Distance of 1 or 2 characters)
-             const distance = getDistance(word, core);
-             const isCloseTypo = distance > 0 && distance <= 2 && word.length > 2;
- 
-             if (isCaseCollision || isCloseTypo) {
-                 const errorType = isCaseCollision ? "Case Sensitivity Collision" : "Subtle Token Mutation";
-                 const errorMsg = isCaseCollision 
-                     ? `Casing conflict found: "${word}" should match core identity "${core}".`
-                     : `Subtle name variance found: "${word}" looks like a typo of core identity "${core}".`;
- 
-                 // Locate every line where this specific bad word tripped up
-                 lines.forEach((lineText, idx) => {
-                     const col = lineText.indexOf(word);
-                     if (col !== -1) {
-                         reports.push({
-                             severity: isCaseCollision ? "WARNING" : "INFO",
-                             type: errorType,
-                             message: errorMsg,
-                             line: idx + 1,
-                             col: col + 1
-                         });
-                     }
-                 });
-             }
-         });
-     });
-}   },
-
-
-
-
 
    Terminal: {
    instance: null,
@@ -4221,44 +4141,118 @@ redo() {
 },
 
 BracketCartographer: {
-brackets: { '{': '}', '[': ']', '(': ')', '<': '>', "'": "'", '"': '"', '`': '`' },
-antiBrackets: { '}': '{', ']': '[', ')': '(', '>': '<', "'": "'", '"': '"', '`': '`' },
-
+// Errors are { line (0-indexed), col, char } — kept identical to the old
+// shape, since checkBrackets/runBracketsCard/runFullSweep all consume it.
 mapStructure(code) {
-    const stack = [], matches = [], errors = [], lines = code.split('\n');
-    
+    const ext = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
+    if (ext === 'js') return this._mapJs(code);
+    if (ext === 'html') return this._mapHtml(code);
+    return this._mapCss(code); // .css and anything unrecognized
+},
+
+// JS: let the real parser be the judge. It either parses cleanly
+// (brackets and everything else are structurally sound) or throws with an
+// exact line/column — far more reliable than a hand-rolled character
+// scanner, which had no way to tell a "<" comparison from an opening tag,
+// or a "//" inside a URL string from a real comment.
+_mapJs(code) {
+    try {
+        acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module' });
+        return { errors: [], matches: [] };
+    } catch (e) {
+        const line = typeof e.loc?.line === 'number' ? e.loc.line - 1 : 0;
+        const col = e.loc?.column || 0;
+        return { errors: [{ line, col, char: '(syntax error — ' + e.message.replace(/\s*\(\d+:\d+\)$/, '') + ')' }], matches: [] };
+    }
+},
+
+// HTML: brackets only really matter inside embedded <script> (checked with
+// the same real parser) and <style> (checked with the masked scan below).
+// The surrounding markup's own tag structure is already covered separately
+// by the HTML nesting/balance checks in the auditor.
+_mapHtml(code) {
+    const errors = [];
+    const scriptRe = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    let m;
+    while ((m = scriptRe.exec(code))) {
+        const inner = m[1];
+        if (!inner.trim()) continue;
+        const blockStart = m.index + m[0].indexOf(inner);
+        const startLine = code.slice(0, blockStart).split('\n').length - 1;
+        try {
+            acorn.parse(inner, { ecmaVersion: 2022, sourceType: 'module' });
+        } catch (e) {
+            const relLine = (e.loc?.line || 1) - 1;
+            errors.push({ line: startLine + relLine, col: e.loc?.column || 0, char: '(script syntax error)' });
+        }
+    }
+    const styleRe = /<style\b[^>]*>([\s\S]*?)<\/style>/gi;
+    while ((m = styleRe.exec(code))) {
+        const inner = m[1];
+        const blockStart = m.index + m[0].indexOf(inner);
+        const startLine = code.slice(0, blockStart).split('\n').length - 1;
+        const sub = this._mapCss(inner);
+        sub.errors.forEach(e => errors.push({ line: startLine + e.line, col: e.col, char: e.char }));
+    }
+    return { errors, matches: [] };
+},
+
+// Blanks out string and comment content first (same length, newlines kept,
+// so line/col numbers stay accurate) so brackets inside a string or
+// comment can't confuse the scan that follows.
+_maskStringsAndComments(code) {
+    let out = '';
+    let i = 0;
+    while (i < code.length) {
+        const ch = code[i], next = code[i + 1];
+        if (ch === '/' && next === '*') {
+            out += '  '; i += 2;
+            while (i < code.length && !(code[i] === '*' && code[i + 1] === '/')) {
+                out += code[i] === '\n' ? '\n' : ' '; i++;
+            }
+            if (i < code.length) { out += '  '; i += 2; }
+            continue;
+        }
+        if (ch === '"' || ch === "'") {
+            const quote = ch; out += ' '; i++;
+            while (i < code.length && code[i] !== quote) {
+                if (code[i] === '\\' && i + 1 < code.length) { out += '  '; i += 2; continue; }
+                out += code[i] === '\n' ? '\n' : ' '; i++;
+            }
+            if (i < code.length) { out += ' '; i++; }
+            continue;
+        }
+        out += ch; i++;
+    }
+    return out;
+},
+
+// CSS (and the fallback for anything unrecognized): mask strings/comments,
+// then a plain {}/[]/() stack scan on what's left. No more treating "<"/">"
+// as brackets — they aren't bracket characters in CSS or JS, that was only
+// ever a rough (and unreliable) proxy for HTML angle brackets, which have
+// their own dedicated, already-correct tag-nesting checker.
+_mapCss(code) {
+    const masked = this._maskStringsAndComments(code);
+    const pairs = { '{': '}', '[': ']', '(': ')' };
+    const antiPairs = { '}': '{', ']': '[', ')': '(' };
+    const stack = [];
+    const errors = [];
+    const lines = masked.split('\n');
     for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
         const txt = lines[lineIdx];
-        for (let colIdx = 0; colIdx < txt.length; colIdx++) {
-            const char = txt[colIdx];
-            if (char === '/' && txt[colIdx+1] === '/') break;
-            
-            if (this.brackets[char]) {
-                if (["'", '"', '`'].includes(char)) {
-                    if (stack.length > 0 && stack[stack.length - 1].char === char) {
-                        const op = stack.pop();
-                        matches.push({ open: op, close: { char, line: lineIdx, col: colIdx, depth: op.depth } });
-                    } else {
-                        stack.push({ char, line: lineIdx, col: colIdx, depth: stack.length });
-                    }
-                } else {
-                    stack.push({ char, line: lineIdx, col: colIdx, depth: stack.length });
-                }
-            } else if (this.antiBrackets[char]) {
-                if (stack.some(n => ["'", '"', '`'].includes(n.char))) continue;
-                const exp = this.antiBrackets[char];
-                if (stack.length > 0 && stack[stack.length - 1].char === exp) {
-                    const op = stack.pop();
-                    matches.push({ open: op, close: { char, line: lineIdx, col: colIdx, depth: op.depth } });
-                } else {
-                    errors.push({ char, line: lineIdx, col: colIdx });
-                }
+        for (let col = 0; col < txt.length; col++) {
+            const ch = txt[col];
+            if (pairs[ch]) stack.push({ char: ch, line: lineIdx, col });
+            else if (antiPairs[ch]) {
+                if (stack.length && stack[stack.length - 1].char === antiPairs[ch]) stack.pop();
+                else errors.push({ char: ch, line: lineIdx, col });
             }
         }
     }
-    while (stack.length > 0) errors.push(stack.pop());
-    return { matches, errors };
-}
+    while (stack.length) errors.push(stack.pop());
+    return { errors, matches: [] };
+},
 },
 
 DpadEngine: {
@@ -5449,6 +5443,165 @@ Sentinel : {
            const out = lines.join('\n') + (hadTrailingNewline ? '\n' : '');
            this.replaceRange(from, to, out);
            this.log("[SORT LINES] Sorted alphabetically (A-Z, case-insensitive).", "success");
+       },
+
+       removeBlankLines() {
+           if (!Nexus.state.activeFile) return;
+           if (this.isLocked()) return this.log("[REMOVE BLANK LINES] EDITOR LOCKED. Cannot modify.", "danger");
+           const code = this.getLiveCode();
+           const result = code.split('\n').filter(line => line.trim() !== '').join('\n') + '\n';
+           this.setLiveCode(result);
+           this.log("[REMOVE BLANK LINES] Done.", "success");
+       },
+
+       alignLeft() {
+           if (!Nexus.state.activeFile) return;
+           if (this.isLocked()) return this.log("[ALIGN LEFT] EDITOR LOCKED. Cannot modify.", "danger");
+           const code = this.getLiveCode();
+           const result = code.split('\n').map(line => line.replace(/^[ \t]+/, '')).join('\n');
+           this.setLiveCode(result);
+           this.log("[ALIGN LEFT] All lines flushed to column 0.", "success");
+       },
+
+       // Computes one indent depth per line for bracket-nested content
+       // ({}/[]/()), safely (strings/comments masked out first so brackets
+       // inside them can't throw off the count). Standard formatter rule: a
+       // line that OPENS gets its depth assigned before incrementing; a line
+       // that CLOSES gets decremented first, then assigned — so the closer
+       // lines up with whatever opened it, not one level deeper. Lines with
+       // no bracket at all just inherit whatever depth is current.
+       _bracketDepthPerLine(code) {
+           const masked = Nexus.BracketCartographer._maskStringsAndComments(code);
+           const lines = masked.split('\n');
+           const depths = new Array(lines.length).fill(0);
+           let depth = 0;
+           for (let i = 0; i < lines.length; i++) {
+               let assigned = false;
+               const txt = lines[i];
+               for (let col = 0; col < txt.length; col++) {
+                   const ch = txt[col];
+                   if (ch === '{' || ch === '[' || ch === '(') {
+                       if (!assigned) { depths[i] = depth; assigned = true; }
+                       depth++;
+                   } else if (ch === '}' || ch === ']' || ch === ')') {
+                       depth = Math.max(0, depth - 1);
+                       if (!assigned) { depths[i] = depth; assigned = true; }
+                   }
+               }
+               if (!assigned) depths[i] = depth;
+           }
+           return depths;
+       },
+
+       // Same idea, but walking real HTML tags (reusing the same void-element
+       // list and self-closing detection as the HTML nesting checker) instead
+       // of brackets. <script>/<style> content is reindented with its own
+       // bracket-depth pass and nested one level inside its tag.
+       _tagDepthPerLine(code) {
+           const lines = code.split('\n');
+           const depths = new Array(lines.length).fill(0);
+           const assignedLine = new Array(lines.length).fill(false);
+           const depthAfterLine = new Array(lines.length).fill(null);
+           const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
+
+           // Blank out script/style content from the tag walk (handled
+           // separately below) so tags typed as plain text inside a <script>
+           // string, for instance, can't confuse the HTML-level pass.
+           const blanked = code.replace(/(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi, (m, o, inner, c) => o + inner.replace(/[^\n]/g, ' ') + c)
+                               .replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (m, o, inner, c) => o + inner.replace(/[^\n]/g, ' ') + c);
+
+           const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*?(\/?)>/g;
+           let depth = 0, m;
+           while ((m = tagRe.exec(blanked))) {
+               const [full, closing, name, selfClose] = m;
+               const tag = name.toLowerCase();
+               const lineIdx = blanked.slice(0, m.index).split('\n').length - 1;
+               if (voidTags.has(tag) || selfClose) {
+                   if (!assignedLine[lineIdx]) { depths[lineIdx] = depth; assignedLine[lineIdx] = true; }
+               } else if (closing) {
+                   depth = Math.max(0, depth - 1);
+                   if (!assignedLine[lineIdx]) { depths[lineIdx] = depth; assignedLine[lineIdx] = true; }
+               } else {
+                   if (!assignedLine[lineIdx]) { depths[lineIdx] = depth; assignedLine[lineIdx] = true; }
+                   depth++;
+               }
+               depthAfterLine[lineIdx] = depth; // running depth once this tag is done, refreshed per tag on this line
+           }
+           // Carry forward IN ORDER: a line with no tag inherits the depth
+           // left behind once the most recent preceding tagged line finished
+           // processing (its "after" depth) — not the label assigned TO that
+           // line, since a line that just opened a tag needs its children to
+           // sit one level deeper than the tag itself.
+           let current = 0;
+           for (let i = 0; i < lines.length; i++) {
+               if (assignedLine[i]) current = depthAfterLine[i];
+               else depths[i] = current;
+           }
+
+           // Now layer in <script>/<style> internals, nested one level inside
+           // their own tag's depth. Found by line index (which line does the
+           // opening tag start on, which line does the closing tag start on,
+           // inner content is exactly the lines strictly between) rather than
+           // raw substring offsets — a regex capture of "everything between
+           // the tags" includes the newline right after "<script>", which
+           // otherwise makes it ambiguous whether that newline belongs to the
+           // tag's own line or the first content line.
+           [{ open: /<script\b[^>]*>/gi, close: /<\/script>/gi }, { open: /<style\b[^>]*>/gi, close: /<\/style>/gi }].forEach(({ open, close }) => {
+               open.lastIndex = 0;
+               let om;
+               while ((om = open.exec(code))) {
+                   close.lastIndex = om.index + om[0].length;
+                   const cm = close.exec(code);
+                   if (!cm) continue;
+                   const tagLine = code.slice(0, om.index).split('\n').length - 1;
+                   const closeLine = code.slice(0, cm.index).split('\n').length - 1;
+                   const firstInnerLine = tagLine + 1;
+                   const lastInnerLine = closeLine - 1;
+                   if (firstInnerLine > lastInnerLine) continue; // empty, or opened+closed on one line — nothing to nest
+                   const innerLines = lines.slice(firstInnerLine, lastInnerLine + 1);
+                   if (!innerLines.join('').trim()) continue;
+                   const baseDepth = depths[tagLine] + 1;
+                   const innerDepths = this._bracketDepthPerLine(innerLines.join('\n'));
+                   innerDepths.forEach((d, i) => { depths[firstInnerLine + i] = baseDepth + d; });
+                   open.lastIndex = cm.index + cm[0].length;
+               }
+           });
+           return depths;
+       },
+
+       // Re-indents every line to (depth * 1 tab), where depth is however
+       // many levels deep that line's content is nested — matching whatever
+       // the editor's own folding considers a nested region (HTML elements,
+       // or {}/[]/() for JS and CSS). Refuses on genuinely unbalanced
+       // brackets/tags, since depth is meaningless until those are fixed —
+       // reuses the same check the BRACKETS card already runs.
+       reindentByDepth() {
+           if (!Nexus.state.activeFile) return;
+           if (this.isLocked()) return this.log("[RE-INDENT] EDITOR LOCKED. Cannot modify.", "danger");
+           const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+           const code = this.getLiveCode();
+
+           if (ext === 'js' || ext === 'css') {
+               const check = Nexus.BracketCartographer.mapStructure(code);
+               if (check.errors.length > 0) {
+                   return this.log(`[RE-INDENT] Unbalanced brackets — fix those first (Check Brackets) so depth is well-defined.`, "danger");
+               }
+           }
+
+           const lines = code.split('\n');
+           let depths;
+           if (ext === 'html') depths = this._tagDepthPerLine(code);
+           else if (ext === 'js' || ext === 'css') depths = this._bracketDepthPerLine(code);
+           else return this.log("[RE-INDENT] Only .html, .js, and .css files are supported.", "warn");
+
+           const result = lines.map((line, i) => {
+               const trimmed = line.replace(/^[ \t]+/, '');
+               if (trimmed === '') return '';
+               return '\t'.repeat(depths[i]) + trimmed;
+           }).join('\n');
+
+           this.setLiveCode(result);
+           this.log("[RE-INDENT] Re-indented by nesting depth (1 tab per level).", "success");
        },
 
        formatJSON() {
@@ -7194,6 +7347,14 @@ settings: {
     async boot() { 
         const saved = await localforage.getItem('nexus_prefs_v42'); 
         if (saved) Nexus.state.prefs = saved; 
+
+        // Restore widget visibility (utility bar, D-pad, etc.) from the
+        // preference toggleWidget() now actually saves it under. Merge onto
+        // the existing defaults rather than replacing outright, so a widget
+        // added after this was last saved still gets its normal default.
+        if (Nexus.state.prefs.widgetVisibility) {
+            Object.assign(Nexus.state.widgets, Nexus.state.prefs.widgetVisibility);
+        }
         
         // Ensure the base object exists
         if (!Nexus.state.prefs.kbLayouts) Nexus.state.prefs.kbLayouts = {};
@@ -7936,6 +8097,15 @@ UI: {
         if (Nexus.vault && typeof Nexus.vault.boot === 'function') await Nexus.vault.boot(); 
         if (Nexus.snapshots && typeof Nexus.snapshots.boot === 'function') await Nexus.snapshots.boot(); 
         if (Nexus.settings && typeof Nexus.settings.boot === 'function') await Nexus.settings.boot(); 
+
+        // FIX: the initial initSubSystems()/updateWidgets() calls above ran
+        // before settings.boot() had restored the real saved prefs (widget
+        // visibility, utility bar layout), so they rendered/applied only the
+        // hardcoded defaults every single time — the saved values were
+        // sitting correctly in storage the whole time, just never re-applied
+        // to the screen once loaded. Do it again now that they're in.
+        if (typeof this.updateWidgets === 'function') this.updateWidgets();
+        if (typeof this.renderUtilBar === 'function') this.renderUtilBar();
         
         // 3. Engine Initializations
         if (Nexus.DpadEngine && typeof Nexus.DpadEngine.init === 'function') Nexus.DpadEngine.init();
@@ -8126,8 +8296,12 @@ toggleKeyboardRows() {
            const isHidden = el.style.display === 'none' || el.style.display === '';
            el.style.display = isHidden ? 'flex' : 'none';
            Nexus.state.widgets[id] = isHidden;
-           // Ensure UI state is saved
-           Nexus.Vfs.save();
+           // FIX: this used to call Nexus.Vfs.save(), which only persists
+           // file contents — it never touched widget visibility at all, so
+           // every toggle silently failed to save despite the comment here
+           // saying otherwise. Persist through the same settings/prefs
+           // mechanism the rest of the app's preferences already use.
+           Nexus.settings.update('widgetVisibility', Nexus.state.widgets);
        },
 
        // The old grip on this bar tried to free-drag it (onmousedown only —
@@ -8419,6 +8593,9 @@ insertUUID() {
            { group: 'Fix & Format', key: 'upper', label: 'UPPERCASE Selection' },
            { group: 'Fix & Format', key: 'lower', label: 'lowercase Selection' },
            { group: 'Fix & Format', key: 'title', label: 'Title Case Selection' },
+           { group: 'Fix & Format', key: 'blanklines', label: 'Remove Blank Lines' },
+           { group: 'Fix & Format', key: 'alignleft', label: 'Align Left' },
+           { group: 'Fix & Format', key: 'reindent', label: 'Re-indent by Depth' },
            { group: 'Dev Utilities', key: 'base64encode', label: 'Base64 Encode' },
            { group: 'Dev Utilities', key: 'base64decode', label: 'Base64 Decode' },
            { group: 'Dev Utilities', key: 'urlencode', label: 'URL Encode' },
@@ -8563,6 +8740,9 @@ insertUUID() {
            'upper': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('upper')" title="UPPERCASE Selection" aria-label="Convert selection to uppercase"><span style="font-size:14px; font-weight:900;">AB</span><span class="util-lbl">Upper</span></button>`,
            'lower': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('lower')" title="lowercase Selection" aria-label="Convert selection to lowercase"><span style="font-size:14px; font-weight:900;">ab</span><span class="util-lbl">Lower</span></button>`,
            'title': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('title')" title="Title Case Selection" aria-label="Convert selection to title case"><span style="font-size:14px; font-weight:900;">Ab</span><span class="util-lbl">Title</span></button>`,
+           'blanklines': `<button class="sleek-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove Blank Lines" aria-label="Remove blank lines"><span style="font-size:16px;">🧽</span><span class="util-lbl">No Blank</span></button>`,
+           'alignleft': `<button class="sleek-btn" onclick="Nexus.Sentinel.alignLeft()" title="Align Left" aria-label="Align everything to the left"><span style="font-size:16px;">⬅️</span><span class="util-lbl">Align</span></button>`,
+           'reindent': `<button class="sleek-btn" onclick="Nexus.Sentinel.reindentByDepth()" title="Re-indent by Depth" aria-label="Re-indent by nesting depth"><span style="font-size:16px;">📐</span><span class="util-lbl">Indent</span></button>`,
            'datetime': `<button class="sleek-btn" onclick="Nexus.UI.insertDateTime()" title="Insert Date/Time" aria-label="Insert current date and time"><span style="font-size:16px;">🕐</span><span class="util-lbl">Date</span></button>`,
            'docstats': `<button class="sleek-btn" onclick="Nexus.docStats.show()" title="Document Stats" aria-label="Show document statistics"><span style="font-size:16px;">📊</span><span class="util-lbl">Stats</span></button>`,
            'base64encode': `<button class="sleek-btn" onclick="Nexus.Sentinel.base64Encode()" title="Base64 Encode" aria-label="Base64 encode selection"><span style="font-size:16px;">🔐</span><span class="util-lbl">B64 En</span></button>`,
