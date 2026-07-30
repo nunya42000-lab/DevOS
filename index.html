@@ -1521,7 +1521,7 @@
 
         <div class="slab">
             <div class="section-label" style="margin-top: 0;">Diagnostics</div>
-            <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">One tap checks lint, structure, syntax, CSS, orphaned IDs, brackets, and likely typos together.</div>
+            <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">One tap checks lint, structure, syntax, CSS, orphaned IDs, and brackets together.</div>
 
             <button class="tool-btn btn-danger" style="width:100%; padding:14px; font-weight:800; margin-bottom:8px;" onclick="Nexus.auditor.runFullSweep()">🔍 RUN FULL DIAGNOSTIC SWEEP</button>
 
@@ -1553,10 +1553,6 @@
                 <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runTodoScan()">
                     <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">TODOS ➔</span>
                     <span id="audit-count-todo" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                </div>
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runFuzzyNameCard()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">FUZZY ➔</span>
-                    <span id="audit-count-fuzzy" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
                 </div>
             </div>
 
@@ -2833,7 +2829,6 @@ auditor: {
         document.getElementById('audit-count-lint').innerText = '0';
         document.getElementById('audit-count-brackets').innerText = '0';
         document.getElementById('audit-count-todo').innerText = '0';
-        document.getElementById('audit-count-fuzzy').innerText = '0';
     },
 
     // Universal multi-target clipboard router
@@ -2915,10 +2910,6 @@ auditor: {
         } catch (e) { /* best-effort; leave empty rather than break the whole sweep */ }
         sections.push({ label: 'BRACKETS', count: bracketIssues.length, items: bracketIssues });
 
-        // --- Fuzzy names (near-duplicate identifiers — likely typos) ---
-        const fuzzyIssues = this._detectFuzzyNameIssues(srcCode);
-        sections.push({ label: 'FUZZY NAMES', count: fuzzyIssues.length, items: fuzzyIssues });
-
         // --- Dependencies (informational — not counted as a defect) ---
         const depMatches = srcCode.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g) || [];
         const uniqueDeps = [...new Set(depMatches.map(d => { const m = d.match(/['"]([^'"]+)['"]/); return m ? m[1] : d; }))];
@@ -2935,7 +2926,6 @@ auditor: {
         setCount('audit-count-lint', lintIssues.length);
         setCount('audit-count-brackets', bracketIssues.length);
         setCount('audit-count-todo', todos.length);
-        setCount('audit-count-fuzzy', fuzzyIssues.length);
 
         // --- Render one consolidated report ---
         const totalIssues = sections.reduce((sum, s) => sum + s.count, 0);
@@ -2962,7 +2952,7 @@ auditor: {
         });
 
         if (totalIssues === 0) {
-            html += `<div style="color:var(--success); font-size:11px;">Lint, HTML structure, JS syntax, CSS, orphaned IDs, brackets, and fuzzy names are all clean.</div>`;
+            html += `<div style="color:var(--success); font-size:11px;">Lint, HTML structure, JS syntax, CSS, orphaned IDs, and brackets are all clean.</div>`;
         }
         if (uniqueDeps.length > 0) {
             html += `<div style="margin-top:6px; padding-top:10px; border-top:1px solid var(--border); font-size:10px; opacity:0.7;">🔗 ${uniqueDeps.length} external dependenc${uniqueDeps.length === 1 ? 'y' : 'ies'} detected.</div>`;
@@ -3143,57 +3133,73 @@ auditor: {
  items.push({ text: `Parser Bug: ${err.textContent.split('\n')[0]}` });
  });
  
- // 4. Run structural balance checks on the remaining clean layout
- const targetTags = ['div', 'span', 'button', 'script', 'style', 'section', 'main', 'header', 'footer'];
- targetTags.forEach(tag => {
- const openMatches = [...srcCode.matchAll(new RegExp(`<${tag}\\b`, 'g'))];
- const closeCount = (srcCode.match(new RegExp(`</${tag}>`, 'g')) || []).length;
- 
- if (openMatches.length !== closeCount) {
- const diff = Math.abs(openMatches.length - closeCount);
- // Jump to the LAST opening occurrence — the most likely place to start
- // tracing the mismatch from, since it's the one still "open" furthest in.
- const lastMatch = openMatches[openMatches.length - 1];
- const line = lastMatch ? srcCode.slice(0, lastMatch.index).split('\n').length : null;
- items.push({ text: `Mismatched &lt;${tag}&gt;: Found ${openMatches.length} open, ${closeCount} closed. Missing ${diff}.`, line });
- }
- });
-
- // 5. NESTING validation — the count check above can't catch improperly
- // NESTED tags: <div><span></div></span> has one open + one close of each,
- // so it passes the count check clean, but the closes are in the wrong
- // order. Walk the raw tags as a stack (skipping script/style content,
- // since JS/CSS routinely contains bare < and > that aren't tags at all).
+ // 4/5. FULL-COVERAGE TAG TRACE — one stack walk over every tag in the
+ // file (not a hardcoded shortlist), reporting every violation it finds
+ // rather than stopping at the first. Replaces two earlier passes that
+ // each had a real gap:
+ //   - the old count check only watched 8 hardcoded tag names (div, span,
+ //     button, script, style, section, main, header, footer), so a
+ //     mismatched <ul>/<li>, <table>/<tr>, or any custom/less-common tag
+ //     passed silently with zero report;
+ //   - the old nesting check covered every tag correctly, but stopped
+ //     after reporting its first violation (`nestingFlagged = true` broke
+ //     the loop), so a file with 3 problems took 3 fix-rerun cycles to
+ //     surface them all instead of one.
+ // A single stack walk that reports as it goes gives correct-order nesting
+ // detection AND true unclosed-tag detection (whatever's left on the stack
+ // at EOF) for every tag name, in one pass, with nothing silently skipped.
  {
      const stripped = srcCode
          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, m => ' '.repeat(m.length))
          .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, m => ' '.repeat(m.length));
      const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
      const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*?(\/?)>/g;
+     const lineOf = (idx) => stripped.slice(0, idx).split('\n').length;
      const stack = [];
      let m;
-     let nestingFlagged = false;
-     while ((m = tagRe.exec(stripped)) && !nestingFlagged) {
+     while ((m = tagRe.exec(stripped))) {
          const [full, closing, name, selfClose] = m;
          const tag = name.toLowerCase();
          if (voidTags.has(tag) || selfClose) continue;
          if (!closing) {
              stack.push({ tag, index: m.index });
-         } else {
-             if (stack.length === 0) continue; // stray closing tag with nothing open — count check already covers pure imbalance
-             const top = stack[stack.length - 1];
-             if (top.tag === tag) {
-                 stack.pop();
-             } else if (stack.some(s => s.tag === tag)) {
-                 // The matching opener exists, but not at the top of the stack —
-                 // this closing tag jumped past something still open. That's a
-                 // real nesting violation, not just an overall count mismatch.
-                 const line = stripped.slice(0, m.index).split('\n').length;
-                 items.push({ text: `Improper nesting: &lt;/${tag}&gt; closes before its inner &lt;${top.tag}&gt; (opened line ${stripped.slice(0, top.index).split('\n').length}) does.`, line });
-                 nestingFlagged = true; // one clear report is more useful than a cascade from the same root cause
-             }
+             continue;
          }
+         if (stack.length === 0) {
+             // Stray closing tag with nothing open at all — previously
+             // silently skipped ("count check covers it"), but there is no
+             // count check anymore, so this needs its own report.
+             items.push({ text: `Unexpected &lt;/${tag}&gt; — no matching &lt;${tag}&gt; is open at this point.`, line: lineOf(m.index) });
+             continue;
+         }
+         const top = stack[stack.length - 1];
+         if (top.tag === tag) {
+             stack.pop();
+             continue;
+         }
+         const matchIdx = stack.map(s => s.tag).lastIndexOf(tag);
+         if (matchIdx === -1) {
+             // No opener for this tag anywhere on the stack — treat as stray,
+             // same as the empty-stack case above, so it still gets reported
+             // and the stack is left untouched for whatever comes next.
+             items.push({ text: `Unexpected &lt;/${tag}&gt; — no matching &lt;${tag}&gt; is open at this point.`, line: lineOf(m.index) });
+             continue;
+         }
+         // The matching opener exists further down the stack, not at the
+         // top — this closing tag jumped past something still open. Report
+         // it, then pop back to (and including) the real match so the walk
+         // stays coherent for the rest of the file instead of cascading
+         // false positives off one bad tag.
+         items.push({ text: `Improper nesting: &lt;/${tag}&gt; closes before its inner &lt;${top.tag}&gt; (opened line ${lineOf(top.index)}) does.`, line: lineOf(m.index) });
+         stack.length = matchIdx;
      }
+     // Anything left on the stack at EOF was opened but never closed —
+     // this is the true unclosed-tag report, correct per tag NAME (every
+     // tag, not a hardcoded 8) and per tag INSTANCE (each leftover open
+     // gets its own line-numbered entry rather than one aggregate count).
+     stack.forEach(({ tag, index }) => {
+         items.push({ text: `Unclosed &lt;${tag}&gt; — opened here but never closed.`, line: lineOf(index) });
+     });
  }
 
  // 6. Duplicate ids — breaks getElementById()'s "one true element" guarantee.
@@ -3230,66 +3236,6 @@ auditor: {
      const looksLikeFullDoc = /<html[\s>]/i.test(srcCode);
      if (looksLikeFullDoc && !doc.querySelector('meta[name="viewport"]')) {
          items.push({ text: `No &lt;meta name="viewport"&gt; tag — this page will render tiny/zoomed-out on phones.` });
-     }
- }
-
- // 9. Broken same-page anchor links — the reverse of "orphaned id": a link
- // POINTS at a same-page fragment that doesn't actually exist anywhere in
- // the document, so tapping it does nothing.
- {
-     const definedIds = new Set([...doc.querySelectorAll('[id]')].map(el => el.id));
-     const seenBroken = new Set();
-     doc.querySelectorAll('a[href^="#"], area[href^="#"]').forEach(el => {
-         const href = el.getAttribute('href') || '';
-         const target = href.slice(1);
-         if (!target || target === 'top') return; // bare "#" and "#top" are conventional page-top links, not real anchors
-         if (definedIds.has(target) || seenBroken.has(target)) return;
-         seenBroken.add(target);
-         const escapedHref = href.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-         const defMatch = srcCode.match(new RegExp(`href=["']${escapedHref}["']`));
-         const line = defMatch ? srcCode.slice(0, defMatch.index).split('\n').length : null;
-         items.push({ text: `Broken anchor: href="${href}" has no matching id="${target}" anywhere in the page.`, line });
-     });
- }
-
- // 10. Form fields with no accessible label — a sighted user infers purpose
- // from placement, but a screen reader announces nothing useful.
- {
-     const unlabeled = [];
-     doc.querySelectorAll('input, textarea, select').forEach(el => {
-         const type = (el.getAttribute('type') || '').toLowerCase();
-         if (['hidden', 'submit', 'button', 'reset', 'image'].includes(type)) return;
-         const id = el.id;
-         const hasFor = id && doc.querySelector(`label[for="${id}"]`);
-         const wrappedInLabel = el.closest('label');
-         const hasAriaLabel = el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby');
-         if (!hasFor && !wrappedInLabel && !hasAriaLabel) unlabeled.push(el);
-     });
-     if (unlabeled.length > 0) {
-         const firstTag = unlabeled[0].tagName.toLowerCase();
-         const firstMatch = srcCode.match(new RegExp(`<${firstTag}\\b`, 'i'));
-         const line = firstMatch ? srcCode.slice(0, firstMatch.index).split('\n').length : null;
-         items.push({ text: `${unlabeled.length} form field${unlabeled.length === 1 ? '' : 's'} with no &lt;label&gt;, aria-label, or aria-labelledby (screen readers announce nothing).`, line });
-     }
- }
-
- // 11. Buttons and links with no accessible name at all — an icon-only
- // control with no text, aria-label, or title is invisible to a screen
- // reader even though it's clearly clickable on screen.
- {
-     const nameless = [];
-     doc.querySelectorAll('button, a[href]').forEach(el => {
-         const text = (el.textContent || '').trim();
-         if (text) return;
-         if (el.hasAttribute('aria-label') || el.hasAttribute('aria-labelledby') || el.hasAttribute('title')) return;
-         if (el.querySelector('img[alt]')) return; // an alt-texted image inside counts as the accessible name
-         nameless.push(el);
-     });
-     if (nameless.length > 0) {
-         const firstTag = nameless[0].tagName.toLowerCase();
-         const firstMatch = srcCode.match(new RegExp(`<${firstTag}\\b`, 'i'));
-         const line = firstMatch ? srcCode.slice(0, firstMatch.index).split('\n').length : null;
-         items.push({ text: `${nameless.length} ${firstTag}${nameless.length === 1 ? '' : 's'} with no visible text, aria-label, or title (nothing for a screen reader to announce).`, line });
      }
  }
 
@@ -3580,39 +3526,6 @@ _detectCssIssues(srcCode) {
             unused.push({ selector, line });
         }
     });
-
-    // --- Class selectors (.foo) ---
-    // The leading character class after the dot deliberately excludes digits,
-    // so decimal values like `opacity: .5` or `margin: .25em` are never
-    // mistaken for a class selector the way a bare /\.[\w-]+/ would.
-    const classMatches = styleContent.match(/\.([a-zA-Z_-][a-zA-Z0-9_-]*)/g) || [];
-    const uniqueClasses = [...new Set(classMatches)];
-    if (uniqueClasses.length > 0) {
-        // Unlike ids, classes are overwhelmingly toggled from JS
-        // (classList.add/remove/toggle, className assignment) rather than
-        // sitting statically in the markup — so this also has to look at
-        // script content, or almost every interactive class gets flagged
-        // as dead. Mirrors the same script-gathering the orphan-id check uses.
-        let scriptContent = '';
-        doc.querySelectorAll('script').forEach(scr => {
-            scriptContent += scr.innerHTML + '\n';
-            const resolved = this._resolveVfsPath(scr.getAttribute('src'));
-            if (resolved) scriptContent += Nexus.state.Vfs[resolved] + '\n';
-        });
-        const baseSafeClasses = ['active', 'hidden', 'show', 'open', 'selected', 'disabled', 'dragging', 'loading', 'error', 'visible', 'collapsed'];
-        uniqueClasses.forEach(selector => {
-            const cls = selector.replace('.', '');
-            if (baseSafeClasses.includes(cls)) return;
-            if (doc.querySelector(`.${CSS.escape(cls)}`)) return;
-            const escapedCls = cls.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-            const wordRegex = new RegExp(`\\b${escapedCls}\\b`);
-            if (wordRegex.test(scriptContent)) return; // toggled dynamically from JS
-            const defMatch = srcCode.match(new RegExp(`\\.${escapedCls}(?=[\\s,{:.\\[])`));
-            const line = defMatch ? srcCode.slice(0, defMatch.index).split('\n').length : null;
-            unused.push({ selector, line });
-        });
-    }
-
     return unused;
 },
 runCssAudit() {
@@ -3637,177 +3550,6 @@ runCssAudit() {
         html += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${u.line})" style="cursor:pointer;"` : ''} style="background:var(--surface); padding:6px 10px; margin-bottom:4px; border-left:3px solid var(--gold); border-radius:4px; display:flex; justify-content:space-between; align-items:center;">`
             + `<span style="font-size:11px;">${u.selector}</span>`
             + (clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap;">LN ${u.line} →</span>` : '')
-            + `</div>`;
-    });
-    reportBox.innerHTML = html;
-},
-
-// =======================================================
-// FUZZY NAME SCANNER — rebuilt from scratch. The previous version
-// compared identifiers against a hardcoded list of divIDE's OWN internal
-// Nexus.* namespace tokens instead of the identifiers actually declared
-// in the file being edited, so it was comparing the user's code against
-// completely unrelated internal names and either matched nothing real or
-// flagged normal code at random. This version parses the ACTIVE FILE
-// fresh every run (via Acorn, never regex — same reasoning as
-// BracketCartographer) and only ever compares that file's own names
-// against each other.
-// =======================================================
-_editDistance(a, b) {
-    // Damerau-Levenshtein (adjacent transposition counts as ONE edit, not
-    // two) — "cuonter" vs "counter" is the single most common real typo
-    // shape, and plain Levenshtein would score that as two edits.
-    const al = a.length, bl = b.length;
-    if (Math.abs(al - bl) > 1) return 99;
-    const d = Array.from({ length: al + 1 }, () => new Array(bl + 1).fill(0));
-    for (let i = 0; i <= al; i++) d[i][0] = i;
-    for (let j = 0; j <= bl; j++) d[0][j] = j;
-    for (let i = 1; i <= al; i++) {
-        for (let j = 1; j <= bl; j++) {
-            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-            d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
-            if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
-                d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
-            }
-        }
-    }
-    return d[al][bl];
-},
-
-// Plural, past-tense, and agent/gerund suffixes routinely produce a
-// second, DELIBERATELY different word from the same root ("resolve" /
-// "resolved", "item" / "items") — not a typo of one another.
-_hasCommonSuffixVariant(a, b) {
-    const suffixes = ['s', 'es', 'd', 'ed', 'er', 'or', 'ing'];
-    return suffixes.some(suf => a === b + suf || b === a + suf);
-},
-
-_fuzzyBuiltins: new Set(['String', 'Number', 'Boolean', 'Object', 'Array', 'Symbol', 'Promise', 'Error', 'Map', 'Set', 'Date', 'RegExp', 'JSON', 'Math', 'console', 'window', 'document', 'undefined', 'Worker', 'Blob', 'Event', 'Request', 'Response', 'Headers', 'Element', 'Node', 'Storage', 'Function']),
-
-// One name → {count, firstLine} for every identifier-like token in a
-// script block, EXCEPT property/method KEYS (obj.foo, {foo:1}) — those
-// live in a different namespace and would just add noise (e.g. flagging
-// a built-in property name against an unrelated user variable).
-_extractIdentifierInfo(jsCode) {
-    const info = new Map();
-    const bump = (name, line) => {
-        const cur = info.get(name);
-        if (cur) cur.count++;
-        else info.set(name, { count: 1, firstLine: line });
-    };
-    let ast;
-    try {
-        ast = acorn.parse(jsCode, { ecmaVersion: 2022, sourceType: 'script', locations: true, allowReturnOutsideFunction: true });
-    } catch (e) {
-        return { info, parseError: e.message };
-    }
-    const walk = (node, parent) => {
-        if (!node || typeof node !== 'object' || typeof node.type !== 'string') return;
-        if (node.type === 'Identifier') {
-            const isPropKey =
-                (parent && parent.type === 'MemberExpression' && parent.property === node && !parent.computed) ||
-                (parent && (parent.type === 'Property' || parent.type === 'MethodDefinition') && parent.key === node && !parent.computed);
-            if (!isPropKey) bump(node.name, node.loc.start.line);
-        }
-        for (const key in node) {
-            if (key === 'loc' || key === 'start' || key === 'end' || key === 'range') continue;
-            const val = node[key];
-            if (Array.isArray(val)) { for (const v of val) if (v && typeof v === 'object') walk(v, node); }
-            else if (val && typeof val === 'object' && typeof val.type === 'string') walk(val, node);
-        }
-    };
-    walk(ast, null);
-    return { info, parseError: null };
-},
-
-_compareFuzzyPairs(info) {
-    const candidates = [...info.keys()].filter(n => n.length >= 6 && !this._fuzzyBuiltins.has(n));
-    const seen = new Set();
-    const issues = [];
-    for (let i = 0; i < candidates.length; i++) {
-        for (let j = i + 1; j < candidates.length; j++) {
-            const a = candidates[i], b = candidates[j];
-            if (this._hasCommonSuffixVariant(a, b)) continue;
-            const dist = this._editDistance(a, b);
-            if (dist < 1 || dist > 2) continue;
-            const ca = info.get(a).count, cb = info.get(b).count;
-            const minC = Math.min(ca, cb), maxC = Math.max(ca, cb);
-            // The "real" name must be clearly established (used several+
-            // times) AND the suspect must be rare in absolute terms — two
-            // independently common words will always have SOME usage
-            // gap, that alone isn't typo evidence. A stray typo, by
-            // contrast, essentially never becomes a genuinely load-bearing
-            // identifier in its own right.
-            if (!(minC <= 2 && maxC >= 4)) continue;
-            const suspect = ca <= cb ? a : b;
-            const other = ca <= cb ? b : a;
-            const key = [suspect, other].sort().join('|');
-            if (seen.has(key)) continue;
-            seen.add(key);
-            issues.push({ suspect, other, suspectCount: minC, otherCount: maxC, relLine: info.get(suspect).firstLine });
-        }
-    }
-    return issues;
-},
-
-_detectFuzzyNameIssues(srcCode) {
-    const ext = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
-    const blocks = []; // { code, offset } — analyzed per <script> block, matching
-                        // each classic script tag's own real top-level scope,
-                        // rather than risking a cross-script `let`/`const` collision
-                        // from naively concatenating every block into one parse.
-    if (ext === 'html') {
-        const doc = this.getVirtualDoc(srcCode);
-        doc.querySelectorAll('script').forEach(scr => {
-            if (scr.hasAttribute('src') || !scr.innerHTML.trim()) return;
-            const idx = srcCode.indexOf(scr.innerHTML);
-            blocks.push({ code: scr.innerHTML, offset: idx >= 0 ? idx : 0 });
-        });
-    } else if (ext === 'js') {
-        blocks.push({ code: srcCode, offset: 0 });
-    } else {
-        return []; // CSS/other file types have no identifiers to compare
-    }
-
-    const allIssues = [];
-    blocks.forEach(block => {
-        const { info, parseError } = this._extractIdentifierInfo(block.code);
-        if (parseError) return; // the JS SYNTAX card already reports real parse errors; don't double up here
-        const startLine = srcCode.slice(0, block.offset).split('\n').length;
-        this._compareFuzzyPairs(info).forEach(it => {
-            allIssues.push({
-                text: `'${it.suspect}' is very close to '${it.other}' (used ${it.otherCount}x vs ${it.suspectCount}x here) — possible typo`,
-                line: startLine + it.relLine - 1
-            });
-        });
-    });
-    return allIssues.sort((a, b) => (a.line || 0) - (b.line || 0));
-},
-
-runFuzzyNameCard() {
-    if (!Nexus.state.activeFile) return;
-    document.getElementById('auditor-mode-title').innerText = "ACTIVE: FUZZY NAME SCAN";
-    const srcCode = this.getEditorContent();
-    if (!srcCode.trim()) return;
-    const issues = this._detectFuzzyNameIssues(srcCode);
-    const counter = document.getElementById('audit-count-fuzzy');
-    if (counter) counter.innerText = issues.length;
-    const reportBox = document.getElementById('auditor-report-box');
-    if (issues.length === 0) {
-        reportBox.innerHTML = `<div style="color: var(--success); font-weight: bold;">✔ No near-duplicate names found.</div>`;
-        return;
-    }
-    let html = `<div style="color:var(--gold); font-weight:bold; margin-bottom:6px;">POSSIBLE TYPOS</div>`;
-    issues.forEach((it, idx) => {
-        const clickable = it.line != null;
-        html += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${it.line})" style="cursor:pointer;"` : ''} style="background:var(--surface); padding:8px 10px; margin-bottom:6px; border-left:3px solid var(--gold); border-radius:4px;">`
-            + `<div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">`
-            + `<span style="font-size:11px;">${it.text}</span>`
-            + `<span style="display:flex; gap:4px; align-items:center; white-space:nowrap;">`
-            + `<button class="tool-btn" style="padding:2px 6px; font-size:9px;" onclick="event.stopPropagation(); Nexus.tutor.toggleExplain('fuzzy-${idx}')" title="Explain in plain English" aria-label="Explain this issue">?</button>`
-            + (clickable ? `<span style="font-size:9px; opacity:0.6;">LN ${it.line} →</span>` : '')
-            + `</span></div>`
-            + `<div id="explain-fuzzy-${idx}" style="display:none;">${Nexus.tutor.renderExplainCard(Nexus.tutor.lintLibrary.FUZZY_NAME)}</div>`
             + `</div>`;
     });
     reportBox.innerHTML = html;
@@ -5054,30 +4796,6 @@ tutor: {
             plain: "This variable is created but never read or referenced anywhere else in the file.",
             why: "Harmless on its own, but it usually means either leftover code from an earlier version, or a typo where you meant to use it somewhere and didn't.",
             fix: "If you don't need it, delete the declaration. If you meant to use it, that's your clue to go find where it should have been referenced."
-        },
-        LOOSE_EQ: {
-            title: "This comparison allows silent type conversion",
-            plain: "== and != compare values after automatically converting them to match types first — so 0, '0', and false can all end up considered equal, even though they're different types.",
-            why: "This can make a comparison quietly pass (or fail) in a way you didn't expect, especially once a variable's type changes somewhere you didn't notice.",
-            fix: "Use === and !== instead — they compare type AND value with no hidden conversion. (Comparing straight against null, like `x == null`, is a common intentional exception that also catches undefined — that's not flagged here.)"
-        },
-        UNREACHABLE: {
-            title: "This code can never run",
-            plain: "A return, throw, break, or continue directly above this line always exits (or exits the loop) first, so nothing after it in this block ever executes.",
-            why: "It isn't a crash, but it's almost always a sign the logic above it doesn't do what you intended — otherwise, why write code you never meant to skip?",
-            fix: "Check whether the return/throw/break/continue above is really supposed to be unconditional. If this code should run sometimes, move it before that line or put it behind its own condition."
-        },
-        GLOBAL_LEAK: {
-            title: "This creates a variable that was never declared",
-            plain: "This assigns a value to a name that isn't declared anywhere in the file with let, const, or var — not even in an outer function or at the top level.",
-            why: "In normal (\"sloppy\") mode, this silently creates a global variable that can quietly leak state between unrelated parts of your code. In strict mode or inside a module, it throws a ReferenceError instead. Either way, it's very often a typo of a name you meant to reuse.",
-            fix: "Check the spelling against the variable you meant to use. If this really is meant to be new, declare it properly first with let or const."
-        },
-        FUZZY_NAME: {
-            title: "Two names in your code are almost identical",
-            plain: "These two names differ by only one or two characters — a swapped letter, one extra or missing character, or different capitalization — and one of them barely appears anywhere else.",
-            why: "This is one of the most common silent bugs in any codebase: you meant to use the same variable or function everywhere, but a typo quietly created a second, unrelated one. JavaScript won't warn you — it just treats them as two different names.",
-            fix: "Open both spots and check: did you mean to use the exact same name both times? If so, fix the typo. If they're genuinely two different things, it's safe to ignore this."
         }
     },
 
@@ -5375,28 +5093,6 @@ Sentinel : {
                    this.declarations = new Map(); 
                    this.references = new Set(); 
                    this.magicNumbers = new Map(); 
-                   // Broader binding tracker for GLOBAL_LEAK below — `declarations`
-                   // above deliberately excludes functions (see ZOMBIE_CODE's own
-                   // comment) which is correct for THAT check but wrong for this
-                   // one: assigning to a declared function's own name, or to any
-                   // parameter, is not a leak.
-                   this.allBindings = new Set();
-                   this.leakCandidates = [];
-                   this.knownGlobals = new Set([
-                       'window','document','console','Math','JSON','Array','Object','String','Number','Boolean','Date','RegExp',
-                       'Promise','Map','Set','WeakMap','WeakSet','Symbol','Proxy','Reflect','Error','TypeError','RangeError',
-                       'SyntaxError','ReferenceError','EvalError','URIError','globalThis','undefined','NaN','Infinity',
-                       'fetch','XMLHttpRequest','WebSocket','Worker','Blob','File','FileReader','FormData','Headers','Request','Response',
-                       'localStorage','sessionStorage','indexedDB','navigator','location','history','screen','performance','crypto',
-                       'alert','confirm','prompt','print','open','close','focus','blur','scroll','scrollTo','scrollBy',
-                       'setTimeout','setInterval','clearTimeout','clearInterval','setImmediate','queueMicrotask',
-                       'requestAnimationFrame','cancelAnimationFrame','requestIdleCallback','cancelIdleCallback',
-                       'isNaN','isFinite','parseInt','parseFloat','encodeURIComponent','decodeURIComponent','encodeURI','decodeURI',
-                       'structuredClone','btoa','atob','CustomEvent','Event','EventTarget','MutationObserver','IntersectionObserver',
-                       'ResizeObserver','URL','URLSearchParams','TextEncoder','TextDecoder','DOMParser','XMLSerializer',
-                       'Node','Element','HTMLElement','NodeFilter','CSS','customElements','name','status','event','self','top',
-                       'parent','frames','length','closed','opener','getComputedStyle','getSelection','matchMedia'
-                   ]);
                    this.initDefaultCheckers(); 
                }
                
@@ -5555,75 +5251,14 @@ Sentinel : {
                            };
                        }
                    }});
-
-                 // --- 5. STRICTNESS & CORRECTNESS ---
-                   this.use({ check: (node) => {
-                       if (node.type === 'BinaryExpression' && (node.operator === '==' || node.operator === '!=')) {
-                           const isNullLit = (n) => n.type === 'Literal' && n.value === null;
-                           if (isNullLit(node.left) || isNullLit(node.right)) return; // smart-mode exception: `== null` is a common, intentional idiom that also catches undefined
-                           return { id: 'LOOSE_EQ', message: `Loose comparison: '${node.operator}' allows type coercion between different types. Consider '${node.operator}=' instead.`, severity: 'LOW' };
-                       }
-                   }});
-
-                   this.use({ check: (node, parent) => {
-                       if (!parent) return;
-                       const body = parent.type === 'SwitchCase' ? parent.consequent
-                                  : (parent.type === 'BlockStatement' || parent.type === 'Program') ? parent.body
-                                  : null;
-                       if (!body) return;
-                       const idx = body.indexOf(node);
-                       if (idx <= 0) return;
-                       const terminators = ['ReturnStatement', 'ThrowStatement', 'BreakStatement', 'ContinueStatement'];
-                       // Only the FIRST unreachable statement fires — its preceding
-                       // sibling must be the terminator itself, not just "somewhere
-                       // earlier in the block" — so one dead block doesn't cascade
-                       // into a duplicate report per line.
-                       if (!terminators.includes(body[idx - 1].type)) return;
-                       if (node.type === 'FunctionDeclaration') return; // hoisted; its binding exists regardless of reaching this line
-                       const kind = body[idx - 1].type.replace('Statement', '').toLowerCase();
-                       return { id: 'UNREACHABLE', message: `Unreachable code: this can never run — the ${kind} above it always exits first.`, severity: 'MEDIUM' };
-                   }});
-
-                   // Broader binding tracker (functions, params, classes, catch
-                   // clauses — not just plain vars) feeding the global-leak check.
-                   this.use({ check: (node) => {
-                       if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') this.allBindings.add(node.id.name);
-                       if (['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression'].includes(node.type)) {
-                           if (node.id?.type === 'Identifier') this.allBindings.add(node.id.name);
-                           (node.params || []).forEach(p => this._collectParamNames(p).forEach(n => this.allBindings.add(n)));
-                       }
-                       if (node.type === 'ClassDeclaration' && node.id?.type === 'Identifier') this.allBindings.add(node.id.name);
-                       if (node.type === 'CatchClause' && node.param?.type === 'Identifier') this.allBindings.add(node.param.name);
-                   }});
-
-                   this.use({ check: (node) => {
-                       if (node.type === 'AssignmentExpression' && node.operator === '=' && node.left.type === 'Identifier') {
-                           this.leakCandidates.push({ name: node.left.name, line: node.loc?.start?.line });
-                       }
-                   }});
                }
 
                use(checkerObj) { this.registry.push(checkerObj); }
-
-               // Handles the common parameter shapes (plain, default value,
-               // rest, and destructured object/array) so a param name is
-               // recognized as a real binding no matter how it's written.
-               _collectParamNames(p) {
-                   if (!p) return [];
-                   if (p.type === 'Identifier') return [p.name];
-                   if (p.type === 'AssignmentPattern') return this._collectParamNames(p.left);
-                   if (p.type === 'RestElement') return this._collectParamNames(p.argument);
-                   if (p.type === 'ObjectPattern') return p.properties.flatMap(pr => pr.type === 'RestElement' ? this._collectParamNames(pr.argument) : this._collectParamNames(pr.value));
-                   if (p.type === 'ArrayPattern') return p.elements.flatMap(e => this._collectParamNames(e));
-                   return [];
-               }
                
                analyzeAndMutate(code, mode) {
                    this.declarations.clear();
                    this.references.clear();
                    this.magicNumbers.clear();
-                   this.allBindings.clear();
-                   this.leakCandidates.length = 0;
                    
                    if (typeof acorn === 'undefined') throw new Error("Acorn Parser Missing.");
                    const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', locations: true, ranges: true });
@@ -5645,17 +5280,6 @@ Sentinel : {
                            issues.push({ id: 'ZOMBIE_CODE', message: `Unused variable: '${name}'.`, severity: 'LOW', line: node.loc?.start.line });
                        }
                    }
-
-                   // Global-Leak Check (Post-scan) — deliberately run AFTER the full
-                   // traversal so a hoisted declaration appearing LATER in the file
-                   // is already known by the time an earlier assignment is checked
-                   // against it; checking this inline per-assignment would misfire
-                   // on ordinary hoisting.
-                   for (const cand of this.leakCandidates) {
-                       if (this.allBindings.has(cand.name) || this.knownGlobals.has(cand.name)) continue;
-                       issues.push({ id: 'GLOBAL_LEAK', message: `'${cand.name}' is never declared with let/const/var anywhere in this file — this either creates an accidental global (outside strict mode) or throws a ReferenceError (in strict mode/modules). Often a typo of an existing name.`, severity: 'HIGH', line: cand.line });
-                   }
-
                    return { issues, ast };
                }
                traverse(node, callback, parent = null) {
