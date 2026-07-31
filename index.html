@@ -2,7 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <!-- interactive-widget=resizes-content: makes the LAYOUT viewport (not
+         just the visual one) shrink when the on-screen keyboard opens, on
+         Chrome 108+ / Firefox 132+ on Android. Without this, #app-root's
+         100dvh doesn't account for the keyboard at all (100dvh handles
+         mobile browser chrome like address bars, but is a separate thing
+         from the keyboard — confirmed against the CSS Working Group's own
+         discussion of this exact gap), so the editor's bottom rows render
+         underneath/behind the keyboard instead of shrinking to stay above
+         it. This is Android-only; iOS Safari doesn't implement this meta
+         value, so it's paired with the visualViewport JS fallback below
+         (Nexus.UI.trackKeyboardViewport) for iOS + as a safety net if a
+         future browser version regresses this. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="theme-color" content="#0d1117">
     <title>divIDE v0.8</title>
     <!-- divIDE's own installability. NOTE: there's deliberately no
@@ -234,6 +246,18 @@
     display: flex; 
     flex-direction: column; 
     height: 100dvh; /* dvh prevents mobile browser bars from hiding the footer */
+    /* Keyboard-aware fallback for browsers where <meta interactive-widget=
+       resizes-content> isn't implemented (iOS Safari, and any other engine
+       that ignores it) — see Nexus.UI.trackKeyboardViewport for how
+       --app-vh-px gets set. On browsers where the meta tag DOES work
+       (Chrome/Firefox Android), 100dvh is already correct once the keyboard
+       opens, --app-vh-px will equal (or be extremely close to) the same
+       value, and min() picks whichever is smaller — so this is a pure
+       fallback that activates only where the primary fix doesn't reach, and
+       never fights it or overrides correct behavior elsewhere. Falls back
+       cleanly to plain 100dvh if the custom property was never set (var()
+       with no fallback inside min() is simply ignored by that browser). */
+    height: min(100dvh, var(--app-vh-px, 100dvh));
     width: 100vw; 
     position: relative; 
     overflow: hidden;
@@ -1238,6 +1262,30 @@
     /* CodeMirror 6 Strict Dimensions */
     .cm-editor { height: 100%; width: 100%; font-family: monospace; font-size: 14px; }
     .cm-scroller { overflow: auto; }
+    /* Bracket & Tag Tracing — CM6's bracketMatching() extension drives BOTH
+       of these through the exact same mechanism: JS {}/[]/() pairs directly,
+       and HTML <tag></tag> pairs via lang-html's bracketMatchingHandle (which
+       hands the tag-NAME text to the same matcher). Both render through
+       .cm-matchingBracket / .cm-nonmatchingBracket — there is no separate
+       "tag" class to target. CM6's own baseTheme already applies these
+       classes with a low-opacity fill (#328c8252 / #bb555544), which is
+       correct behavior but reads as barely-there against this editor's dark
+       theme/small phone screen — so this overrides with the app's own
+       --accent/--danger palette at higher opacity, plus an underline (not
+       background alone) so a matched/mismatched pair is legible at a glance
+       while scrolling past it, not just when squinting at the highlight. */
+    .cm-matchingBracket {
+        background: color-mix(in srgb, var(--accent) 35%, transparent) !important;
+        color: inherit !important;
+        border-bottom: 2px solid var(--accent);
+        border-radius: 2px;
+    }
+    .cm-nonmatchingBracket {
+        background: color-mix(in srgb, var(--danger) 40%, transparent) !important;
+        color: inherit !important;
+        border-bottom: 2px solid var(--danger);
+        border-radius: 2px;
+    }
     /* Utility Touch Buttons */
     .dock-btn {
     background-color: #2c313c;
@@ -2348,7 +2396,32 @@ compiler: {
        isCM6: false,
        isLoaded: false,
        view: null,
-       modules: {}
+       modules: {},
+       // Adds real padding-bottom to .cm-content sized to ~15 rendered
+       // lines, so the editor can scroll past the last line of code
+       // instead of pinning it to the bottom edge. Reads the ACTUAL
+       // rendered height of a real .cm-line in the DOM (not a guessed
+       // ratio of font-size), so this stays correct across font-size
+       // preference changes, different fonts, and different browsers'
+       // font metrics — a hardcoded pixel number would silently drift
+       // wrong the moment any of those changed.
+       applyScrollPastEnd(targetLines = 15) {
+           if (!this.view) return;
+           // Let CM6 finish its own layout pass first — right after
+           // EditorView construction, .cm-line elements exist but may not
+           // yet have their final measured height on the very first paint.
+           requestAnimationFrame(() => {
+               if (!this.view) return; // view could have been destroyed (e.g. fast engine-toggle) before this fires
+               const sampleLine = this.view.contentDOM.querySelector('.cm-line');
+               const scroller = this.view.scrollDOM;
+               if (!sampleLine || !scroller) return;
+               const measuredLineHeight = sampleLine.getBoundingClientRect().height;
+               if (!measuredLineHeight || measuredLineHeight <= 0) return; // don't apply a bogus 0/NaN padding
+               const scrollPastPx = Math.round(measuredLineHeight * targetLines);
+               const contentEl = scroller.querySelector('.cm-content');
+               if (contentEl) contentEl.style.paddingBottom = `${scrollPastPx}px`;
+           });
+       }
 },
 ICONS: {
     readonly: `<svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`,
@@ -2969,7 +3042,12 @@ auditor: {
     // Orphans instead of the separate diag-out stream, so results never get
     // silently overwritten as you tap between cards.
     runLintCard() {
-        if (!Nexus.state.activeFile) return;
+        if (!Nexus.state.activeFile) {
+            document.getElementById('auditor-mode-title').innerText = "ACTIVE: LINT";
+            const box = document.getElementById('auditor-report-box');
+            if (box) box.innerHTML = `<div style="color: var(--gold); font-weight: bold;">No file open — open or create a file first.</div>`;
+            return;
+        }
         document.getElementById('auditor-mode-title').innerText = "ACTIVE: LINT";
         const srcCode = this.getEditorContent();
         const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
@@ -3040,7 +3118,12 @@ auditor: {
 
     // Single-check counterpart to the BRACKETS portion of runFullSweep.
     runBracketsCard() {
-        if (!Nexus.state.activeFile) return;
+        if (!Nexus.state.activeFile) {
+            document.getElementById('auditor-mode-title').innerText = "ACTIVE: BRACKETS";
+            const box = document.getElementById('auditor-report-box');
+            if (box) box.innerHTML = `<div style="color: var(--gold); font-weight: bold;">No file open — open or create a file first.</div>`;
+            return;
+        }
         document.getElementById('auditor-mode-title').innerText = "ACTIVE: BRACKETS";
         const srcCode = this.getEditorContent();
         let bracketIssues = [];
@@ -3081,7 +3164,12 @@ auditor: {
         return todos;
     },
     runTodoScan() {
-        if (!Nexus.state.activeFile) return;
+        if (!Nexus.state.activeFile) {
+            document.getElementById('auditor-mode-title').innerText = "ACTIVE: TODO SCAN";
+            const box = document.getElementById('auditor-report-box');
+            if (box) box.innerHTML = `<div style="color: var(--gold); font-weight: bold;">No file open — open or create a file first.</div>`;
+            return;
+        }
         document.getElementById('auditor-mode-title').innerText = "ACTIVE: TODO SCAN";
         const srcCode = this.getEditorContent();
         const todos = this._detectTodos(srcCode);
@@ -3133,73 +3221,57 @@ auditor: {
  items.push({ text: `Parser Bug: ${err.textContent.split('\n')[0]}` });
  });
  
- // 4/5. FULL-COVERAGE TAG TRACE — one stack walk over every tag in the
- // file (not a hardcoded shortlist), reporting every violation it finds
- // rather than stopping at the first. Replaces two earlier passes that
- // each had a real gap:
- //   - the old count check only watched 8 hardcoded tag names (div, span,
- //     button, script, style, section, main, header, footer), so a
- //     mismatched <ul>/<li>, <table>/<tr>, or any custom/less-common tag
- //     passed silently with zero report;
- //   - the old nesting check covered every tag correctly, but stopped
- //     after reporting its first violation (`nestingFlagged = true` broke
- //     the loop), so a file with 3 problems took 3 fix-rerun cycles to
- //     surface them all instead of one.
- // A single stack walk that reports as it goes gives correct-order nesting
- // detection AND true unclosed-tag detection (whatever's left on the stack
- // at EOF) for every tag name, in one pass, with nothing silently skipped.
+ // 4. Run structural balance checks on the remaining clean layout
+ const targetTags = ['div', 'span', 'button', 'script', 'style', 'section', 'main', 'header', 'footer'];
+ targetTags.forEach(tag => {
+ const openMatches = [...srcCode.matchAll(new RegExp(`<${tag}\\b`, 'g'))];
+ const closeCount = (srcCode.match(new RegExp(`</${tag}>`, 'g')) || []).length;
+ 
+ if (openMatches.length !== closeCount) {
+ const diff = Math.abs(openMatches.length - closeCount);
+ // Jump to the LAST opening occurrence — the most likely place to start
+ // tracing the mismatch from, since it's the one still "open" furthest in.
+ const lastMatch = openMatches[openMatches.length - 1];
+ const line = lastMatch ? srcCode.slice(0, lastMatch.index).split('\n').length : null;
+ items.push({ text: `Mismatched &lt;${tag}&gt;: Found ${openMatches.length} open, ${closeCount} closed. Missing ${diff}.`, line });
+ }
+ });
+
+ // 5. NESTING validation — the count check above can't catch improperly
+ // NESTED tags: <div><span></div></span> has one open + one close of each,
+ // so it passes the count check clean, but the closes are in the wrong
+ // order. Walk the raw tags as a stack (skipping script/style content,
+ // since JS/CSS routinely contains bare < and > that aren't tags at all).
  {
      const stripped = srcCode
          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, m => ' '.repeat(m.length))
          .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, m => ' '.repeat(m.length));
      const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
      const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*?(\/?)>/g;
-     const lineOf = (idx) => stripped.slice(0, idx).split('\n').length;
      const stack = [];
      let m;
-     while ((m = tagRe.exec(stripped))) {
+     let nestingFlagged = false;
+     while ((m = tagRe.exec(stripped)) && !nestingFlagged) {
          const [full, closing, name, selfClose] = m;
          const tag = name.toLowerCase();
          if (voidTags.has(tag) || selfClose) continue;
          if (!closing) {
              stack.push({ tag, index: m.index });
-             continue;
+         } else {
+             if (stack.length === 0) continue; // stray closing tag with nothing open — count check already covers pure imbalance
+             const top = stack[stack.length - 1];
+             if (top.tag === tag) {
+                 stack.pop();
+             } else if (stack.some(s => s.tag === tag)) {
+                 // The matching opener exists, but not at the top of the stack —
+                 // this closing tag jumped past something still open. That's a
+                 // real nesting violation, not just an overall count mismatch.
+                 const line = stripped.slice(0, m.index).split('\n').length;
+                 items.push({ text: `Improper nesting: &lt;/${tag}&gt; closes before its inner &lt;${top.tag}&gt; (opened line ${stripped.slice(0, top.index).split('\n').length}) does.`, line });
+                 nestingFlagged = true; // one clear report is more useful than a cascade from the same root cause
+             }
          }
-         if (stack.length === 0) {
-             // Stray closing tag with nothing open at all — previously
-             // silently skipped ("count check covers it"), but there is no
-             // count check anymore, so this needs its own report.
-             items.push({ text: `Unexpected &lt;/${tag}&gt; — no matching &lt;${tag}&gt; is open at this point.`, line: lineOf(m.index) });
-             continue;
-         }
-         const top = stack[stack.length - 1];
-         if (top.tag === tag) {
-             stack.pop();
-             continue;
-         }
-         const matchIdx = stack.map(s => s.tag).lastIndexOf(tag);
-         if (matchIdx === -1) {
-             // No opener for this tag anywhere on the stack — treat as stray,
-             // same as the empty-stack case above, so it still gets reported
-             // and the stack is left untouched for whatever comes next.
-             items.push({ text: `Unexpected &lt;/${tag}&gt; — no matching &lt;${tag}&gt; is open at this point.`, line: lineOf(m.index) });
-             continue;
-         }
-         // The matching opener exists further down the stack, not at the
-         // top — this closing tag jumped past something still open. Report
-         // it, then pop back to (and including) the real match so the walk
-         // stays coherent for the rest of the file instead of cascading
-         // false positives off one bad tag.
-         items.push({ text: `Improper nesting: &lt;/${tag}&gt; closes before its inner &lt;${top.tag}&gt; (opened line ${lineOf(top.index)}) does.`, line: lineOf(m.index) });
-         stack.length = matchIdx;
      }
-     // Anything left on the stack at EOF was opened but never closed —
-     // this is the true unclosed-tag report, correct per tag NAME (every
-     // tag, not a hardcoded 8) and per tag INSTANCE (each leftover open
-     // gets its own line-numbered entry rather than one aggregate count).
-     stack.forEach(({ tag, index }) => {
-         items.push({ text: `Unclosed &lt;${tag}&gt; — opened here but never closed.`, line: lineOf(index) });
-     });
  }
 
  // 6. Duplicate ids — breaks getElementById()'s "one true element" guarantee.
@@ -5370,7 +5442,7 @@ Sentinel : {
            };
        },
        runMedicString() { 
-           if(!Nexus.state.activeFile) return; 
+           if (!Nexus.state.activeFile) return this.log("[MEDIC STRING] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[MEDIC] EDITOR LOCKED. Cannot apply patch.", "danger");
            
            let code = this.getLiveCode();
@@ -5383,7 +5455,7 @@ Sentinel : {
            this.log("[MEDIC STRING] Deep string scrub complete. Whitespace optimized.", "success"); 
        },
        runMedicAST() { 
-           if(!Nexus.state.activeFile) return; 
+           if (!Nexus.state.activeFile) return this.log("[MEDIC AST] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebuild.", "danger");
            
            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
@@ -5415,7 +5487,7 @@ Sentinel : {
        // CSS is simple enough (no nested-slash ambiguity in practice) for a
        // straightforward regex.
        stripComments() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[STRIP COMMENTS] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[STRIP COMMENTS] EDITOR LOCKED. Cannot modify.", "danger");
 
            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
@@ -5498,7 +5570,7 @@ Sentinel : {
        },
 
        changeCase(mode) {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[CHANGE CASE] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[CHANGE CASE] EDITOR LOCKED. Cannot modify.", "danger");
            const { text, from, to } = this.getSelectionRange();
            if (!text) return;
@@ -5512,7 +5584,7 @@ Sentinel : {
        },
 
        sortLines() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[SORT LINES] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[SORT LINES] EDITOR LOCKED. Cannot modify.", "danger");
            const { text, from, to } = this.getSelectionRange();
            if (!text) return;
@@ -5526,7 +5598,7 @@ Sentinel : {
        },
 
        removeBlankLines() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[REMOVE BLANK LINES] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[REMOVE BLANK LINES] EDITOR LOCKED. Cannot modify.", "danger");
            const code = this.getLiveCode();
            const result = code.split('\n').filter(line => line.trim() !== '').join('\n') + '\n';
@@ -5535,7 +5607,7 @@ Sentinel : {
        },
 
        alignLeft() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[ALIGN LEFT] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[ALIGN LEFT] EDITOR LOCKED. Cannot modify.", "danger");
            const code = this.getLiveCode();
            const result = code.split('\n').map(line => line.replace(/^[ \t]+/, '')).join('\n');
@@ -5656,7 +5728,7 @@ Sentinel : {
        // brackets/tags, since depth is meaningless until those are fixed —
        // reuses the same check the BRACKETS card already runs.
        reindentByDepth() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[RE-INDENT] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[RE-INDENT] EDITOR LOCKED. Cannot modify.", "danger");
            const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
            const code = this.getLiveCode();
@@ -5685,7 +5757,7 @@ Sentinel : {
        },
 
        formatJSON() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[FORMAT JSON] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[FORMAT JSON] EDITOR LOCKED. Cannot modify.", "danger");
            const code = this.getLiveCode();
            try {
@@ -5703,7 +5775,7 @@ Sentinel : {
        // applied to GitHub pull/push this session) since plain btoa/atob
        // corrupts any non-ASCII text.
        base64Encode() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[BASE64] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[BASE64] EDITOR LOCKED. Cannot modify.", "danger");
            const { text, from, to } = this.getSelectionRange();
            if (!text) return;
@@ -5715,7 +5787,7 @@ Sentinel : {
            }
        },
        base64Decode() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[BASE64] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[BASE64] EDITOR LOCKED. Cannot modify.", "danger");
            const { text, from, to } = this.getSelectionRange();
            if (!text) return;
@@ -5727,7 +5799,7 @@ Sentinel : {
            }
        },
        urlEncode() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[URL ENCODE] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[URL ENCODE] EDITOR LOCKED. Cannot modify.", "danger");
            const { text, from, to } = this.getSelectionRange();
            if (!text) return;
@@ -5735,7 +5807,7 @@ Sentinel : {
            this.log("[URL ENCODE] Encoded.", "success");
        },
        urlDecode() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return this.log("[URL DECODE] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[URL DECODE] EDITOR LOCKED. Cannot modify.", "danger");
            const { text, from, to } = this.getSelectionRange();
            if (!text) return;
@@ -5748,7 +5820,11 @@ Sentinel : {
        },
        
        scanDeps() { 
-           if(!Nexus.state.activeFile) return; 
+           if (!Nexus.state.activeFile) {
+               const out = document.getElementById('diag-out');
+               if (out) out.innerHTML = `<div style="color:var(--gold); font-weight:bold;">No file open — open or create a file first.</div>`;
+               return;
+           }
            const code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
            const deps = code.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g);
            
@@ -6045,13 +6121,23 @@ try {
             html: cmHTML.html,
             oneDark: cmTheme.oneDark,
             foldAll: cmLang.foldAll,       
-            unfoldAll: cmLang.unfoldAll    
+            unfoldAll: cmLang.unfoldAll,
+            // Bracket & tag tracing: same extension covers both. For JS it
+            // matches {}/[]/(); for HTML, lang-html's bracketMatchingHandle
+            // routes tag-name text through this exact matcher, so <div>/</div>
+            // pairs highlight the same way brackets do — no separate
+            // "tag matching" extension exists or is needed. basicSetup already
+            // bundles a copy, but CM6 dedupes extensions by identity (per
+            // CodeMirror's own facet docs), so adding it again explicitly here
+            // is safe and gives a stable named hook independent of whatever
+            // basicSetup happens to bundle internally.
+            bracketMatching: cmLang.bracketMatching
         };
 
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, javascript, html, oneDark } = Nexus.editorCore.modules;
+    const { EditorState, EditorView, basicSetup, javascript, html, oneDark, bracketMatching } = Nexus.editorCore.modules;
     
     // Choose language extension based on active file type
     const activeExt = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
@@ -6085,6 +6171,7 @@ try {
     Nexus.editorCore.currentExtensions = [
        basicSetup, 
        langExtension, 
+       bracketMatching(), // JS {}/[]/() AND HTML <tag></tag> — same extension, same mechanism (see comment in Nexus.editorCore.modules above)
        ...(wantsDark ? [oneDark] : []),
        fixedHeight,
        EditorView.updateListener.of((update) => {
@@ -6119,6 +6206,27 @@ try {
         }),
         parent: actualCmContainer
     });
+
+    // Scroll-past-end: lets the editor scroll ~15 lines past the last line
+    // of code, so the last few lines aren't stuck pinned at the very bottom
+    // edge of the screen (awkward to read/edit one-handed) or hidden behind
+    // the on-screen keyboard.
+    //
+    // CM6 has no built-in "N lines past end" option — its own author has
+    // said directly on the CM6 forum that the recommended approach for a
+    // SPECIFIC distance is exactly this: add real padding-bottom to
+    // .cm-content, sized in actual pixels you compute yourself. (The
+    // built-in scrollPastEnd() extension instead scrolls until the last
+    // line reaches the TOP of the viewport — unconfigurable and not what
+    // "10 to 20 lines" describes.)
+    //
+    // The padding is computed from a REAL rendered .cm-line, not a guessed
+    // ratio of font-size — line-height varies slightly by font/browser, and
+    // Nexus.state.prefs.fontSize is user-configurable, so hardcoding a
+    // pixel number would silently drift wrong the moment someone changes
+    // their font size. Reading the actual DOM after the view exists is the
+    // only way this stays correct regardless of font-size preference.
+    Nexus.editorCore.applyScrollPastEnd();
 
     Nexus.editorCore.isCM6 = true;
     Nexus.state.isCM6 = true;
@@ -6306,7 +6414,7 @@ try {
        // Manual, on-demand whole-file clean — also catches characters
        // introduced by typing with autocorrect on, not just pasting.
        cleanActiveFile() {
-           if (!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return Nexus.shell.out('No file open — open or create a file first.', 'warn');
            const code = Nexus.state.Vfs[Nexus.state.activeFile] || '';
            const { count, found } = this.scan(code);
            if (count === 0) {
@@ -7517,6 +7625,14 @@ settings: {
         // also reads this same preference for the next fresh boot/switch.
         if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
             Nexus.editorCore.view.contentDOM.style.fontSize = Nexus.state.prefs.fontSize + 'px';
+            // Font size just changed live, so the previously-measured
+            // .cm-line height (and therefore the scroll-past-end padding
+            // sized from it) is now stale — re-measure and re-apply so it
+            // keeps corresponding to ~15 real lines instead of silently
+            // drifting to whatever the old font size produced.
+            if (typeof Nexus.editorCore.applyScrollPastEnd === 'function') {
+                Nexus.editorCore.applyScrollPastEnd();
+            }
         }
         
         // Sync open UI inputs safely using optional chaining
@@ -8211,6 +8327,10 @@ UI: {
         if (document.getElementById('dreamer-type') && Nexus.dreamer && typeof Nexus.dreamer.updatePreview === 'function') {
             Nexus.dreamer.updatePreview(); 
         }
+
+        // 5. Keyboard-aware viewport (see trackKeyboardViewport below). Runs
+        // once for the app's lifetime, not per-file/per-engine-switch.
+        if (typeof this.trackKeyboardViewport === 'function') this.trackKeyboardViewport();
         
     },
     
@@ -8231,6 +8351,45 @@ UI: {
           });
       }
   }, // <-- Added the crucial closing method brace and trailing comma!
+
+  // KEYBOARD-AWARE VIEWPORT — "the editor should rise above the keyboard,
+  // not be hidden behind it." Two browser families need two different
+  // fixes, and this covers both without them fighting each other:
+  //
+  //   - Chrome/Firefox on Android: the <meta interactive-widget=
+  //     resizes-content> tag (see <head>) already makes the LAYOUT viewport
+  //     itself shrink when the keyboard opens, so #app-root's existing
+  //     `height: 100dvh` automatically becomes correct — no JS needed, and
+  //     this function's CSS var ends up unused there (harmless).
+  //   - iOS Safari does not implement that meta tag at all. There, only the
+  //     VISUAL viewport shrinks; the layout viewport (and therefore dvh,
+  //     and therefore #app-root) stays the original full-screen size, which
+  //     is exactly why content ends up rendered underneath/behind the
+  //     keyboard. The only reliable signal on iOS is the
+  //     window.visualViewport resize event, so this listens for that and
+  //     writes the real, live height into a CSS custom property.
+  //
+  // --app-vh-px is consumed by a small additive CSS rule (search
+  // "--app-vh-px" in the <style> block) that only takes effect via an
+  // @supports-guarded selector scoped to exactly the case where the visual
+  // viewport is shorter than the layout viewport — i.e. only when a
+  // keyboard (or similar overlay) is actually open — so it does nothing on
+  // desktop or when the keyboard is closed, and never overrides the normal
+  // 100dvh sizing that already works correctly everywhere else.
+  trackKeyboardViewport() {
+      if (!window.visualViewport) return; // very old browser — no signal available, degrade to prior (imperfect) behavior rather than throw
+      const root = document.documentElement;
+      const applyHeight = () => {
+          root.style.setProperty('--app-vh-px', `${window.visualViewport.height}px`);
+      };
+      applyHeight();
+      window.visualViewport.addEventListener('resize', applyHeight);
+      // iOS in particular can fire scroll on the visual viewport as the
+      // keyboard animates open/closed without a matching resize event on
+      // some versions; re-applying on both keeps the boundary tracking
+      // smoothly through the animation instead of snapping at the end.
+      window.visualViewport.addEventListener('scroll', applyHeight);
+  }, // <-- closes trackKeyboardViewport
   
   checkSyntax: () => {
       // 1. Get the code currently in your editor
@@ -8534,7 +8693,7 @@ insertUUID() {
      
 
                jumpPrompt(directLine) {
-           if(!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
            
            // 1. Safety Guard: Ignore accidental MouseEvents from button clicks
            let ln = directLine;
@@ -8585,7 +8744,7 @@ insertUUID() {
        },
 
        jumpRelative(offset) {
-           if(!Nexus.state.activeFile) return;
+           if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
            
            // --- CM6 ROUTING ---
            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
@@ -8874,7 +9033,7 @@ insertUUID() {
        setTimeout(() => document.addEventListener('click', closeMenu), 50);
    },
    async runPrettier() {
-       if(!Nexus.state.activeFile) return;
+       if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
        const ed = document.getElementById('raw-terminal');
        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
        
@@ -8927,7 +9086,11 @@ insertUUID() {
        }
    },
 checkBrackets() {
-  if(!Nexus.state.activeFile) return;
+  if (!Nexus.state.activeFile) {
+      const out = document.getElementById('diag-out');
+      if (out) out.innerHTML = `<div style="color:var(--gold); font-weight:bold;">No file open — open or create a file first.</div>`;
+      return;
+  }
   const code = Nexus.state.Vfs[Nexus.state.activeFile];
   const result = Nexus.BracketCartographer.mapStructure(code);
   const out = document.getElementById('diag-out');
@@ -8962,7 +9125,7 @@ runDiff(target) {
 },
 
    runJSBeautify() {
-       if(!Nexus.state.activeFile) return;
+       if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
        const ed = document.getElementById('raw-terminal');
        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
        
@@ -9082,7 +9245,11 @@ initInfiniteRibbon() {
            const btns = document.querySelectorAll('.edit-btn-trigger'); 
            const cmDom = (Nexus.editorCore && Nexus.editorCore.view && Nexus.editorCore.view.contentDOM) || null;
            
-           if(!Nexus.state.activeFile) return; 
+           if (!Nexus.state.activeFile) {
+               st.innerText = "NO FILE OPEN";
+               st.style.color = "var(--gold)";
+               return;
+           }
 
            if (ed.hasAttribute('readonly')) { 
                // Transition to UTIL MODE (No native keyboard, but cursor placement/selection allowed)
