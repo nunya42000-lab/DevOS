@@ -55,7 +55,8 @@
             "@marijn/find-cluster-break": "https://esm.sh/*@marijn/find-cluster-break",
             "style-mod": "https://esm.sh/*style-mod",
             "w3c-keyname": "https://esm.sh/*w3c-keyname",
-            "crelt": "https://esm.sh/*crelt"
+            "crelt": "https://esm.sh/*crelt",
+            "@replit/codemirror-indentation-markers": "https://esm.sh/*@replit/codemirror-indentation-markers"
         }
     }
     </script>
@@ -1398,6 +1399,7 @@
             <button id="ribbon-save-btn" class="tool-btn btn-success" onclick="Nexus.Vfs.manualSave()" title="Save Now" aria-label="Save current file now">💾</button>
             <button id="edit-mode-btn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.UI.toggleEditMode()" title="Edit Lock" aria-label="Toggle edit lock">🔒</button>
             <button class="tool-btn" onclick="Nexus.toggleEditor()" title="Swap Editor Engine" aria-label="Swap editor engine">🔄</button>
+            <button id="indent-guides-btn" class="tool-btn" onclick="Nexus.UI.toggleIndentGuides()" title="Toggle Indent/Tag Guide Lines (CM6 only)" aria-label="Toggle indent and tag guide lines">📏</button>
             <button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()" title="Refresh File" aria-label="Refresh current file">♻️</button>
             <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sandbox')" title="Run / Preview" aria-label="Run preview">▶️</button>
             <div class="dock-divider" role="separator"></div>
@@ -2371,7 +2373,8 @@ window.Nexus = {
            kbLayouts: {},
            ghToken: "",
            ghRepo: "",
-           activeEngine: 'vanilla'
+           activeEngine: 'vanilla',
+           indentGuides: true
        },
        searchOpts: { case: false, regex: false, global: false },
        widgets: { 'utility-bar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false, 'nexus-dpad': false }
@@ -3222,56 +3225,73 @@ auditor: {
  });
  
  // 4. Run structural balance checks on the remaining clean layout
- const targetTags = ['div', 'span', 'button', 'script', 'style', 'section', 'main', 'header', 'footer'];
- targetTags.forEach(tag => {
- const openMatches = [...srcCode.matchAll(new RegExp(`<${tag}\\b`, 'g'))];
- const closeCount = (srcCode.match(new RegExp(`</${tag}>`, 'g')) || []).length;
- 
- if (openMatches.length !== closeCount) {
- const diff = Math.abs(openMatches.length - closeCount);
- // Jump to the LAST opening occurrence — the most likely place to start
- // tracing the mismatch from, since it's the one still "open" furthest in.
- const lastMatch = openMatches[openMatches.length - 1];
- const line = lastMatch ? srcCode.slice(0, lastMatch.index).split('\n').length : null;
- items.push({ text: `Mismatched &lt;${tag}&gt;: Found ${openMatches.length} open, ${closeCount} closed. Missing ${diff}.`, line });
- }
- });
-
- // 5. NESTING validation — the count check above can't catch improperly
- // NESTED tags: <div><span></div></span> has one open + one close of each,
- // so it passes the count check clean, but the closes are in the wrong
- // order. Walk the raw tags as a stack (skipping script/style content,
- // since JS/CSS routinely contains bare < and > that aren't tags at all).
+ // 4/5. FULL-COVERAGE TAG TRACE — one stack walk over every tag in the
+ // file (not a hardcoded shortlist), reporting every violation it finds
+ // rather than stopping at the first. Replaces two earlier passes that
+ // each had a real gap:
+ //   - the old count check only watched 8 hardcoded tag names (div, span,
+ //     button, script, style, section, main, header, footer), so a
+ //     mismatched <ul>/<li>, <table>/<tr>, or any custom/less-common tag
+ //     passed silently with zero report;
+ //   - the old nesting check covered every tag correctly, but stopped
+ //     after reporting its first violation (`nestingFlagged = true` broke
+ //     the loop), so a file with 3 problems took 3 fix-rerun cycles to
+ //     surface them all instead of one.
+ // A single stack walk that reports as it goes gives correct-order nesting
+ // detection AND true unclosed-tag detection (whatever's left on the stack
+ // at EOF) for every tag name, in one pass, with nothing silently skipped.
  {
      const stripped = srcCode
          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, m => ' '.repeat(m.length))
          .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, m => ' '.repeat(m.length));
      const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
      const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*?(\/?)>/g;
+     const lineOf = (idx) => stripped.slice(0, idx).split('\n').length;
      const stack = [];
      let m;
-     let nestingFlagged = false;
-     while ((m = tagRe.exec(stripped)) && !nestingFlagged) {
+     while ((m = tagRe.exec(stripped))) {
          const [full, closing, name, selfClose] = m;
          const tag = name.toLowerCase();
          if (voidTags.has(tag) || selfClose) continue;
          if (!closing) {
              stack.push({ tag, index: m.index });
-         } else {
-             if (stack.length === 0) continue; // stray closing tag with nothing open — count check already covers pure imbalance
-             const top = stack[stack.length - 1];
-             if (top.tag === tag) {
-                 stack.pop();
-             } else if (stack.some(s => s.tag === tag)) {
-                 // The matching opener exists, but not at the top of the stack —
-                 // this closing tag jumped past something still open. That's a
-                 // real nesting violation, not just an overall count mismatch.
-                 const line = stripped.slice(0, m.index).split('\n').length;
-                 items.push({ text: `Improper nesting: &lt;/${tag}&gt; closes before its inner &lt;${top.tag}&gt; (opened line ${stripped.slice(0, top.index).split('\n').length}) does.`, line });
-                 nestingFlagged = true; // one clear report is more useful than a cascade from the same root cause
-             }
+             continue;
          }
+         if (stack.length === 0) {
+             // Stray closing tag with nothing open at all — previously
+             // silently skipped ("count check covers it"), but there is no
+             // count check anymore, so this needs its own report.
+             items.push({ text: `Unexpected &lt;/${tag}&gt; — no matching &lt;${tag}&gt; is open at this point.`, line: lineOf(m.index) });
+             continue;
+         }
+         const top = stack[stack.length - 1];
+         if (top.tag === tag) {
+             stack.pop();
+             continue;
+         }
+         const matchIdx = stack.map(s => s.tag).lastIndexOf(tag);
+         if (matchIdx === -1) {
+             // No opener for this tag anywhere on the stack — treat as stray,
+             // same as the empty-stack case above, so it still gets reported
+             // and the stack is left untouched for whatever comes next.
+             items.push({ text: `Unexpected &lt;/${tag}&gt; — no matching &lt;${tag}&gt; is open at this point.`, line: lineOf(m.index) });
+             continue;
+         }
+         // The matching opener exists further down the stack, not at the
+         // top — this closing tag jumped past something still open. Report
+         // it, then pop back to (and including) the real match so the walk
+         // stays coherent for the rest of the file instead of cascading
+         // false positives off one bad tag.
+         items.push({ text: `Improper nesting: &lt;/${tag}&gt; closes before its inner &lt;${top.tag}&gt; (opened line ${lineOf(top.index)}) does.`, line: lineOf(m.index) });
+         stack.length = matchIdx;
      }
+     // Anything left on the stack at EOF was opened but never closed —
+     // this is the true unclosed-tag report, correct per tag NAME (every
+     // tag, not a hardcoded 8) and per tag INSTANCE (each leftover open
+     // gets its own line-numbered entry rather than one aggregate count).
+     stack.forEach(({ tag, index }) => {
+         items.push({ text: `Unclosed &lt;${tag}&gt; — opened here but never closed.`, line: lineOf(index) });
+     });
  }
 
  // 6. Duplicate ids — breaks getElementById()'s "one true element" guarantee.
@@ -6103,20 +6123,22 @@ try {
     if (!Nexus.editorCore.isLoaded) {
         // FIX 1: Stripped version numbers. 
         // ESM.sh will now resolve a perfectly matched, conflict-free dependency tree.
-        const [cm6, cmState, cmView, cmJS, cmTheme, cmLang, cmHTML] = await Promise.all([
+        const [cm6, cmState, cmView, cmJS, cmTheme, cmLang, cmHTML, cmIndentMarkers] = await Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
             import("@codemirror/view"),
             import("@codemirror/lang-javascript"),
             import("@codemirror/theme-one-dark"),
             import("@codemirror/language"),
-            import("@codemirror/lang-html")
+            import("@codemirror/lang-html"),
+            import("@replit/codemirror-indentation-markers")
         ]);
         
         Nexus.editorCore.modules = {
             basicSetup: cm6.basicSetup,
             EditorView: cmView.EditorView,
             EditorState: cmState.EditorState,
+            Compartment: cmState.Compartment,
             javascript: cmJS.javascript,
             html: cmHTML.html,
             oneDark: cmTheme.oneDark,
@@ -6131,13 +6153,29 @@ try {
             // CodeMirror's own facet docs), so adding it again explicitly here
             // is safe and gives a stable named hook independent of whatever
             // basicSetup happens to bundle internally.
-            bracketMatching: cmLang.bracketMatching
+            bracketMatching: cmLang.bracketMatching,
+            // Full-scope indent/tag guide lines (the always-visible vertical
+            // rail down the left margin, distinct from bracketMatching's
+            // tap-to-see-one-pair behavior). CM6 core has no built-in
+            // extension for this — confirmed directly against CodeMirror's
+            // own "List of Core Extensions" reference page, which lists
+            // gutter/foldGutter/lintGutter/highlightActiveLineGutter but
+            // nothing for indent guides. This is @replit/codemirror-
+            // indentation-markers: MIT-licensed, ~167k weekly npm downloads,
+            // zero known vulnerabilities, maintained by Replit (a real
+            // production code-editor company, not a hobbyist gist). Its
+            // peerDependencies on @codemirror/state and @codemirror/view
+            // mean it shares THIS app's already-deduplicated instances of
+            // those (via the importmap above) rather than bundling its own
+            // — the same conflict-avoidance strategy already proven correct
+            // for every other @codemirror/* package here.
+            indentationMarkers: cmIndentMarkers.indentationMarkers
         };
 
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, javascript, html, oneDark, bracketMatching } = Nexus.editorCore.modules;
+    const { EditorState, EditorView, basicSetup, javascript, html, oneDark, bracketMatching, indentationMarkers, Compartment } = Nexus.editorCore.modules;
     
     // Choose language extension based on active file type
     const activeExt = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
@@ -6168,10 +6206,52 @@ try {
     // swap extensions in-place — but every fresh editor boot/file-switch now
     // picks up whichever theme is current.)
     const wantsDark = !document.body.classList.contains('outdoor-mode');
+
+    // Indent/tag guide lines live inside a Compartment so the toolbar toggle
+    // (Nexus.UI.toggleIndentGuides) can swap them on/off INSTANTLY via
+    // view.dispatch({effects: compartment.reconfigure(...)}) without
+    // rebuilding the whole EditorView — CM6's own documented mechanism for
+    // exactly this ("dynamically en-/disable some extensions" — see
+    // CodeMirror's own Configuration example page). A fresh Compartment is
+    // created on every boot since a fresh EditorView is too; storing it on
+    // Nexus.editorCore keeps it reachable from outside this function.
+    Nexus.editorCore.indentGuideCompartment = new Compartment();
+
+    // Theming @replit/codemirror-indentation-markers: its own default theme
+    // draws each guide line via a generated CSS background-gradient that
+    // reads two custom properties — --indent-marker-bg-color and
+    // --indent-marker-active-bg-color — set inside its own internal
+    // EditorView.baseTheme() under &light/&dark selectors (confirmed by
+    // reading the package's actual real source directly, not just its
+    // README prose, which turned out to describe options — markerType,
+    // thickness, a `colors` object — that this specific published version
+    // doesn't actually have). Overriding a CSS class directly (the way
+    // bracketMatching's classes were styled) would fight this gradient
+    // mechanism rather than work with it; setting these two variables via
+    // divIDE's own baseTheme extension, layered alongside the package's,
+    // is the confirmed-correct approach — the same technique Home
+    // Assistant's own frontend team uses in production for this exact
+    // package.
+    const indentGuideTheme = EditorView.baseTheme({
+        '&light': { '--indent-marker-bg-color': 'var(--border)', '--indent-marker-active-bg-color': 'var(--border)' },
+        '&dark': { '--indent-marker-bg-color': 'var(--border)', '--indent-marker-active-bg-color': 'var(--border)' }
+    });
+
+    const indentGuideExtension = indentationMarkers({
+        hideFirstIndent: true // matches the reference screenshot: no guide line at the outermost/first level, only nested scopes
+        // Only passing options confirmed present in the package's actual
+        // real source (hideFirstIndent, highlightActiveBlock — the latter
+        // left at its true default of `true`), not the extra options the
+        // npm README describes for a newer version than what's verified
+        // here.
+    });
+
     Nexus.editorCore.currentExtensions = [
        basicSetup, 
        langExtension, 
        bracketMatching(), // JS {}/[]/() AND HTML <tag></tag> — same extension, same mechanism (see comment in Nexus.editorCore.modules above)
+       indentGuideTheme, // always present — just defines CSS variables, harmless when the marker extension itself is toggled off via the compartment below
+       Nexus.editorCore.indentGuideCompartment.of(Nexus.state.prefs.indentGuides ? indentGuideExtension : []),
        ...(wantsDark ? [oneDark] : []),
        fixedHeight,
        EditorView.updateListener.of((update) => {
@@ -7642,6 +7722,8 @@ settings: {
         if(document.getElementById('pref-writer-custom')) document.getElementById('pref-writer-custom').value = Nexus.state.prefs.customVocab || "";
         if(document.getElementById('pref-gh-repo')) document.getElementById('pref-gh-repo').value = Nexus.state.prefs.ghRepo || "";
         if(document.getElementById('pref-gh-token')) document.getElementById('pref-gh-token').value = Nexus.state.prefs.ghToken || "";
+        const indentBtn = document.getElementById('indent-guides-btn');
+        if (indentBtn) indentBtn.classList.toggle('btn-accent', Nexus.state.prefs.indentGuides !== false);
 
         // Sync local widget engine configs 
         Nexus.widgetConfig.keyboard.visibleRows = Nexus.state.prefs.kbRows || 1;
@@ -9343,6 +9425,33 @@ initInfiniteRibbon() {
            // Persist — this used to be a bare class toggle with no memory,
            // so the display mode silently reset to dark on every reload.
            Nexus.settings.update('outdoorMode', document.body.classList.contains('outdoor-mode'));
+       },
+
+       toggleIndentGuides() {
+           Nexus.state.prefs.indentGuides = !Nexus.state.prefs.indentGuides;
+           Nexus.settings.update('indentGuides', Nexus.state.prefs.indentGuides);
+
+           // Live-update immediately if CM6 is already open, via the
+           // Compartment set up in toggleEditor() — no rebuild, no flicker,
+           // no needing to switch files to see the change take effect. This
+           // only works if CM6 has actually booted at least once this
+           // session (indentGuideCompartment and modules only exist after
+           // that); if not (still on vanilla, or CM6 never opened yet), the
+           // preference is still saved correctly and will simply apply the
+           // next time CM6 boots — same "not live, but correct on next
+           // boot" fallback the outdoor-mode/theme toggle already uses.
+           if (Nexus.editorCore.isCM6 && Nexus.editorCore.view && Nexus.editorCore.indentGuideCompartment && Nexus.editorCore.modules && Nexus.editorCore.modules.indentationMarkers) {
+               const { indentationMarkers } = Nexus.editorCore.modules;
+               const newExtension = Nexus.state.prefs.indentGuides
+                   ? indentationMarkers({ hideFirstIndent: true })
+                   : [];
+               Nexus.editorCore.view.dispatch({
+                   effects: Nexus.editorCore.indentGuideCompartment.reconfigure(newExtension)
+               });
+           }
+
+           const btn = document.getElementById('indent-guides-btn');
+           if (btn) btn.classList.toggle('btn-accent', Nexus.state.prefs.indentGuides);
        },
   syncStatus() {
        const ed = document.getElementById('raw-terminal');
