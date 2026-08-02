@@ -6232,9 +6232,27 @@ try {
     // is the confirmed-correct approach — the same technique Home
     // Assistant's own frontend team uses in production for this exact
     // package.
+    // Colors: --border (#30363d dark / #d0d7de light) was the original
+    // choice, reused from the app's own subtle-divider variable — but it's
+    // genuinely too low-contrast for a persistent tracking aid: computed
+    // against this app's real --bg via WCAG relative luminance, it's only
+    // 1.55:1 (dark) / 1.45:1 (light), nowhere near even the 3:1 floor WCAG
+    // sets for large/decorative elements. It was also used identically for
+    // BOTH regular and active-scope lines, so the active-line highlight —
+    // the whole point of tracking which scope you're in, per the reference
+    // screenshot — wasn't happening at all. VS Code's own well-known dark
+    // themes (e.g. its indent-guide color customization docs) deliberately
+    // use two distinct tiers for exactly this reason: a uniform color
+    // reads as either invisible or, on some themes, backwards-highlighted.
+    // These replacements are computed the same way: real contrast-ratio
+    // math against this app's actual --bg, landing on two of GitHub's own
+    // recognized dark/light secondary-UI grays (consistent with the rest
+    // of this app's GitHub-derived palette) rather than picked by eye.
+    //   dark:  inactive #4d5560 (2.51:1, was 1.55:1) / active #6e7681 (4.12:1)
+    //   light: inactive #a8b1ba (2.17:1, was 1.45:1) / active #8c959f (3.04:1)
     const indentGuideTheme = EditorView.baseTheme({
-        '&light': { '--indent-marker-bg-color': 'var(--border)', '--indent-marker-active-bg-color': 'var(--border)' },
-        '&dark': { '--indent-marker-bg-color': 'var(--border)', '--indent-marker-active-bg-color': 'var(--border)' }
+        '&light': { '--indent-marker-bg-color': '#a8b1ba', '--indent-marker-active-bg-color': '#8c959f' },
+        '&dark': { '--indent-marker-bg-color': '#4d5560', '--indent-marker-active-bg-color': '#6e7681' }
     });
 
     const indentGuideExtension = indentationMarkers({
