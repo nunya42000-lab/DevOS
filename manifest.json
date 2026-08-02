@@ -1,16 +1,25 @@
 {
-  "name": "DevOS Nexus Prime",
-  "short_name": "DevOS",
-  "start_url": "index.html",
+  "name": "divIDE",
+  "short_name": "divIDE",
+  "description": "A phone-native code editor.",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
+  "orientation": "any",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/5968/5968292.png",
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
