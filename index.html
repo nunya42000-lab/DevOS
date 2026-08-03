@@ -4373,10 +4373,28 @@ _mapHtml(code) {
 // so line/col numbers stay accurate) so brackets inside a string or
 // comment can't confuse the scan that follows.
 _maskStringsAndComments(code) {
+    // Handles block comments (/* */) and both quote-string types — but
+    // until this fix, had NO handling at all for // line comments or
+    // template literals (`...`). That's a real, confirmed bug: a line
+    // comment or template literal containing an apostrophe or double-quote
+    // character (e.g. "// depths that don't match...") gets misread as
+    // that character OPENING A REAL STRING, and since there's no matching
+    // close-quote nearby, everything from that point to the end of the
+    // file gets silently masked away — which corrupts every subsequent
+    // depth calculation, not just on the line with the apostrophe.
+    // Verified directly: this exact case (an apostrophe inside "don't" in
+    // a // comment) was reproduced and confirmed as the root cause of
+    // widespread incorrect re-indentation across an entire file, not a
+    // narrow edge case.
     let out = '';
     let i = 0;
     while (i < code.length) {
         const ch = code[i], next = code[i + 1];
+        if (ch === '/' && next === '/') {
+            out += '  '; i += 2;
+            while (i < code.length && code[i] !== '\n') { out += ' '; i++; }
+            continue;
+        }
         if (ch === '/' && next === '*') {
             out += '  '; i += 2;
             while (i < code.length && !(code[i] === '*' && code[i + 1] === '/')) {
@@ -4393,6 +4411,71 @@ _maskStringsAndComments(code) {
             }
             if (i < code.length) { out += ' '; i++; }
             continue;
+        }
+        if (ch === '`') {
+            // Template literals need real depth tracking for ${...}
+            // interpolations, not just blanket masking to end-of-string —
+            // an interpolation can contain a genuine object literal (e.g.
+            // `${ {a:1} }`) whose braces DO need to count toward real
+            // code depth. Everything else inside the template (the
+            // literal text portions) is masked, same as a normal string.
+            out += ' '; i++;
+            let interpDepth = 0;
+            while (i < code.length) {
+                if (code[i] === '\\' && i + 1 < code.length) { out += '  '; i += 2; continue; }
+                if (interpDepth === 0 && code[i] === '`') { out += ' '; i++; break; }
+                if (interpDepth === 0 && code[i] === '$' && code[i + 1] === '{') {
+                    // Mask only the $ — the { is REAL syntax that opens a
+                    // scope and must be preserved for depth-counting,
+                    // paired with the interpolation's closing } (already
+                    // preserved below). Masking both to spaces was the
+                    // actual bug: the depth counter would then see an
+                    // unmatched closing } later with no opening { to pair
+                    // it against, corrupting the running depth count for
+                    // everything after it in the whole file.
+                    out += ' '; i++;
+                    out += code[i]; i++;
+                    interpDepth = 1; continue;
+                }
+                if (interpDepth > 0) {
+                    if (code[i] === '{') interpDepth++;
+                    else if (code[i] === '}') { interpDepth--; if (interpDepth === 0) { out += code[i]; i++; continue; } }
+                    out += code[i]; i++; continue;
+                }
+                out += code[i] === '\n' ? '\n' : ' '; i++;
+            }
+            continue;
+        }
+        if (ch === '/' && next !== '/' && next !== '*') {
+            // Division-vs-regex is ambiguous without a full parser, but
+            // the standard heuristic works well in practice: a `/` is a
+            // regex start unless the last significant character indicates
+            // the previous token was something that stands alone as a
+            // complete expression (identifier char, digit, or a closing
+            // bracket) — otherwise it's division. This exists because a
+            // regex literal's PATTERN can itself contain a quote character
+            // (confirmed real: app.js's escapeHtml() uses /'/g and /"/g),
+            // which without this check gets misread as opening a real
+            // string and desyncs everything after it, same failure shape
+            // as the // and ` gaps this fix also closes.
+            let lastSig = '';
+            for (let k = out.length - 1; k >= 0; k--) {
+                if (out[k] === ' ' || out[k] === '\t' || out[k] === '\n') continue;
+                lastSig = out[k];
+                break;
+            }
+            const isDivision = /[A-Za-z0-9_$)\]]/.test(lastSig);
+            if (!isDivision) {
+                out += ' '; i++;
+                while (i < code.length) {
+                    if (code[i] === '\\' && i + 1 < code.length) { out += '  '; i += 2; continue; }
+                    if (code[i] === '/') { out += ' '; i++; break; }
+                    if (code[i] === '\n') break; // regex can't span a real newline unescaped — bail out to avoid over-masking if something's malformed
+                    out += ' '; i++;
+                }
+                while (i < code.length && /[a-z]/.test(code[i])) { out += ' '; i++; } // flags
+                continue;
+            }
         }
         out += ch; i++;
     }
