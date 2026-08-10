@@ -26,8 +26,8 @@
 
 const CACHE_NAME = 'divide-pwa-v1';
 const PRECACHE_ASSETS = [
-  '/icon-192.png',
-  '/icon-512.png'
+  'icon-192.png',
+  'icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
