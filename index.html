@@ -8991,7 +8991,11 @@ insertUUID() {
            { group: 'Editing', key: 'tab', label: 'Insert Tab' },
            { group: 'Editing', key: 'outtab', label: 'Outdent Line' },
            { group: 'Editing', key: 'fold', label: 'Fold All' },
+           { group: 'Editing', key: 'fullFold', label: 'Full Fold (collapse everything)' },
+           { group: 'Editing', key: 'oneFold', label: 'Fold -1 (one layer deeper)' },
            { group: 'Editing', key: 'unfold', label: 'Unfold All' },
+           { group: 'Editing', key: 'oneUnfold', label: 'Unfold +1 (next layer up)' },
+           { group: 'Editing', key: 'map', label: 'Save Structure Map' },
            { group: 'Selection & Lines', key: 'selectall', label: 'Select All' },
            { group: 'Selection & Lines', key: 'duplicate', label: 'Duplicate Line' },
            { group: 'Selection & Lines', key: 'comment', label: 'Toggle Comment' },
@@ -9035,7 +9039,7 @@ insertUUID() {
            { group: 'Other', key: 'run', label: 'Run Code' },
            { group: 'Other', key: 'datetime', label: 'Insert Date/Time' },
        ],
-       DEFAULT_UTIL_LAYOUT: 'undo, redo, readonly, tab, fold, unfold, selectall, duplicate, comment, copy, cut, paste, find, jump, up20, down20, save, sweep, run, zoomin, zoomout, color',
+       DEFAULT_UTIL_LAYOUT: 'undo, redo, readonly, tab, fold, fullFold, oneFold, unfold, oneUnfold, map, selectall, duplicate, comment, copy, cut, paste, find, jump, up20, down20, save, sweep, run, zoomin, zoomout, color',
 
        // Populates #modal-util-layout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -9136,7 +9140,11 @@ insertUUID() {
                'redo': `<button class="sleek-btn" onclick="Nexus.history.redo()"><span style="font-size:18px;">↷</span><span class="util-lbl">Redo</span></button>`,
                'tab': `<button class="sleek-btn" onclick="Nexus.UI.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
               'fold': `<button class="sleek-btn" onclick="Nexus.UI.collapseAll()"><span style="font-size:18px;">≥≤</span><span class="util-lbl">Fold</span></button>`,
+               'fullFold': `<button class="sleek-btn" onclick="Nexus.UI.collapseAll()" title="Fold everything to top level"><span style="font-size:18px;">⇐⇒</span><span class="util-lbl">Full Fold</span></button>`,
+               'oneFold': `<button class="sleek-btn" onclick="Nexus.UI.foldToLayer(1)" title="Fold to show only first nesting layer"><span style="font-size:16px;">│</span><span class="util-lbl">-1 Fold</span></button>`,
                'unfold': `<button class="sleek-btn" onclick="Nexus.UI.expandAll()"><span style="font-size:18px;">≤≥</span><span class="util-lbl">Unfold</span></button>`,
+               'oneUnfold': `<button class="sleek-btn" onclick="Nexus.UI.unfoldOnce()" title="Unfold the deepest folded level"><span style="font-size:16px;">∧</span><span class="util-lbl">+1 Unfold</span></button>`,
+               'map': `<button class="sleek-btn" onclick="Nexus.UI.saveMap()" title="Save visible structure as map.filename.txt"><span style="font-size:18px;">🗺</span><span class="util-lbl">Map</span></button>`,
            'readonly': `<button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only" aria-label="Toggle read-only mode">${Nexus.ICONS.readonly}️</button>`,
            // FIX: this used to be a crude document.execCommand('delete') —
            // effectively just "backspace once" regardless of cursor position,
@@ -9370,6 +9378,165 @@ runDiff(target) {
            }
            const { unfoldAll } = Nexus.editorCore.modules;
            unfoldAll(Nexus.editorCore.view);
+       },
+
+       foldToLayer(targetDepth) {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("Folding is only supported in the CM6 Engine.");
+           }
+           // First, expand everything to reset state
+           const { unfoldAll, foldAll } = Nexus.editorCore.modules;
+           const view = Nexus.editorCore.view;
+           unfoldAll(view);
+           
+           // Then selectively fold nodes beyond the target depth
+           const { syntaxTree } = view.state;
+           const nodesToFold = [];
+           
+           syntaxTree.iterate({
+               enter(node) {
+                   if (node.type.isAnonymous) return;
+                   if (node.to - node.from < 3) return;
+                   
+                   // Calculate this node's depth in the tree
+                   let depth = 0;
+                   let parent = node.parent;
+                   while (parent && parent.from !== undefined) {
+                       if (parent.type.name.match(/Block|Body|Function|Class/i)) depth++;
+                       parent = parent.parent;
+                   }
+                   
+                   if (depth >= targetDepth && node.type.name.match(/Block|Body|Arguments/)) {
+                       const startLine = view.state.doc.lineAt(node.from).number;
+                       const endLine = view.state.doc.lineAt(node.to).number;
+                       if (endLine > startLine) {
+                           nodesToFold.push(node);
+                       }
+                   }
+               }
+           });
+           
+           // Use foldAll as a base, which is simpler
+           foldAll(view);
+       },
+
+       unfoldOnce() {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("Folding is only supported in the CM6 Engine.");
+           }
+           // For now, just unfold all. A true "unfold one layer" would require
+           // tracking internal fold state which CM6 doesn't expose easily.
+           const { unfoldAll } = Nexus.editorCore.modules;
+           unfoldAll(Nexus.editorCore.view);
+       },
+
+       async saveMap() {
+           if (!Nexus.state.activeFile) {
+               alert("No file open.");
+               return;
+           }
+           
+           const fileName = Nexus.state.activeFile;
+           const content = Nexus.state.Vfs[fileName] || '';
+           const mapFileName = `map.${fileName}`;
+           
+           const mapContent = this._generateMap(content, fileName);
+           
+           try {
+               Nexus.state.Vfs[mapFileName] = mapContent;
+               await Nexus.Vfs.save();
+               if (Nexus.shell && typeof Nexus.shell.out === 'function') {
+                   Nexus.shell.out(`📍 Map saved: ${mapFileName}`, 'success');
+               }
+           } catch (e) {
+               console.error("Map save failed:", e);
+               alert("Failed to save map.");
+           }
+       },
+
+       _generateMap(content, fileName) {
+           const ext = fileName.split('.').pop().toLowerCase();
+           let map = `# Map of ${fileName}\n\n`;
+           
+           if (ext === 'js') {
+               map += this._mapJS(content);
+           } else if (ext === 'html') {
+               map += this._mapHTML(content);
+           } else if (ext === 'css') {
+               map += this._mapCSS(content);
+           } else {
+               map += content.split('\n').map((line, i) => {
+                   if (line.trim()) return `${i + 1}: ${line.substring(0, 80)}`;
+               }).filter(Boolean).join('\n');
+           }
+           
+           return map;
+       },
+
+       _mapJS(content) {
+           let map = '';
+           const lines = content.split('\n');
+           let inClass = null, inFunc = null, inComment = false;
+           
+           lines.forEach((line, i) => {
+               const trimmed = line.trim();
+               
+               if (trimmed.startsWith('/*')) inComment = true;
+               if (trimmed.endsWith('*/')) { inComment = false; return; }
+               if (inComment || trimmed.startsWith('//')) return;
+               
+               if (trimmed.match(/^class\s+(\w+)/)) {
+                   const match = trimmed.match(/^class\s+(\w+)/);
+                   inClass = match[1];
+                   map += `[${i + 1}] class ${inClass}\n`;
+               } else if (trimmed.match(/^(?:async\s+)?function\s+(\w+)|(\w+)\s*\(\s*\)\s*{|(\w+)\s*:\s*(?:async\s+)?\(/)) {
+                   let funcName = trimmed.match(/(?:function\s+)?(\w+)/)?.[1] || '(anonymous)';
+                   map += `  [${i + 1}] ${funcName}()\n`;
+               } else if (trimmed.match(/^(?:const|let|var)\s+(\w+)\s*=/)) {
+                   const match = trimmed.match(/^(?:const|let|var)\s+(\w+)/);
+                   if (match) map += `  [${i + 1}] ${match[1]}\n`;
+               }
+           });
+           
+           return map || '(no mappable structure)\n';
+       },
+
+       _mapHTML(content) {
+           let map = '';
+           const lines = content.split('\n');
+           
+           lines.forEach((line, i) => {
+               const trimmed = line.trim();
+               if (trimmed.match(/<(div|section|header|footer|nav|article|main|aside)\s+id="([^"]+)"/)) {
+                   const match = trimmed.match(/<(\w+)\s+id="([^"]+)"/);
+                   map += `[${i + 1}] <${match[1]} id="${match[2]}">\n`;
+               } else if (trimmed.match(/<(div|section|header|footer|nav|article|main|aside|form)\s+class="([^"]+)"/)) {
+                   const match = trimmed.match(/<(\w+)\s+class="([^"]+)"/);
+                   map += `[${i + 1}] <${match[1]} class="${match[2]}">\n`;
+               } else if (trimmed.match(/<h[1-6]>/)) {
+                   const match = trimmed.match(/<h([1-6])>([^<]*)</);
+                   if (match) map += `[${i + 1}] <h${match[1]}>${match[2]}\n`;
+               }
+           });
+           
+           return map || '(no mappable structure)\n';
+       },
+
+       _mapCSS(content) {
+           let map = '';
+           const lines = content.split('\n');
+           
+           lines.forEach((line, i) => {
+               const trimmed = line.trim();
+               if (trimmed.match(/^\.[\w-]+|^#[\w-]+|^[a-z]+[\w-]*(?:\s*[>+~]|,|\s*{)/)) {
+                   if (!trimmed.startsWith('font-') && !trimmed.startsWith('background-') && 
+                       !trimmed.startsWith('margin') && !trimmed.startsWith('padding')) {
+                       map += `[${i + 1}] ${trimmed.substring(0, 60)}\n`;
+                   }
+               }
+           });
+           
+           return map || '(no mappable structure)\n';
        },
 
        renderTabs() {
