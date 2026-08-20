@@ -17,20 +17,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover, interactive-widget=resizes-content">
     <meta name="theme-color" content="#0d1117">
     <title>divIDE v0.8</title>
-    <!-- divIDE's own installability. NOTE: there's deliberately no
-         navigator.serviceWorker.register() call here — a service worker
-         script MUST be a real http(s) same-origin .js file per spec
-         (browsers reject blob:/data: URLs with "Script URL's scheme is not
-         'http' or 'https'"), so a literal single HTML file can never
-         self-register one. That's a hard platform limitation, not something
-         fixable with a script trick — see the PWA Forge fix elsewhere in
-         this file for the same constraint on exported projects. The
-         manifest+icon below still make "Add to Home Screen" available where
-         supported; full offline boot would need divIDE to be served
-         alongside a real sw.js, which is out of scope for a single file. -->
-    <link rel="manifest" href="data:application/json;charset=utf-8,%7B%22name%22%3A%22divIDE%22%2C%22short_name%22%3A%22divIDE%22%2C%22start_url%22%3A%22.%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230d1117%22%2C%22theme_color%22%3A%22%230d1117%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%3Bcharset%3Dutf-8%2C%253Csvg%2520xmlns%253D%2522http%253A%252F%252Fwww.w3.org%252F2000%252Fsvg%2522%2520viewBox%253D%25220%25200%2520512%2520512%2522%253E%253Crect%2520width%253D%2522512%2522%2520height%253D%2522512%2522%2520rx%253D%252296%2522%2520fill%253D%2522%25230d1117%2522%252F%253E%253Ctext%2520x%253D%252250%2525%2522%2520y%253D%252250%2525%2522%2520dy%253D%2522.33em%2522%2520text-anchor%253D%2522middle%2522%2520font-family%253D%2522Menlo%252CConsolas%252Cmonospace%2522%2520font-size%253D%2522200%2522%2520font-weight%253D%2522700%2522%2520fill%253D%2522%25232f81f7%2522%253E%2526lt%253B%252F%2526gt%253B%253C%252Ftext%253E%253C%252Fsvg%253E%22%2C%22sizes%22%3A%22512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%22%7D%5D%7D">
+    <!-- divIDE's own installability. file_handlers (so Android's "Open
+         with" menu can launch divIDE directly on a tapped .html/.js/.css/
+         etc file) and share_target (so the Android Share sheet can send
+         text/URLs into divIDE) are BOTH spec'd to require a same-origin
+         manifest FILE — the data: URI trick used everywhere else in this
+         file for the SVG icons does not satisfy that requirement for these
+         two members specifically (confirmed against the W3C File Handling
+         and Web Share Target specs). That forces manifest.json to be a
+         real sibling file rather than another inline data: URI, same class
+         of hard platform constraint as the sw.js note below. -->
+    <link rel="manifest" href="./manifest.json">
     <link rel="apple-touch-icon" href="data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%2296%22%20fill%3D%22%230d1117%22/%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.33em%22%20text-anchor%3D%22middle%22%20font-family%3D%22Menlo%2CConsolas%2Cmonospace%22%20font-size%3D%22200%22%20font-weight%3D%22700%22%20fill%3D%22%232f81f7%22%3E%26lt%3B/%26gt%3B%3C/text%3E%3C/svg%3E">
-   
+    <script>
+       // Register the real sibling sw.js. Wrapped in a same-origin check
+       // because this file is also opened directly from disk (file://) or
+       // pasted into Claude's own preview sandbox during development, where
+       // there's no sw.js sitting next to it — registration would just
+       // reject with a fetch error in those contexts, so it's skipped
+       // rather than logged as an alarming failure.
+       if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+           window.addEventListener('load', () => {
+               navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed (expected if sw.js is not served alongside this file):', err));
+           });
+       }
+
+       // File Handling API: when Android launches divIDE because the user
+       // tapped a .html/.js/.css/etc file (via file_handlers in
+       // manifest.json), Chrome delivers the file(s) through
+       // window.launchQueue — NOT through a URL param and NOT through the
+       // service worker. This has to run before Nexus.boot exists, so it
+       // queues the handoff the same way Nexus._queue already buffers
+       // early boot() calls above, and Nexus.pwa.consumeLaunchFiles (added
+       // alongside pwa.forge) drains it once the app is actually ready.
+       if ('launchQueue' in window) {
+           window.launchQueue.setConsumer((launchParams) => {
+               if (!launchParams.files || !launchParams.files.length) return;
+               window.Nexus._pendingLaunchFiles = launchParams.files;
+               if (window.Nexus.pwa && typeof window.Nexus.pwa.consumeLaunchFiles === 'function') {
+                   window.Nexus.pwa.consumeLaunchFiles();
+               }
+           });
+       }
+    </script>
     <!-- CodeMirror dependency de-duplication. Without this, dynamically
          importing multiple separate @codemirror/* packages from esm.sh (see
          toggleEditor() and DpadEngine.navigate()) lets EACH one independently
@@ -7003,11 +7032,64 @@ inject() {
 
 
    pwa: {
+       // Drains files handed off via window.launchQueue (see the head
+       // script) — this fires when Android opens divIDE because the user
+       // tapped a file registered in manifest.json's file_handlers. Each
+       // entry is a FileSystemFileHandle, not a File, so getFile() is
+       // needed to read actual content. Runs after Nexus.boot so Vfs/UI
+       // are guaranteed to exist; called once from the head script's
+       // launchQueue consumer, and again here defensively in case boot()
+       // finishes after the launch already queued.
+       async consumeLaunchFiles() {
+           const handles = window.Nexus._pendingLaunchFiles;
+           if (!handles || !handles.length) return;
+           window.Nexus._pendingLaunchFiles = null;
+
+           let lastImported = null;
+           for (const handle of handles) {
+               try {
+                   const file = await handle.getFile();
+                   const text = await file.text();
+                   let name = file.name;
+                   // Same collision handling as a manual New File — don't
+                   // silently clobber an existing same-named file in the
+                   // Vortex.
+                   if (Nexus.state.Vfs[name] !== undefined) {
+                       const stamp = Date.now().toString(36).slice(-4);
+                       const dot = name.lastIndexOf('.');
+                       name = dot > 0 ? `${name.slice(0, dot)}_${stamp}${name.slice(dot)}` : `${name}_${stamp}`;
+                   }
+                   Nexus.state.Vfs[name] = text;
+                   Nexus.state.originals[name] = text;
+                   lastImported = name;
+               } catch (e) {
+                   console.warn('File Handling: failed to read launched file:', e);
+               }
+           }
+
+           if (lastImported) {
+               if (typeof Nexus.Vfs.renderAccordion === 'function') Nexus.Vfs.renderAccordion();
+               Nexus.Vfs.switchFile(lastImported);
+               Nexus.Vfs.save();
+               if (Nexus.shell && typeof Nexus.shell.out === 'function') {
+                   Nexus.shell.out(`📂 Opened from system: ${lastImported}`, 'success');
+               }
+           }
+       },
+
+
        async forge() {
            if (!Nexus.state.activeFile.endsWith('.html')) return alert("HTML Required.");
            const name = prompt("PWA Name:", "Nexus Tool");
            const color = prompt("Theme Color:", "#0d1117");
            if (!name || !color) return;
+
+           const wantsFileHandling = confirm("Register this app as a file opener too? (lets Android's 'Open with' menu launch it directly on tapped files — OK for yes)");
+           let extensions = [];
+           if (wantsFileHandling) {
+               const raw = prompt("File extensions to handle, comma-separated:", "html,htm,js,css,json,txt,md");
+               extensions = (raw || "").split(",").map(s => s.trim().replace(/^\./, "")).filter(Boolean);
+           }
 
            // Generate a simple app icon on the fly (colored square + initial)
            // as an absolute data: URI. The old manifest shipped with NO
@@ -7021,12 +7103,20 @@ inject() {
                + `font-size="260" font-weight="700" fill="#ffffff">${initial}</text></svg>`;
            const iconURI = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(iconSVG);
 
+           // MIME lookup for the extensions the user picked — good-enough
+           // coverage for what a divIDE-forged export is likely to be.
+           const MIME = {
+               html: "text/html", htm: "text/html", js: "text/javascript", mjs: "text/javascript",
+               css: "text/css", json: "application/json", md: "text/markdown", txt: "text/plain",
+               svg: "image/svg+xml", xml: "application/xml", ts: "application/typescript"
+           };
+
            const manifest = { 
+               id: "/",
                name, 
                short_name: name.slice(0, 12), 
-               start_url: "./",   // "./" is the documented cross-browser-safe default (MDN); a data:-URI
-                                   // manifest can't same-origin-resolve a relative start_url anyway, so this
-                                   // reliably falls back to "the page that linked the manifest" — correct either way.
+               start_url: "./",
+               scope: "./",
                display: "standalone", 
                background_color: color, 
                theme_color: color,
@@ -7035,13 +7125,35 @@ inject() {
                    { src: iconURI, sizes: "512x512", type: "image/svg+xml", purpose: "maskable" }
                ]
            };
-           const mURI = "data:application/json;charset=utf-8," + encodeURIComponent(JSON.stringify(manifest));
+
+           // file_handlers requires a real same-origin manifest.json — this
+           // is exactly why Forge writes manifest.json as a sibling file in
+           // the zip below instead of inlining it as a data: URI like the
+           // icons. Confirmed against the W3C File Handling spec.
+           if (wantsFileHandling && extensions.length) {
+               const accept = {};
+               for (const ext of extensions) {
+                   const mime = MIME[ext.toLowerCase()] || "application/octet-stream";
+                   if (!accept[mime]) accept[mime] = [];
+                   accept[mime].push(`.${ext}`);
+               }
+               manifest.file_handlers = [{
+                   action: "./",
+                   accept,
+                   icons: [{ src: iconURI, sizes: "512x512", type: "image/svg+xml" }],
+                   launch_type: "single-client"
+               }];
+               manifest.launch_handler = { client_mode: "focus-existing" };
+           }
+
+           const manifestJSON = JSON.stringify(manifest, null, 2);
 
            // A real, working service worker: cache the app shell on install,
            // then cache-first/network-fallback on fetch, topping up the
-           // cache as new same-origin resources are requested.
+           // cache as new same-origin resources are requested. Also caches
+           // manifest.json itself so installability survives offline.
            const swCode = `const CACHE = 'nexus-pwa-v1';
-const APP_SHELL = ['./', '${Nexus.state.activeFile}'];
+const APP_SHELL = ['./', './${Nexus.state.activeFile}', './manifest.json'];
 self.addEventListener('install', (e) => {
   self.skipWaiting();
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(APP_SHELL).catch(() => {})));
@@ -7066,12 +7178,14 @@ self.addEventListener('fetch', (e) => {
            // NOTE: registering a service worker from a blob:/data: URL is not
            // a bug we can code around — the spec requires an http(s)
            // same-origin script file, and browsers reject anything else with
-           // "Script URL's scheme is not 'http' or 'https'". The previous
-           // version's Blob-based registration silently threw every time. So
-           // instead of injecting a fake self-registering script, Forge now
-           // ships sw.js as a real sibling file the page registers by path —
-           // the only approach that actually works.
-           const inject = `\n<link rel="manifest" href="${mURI}">\n<link rel="apple-touch-icon" href="${iconURI}">\n<meta name="theme-color" content="${color}">\n<script>\nif ('serviceWorker' in navigator) { window.addEventListener('load', () => {\n  navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed:', err));\n}); }\n<\/script>\n`;
+           // "Script URL's scheme is not 'http' or 'https'". So Forge ships
+           // sw.js AND manifest.json as real sibling files in the zip — the
+           // only approach that actually works for either.
+           let inject = `\n<link rel="manifest" href="./manifest.json">\n<link rel="apple-touch-icon" href="${iconURI}">\n<meta name="theme-color" content="${color}">\n<script>\nif ('serviceWorker' in navigator) { window.addEventListener('load', () => {\n  navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed:', err));\n}); }\n<\/script>\n`;
+
+           if (wantsFileHandling && extensions.length) {
+               inject += `<script>\nif ('launchQueue' in window) {\n  window.launchQueue.setConsumer(async (launchParams) => {\n    if (!launchParams.files || !launchParams.files.length) return;\n    const handle = launchParams.files[0];\n    const file = await handle.getFile();\n    const text = await file.text();\n    console.log('Opened via file association:', file.name, text.length + ' chars');\n    // Wire this into your own app's file-loading logic as needed.\n  });\n}\n<\/script>\n`;
+           }
            
            let code = Nexus.state.Vfs[Nexus.state.activeFile];
            code = code.includes('</head>') ? code.replace('</head>', inject + '</head>') : inject + code;
@@ -7086,13 +7200,14 @@ self.addEventListener('fetch', (e) => {
                const zip = new JSZip();
                zip.file(Nexus.state.activeFile, code);
                zip.file("sw.js", swCode);
+               zip.file("manifest.json", manifestJSON);
                const blob = await zip.generateAsync({ type: "blob" });
                const a = document.createElement('a');
                a.href = URL.createObjectURL(blob);
                a.download = `${(name.replace(/[^a-z0-9-_]+/gi, '_') || 'nexus-pwa')}.zip`;
                a.click();
                if (status) { status.innerText = "FORGED"; setTimeout(() => status.innerText = "READY", 3000); }
-               Nexus.shell.out(`Exported ${a.download} — unzip both files onto any static host (GitHub Pages, Netlify, etc.) to install.`, "success");
+               Nexus.shell.out(`Exported ${a.download} — unzip all three files onto any static host (GitHub Pages, Netlify, etc.) to install.`, "success");
            } catch (e) {
                console.error("PWA Forge export failed:", e);
                alert("Forge Fault: " + e.message);
@@ -10448,6 +10563,17 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
         // 2. Safe execution of the UI Boot sequence
         await Nexus.UI.boot(); 
+
+        // File Handling API safety net: if the launchQueue consumer (set
+        // up in <head>, before Nexus.pwa existed) already fired and
+        // stashed files on Nexus._pendingLaunchFiles, drain them now that
+        // Nexus.pwa/Vfs are guaranteed to exist. Normally the head
+        // consumer's own call to consumeLaunchFiles already handles this;
+        // this only matters on the rare timing where launchQueue's
+        // consumer runs before this handler finishes attaching.
+        if (Nexus._pendingLaunchFiles && Nexus.pwa && typeof Nexus.pwa.consumeLaunchFiles === 'function') {
+            Nexus.pwa.consumeLaunchFiles();
+        }
         
         // 3. Safely bind listeners after everything successfully initialised
         const ed = document.getElementById('rawTerminal');

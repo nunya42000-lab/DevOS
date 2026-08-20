@@ -1,99 +1,100 @@
-// sw.js — standalone service worker for divIDE.
-//
-// Two different caching strategies, deliberately split by request type:
-//
-//   - HTML / navigation requests: NETWORK-FIRST. If this were cache-first
-//     (the simpler, more common approach — and what divIDE's own in-app
-//     PWA Forge tool currently does for everything), users who have the
-//     app installed would get permanently stuck on whatever HTML shell was
-//     cached at install time, even after you ship real updates. Current
-//     guidance is explicit that this is a named, well-known anti-pattern,
-//     not just a style choice — HTML should always try the network first
-//     so a fresh deploy is actually seen, falling back to the cached copy
-//     only when genuinely offline.
-//
-//   - Everything else (icons, CSS, JS, images): CACHE-FIRST. These change
-//     far less often than the HTML shell, and cache-first gives instant,
-//     truly-offline-capable loading for them without the staleness risk
-//     that applies to the shell itself.
-//
-// Only files confirmed to exist are precached at install time (this file's
-// own two icon files). cache.addAll() fails ATOMICALLY — if even one URL
-// in the list 404s, the entire install step fails and the service worker
-// never activates — so nothing is guessed at or assumed present here.
-// Everything else gets cached opportunistically as it's actually
-// requested, the first time it's fetched successfully.
+// divIDE service worker
+// Paired with manifest.json's file_handlers/share_target. Registered from
+// index.html's <head> script — see the comment there for why this has to
+// be a real sibling file rather than inlined (blob:/data: registration is
+// rejected by spec: "Script URL's scheme is not 'http' or 'https'").
 
-const CACHE_NAME = 'divide-pwa-v1';
-const PRECACHE_ASSETS = [
-  'icon-192.png',
-  'icon-512.png'
+const CACHE = 'divide-shell-v1';
+
+// Everything needed to boot divIDE with no network. The CDN scripts
+// (CodeMirror deps, localforage, acorn, prettier, etc.) are cached
+// opportunistically on first fetch below rather than listed here up
+// front — pinning ~20 cross-origin esm.sh/jsdelivr/unpkg URLs by hand
+// would silently rot the moment any of those packages ship a new
+// version, so the fetch handler's cache-as-you-go strategy is the
+// version that actually stays correct over time.
+const APP_SHELL = [
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
-self.addEventListener('install', (event) => {
+self.addEventListener('install', (e) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_ASSETS))
+  e.waitUntil(
+    caches.open(CACHE).then((c) => c.addAll(APP_SHELL).catch(() => {
+      // A single missing shell file (e.g. this SW served from a path
+      // where index.html has a different name) shouldn't hard-fail
+      // install and leave the app entirely uninstallable offline.
+    }))
   );
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
+      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
+// share_target is declared with method: "GET" in manifest.json, so Android
+// delivers a shared title/text/url as ordinary query params on a normal
+// navigation to the action URL — there is no special "share" fetch event
+// to intercept. The only SW-relevant part is making sure that navigation
+// still resolves offline, which the network-first/cache-fallback logic
+// below already covers since the action URL ("./") is the same app shell.
+self.addEventListener('fetch', (e) => {
+  if (e.request.method !== 'GET') return;
 
-  // Only ever handle GET — POST/PUT/etc. should always hit the network
-  // untouched; caching or intercepting them would be actively wrong.
-  if (request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
 
-  // request.mode === 'navigate' catches actual page loads/navigations;
-  // checking the Accept header too catches cases some browsers report
-  // differently, so real HTML requests aren't missed either way.
-  const isHTMLRequest =
-    request.mode === 'navigate' ||
-    (request.headers.get('accept') || '').includes('text/html');
+  e.respondWith(
+    caches.match(e.request).then((cached) => {
+      // Network-first for same-origin HTML (so edits to index.html show up
+      // immediately on reload instead of serving a stale cached shell),
+      // cache-first for everything else (CDN deps, fonts, icons — these
+      // are version-pinned URLs that never change content, so cache-first
+      // saves a round trip every load with zero staleness risk).
+      const isHTML = e.request.mode === 'navigate' || e.request.destination === 'document';
 
-  if (isHTMLRequest) {
-    // NETWORK-FIRST for HTML: try the live network first so a real update
-    // is always seen. Only fall back to whatever's cached if the network
-    // request genuinely fails (offline, DNS failure, etc.) — and only then
-    // top up the cache with a fresh copy for the next time we're offline.
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => caches.match(request))
-    );
-    return;
-  }
+      if (isSameOrigin && isHTML) {
+        return fetch(e.request)
+          .then((res) => {
+            if (res && res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(e.request, copy));
+            }
+            return res;
+          })
+          .catch(() => cached || caches.match('./index.html'));
+      }
 
-  // CACHE-FIRST for everything else: serve instantly from cache when
-  // available, and only hit the network on an actual cache miss — then
-  // store that response for next time.
-  event.respondWith(
-    caches.match(request).then((cached) => {
       if (cached) return cached;
-      return fetch(request)
-        .then((response) => {
-          if (response && response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+
+      return fetch(e.request)
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy));
           }
-          return response;
+          return res;
         })
-        .catch(() => cached); // cached is undefined here (we already checked), but kept for symmetry/clarity if this branch is ever refactored to fall through from a partial hit
+        .catch(() => cached);
     })
   );
+});
+
+// Lets the page force a fresh shell (e.g. after Nexus.pwa re-forges or the
+// user bumps a version) without waiting for the next natural activate
+// cycle. Call via: navigator.serviceWorker.controller.postMessage({type:'SKIP_WAITING'})
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (e.data && e.data.type === 'CLEAR_CACHE') {
+    e.waitUntil(caches.delete(CACHE));
+  }
 });

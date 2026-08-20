@@ -1,36 +1,82 @@
 {
+  "id": "/",
   "name": "divIDE",
   "short_name": "divIDE",
-  "description": "A phone-native code editor.",
+  "description": "Phone-native single-file code editor with built-in diagnostics, linting, and project tools.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone"],
+  "orientation": "any",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
-  "orientation": "any",
+  "categories": ["developer", "productivity", "utilities"],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
   "icons": [
     {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "src": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%2296%22%20fill%3D%22%230d1117%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.33em%22%20text-anchor%3D%22middle%22%20font-family%3D%22Menlo%2CConsolas%2Cmonospace%22%20font-size%3D%22200%22%20font-weight%3D%22700%22%20fill%3D%22%232f81f7%22%3E%26lt%3B%2F%26gt%3B%3C%2Ftext%3E%3C%2Fsvg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
     },
     {
-      "src": "icon-512.png",
+      "src": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%2296%22%20fill%3D%22%230d1117%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.33em%22%20text-anchor%3D%22middle%22%20font-family%3D%22Menlo%2CConsolas%2Cmonospace%22%20font-size%3D%22200%22%20font-weight%3D%22700%22%20fill%3D%22%232f81f7%22%3E%26lt%3B%2F%26gt%3B%3C%2Ftext%3E%3C%2Fsvg%3E",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ],
   "file_handlers": [
     {
       "action": "./",
       "accept": {
-        "text/javascript": [".js"],
         "text/html": [".html", ".htm"],
+        "text/javascript": [".js", ".mjs", ".jsx"],
+        "text/css": [".css"],
         "application/json": [".json"],
-        "text/css": [".css"]
-      }
+        "text/markdown": [".md"],
+        "text/plain": [".txt"],
+        "application/typescript": [".ts", ".tsx"],
+        "text/x-python": [".py"],
+        "application/xml": [".xml"],
+        "image/svg+xml": [".svg"]
+      },
+      "icons": [
+        {
+          "src": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%2296%22%20fill%3D%22%230d1117%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.33em%22%20text-anchor%3D%22middle%22%20font-family%3D%22Menlo%2CConsolas%2Cmonospace%22%20font-size%3D%22200%22%20font-weight%3D%22700%22%20fill%3D%22%232f81f7%22%3E%26lt%3B%2F%26gt%3B%3C%2Ftext%3E%3C%2Fsvg%3E",
+          "sizes": "512x512",
+          "type": "image/svg+xml"
+        }
+      ],
+      "launch_type": "single-client"
     }
-  ]
+  ],
+  "share_target": {
+    "action": "./share-target/",
+    "method": "GET",
+    "enctype": "application/x-www-form-urlencoded",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url"
+    }
+  },
+  "shortcuts": [
+    {
+      "name": "New File",
+      "short_name": "New",
+      "description": "Start a new file in divIDE",
+      "url": "./?action=new",
+      "icons": [
+        {
+          "src": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20512%20512%22%3E%3Crect%20width%3D%22512%22%20height%3D%22512%22%20rx%3D%2296%22%20fill%3D%22%232f81f7%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20dy%3D%22.33em%22%20text-anchor%3D%22middle%22%20font-family%3D%22Menlo%2CConsolas%2Cmonospace%22%20font-size%3D%22280%22%20font-weight%3D%22700%22%20fill%3D%22%230d1117%22%3E%2B%3C%2Ftext%3E%3C%2Fsvg%3E",
+          "sizes": "512x512",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ],
+  "prefer_related_applications": false
 }
