@@ -16,7 +16,11 @@ const CACHE = 'divide-shell-v1';
 const APP_SHELL = [
   './',
   './index.html',
-  './manifest.json'
+  './manifest.json',
+  './icon-192.png',
+  './icon-512.png',
+  './icon-192-maskable.png',
+  './icon-512-maskable.png'
 ];
 
 self.addEventListener('install', (e) => {
