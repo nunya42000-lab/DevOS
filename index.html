@@ -1399,45 +1399,18 @@
 
     <div id="utilityBar" class="floating-widget util-vertical util-docked">
         <div class="util-grip" onclick="Nexus.UI.toggleUtilCollapse()" title="Collapse/expand" aria-label="Collapse or expand utility bar"></div>
-        <div class="sleek-bar-content" style="overflow-y: auto; -webkit-overflow-scrolling: touch;">
-            <button class="sleek-btn" onclick="document.execCommand('insertText', false, '  ')" title="Insert Tab" aria-label="Insert tab"><span class="util-lbl">TAB →</span></button>
-            <button class="sleek-btn" onclick="Nexus.tools.outdentLine()" title="Remove Tab" aria-label="Remove tab"><span class="util-lbl">← TAB</span></button>
-
-            <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
-
-            <button class="sleek-btn" onclick="Nexus.UI.collapseAll()" title="Full Fold" aria-label="Fold all"><span class="util-lbl">FULL FOLD</span></button>
-            <button class="sleek-btn" onclick="Nexus.UI.foldToLayer(1)" title="Fold one layer deeper" aria-label="Fold one layer"><span class="util-lbl">-1 FOLD</span></button>
-            <button class="sleek-btn" onclick="Nexus.UI.expandAll()" title="Full Unfold" aria-label="Unfold all"><span class="util-lbl">FULL UNFOLD</span></button>
-            <button class="sleek-btn" onclick="Nexus.UI.unfoldOnce()" title="Unfold one layer" aria-label="Unfold one layer"><span class="util-lbl">+1 UNFOLD</span></button>
-            <button class="sleek-btn" onclick="Nexus.UI.saveMap()" title="Save structure map" aria-label="Save map"><span class="util-lbl">MAP</span></button>
-
-            <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
-
-            <button class="sleek-btn" onclick="Nexus.tools.selectAll()" title="Select All" aria-label="Select all"><span class="util-lbl">ALL</span></button>
-            <button class="sleek-btn" onclick="Nexus.tools.copyLine()" title="Copy Line" aria-label="Copy current line"><span class="util-lbl">COPY LN</span></button>
-            <button class="sleek-btn" onclick="Nexus.tools.toggleComment()" title="Insert/Remove Comment" aria-label="Toggle line comment"><span class="util-lbl">//</span></button>
-
-            <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
-
-            <button class="sleek-btn" onclick="Nexus.tools.clipboard('copy')" title="Copy" aria-label="Copy"><span class="util-lbl">COPY</span></button>
-            <button class="sleek-btn" onclick="Nexus.tools.clipboard('cut')" title="Cut" aria-label="Cut"><span class="util-lbl">CUT</span></button>
-            <button class="sleek-btn" onclick="Nexus.tools.clipboard('paste')" title="Paste" aria-label="Paste"><span class="util-lbl">PASTE</span></button>
-
-            <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
-
-            <button class="sleek-btn" onclick="Nexus.tools.jumpToLinePrompt()" title="Jump to Line" aria-label="Jump to line number"><span class="util-lbl">LN #</span></button>
-            <button class="sleek-btn" onclick="Nexus.tools.jumpByAmount('Up')" title="Move Up X Lines" aria-label="Move up a number of lines"><span class="util-lbl">UP x</span></button>
-            <button class="sleek-btn" onclick="Nexus.tools.jumpByAmount('Down')" title="Move Down X Lines" aria-label="Move down a number of lines"><span class="util-lbl">DN x</span></button>
-
-            <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
-
-            <button class="sleek-btn" onclick="Nexus.history.undo()" title="Undo" aria-label="Undo"><span class="util-lbl">UNDO</span></button>
-            <button class="sleek-btn" onclick="Nexus.history.redo()" title="Redo" aria-label="Redo"><span class="util-lbl">REDO</span></button>
-
-            <div style="height:1px; background:var(--border); width:80%; margin:5px auto;"></div>
-
-            <button class="sleek-btn" onclick="document.getElementById('colorPickerInput').click()" title="Color Picker" aria-label="Open color picker"><span class="util-lbl">🎨</span></button>
-        </div>
+        <!-- Content is entirely populated by Nexus.UI.renderUtilBar() from
+             Nexus.state.prefs.utilLayout (persisted via Nexus.settings.update,
+             restored on boot by Nexus.settings.boot). This div used to also
+             ship a full hardcoded set of buttons inline — since renderUtilBar()
+             always overwrites this container's innerHTML on boot and after
+             every layout edit, those hardcoded buttons were dead weight that
+             flashed on screen for one frame before being replaced, and any
+             new tool (fold variants, Map, one-line format) had to be
+             maintained in TWO places to actually persist across reloads.
+             Left empty here — the tools map in renderUtilBar() is now the
+             single source of truth. -->
+        <div class="sleek-bar-content" style="overflow-y: auto; -webkit-overflow-scrolling: touch;"></div>
     </div>
 </div>
     </div>
@@ -6344,6 +6317,11 @@ try {
             oneDark: cmTheme.oneDark,
             foldAll: cmLang.foldAll,       
             unfoldAll: cmLang.unfoldAll,
+            foldable: cmLang.foldable,
+            foldEffect: cmLang.foldEffect,
+            unfoldEffect: cmLang.unfoldEffect,
+            foldedRanges: cmLang.foldedRanges,
+            syntaxTree: cmLang.syntaxTree,
             // Bracket & tag tracing: same extension covers both. For JS it
             // matches {}/[]/(); for HTML, lang-html's bracketMatchingHandle
             // routes tag-name text through this exact matcher, so <div>/</div>
@@ -9239,6 +9217,8 @@ insertUUID() {
            { group: 'Editing', key: 'unfold', label: 'Unfold All' },
            { group: 'Editing', key: 'oneUnfold', label: 'Unfold +1 (next layer up)' },
            { group: 'Editing', key: 'map', label: 'Save Structure Map' },
+           { group: 'Fix & Format', key: 'oneLine', label: 'Format to One Line (function/class/const)' },
+           { group: 'Fix & Format', key: 'expandLine', label: 'Expand/Restore from One Line' },
            { group: 'Selection & Lines', key: 'selectall', label: 'Select All' },
            { group: 'Selection & Lines', key: 'duplicate', label: 'Duplicate Line' },
            { group: 'Selection & Lines', key: 'comment', label: 'Toggle Comment' },
@@ -9282,7 +9262,7 @@ insertUUID() {
            { group: 'Other', key: 'run', label: 'Run Code' },
            { group: 'Other', key: 'datetime', label: 'Insert Date/Time' },
        ],
-       DEFAULT_UTIL_LAYOUT: 'undo, redo, readonly, tab, fold, fullFold, oneFold, unfold, oneUnfold, map, selectall, duplicate, comment, copy, cut, paste, find, jump, up20, down20, save, sweep, run, zoomin, zoomout, color',
+       DEFAULT_UTIL_LAYOUT: 'undo, redo, readonly, tab, fold, fullFold, oneFold, unfold, oneUnfold, map, oneLine, expandLine, selectall, duplicate, comment, copy, cut, paste, find, jump, up20, down20, save, sweep, run, zoomin, zoomout, color',
 
        // Populates #modalUtilLayout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -9384,10 +9364,12 @@ insertUUID() {
                'tab': `<button class="sleek-btn" onclick="Nexus.UI.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
               'fold': `<button class="sleek-btn" onclick="Nexus.UI.collapseAll()"><span style="font-size:18px;">≥≤</span><span class="util-lbl">Fold</span></button>`,
                'fullFold': `<button class="sleek-btn" onclick="Nexus.UI.collapseAll()" title="Fold everything to top level"><span style="font-size:18px;">⇐⇒</span><span class="util-lbl">Full Fold</span></button>`,
-               'oneFold': `<button class="sleek-btn" onclick="Nexus.UI.foldToLayer(1)" title="Fold deepest layer"><span style="font-size:16px;">│</span><span class="util-lbl">-1 Fold</span></button>`,
+               'oneFold': `<button class="sleek-btn" onclick="Nexus.UI.foldToLayer()" title="Fold deepest layer"><span style="font-size:16px;">│</span><span class="util-lbl">-1 Fold</span></button>`,
                'unfold': `<button class="sleek-btn" onclick="Nexus.UI.expandAll()"><span style="font-size:18px;">≤≥</span><span class="util-lbl">Unfold</span></button>`,
                'oneUnfold': `<button class="sleek-btn" onclick="Nexus.UI.unfoldOnce()" title="Unfold highest folded level"><span style="font-size:16px;">∧</span><span class="util-lbl">+1 Unfold</span></button>`,
                'map': `<button class="sleek-btn" onclick="Nexus.UI.saveMap()" title="Save visible structure as map.filename.txt"><span style="font-size:18px;">🗺</span><span class="util-lbl">Map</span></button>`,
+               'oneLine': `<button class="sleek-btn" onclick="Nexus.UI.collapseSelectionToOneLine()" title="Format function/class/const under cursor to one line"><span style="font-size:16px;">⟷</span><span class="util-lbl">To 1-Line</span></button>`,
+               'expandLine': `<button class="sleek-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat function/class/const under cursor"><span style="font-size:16px;">⟵⟶</span><span class="util-lbl">Expand</span></button>`,
            'readonly': `<button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only" aria-label="Toggle read-only mode">${Nexus.ICONS.readonly}️</button>`,
            // FIX: this used to be a crude document.execCommand('delete') —
            // effectively just "backspace once" regardless of cursor position,
@@ -9607,6 +9589,62 @@ runDiff(target) {
        }
    },
 
+   // Enumerates every foldable range in the document along with its
+   // "fold depth" — how many OTHER foldable ranges enclose it. This is
+   // deliberately not raw syntax-tree depth: a Program -> Statement ->
+   // ExpressionStatement -> CallExpression chain is 4 AST levels but 0
+   // foldable ones, since none of those wrapper nodes are foldable
+   // themselves. Depth here means "how many fold-brackets would you have
+   // to cross to unfold your way out to this range", which is what -1
+   // Fold / +1 Unfold actually need to reason about.
+   _getFoldableRangesWithDepth(view) {
+       const { foldable, syntaxTree } = Nexus.editorCore.modules;
+       const tree = syntaxTree(view.state);
+       const ranges = [];
+       const stack = [];
+       // Some Lezer grammars report the identical foldable from/to for
+       // several nested ancestor nodes at once — e.g. a Statement and the
+       // Block it directly wraps both resolve to the same fold point. Each
+       // of those nodes still fires its own enter()/leave() pair, so
+       // without this counter the SAME key gets pushed onto `stack`
+       // multiple times for what is really one visual foldable region,
+       // inflating the depth of everything nested inside it. refCounts
+       // tracks how many enter() calls are "inside" each key so the stack
+       // only gains one real frame per unique key, while leave() still
+       // balances exactly against however many enters matched it.
+       const refCounts = new Map();
+
+       tree.iterate({
+           enter(node) {
+               const range = foldable(view.state, node.from, node.to);
+               if (range && range.from < range.to) {
+                   const key = range.from + ':' + range.to;
+                   const count = refCounts.get(key) || 0;
+                   if (count === 0) {
+                       ranges.push({ key, from: range.from, to: range.to, depth: stack.length });
+                       stack.push(key);
+                   }
+                   refCounts.set(key, count + 1);
+               }
+           },
+           leave(node) {
+               const range = foldable(view.state, node.from, node.to);
+               if (range && range.from < range.to) {
+                   const key = range.from + ':' + range.to;
+                   const count = refCounts.get(key) || 0;
+                   if (count <= 1) {
+                       if (stack[stack.length - 1] === key) stack.pop();
+                       refCounts.delete(key);
+                   } else {
+                       refCounts.set(key, count - 1);
+                   }
+               }
+           }
+       });
+
+       return ranges;
+   },
+
    collapseAll() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Folding is only supported in the CM6 Engine.");
@@ -9623,22 +9661,249 @@ runDiff(target) {
            unfoldAll(Nexus.editorCore.view);
        },
 
-       foldToLayer(targetDepth) {
+       // "-1 Fold": fold away the deepest layer that isn't ALREADY fully
+       // folded. Finds the current deepest depth among ranges that have
+       // at least one unfolded range, then folds every unfolded range at
+       // that depth. Repeated presses walk outward one layer at a time —
+       // deepest nested blocks fold first, then their parents, etc. —
+       // until everything's collapsed, matching foldAll's end state.
+       foldToLayer() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Folding is only supported in the CM6 Engine.");
            }
-           const { unfoldAll, foldAll } = Nexus.editorCore.modules;
            const view = Nexus.editorCore.view;
-           unfoldAll(view);
-           foldAll(view);
+           const { foldEffect, foldedRanges } = Nexus.editorCore.modules;
+           const folded = foldedRanges(view.state);
+
+           const isAlreadyFolded = (from, to) => {
+               let found = false;
+               folded.between(from, to, (fFrom, fTo) => {
+                   if (fFrom === from && fTo === to) found = true;
+               });
+               return found;
+           };
+
+           const ranges = this._getFoldableRangesWithDepth(view)
+               .map(r => ({ ...r, folded: isAlreadyFolded(r.from, r.to) }));
+
+           const unfoldedRanges = ranges.filter(r => !r.folded);
+           if (unfoldedRanges.length === 0) return; // everything's already fully folded
+
+           const deepestUnfoldedDepth = Math.max(...unfoldedRanges.map(r => r.depth));
+           const toFold = unfoldedRanges.filter(r => r.depth === deepestUnfoldedDepth);
+
+           view.dispatch({
+               effects: toFold.map(r => foldEffect.of({ from: r.from, to: r.to }))
+           });
        },
 
+       // "+1 Unfold": open back up the shallowest layer that's currently
+       // folded. Mirror of foldToLayer — finds the minimum depth among
+       // folded ranges and unfolds just those, so repeated presses peel
+       // outward-in from the top level down, undoing a Full Fold one
+       // layer per press instead of all at once.
        unfoldOnce() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Folding is only supported in the CM6 Engine.");
            }
-           const { unfoldAll } = Nexus.editorCore.modules;
-           unfoldAll(Nexus.editorCore.view);
+           const view = Nexus.editorCore.view;
+           const { unfoldEffect, foldedRanges } = Nexus.editorCore.modules;
+           const folded = foldedRanges(view.state);
+
+           const isFolded = (from, to) => {
+               let found = false;
+               folded.between(from, to, (fFrom, fTo) => {
+                   if (fFrom === from && fTo === to) found = true;
+               });
+               return found;
+           };
+
+           const ranges = this._getFoldableRangesWithDepth(view)
+               .filter(r => isFolded(r.from, r.to));
+           if (ranges.length === 0) return; // nothing folded to open
+
+           const shallowestFoldedDepth = Math.min(...ranges.map(r => r.depth));
+           const toUnfold = ranges.filter(r => r.depth === shallowestFoldedDepth);
+
+           view.dispatch({
+               effects: toUnfold.map(r => unfoldEffect.of({ from: r.from, to: r.to }))
+           });
+       },
+
+       // Finds the "declaration-shaped" foldable node enclosing the cursor
+       // — the innermost Function/Class/Method/Object/Array/Block whose
+       // START is at or before the cursor and END is at or after it. This
+       // deliberately walks OUT from the cursor's own tree position rather
+       // than just taking foldable()'s first hit, because foldable() on a
+       // raw cursor position often returns the nearest inner block (e.g.
+       // an if-statement body one level down) rather than the whole
+       // function/class the user actually means by "this function."
+       _getEnclosingDeclaration(view) {
+           const { syntaxTree, foldable } = Nexus.editorCore.modules;
+           const pos = view.state.selection.main.head;
+           const tree = syntaxTree(view.state);
+           let node = tree.resolveInner(pos, 1);
+
+           // "Property" covers an individual key: value or method()
+           // shorthand entry inside an object literal — without it, the
+           // cursor inside e.g. `bar() { ... }` as a member of `const obj
+           // = {...}` would skip past that specific method entirely and
+           // match the whole enclosing ObjectExpression instead, collapsing
+           // far more than the user actually meant to target.
+           const DECL_PATTERN = /Function|Class|Method|Property|VariableDeclaration|Object|Array|Arrow/i;
+
+           while (node) {
+               if (DECL_PATTERN.test(node.type.name)) {
+                   const range = foldable(view.state, node.from, node.to);
+                   if (range && range.to > range.from) {
+                       return { declFrom: node.from, declTo: node.to, foldFrom: range.from, foldTo: range.to, nodeName: node.type.name };
+                   }
+               }
+               node = node.parent;
+           }
+           return null;
+       },
+
+       // "Format to one line": collapses the enclosing function/class/
+       // const/object under the cursor down to the minimum whitespace that
+       // keeps it syntactically valid — strips comments, collapses all
+       // runs of whitespace/newlines to single spaces, and tightens
+       // spacing around punctuation. This is a purely textual transform
+       // (not a Prettier "printWidth: Infinity" call) because Prettier's
+       // own single-line mode still inserts the line breaks it considers
+       // mandatory (e.g. after every statement in a block), which defeats
+       // the point of an actual one-liner.
+       collapseSelectionToOneLine() {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("This tool requires the CM6 Engine.");
+           }
+           const view = Nexus.editorCore.view;
+           const target = this._getEnclosingDeclaration(view);
+           if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
+
+           const original = view.state.doc.sliceString(target.declFrom, target.declTo);
+           const oneLined = this._toOneLine(original);
+
+           if (oneLined === original) return; // already minimal, nothing to do
+
+           // Stash the pre-collapse text keyed by position so
+           // expandSelectionFromOneLine can restore exact original
+           // formatting rather than just re-running a generic formatter
+           // (which could produce different style choices than the user
+           // originally had — e.g. their own comment placement).
+           Nexus.state._foldSnapshots = Nexus.state._foldSnapshots || {};
+           Nexus.state._foldSnapshots[target.declFrom] = original;
+
+           view.dispatch({
+               changes: { from: target.declFrom, to: target.declTo, insert: oneLined },
+               selection: { anchor: target.declFrom }
+           });
+
+           const st = document.getElementById('footStatus');
+           if (st) { st.innerText = "COLLAPSED TO ONE LINE"; st.style.color = "var(--gold)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
+       },
+
+       // "Expand from one line": the inverse. If a snapshot exists for
+       // this exact position (i.e. this range was collapsed by the tool
+       // above and hasn't been touched since), restores the original
+       // multi-line text verbatim. Otherwise falls back to running the
+       // existing Prettier pipeline scoped to just this node, wrapped in
+       // a throwaway container so the parser accepts a bare
+       // function/class/object fragment standalone.
+       async expandSelectionFromOneLine() {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("This tool requires the CM6 Engine.");
+           }
+           const view = Nexus.editorCore.view;
+           const target = this._getEnclosingDeclaration(view);
+           if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
+
+           const current = view.state.doc.sliceString(target.declFrom, target.declTo);
+           const snapshots = Nexus.state._foldSnapshots || {};
+           const snapshot = snapshots[target.declFrom];
+
+           if (snapshot) {
+               view.dispatch({
+                   changes: { from: target.declFrom, to: target.declTo, insert: snapshot },
+                   selection: { anchor: target.declFrom }
+               });
+               delete snapshots[target.declFrom];
+               const st = document.getElementById('footStatus');
+               if (st) { st.innerText = "RESTORED"; st.style.color = "var(--success)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
+               return;
+           }
+
+           // No snapshot (e.g. the file was reloaded, or this one-liner
+           // was hand-written, not tool-collapsed) — reformat with
+           // Prettier instead of just failing silently. Wrapping keeps
+           // babel's parser happy for fragments that aren't valid as a
+           // top-level Program on their own (a bare object literal, for
+           // instance, parses as a block statement without this).
+           try {
+               const wrapped = `const __nexus_fold_wrap__ = (${current.trim().replace(/;$/, '')});`;
+               const formatted = await prettier.format(wrapped, {
+                   parser: 'babel',
+                   plugins: [prettierPlugins.babel, prettierPlugins.estree],
+                   tabWidth: Nexus.state.prefs.tabWidth,
+                   printWidth: 80,
+                   singleQuote: true
+               });
+               // Strip the wrapper back off.
+               let unwrapped = formatted.trim()
+                   .replace(/^const __nexus_fold_wrap__ = \(?/, '')
+                   .replace(/\)?;?\s*$/, '');
+               view.dispatch({
+                   changes: { from: target.declFrom, to: target.declTo, insert: unwrapped },
+                   selection: { anchor: target.declFrom }
+               });
+               const st = document.getElementById('footStatus');
+               if (st) { st.innerText = "REFORMATTED"; st.style.color = "var(--success)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
+           } catch (e) {
+               // Fall back to the plain multi-line prettify path used
+               // elsewhere (js_beautify) if the wrapped-fragment parse
+               // trick fails on something unusual (e.g. a class with
+               // decorators) rather than leaving the user stuck.
+               try {
+                   const beautified = js_beautify(current, { indent_size: Nexus.state.prefs.tabWidth });
+                   view.dispatch({
+                       changes: { from: target.declFrom, to: target.declTo, insert: beautified },
+                       selection: { anchor: target.declFrom }
+                   });
+               } catch (e2) {
+                   alert("Couldn't reformat this fragment automatically:\n" + e.message);
+               }
+           }
+       },
+
+       // Pure text collapse: strip comments, collapse all whitespace runs
+       // (including newlines) to single spaces, and tighten spacing
+       // immediately inside/around braces and after semicolons/commas so
+       // the result reads like a real one-liner rather than just
+       // "multi-line with the breaks removed."
+       _toOneLine(code) {
+           let out = code;
+           // Strip // line comments (careful not to eat http:// or similar
+           // — only treat // as a comment start when not inside a string;
+           // approximated here by only stripping when preceded by
+           // whitespace-or-start and not part of a :// pattern).
+           out = out.replace(/^\s*\/\/.*$/gm, '');
+           out = out.replace(/([^:])\/\/(?![:/]).*$/gm, '$1');
+           // Strip /* */ block comments.
+           out = out.replace(/\/\*[\s\S]*?\*\//g, '');
+           // Collapse all whitespace runs (including newlines) to one space.
+           out = out.replace(/\s+/g, ' ').trim();
+           // Tighten spacing: no space after { or [ or (, none before } or ] or ),
+           // single space after ; and , when followed by non-space.
+           out = out.replace(/([{\[(])\s+/g, '$1');
+           out = out.replace(/\s+([}\])])/g, '$1');
+           out = out.replace(/;\s*/g, '; ').replace(/;\s*}/g, ';}').replace(/\s+$/,'');
+           out = out.replace(/,\s*/g, ', ');
+           // A trailing comma immediately before a closing brace/bracket
+           // (valid JS, e.g. `{a: 1, b: 2,}`) reads as a leftover artifact
+           // once collapsed to one line — drop it, matching how a human
+           // would actually write the one-liner by hand.
+           out = out.replace(/,\s*([}\]])/g, '$1');
+           return out;
        },
 
        async saveMap() {
@@ -9677,59 +9942,253 @@ runDiff(target) {
            return map;
        },
 
+       // Rebuilt from scratch — the original version was line-by-line regex
+       // matching with no brace tracking, which meant: async methods never
+       // matched (the `async` keyword sat before the name the regex
+       // expected first), arrow-function consts were indistinguishable
+       // from plain values, nested class methods rendered as flat
+       // top-level entries with no indication of what they belonged to,
+       // and there was no way to tell from the map how large any single
+       // entry was. This version tracks actual brace depth so nesting and
+       // extents are both real, and matches functions/methods/arrows in
+       // any order the keywords appear.
        _mapJS(content) {
-           let map = '';
            const lines = content.split('\n');
-           let inComment = false;
-           lines.forEach((line, i) => {
-               const trimmed = line.trim();
-               if (trimmed.startsWith('/*')) { inComment = true; return; }
-               if (trimmed.endsWith('*/')) { inComment = false; return; }
-               if (inComment || trimmed.startsWith('//')) return;
-               if (trimmed.match(/^class\s+(\w+)/)) {
-                   const match = trimmed.match(/^class\s+(\w+)/);
-                   map += `[${i + 1}] class ${match[1]}\n`;
-               } else if (trimmed.match(/^(?:async\s+)?function\s+(\w+)/)) {
-                   const match = trimmed.match(/^(?:async\s+)?function\s+(\w+)/);
-                   map += `  [${i + 1}] ${match[1]}()\n`;
-               } else if (trimmed.match(/^(\w+)\s*\([^)]*\)\s*{/)) {
-                   const match = trimmed.match(/^(\w+)\s*\(/);
-                   if (match) map += `  [${i + 1}] ${match[1]}()\n`;
-               } else if (trimmed.match(/^(?:const|let|var)\s+(\w+)\s*=/)) {
-                   const match = trimmed.match(/^(?:const|let|var)\s+(\w+)/);
-                   if (match) map += `  [${i + 1}] ${match[1]}\n`;
+           const entries = []; // {line, endLine, indent, label}
+           const stack = []; // open braces: {depth, entry}
+           let depth = 0;
+           let inBlockComment = false;
+
+           // Matches, in priority order: class Name, then any of
+           // function decl / async function decl / method shorthand
+           // (optionally async) / arrow assigned to const-let-var, then
+           // plain const/let/var. Each capturer records whether what it
+           // found actually opens a brace on this line, since only
+           // brace-opening entries get pushed onto the nesting stack —
+           // a one-line `const x = 5;` shouldn't swallow everything
+           // that follows as its "children."
+           const CLASS_RE = /^(?:export\s+)?class\s+(\w+)/;
+           const FUNC_DECL_RE = /^(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s*\*?\s+(\w+)\s*\(/;
+           const ARROW_RE = /^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(?[^=]*\)?\s*=>/;
+           const CONST_FN_EXPR_RE = /^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?function\b/;
+           const METHOD_RE = /^(?:static\s+)?(?:async\s+)?(?:get\s+|set\s+)?\*?\s*(\w+)\s*\([^)]*\)\s*\{?\s*$/;
+           const PLAIN_VAR_RE = /^(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=/;
+           // Reserved words that would otherwise false-positive as
+           // "methods" when they start a control-flow line ending in `) {`
+           // — e.g. `if (x) {`, `for (;;) {`, `while (x) {`, `switch (x) {`,
+           // `catch (e) {`.
+           const CONTROL_KEYWORDS = new Set(['if', 'for', 'while', 'switch', 'catch', 'function']);
+
+           for (let i = 0; i < lines.length; i++) {
+               const raw = lines[i];
+               let trimmed = raw.trim();
+
+               // Comment handling: skip content inside /* */ spans and
+               // strip trailing // comments before matching, so a
+               // commented-out `class Foo {` doesn't get mapped.
+               if (inBlockComment) {
+                   if (trimmed.includes('*/')) inBlockComment = false;
+                   continue;
                }
-           });
-           return map || '(no mappable structure)\n';
-       },
+               if (trimmed.startsWith('/*')) {
+                   if (!trimmed.includes('*/')) inBlockComment = true;
+                   continue;
+               }
+               if (trimmed.startsWith('//')) continue;
+               trimmed = trimmed.replace(/\/\/(?![:/]).*$/, '').trim();
+               if (!trimmed) continue;
 
-       _mapHTML(content) {
-           let map = '';
-           const lines = content.split('\n');
-           lines.forEach((line, i) => {
-               const trimmed = line.trim();
-               let match = trimmed.match(/<(\w+)\s+id="([^"]+)"/);
-               if (match) { map += `[${i + 1}] <${match[1]} id="${match[2]}">\n`; return; }
-               match = trimmed.match(/<(\w+)\s+class="([^"]+)"/);
-               if (match) { map += `[${i + 1}] <${match[1]} class="${match[2]}">\n`; return; }
-               match = trimmed.match(/<h([1-6])>([^<]*)</);
-               if (match) map += `[${i + 1}] <h${match[1]}>${match[2]}\n`;
-           });
-           return map || '(no mappable structure)\n';
-       },
+               let label = null;
+               let isBraceOpener = false;
 
-       _mapCSS(content) {
-           let map = '';
-           const lines = content.split('\n');
-           lines.forEach((line, i) => {
-               const trimmed = line.trim();
-               if (trimmed.match(/^\.[\w-]+|^#[\w-]+|^[a-z][\w-]*\s*[,{>]/i)) {
-                   if (!trimmed.match(/^(font-|background-|margin|padding|color|display|width|height)/)) {
-                       map += `[${i + 1}] ${trimmed.substring(0, 60)}\n`;
+               let m;
+               if ((m = trimmed.match(CLASS_RE))) {
+                   label = `class ${m[1]}`;
+                   isBraceOpener = true;
+               } else if ((m = trimmed.match(FUNC_DECL_RE))) {
+                   label = `${m[1]}()`;
+                   isBraceOpener = true;
+               } else if ((m = trimmed.match(ARROW_RE))) {
+                   label = `${m[1]} = () =>`;
+                   isBraceOpener = trimmed.includes('{');
+               } else if ((m = trimmed.match(CONST_FN_EXPR_RE))) {
+                   label = `${m[1]} = function()`;
+                   isBraceOpener = true;
+               } else if ((m = trimmed.match(METHOD_RE)) && !CONTROL_KEYWORDS.has(m[1]) && stack.length > 0) {
+                   // Method shorthand only counts inside an existing
+                   // class/object body (stack.length > 0) — otherwise
+                   // `someCall(x) {` at top level (rare but possible in a
+                   // callback-heavy file) would falsely read as a method.
+                   label = `${m[1]}()`;
+                   isBraceOpener = trimmed.includes('{');
+               } else if ((m = trimmed.match(PLAIN_VAR_RE))) {
+                   label = m[1];
+                   // `const obj = {` opens an object body whose methods
+                   // should nest underneath it — but `const x = 5;` or
+                   // `const arr = [1,2,3];` should not become a fake
+                   // parent for whatever code happens to follow. Only
+                   // treat this as a brace opener when the line ends with
+                   // an actual unclosed `{` (an object literal starting
+                   // here), not just any line containing a brace.
+                   isBraceOpener = /=\s*\{\s*$/.test(trimmed);
+               }
+
+               // Track brace depth for every line regardless of whether it
+               // matched a label, so nesting stays accurate through plain
+               // code between declarations.
+               const opens = (trimmed.match(/\{/g) || []).length;
+               const closes = (trimmed.match(/\}/g) || []).length;
+
+               if (label) {
+                   const indent = stack.length;
+                   const entry = { line: i + 1, endLine: null, indent, label };
+                   entries.push(entry);
+                   if (isBraceOpener) {
+                       stack.push({ depth: depth + opens, entry });
                    }
                }
-           });
-           return map || '(no mappable structure)\n';
+
+               depth += opens;
+               depth -= closes;
+
+               // Pop any stack frames whose opening brace has now been
+               // closed, recording the line each one closed on.
+               while (stack.length && depth < stack[stack.length - 1].depth) {
+                   const frame = stack.pop();
+                   frame.entry.endLine = i + 1;
+               }
+           }
+
+           if (entries.length === 0) return '(no mappable structure)\n';
+
+           return entries.map(e => {
+               const pad = '  '.repeat(e.indent);
+               const span = e.endLine && e.endLine > e.line ? `${e.line}-${e.endLine}` : `${e.line}`;
+               return `${pad}[${span}] ${e.label}`;
+           }).join('\n') + '\n';
+       },
+
+       // Rebuilt from scratch — the original was a flat per-line scan with
+       // no DOM nesting at all (a <header> inside a <div id="appRoot">
+       // rendered as an unindented sibling) and only recognized a
+       // handful of tags with id/class/heading — every other element,
+       // including plain content tags like <a> or <p>, was invisible.
+       // This version does simple tag-depth tracking so indentation
+       // reflects actual nesting, and captures any tag that has an id,
+       // a class, or is a heading/semantic landmark — while still
+       // ignoring pure text/formatting tags that would just add noise
+       // (span, b, i, br, etc. with no id/class of their own).
+       _mapHTML(content) {
+           const lines = content.split('\n');
+           const entries = [];
+           let depth = 0;
+           const VOID_TAGS = new Set(['area','base','br','col','embed','hr','img','input','link','meta','param','source','track','wbr']);
+           const NOISE_TAGS = new Set(['span','b','i','em','strong','small','br','wbr']);
+           const LANDMARK_TAGS = new Set(['header','nav','main','footer','section','article','aside','form','table','ul','ol']);
+
+           for (let i = 0; i < lines.length; i++) {
+               const line = lines[i];
+               // Walk the line character-by-character for tags rather than
+               // one regex per line, so a line with multiple tags (common
+               // in minified or tightly-written HTML) is handled correctly
+               // and depth stays accurate.
+               const tagRe = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:\s+[^<>]*)?)\s*(\/?)>/g;
+               let m;
+               while ((m = tagRe.exec(line)) !== null) {
+                   const isClosing = m[1] === '/';
+                   const tagName = m[2].toLowerCase();
+                   const attrs = m[3] || '';
+                   const isSelfClosing = m[4] === '/' || VOID_TAGS.has(tagName);
+
+                   if (isClosing) {
+                       depth = Math.max(0, depth - 1);
+                       continue;
+                   }
+
+                   const idMatch = attrs.match(/\bid=["']([^"']+)["']/);
+                   const classMatch = attrs.match(/\bclass=["']([^"']+)["']/);
+                   const isHeading = /^h[1-6]$/.test(tagName);
+                   const isLandmark = LANDMARK_TAGS.has(tagName);
+                   const worthMapping = idMatch || classMatch || isHeading || isLandmark;
+
+                   if (worthMapping && !NOISE_TAGS.has(tagName)) {
+                       let label = `<${tagName}`;
+                       if (idMatch) label += ` id="${idMatch[1]}"`;
+                       if (classMatch) label += ` class="${classMatch[1]}"`;
+                       label += '>';
+                       if (isHeading) {
+                           // Pull the heading's text content if it's on
+                           // the same line (the common case).
+                           const textMatch = line.slice(m.index).match(/>([^<]*)</);
+                           if (textMatch && textMatch[1].trim()) label += ` ${textMatch[1].trim()}`;
+                       }
+                       entries.push({ line: i + 1, indent: depth, label });
+                   }
+
+                   if (!isSelfClosing) depth++;
+               }
+           }
+
+           if (entries.length === 0) return '(no mappable structure)\n';
+           return entries.map(e => `${'  '.repeat(e.indent)}[${e.line}] ${e.label}`).join('\n') + '\n';
+       },
+
+       // Rebuilt from scratch — the original had no concept of @media (or
+       // @supports/@keyframes) blocks at all, so a rule nested inside a
+       // media query rendered as an indistinguishable duplicate of any
+       // same-named rule outside it. This version tracks brace depth and
+       // nests rules found inside at-rule blocks under their condition.
+       _mapCSS(content) {
+           const lines = content.split('\n');
+           const entries = [];
+           const stack = []; // {depth, isAtRule}
+           let depth = 0;
+           let inBlockComment = false;
+
+           const AT_RULE_RE = /^(@(?:media|supports|keyframes|font-face|page)\b[^{]*)\{/;
+           const SELECTOR_RE = /^([^{}\n]+)\{/;
+
+           for (let i = 0; i < lines.length; i++) {
+               let trimmed = lines[i].trim();
+
+               if (inBlockComment) {
+                   if (trimmed.includes('*/')) inBlockComment = false;
+                   continue;
+               }
+               if (trimmed.startsWith('/*')) {
+                   if (!trimmed.includes('*/')) inBlockComment = true;
+                   else trimmed = trimmed.replace(/\/\*.*?\*\//, '').trim();
+                   if (!trimmed) continue;
+               }
+               if (!trimmed) continue;
+
+               let m;
+               if ((m = trimmed.match(AT_RULE_RE))) {
+                   entries.push({ line: i + 1, indent: stack.length, label: m[1].trim() });
+                   stack.push({ depth: depth + 1 });
+                   depth++;
+               } else if ((m = trimmed.match(SELECTOR_RE))) {
+                   const selector = m[1].trim().replace(/\s+/g, ' ');
+                   // Skip property-looking false positives (a value that
+                   // happens to contain a brace, e.g. inside a custom
+                   // property) — real selectors don't contain a colon
+                   // immediately followed by a value-like token before
+                   // the brace.
+                   if (!/^[a-z-]+\s*:/i.test(selector)) {
+                       entries.push({ line: i + 1, indent: stack.length, label: selector.length > 60 ? selector.slice(0, 57) + '...' : selector });
+                   }
+                   stack.push({ depth: depth + 1 });
+                   depth++;
+               } else {
+                   const closes = (trimmed.match(/\}/g) || []).length;
+                   for (let c = 0; c < closes; c++) {
+                       if (stack.length) { stack.pop(); depth--; }
+                   }
+               }
+           }
+
+           if (entries.length === 0) return '(no mappable structure)\n';
+           return entries.map(e => `${'  '.repeat(e.indent)}[${e.line}] ${e.label}`).join('\n') + '\n';
        },
 
        renderTabs() {
