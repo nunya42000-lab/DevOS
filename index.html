@@ -1453,7 +1453,7 @@
     <div id="cm6Container" style="display: none; flex: 1; overflow: auto; background: var(--bg); font-family: monospace; font-size: 14px;"></div>
 
     <div id="utilityBar" class="floating-widget util-vertical util-docked">
-        <div class="util-grip" onclick="Nexus.UI.toggleUtilCollapse()" title="Collapse/expand" aria-label="Collapse or expand utility bar"></div>
+        <div class="util-grip" onmousedown="Nexus.UI.scrubStart(event)" ontouchstart="Nexus.UI.scrubStart(event)" title="Tap to collapse/expand — press and drag to scroll fast" aria-label="Collapse or expand utility bar, or drag to scroll"></div>
         <!-- Content is entirely populated by Nexus.UI.renderUtilBar() from
              Nexus.state.prefs.utilLayout (persisted via Nexus.settings.update,
              restored on boot by Nexus.settings.boot). This div used to also
@@ -2014,6 +2014,38 @@
                 <div style="display:flex; flex:1; gap:10px; overflow:hidden;">
                     <div id="diffScrollLeft" style="flex:1; background:#0d1117; color:#fff; overflow:auto; padding:10px; font-family:monospace; font-size:12px; white-space:pre-wrap; border:1px solid var(--border); border-radius:8px;"><div id="diffContentLeft"></div></div>
                     <div id="diffScrollRight" style="flex:1; background:#0d1117; color:#fff; overflow:auto; padding:10px; font-family:monospace; font-size:12px; white-space:pre-wrap; border:1px solid var(--border); border-radius:8px;"><div id="diffContentRight"></div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalChunkEditor" class="modal-overlay">
+        <div class="modal-content" style="width: 92%; height: 80%;">
+            <div class="p-head">
+                <span id="chunkEditorTitle">✏️ EDIT CHUNK</span>
+                <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('chunk-editor')">&times;</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; padding:12px; gap:8px; overflow:hidden;">
+                <div style="font-size:10px; opacity:0.6;" id="chunkEditorSubtitle">Editing an isolated copy — Save writes it back to the exact spot in the real file.</div>
+
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                    <button class="tool-btn" style="padding:6px 10px; font-size:10px;" onclick="Nexus.chunkEditor.format('prettier')" title="Run Prettier on just this chunk">✨ PRETTIER</button>
+                    <button class="tool-btn" style="padding:6px 10px; font-size:10px;" onclick="Nexus.chunkEditor.format('beautify')" title="Run Beautify on just this chunk">🧼 BEAUTIFY</button>
+                    <button class="tool-btn" style="padding:6px 10px; font-size:10px;" onclick="Nexus.chunkEditor.format('oneline')" title="Collapse to a single line">⟷ 1-LINE</button>
+                    <button class="tool-btn" style="padding:6px 10px; font-size:10px;" onclick="Nexus.chunkEditor.format('stripcomments')" title="Remove comments from this chunk">💬 STRIP CMT</button>
+                    <button class="tool-btn" style="padding:6px 10px; font-size:10px;" onclick="Nexus.chunkEditor.format('reindent')" title="Re-indent this chunk from column 0">📐 RE-INDENT</button>
+                    <button class="tool-btn" style="padding:6px 10px; font-size:10px;" onclick="Nexus.chunkEditor.revert()" title="Undo edits, restore what was loaded">↩️ REVERT</button>
+                </div>
+
+                <textarea id="chunkEditorTextarea" spellcheck="false" autocapitalize="off" autocorrect="off"
+                    style="flex:1; width:100%; resize:none; background:#0d1117; color:#e6edf3; border:1px solid var(--border); border-radius:8px; padding:12px; font-family:monospace; font-size:13px; line-height:1.5; white-space:pre; overflow:auto;"></textarea>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span id="chunkEditorStatus" style="font-size:10px; opacity:0.6;"></span>
+                    <div style="display:flex; gap:8px;">
+                        <button class="tool-btn" onclick="Nexus.UI.closeModal('chunk-editor')">CANCEL</button>
+                        <button class="tool-btn btn-accent" style="font-weight:800;" onclick="Nexus.chunkEditor.save()">💾 SAVE TO FILE</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -6353,6 +6385,159 @@ intel: {
        Nexus.UI.openModal('intel');
    }
 },
+
+chunkEditor: {
+   // Isolated single-chunk editor: lets you open just one function, class,
+   // const, or object literal in a focused textarea instead of scrolling
+   // through the whole file to work on it. Reuses the same declaration-
+   // detection logic (_getEnclosingDeclaration) already built for the
+   // one-line format tools, so "what counts as a chunk" is identical
+   // between both features — a function is a function either way.
+   //
+   // Deliberately a plain <textarea>, not a second CM6 instance: mounting
+   // a nested CodeMirror editor for a modal that's open for maybe 30
+   // seconds at a time is a lot of setup/teardown cost and complexity
+   // (compartments, extensions, cleanup on close) for a feature whose
+   // entire value is "quick, distraction-free edit of one small thing."
+   // Every formatting tool inside (Prettier, Beautify, etc.) already
+   // operates on plain text strings under the hood — see runPrettier
+   // above — so nothing is lost by not having syntax highlighting inside
+   // the popup itself.
+
+   // Tracks exactly where in the real document this chunk came from,
+   // so save() can replace precisely that range rather than guessing
+   // by matching text (which would break if the chunk's original text
+   // appears more than once in the file, or if edits shifted things).
+   _target: null,
+   _originalText: null,
+
+   openForCursor() {
+       if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+           return alert("Chunk Editor requires the CM6 Engine.");
+       }
+       const view = Nexus.editorCore.view;
+       const target = Nexus.UI._getEnclosingDeclaration(view);
+       if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
+
+       const text = view.state.doc.sliceString(target.declFrom, target.declTo);
+       this._target = target;
+       this._originalText = text;
+
+       const startLine = view.state.doc.lineAt(target.declFrom).number;
+       const endLine = view.state.doc.lineAt(target.declTo).number;
+
+       document.getElementById('chunkEditorTitle').innerText = `✏️ EDIT CHUNK — ${target.nodeName || 'code'}`;
+       document.getElementById('chunkEditorSubtitle').innerText =
+           `Lines ${startLine}–${endLine} of ${Nexus.state.activeFile} — editing an isolated copy, Save writes it back to this exact spot.`;
+       document.getElementById('chunkEditorTextarea').value = text;
+       document.getElementById('chunkEditorStatus').innerText = '';
+
+       Nexus.UI.openModal('chunk-editor');
+   },
+
+   revert() {
+       if (this._originalText === null) return;
+       document.getElementById('chunkEditorTextarea').value = this._originalText;
+       document.getElementById('chunkEditorStatus').innerText = 'Reverted to original.';
+   },
+
+   // Splices the (possibly edited) textarea content back into the
+   // exact declFrom/declTo range captured when the chunk was opened.
+   // If the surrounding file changed length since then (e.g. another
+   // edit was made through some other path while this modal was
+   // open), declFrom/declTo could point at the wrong place — this is
+   // a known, accepted tradeoff for keeping the feature simple; the
+   // realistic use case is open-edit-save in one uninterrupted pass,
+   // not leaving the modal open while also editing the main file.
+   save() {
+       if (!this._target || !Nexus.editorCore.view) {
+           return alert("Nothing to save — open a chunk first.");
+       }
+       const view = Nexus.editorCore.view;
+       const newText = document.getElementById('chunkEditorTextarea').value;
+
+       // Defensive check: if the live document's content at this range
+       // no longer matches what was loaded, the file changed underneath
+       // us — refuse rather than silently overwriting the wrong text.
+       const currentAtRange = view.state.doc.sliceString(this._target.declFrom, this._target.declTo);
+       if (currentAtRange !== this._originalText) {
+           const proceed = confirm("The file changed since this chunk was opened (possibly at this exact spot). Save anyway? This may overwrite something unexpected.");
+           if (!proceed) return;
+       }
+
+       view.dispatch({
+           changes: { from: this._target.declFrom, to: this._target.declFrom + this._originalText.length, insert: newText }
+       });
+
+       Nexus.state.Vfs[Nexus.state.activeFile] = view.state.doc.toString();
+       Nexus.Vfs.save();
+
+       const st = document.getElementById('chunkEditorStatus');
+       st.innerText = '✔ Saved to file.';
+       st.style.color = 'var(--success)';
+
+       // Keep the modal open with the now-current text as the new
+       // baseline, so further edits/formats in the same session diff
+       // against what's actually on disk now rather than the stale
+       // pre-save version.
+       this._originalText = newText;
+       this._target = { ...this._target, declTo: this._target.declFrom + newText.length };
+   },
+
+   // Scoped formatting: runs the same engines used elsewhere in this
+   // file, but against just the textarea's content rather than the
+   // whole document — so "Prettier" here means "prettify this one
+   // function," not "reformat everything and lose your place."
+   async format(kind) {
+       const textarea = document.getElementById('chunkEditorTextarea');
+       const code = textarea.value;
+       const st = document.getElementById('chunkEditorStatus');
+       const ext = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
+
+       try {
+           if (kind === 'prettier') {
+               // Prettier needs a syntactically complete program, and a
+               // bare method/property fragment (e.g. `bar() { ... }`
+               // with no enclosing object/class) isn't one on its own —
+               // wrap it the same way expandSelectionFromOneLine does
+               // elsewhere in this file, then unwrap after formatting.
+               const wrapped = `const __nexus_chunk_wrap__ = (${code.trim().replace(/;$/, '')});`;
+               let parser = 'babel', plugins = [prettierPlugins.babel, prettierPlugins.estree];
+               if (ext === 'html') { parser = 'html'; plugins = [prettierPlugins.html]; }
+               else if (ext === 'css') { parser = 'css'; plugins = [prettierPlugins.postcss]; }
+
+               const target = (parser === 'babel') ? wrapped : code;
+               const formatted = await prettier.format(target, { parser, plugins, tabWidth: Nexus.state.prefs.tabWidth, printWidth: 80, singleQuote: true });
+
+               textarea.value = (parser === 'babel')
+                   ? formatted.trim().replace(/^const __nexus_chunk_wrap__ = \(?/, '').replace(/\)?;?\s*$/, '')
+                   : formatted;
+               st.innerText = 'Prettified.'; st.style.color = 'var(--success)';
+           } else if (kind === 'beautify') {
+               textarea.value = js_beautify(code, { indent_size: Nexus.state.prefs.tabWidth });
+               st.innerText = 'Beautified.'; st.style.color = 'var(--success)';
+           } else if (kind === 'oneline') {
+               textarea.value = Nexus.UI._toOneLine(code);
+               st.innerText = 'Collapsed to one line.'; st.style.color = 'var(--success)';
+           } else if (kind === 'stripcomments') {
+               textarea.value = code
+                   .replace(/\/\*[\s\S]*?\*\//g, '')
+                   .replace(/([^:])\/\/(?![:/]).*$/gm, '$1')
+                   .replace(/^\s*\/\/.*$/gm, '');
+               st.innerText = 'Comments stripped.'; st.style.color = 'var(--success)';
+           } else if (kind === 'reindent') {
+               const lines = code.split('\n');
+               const minIndent = Math.min(...lines.filter(l => l.trim()).map(l => l.match(/^\s*/)[0].length));
+               textarea.value = lines.map(l => l.slice(minIndent)).join('\n');
+               st.innerText = 'Re-indented from column 0.'; st.style.color = 'var(--success)';
+           }
+       } catch (e) {
+           st.innerText = `Format failed: ${e.message}`;
+           st.style.color = 'var(--danger)';
+       }
+   }
+},
+
 compressor: {
    async run(level) {
        const ed = document.getElementById('rawTerminal');
@@ -9190,6 +9375,142 @@ toggleKeyboardRows() {
            Nexus.Vfs.save();
        },
 
+       // Fast-scroll scrub: press the utility bar's grip and drag
+       // vertically to jump proportionally through the document — grab
+       // near the top of the screen and drag to 75% down and you land at
+       // roughly line (0.75 × total lines), regardless of file size. A
+       // genuine tap (released before any meaningful vertical movement)
+       // still falls through to the existing collapse/expand toggle, so
+       // this doesn't change that behavior at all — it only adds a new
+       // gesture on top of it.
+       //
+       // The proportion is computed against the EDITOR'S OWN on-screen
+       // viewport rect, not the grip's tiny height or the full window —
+       // "3/4 of the way down the screen" only lines up with "75% into the
+       // file" if 0%/100% are anchored to where the editor visually starts
+       // and ends, which is #cm6Container/#rawTerminal's bounding box, not
+       // an arbitrary fixed pixel range.
+       _scrub: { active: false, startY: 0, startX: 0, moved: false, indicatorEl: null },
+
+       scrubStart(event) {
+           const point = event.touches ? event.touches[0] : event;
+           this._scrub.active = true;
+           this._scrub.startY = point.clientY;
+           this._scrub.startX = point.clientX;
+           this._scrub.moved = false;
+
+           document.addEventListener('mousemove', Nexus.UI.scrubMove);
+           document.addEventListener('touchmove', Nexus.UI.scrubMove, { passive: false });
+           document.addEventListener('mouseup', Nexus.UI.scrubEnd);
+           document.addEventListener('touchend', Nexus.UI.scrubEnd);
+       },
+
+       scrubMove(event) {
+           if (!Nexus.UI._scrub.active) return;
+           const point = event.touches ? event.touches[0] : event;
+           const dy = Math.abs(point.clientY - Nexus.UI._scrub.startY);
+           const dx = Math.abs(point.clientX - Nexus.UI._scrub.startX);
+
+           // Small deadzone (8px) before committing to drag mode, so a
+           // slightly-imprecise tap (finger moves a pixel or two on
+           // release, completely normal on touchscreens) doesn't
+           // accidentally trigger a scroll-jump instead of the expected
+           // collapse/expand toggle.
+           if (!Nexus.UI._scrub.moved && (dy > 8 || dx > 8)) {
+               Nexus.UI._scrub.moved = true;
+               Nexus.UI._showScrubIndicator();
+           }
+           if (!Nexus.UI._scrub.moved) return;
+
+           event.preventDefault(); // stop page scroll/text selection while dragging
+
+           const editorEl = document.getElementById('cm6Container').style.display !== 'none'
+               ? document.getElementById('cm6Container')
+               : document.getElementById('rawTerminal');
+           if (!editorEl) return;
+           const rect = editorEl.getBoundingClientRect();
+
+           // Clamp to [0,1] — dragging above or below the editor's own
+           // visible bounds still resolves to line 1 or the last line
+           // rather than doing nothing or erroring.
+           const ratio = Math.max(0, Math.min(1, (point.clientY - rect.top) / rect.height));
+
+           const totalLines = (Nexus.editorCore.isCM6 && Nexus.editorCore.view)
+               ? Nexus.editorCore.view.state.doc.lines
+               : (document.getElementById('rawTerminal')?.value.split('\n').length || 1);
+
+           const targetLine = Math.max(1, Math.min(totalLines, Math.round(ratio * totalLines)));
+
+           Nexus.UI._updateScrubIndicator(targetLine, totalLines, point.clientY);
+           Nexus.UI.scrubJumpToLine(targetLine);
+       },
+
+       scrubEnd(event) {
+           if (!Nexus.UI._scrub.active) return;
+           Nexus.UI._scrub.active = false;
+
+           document.removeEventListener('mousemove', Nexus.UI.scrubMove);
+           document.removeEventListener('touchmove', Nexus.UI.scrubMove);
+           document.removeEventListener('mouseup', Nexus.UI.scrubEnd);
+           document.removeEventListener('touchend', Nexus.UI.scrubEnd);
+
+           // Drop the cached line-offset table so the next drag rebuilds
+           // it fresh — the file may have been edited since this drag
+           // started, and a stale table would map line numbers to the
+           // wrong character positions.
+           Nexus.UI._scrubLineOffsets = null;
+
+           if (Nexus.UI._scrub.moved) {
+               // Was a drag — clean up the indicator, don't also fire the
+               // collapse toggle (a real gesture just happened, treating
+               // its release as a "tap" would be surprising).
+               Nexus.UI._hideScrubIndicator();
+               // A single focus() + scrollIntoView() now, after the drag
+               // ends, gives CM6 a chance to properly center/settle the
+               // final position — scrubJumpToLine() skipped this on every
+               // intermediate move for performance, so it's worth doing
+               // once here at the real destination.
+               if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                   Nexus.editorCore.view.dispatch({ scrollIntoView: true });
+                   Nexus.editorCore.view.focus();
+               }
+           } else {
+               // Was a genuine tap — preserve the original grip behavior
+               // exactly as it worked before this feature existed.
+               Nexus.UI.toggleUtilCollapse();
+           }
+       },
+
+       _showScrubIndicator() {
+           if (this._scrub.indicatorEl) return;
+           const el = document.createElement('div');
+           el.id = 'scrubIndicator';
+           el.style.cssText = `
+               position: fixed; right: 60px; z-index: 9999;
+               background: var(--gold); color: #0d1117; font-weight: 900;
+               font-family: monospace; font-size: 13px; padding: 6px 12px;
+               border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+               pointer-events: none; white-space: nowrap;
+               transform: translateY(-50%);
+           `;
+           document.body.appendChild(el);
+           this._scrub.indicatorEl = el;
+       },
+
+       _updateScrubIndicator(line, total, clientY) {
+           const el = this._scrub.indicatorEl;
+           if (!el) return;
+           el.style.top = clientY + 'px';
+           el.innerText = `LINE ${line} / ${total}`;
+       },
+
+       _hideScrubIndicator() {
+           if (this._scrub.indicatorEl) {
+               this._scrub.indicatorEl.remove();
+               this._scrub.indicatorEl = null;
+           }
+       },
+
        explodeVortex() {
            const isExploded = document.body.classList.toggle('vortex-active');
            const root = document.getElementById('appRoot');
@@ -9437,6 +9758,7 @@ insertUUID() {
            { group: 'Editing', key: 'oneUnfold', label: 'Unfold +1 (next layer up)' },
            { group: 'Editing', key: 'map', label: 'Save Structure Map' },
            { group: 'Fix & Format', key: 'oneLine', label: 'Format to One Line (function/class/const)' },
+           { group: 'Fix & Format', key: 'editChunk', label: 'Edit Chunk (open function/class/const in mini-editor)' },
            { group: 'Fix & Format', key: 'expandLine', label: 'Expand/Restore from One Line' },
            { group: 'Selection & Lines', key: 'selectall', label: 'Select All' },
            { group: 'Selection & Lines', key: 'duplicate', label: 'Duplicate Line' },
@@ -9483,7 +9805,7 @@ insertUUID() {
            { group: 'Other', key: 'run', label: 'Run Code' },
            { group: 'Other', key: 'datetime', label: 'Insert Date/Time' },
        ],
-       DEFAULT_UTIL_LAYOUT: 'undo, redo, readonly, tab, fold, fullFold, oneFold, unfold, oneUnfold, map, oneLine, expandLine, selectall, duplicate, comment, copy, cut, paste, find, jump, up20, down20, save, sweep, run, zoomin, zoomout, color',
+       DEFAULT_UTIL_LAYOUT: 'undo, redo, readonly, tab, fold, fullFold, oneFold, unfold, oneUnfold, map, oneLine, editChunk, expandLine, selectall, duplicate, comment, copy, cut, paste, find, jump, up20, down20, save, sweep, run, zoomin, zoomout, color',
 
        // Populates #modalUtilLayout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -9590,6 +9912,7 @@ insertUUID() {
                'oneUnfold': `<button class="sleek-btn" onclick="Nexus.UI.unfoldOnce()" title="Unfold highest folded level"><span style="font-size:16px;">∧</span><span class="util-lbl">+1 Unfold</span></button>`,
                'map': `<button class="sleek-btn" onclick="Nexus.UI.saveMap()" title="Save visible structure as map.filename.txt"><span style="font-size:18px;">🗺</span><span class="util-lbl">Map</span></button>`,
                'oneLine': `<button class="sleek-btn" onclick="Nexus.UI.collapseSelectionToOneLine()" title="Format function/class/const under cursor to one line"><span style="font-size:16px;">⟷</span><span class="util-lbl">To 1-Line</span></button>`,
+               'editChunk': `<button class="sleek-btn" onclick="Nexus.chunkEditor.openForCursor()" title="Open the function/class/const under the cursor in a focused mini-editor"><span style="font-size:16px;">🔎</span><span class="util-lbl">Edit Chunk</span></button>`,
                'expandLine': `<button class="sleek-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat function/class/const under cursor"><span style="font-size:16px;">⟵⟶</span><span class="util-lbl">Expand</span></button>`,
            'readonly': `<button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only" aria-label="Toggle read-only mode">${Nexus.ICONS.readonly}️</button>`,
            // FIX: this used to be a crude document.execCommand('delete') —
@@ -10933,6 +11256,48 @@ onGutterClick(lineNumber) {
 },
 
 // The missing piece behind "tools tell you things are wrong but don't let
+// Lightweight variant of jumpToLine() built specifically for the scrub
+// gesture, which can fire dozens of times per second during a drag.
+// jumpToLine() itself calls view.focus() and closes any open panel/modal
+// on every call — both fine for a single deliberate jump, but wasteful
+// (and, for focus(), potentially disruptive to the drag gesture itself via
+// mobile keyboard show/hide) when repeated continuously. This skips both,
+// and for the vanilla textarea engine caches the line-offset table for the
+// current drag instead of re-splitting the entire document on every move
+// event — meaningful on files in the tens of thousands of lines, which is
+// exactly the case this feature is for.
+_scrubLineOffsets: null,
+
+scrubJumpToLine(lineNumber) {
+    if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+        const view = Nexus.editorCore.view;
+        const doc = view.state.doc;
+        const clampedLine = Math.min(Math.max(1, lineNumber), doc.lines);
+        const line = doc.line(clampedLine);
+        view.dispatch({ selection: { anchor: line.from }, scrollIntoView: true });
+        return;
+    }
+
+    const ed = document.getElementById('rawTerminal');
+    if (!ed) return;
+
+    if (!this._scrubLineOffsets) {
+        const lines = ed.value.split('\n');
+        const offsets = new Array(lines.length);
+        let acc = 0;
+        for (let i = 0; i < lines.length; i++) {
+            offsets[i] = acc;
+            acc += lines[i].length + 1;
+        }
+        this._scrubLineOffsets = offsets;
+    }
+
+    const clampedLine = Math.min(Math.max(1, lineNumber), this._scrubLineOffsets.length);
+    const startPos = this._scrubLineOffsets[clampedLine - 1];
+    ed.setSelectionRange(startPos, startPos);
+    ed.scrollTop = Math.max(0, (clampedLine - 1) * 22 - ed.clientHeight / 2);
+},
+
 // you jump to them": this was referenced from several places (search for
 // "jumpToLine") behind a defensive typeof-guard, but never actually
 // implemented — so every one of those call sites silently did nothing.
