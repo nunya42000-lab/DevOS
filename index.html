@@ -470,6 +470,18 @@
     /* Hidden by Nexus.UI.filterDiagPanel() when a tool's relevant-file-type
        list doesn't include the currently open file's extension. */
     .diag-lang-hidden { display: none !important; }
+
+    /* Bookmark gutter (CM6). Narrow fixed-width column, subtle hover state
+       so it's clear the gutter itself is clickable to toggle a bookmark —
+       matches the interaction CodeMirror's own breakpoint-gutter example
+       uses (click anywhere in the gutter next to a line to toggle). */
+    .cm-bookmark-gutter {
+        width: 18px;
+        cursor: pointer;
+    }
+    .cm-bookmark-gutter:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .mini-console {
         background: #000;
@@ -577,6 +589,14 @@
         touch-action: pan-y pan-x; 
         -webkit-overflow-scrolling: touch; 
         overscroll-behavior: contain;
+    }
+    /* Word wrap toggle (vanilla textarea engine). CM6's own wrapping is
+       handled separately via EditorView.lineWrapping in a Compartment —
+       see toggleWordWrap() — since CM6 renders its own DOM structure and
+       doesn't share this textarea's CSS at all. */
+    #rawTerminal.word-wrap-on {
+        white-space: pre-wrap;
+        word-break: break-word;
     }
     #raw-terminal[readonly] { opacity: 0.4; user-select: none !important; }
 
@@ -1433,6 +1453,8 @@
             <button id="editModeBtn" class="tool-btn btn-edit-lock edit-btn-trigger" onclick="Nexus.UI.toggleEditMode()" title="Edit Lock" aria-label="Toggle edit lock">🔒</button>
             <button class="tool-btn" onclick="Nexus.toggleEditor()" title="Swap Editor Engine" aria-label="Swap editor engine">🔄</button>
             <button id="indentGuidesBtn" class="tool-btn" onclick="Nexus.UI.toggleIndentGuides()" title="Toggle Indent/Tag Guide Lines (CM6 only)" aria-label="Toggle indent and tag guide lines">📏</button>
+            <button id="wordWrapBtn" class="tool-btn" onclick="Nexus.UI.toggleWordWrap()" title="Toggle Word Wrap" aria-label="Toggle word wrap">↩️</button>
+            <button id="showWhitespaceBtn" class="tool-btn" onclick="Nexus.UI.toggleShowWhitespace()" title="Show Whitespace (spaces/tabs as dots, trailing whitespace highlighted) — CM6 only" aria-label="Toggle whitespace visualization">␣</button>
             <button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()" title="Refresh File" aria-label="Refresh current file">♻️</button>
             <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sandbox')" title="Run / Preview" aria-label="Run preview">▶️</button>
             <div class="dock-divider" role="separator"></div>
@@ -1487,6 +1509,8 @@
             <input type="text" id="replaceInput" class="sleek-input" placeholder="Replace...">
             <button class="sleek-btn" onclick="Nexus.search.replace()" style="background:var(--accent); color:#fff;">REP</button>
         </div>
+        <button class="sleek-btn" style="width:100%; background:var(--danger); color:#fff;" onclick="Nexus.search.replaceAll()" title="Replace every match in the file at once">⚡ REPLACE ALL</button>
+        <div style="font-size:9px; opacity:0.55; line-height:1.4;">Regex mode (.*): use (parens) to capture, then $1 $2 in Replace to reuse them.</div>
         <div style="display:flex; gap:6px;">
             <button class="sleek-btn" style="flex:1;" onclick="Nexus.search.findNext(-1)">↑ PREV</button>
             <button class="sleek-btn" style="flex:1;" onclick="Nexus.search.findNext(1)">↓ NEXT</button>
@@ -2019,6 +2043,19 @@
         </div>
     </div>
 
+    <div id="modalBookmarks" class="modal-overlay">
+        <div class="modal-content" style="width: 90%; height: 70%;">
+            <div class="p-head">
+                <span>🔖 BOOKMARKS</span>
+                <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('bookmarks')">&times;</button>
+            </div>
+            <div class="modal-body" style="display:flex; flex-direction:column; padding:12px; gap:8px; overflow:hidden;">
+                <div style="font-size:10px; opacity:0.6;">Across every file in this project. Tap a bookmark to jump straight to it.</div>
+                <div id="bookmarksList" style="flex:1; overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+
     <div id="modalChunkEditor" class="modal-overlay">
         <div class="modal-content" style="width: 92%; height: 80%;">
             <div class="p-head">
@@ -2430,6 +2467,18 @@ window.Nexus = {
        originals: {}, 
        vault: [], 
        snapshots: [],
+       // Per-file, line-based bookmarks: { [filename]: [{line, label}] }.
+       // Previously a flat {name: characterOffset} map shared across every
+       // file, which meant (a) a bookmark set in one file was silently
+       // indistinguishable from one in another if they reused a name, and
+       // (b) the raw character offset went stale the instant anything
+       // before it in the file was edited — a bookmark on line 500 would
+       // silently point at whatever text now happened to sit at that same
+       // byte offset, not line 500 anymore. Line numbers drift less often
+       // in practice (only when lines are inserted/deleted above the
+       // bookmark, which the CM6 gutter's own StateField already remaps
+       // correctly via transaction.changes) and are meaningful across
+       // files, which raw offsets never were.
        bookmarks: {},
        lastSweep: {}, // { [filename]: { issues: [{id,...}], graphSize: n } } — session-only baseline for neural.analyzeDelta
        prefs: { 
@@ -4037,6 +4086,18 @@ setEmptyState() {
             const view = Nexus.editorCore.view;
             view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
             document.getElementById('footStatus').innerText = "ENGINE: CM6 ACTIVE";
+
+            // Restore this file's saved bookmarks into the gutter. The
+            // dispatch above just replaced the ENTIRE document (0 to
+            // length) to load the new file's content — the bookmark
+            // StateField's automatic position-remapping only tracks
+            // incremental edits within one file, not "swap out to a
+            // completely different file's content," so whatever markers
+            // existed for the PREVIOUS file are gone after that dispatch
+            // and this file's own markers need to be re-applied fresh.
+            if (typeof Nexus.UI._restoreBookmarksToCM6 === 'function') {
+                Nexus.UI._restoreBookmarksToCM6(view, fn);
+            }
         } else {
             const ed = document.getElementById('rawTerminal');
             if (ed) {
@@ -6514,8 +6575,29 @@ chunkEditor: {
                    : formatted;
                st.innerText = 'Prettified.'; st.style.color = 'var(--success)';
            } else if (kind === 'beautify') {
-               textarea.value = js_beautify(code, { indent_size: Nexus.state.prefs.tabWidth });
-               st.innerText = 'Beautified.'; st.style.color = 'var(--success)';
+               // Same typeof guard every other js_beautify call site in
+               // this file already has (see runJSBeautify above) — without
+               // it, a CDN load failure/race throws an uncaught
+               // ReferenceError instead of failing gracefully. Also wraps
+               // bare fragments the same way the prettier branch above
+               // does: js-beautify's parser can behave unpredictably on a
+               // lone method/property body with no enclosing function or
+               // object literal (e.g. `bar() { return 1; }` on its own),
+               // since that's not valid top-level JS on its own — wrapping
+               // it as an object member first, then unwrapping after,
+               // keeps beautify working on exactly the kind of fragment
+               // this feature exists to edit.
+               if (typeof js_beautify !== 'function') {
+                   st.innerText = 'Beautify engine not loaded.'; st.style.color = 'var(--danger)';
+               } else {
+                   const looksLikeBareMember = /^(?:async\s+)?[\w$]+\s*\(/.test(code.trim()) && !/^(?:function|class)\b/.test(code.trim());
+                   const wrapped = looksLikeBareMember ? `const __nexus_chunk_wrap__ = {\n${code}\n};` : code;
+                   const beautified = js_beautify(wrapped, { indent_size: Nexus.state.prefs.tabWidth });
+                   textarea.value = looksLikeBareMember
+                       ? beautified.replace(/^const __nexus_chunk_wrap__ = \{\n?/, '').replace(/\n?\};?\s*$/, '')
+                       : beautified;
+                   st.innerText = 'Beautified.'; st.style.color = 'var(--success)';
+               }
            } else if (kind === 'oneline') {
                textarea.value = Nexus.UI._toOneLine(code);
                st.innerText = 'Collapsed to one line.'; st.style.color = 'var(--success)';
@@ -6689,19 +6771,47 @@ try {
         // one AND .load() is actually called on it below — so opening a
         // .js file still only pulls lang-javascript over the wire, not all
         // hundred-plus packages language-data merely lists.
-        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData] = await Promise.all([
+        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands] = await Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
             import("@codemirror/view"),
             import("@codemirror/theme-one-dark"),
             import("@codemirror/language"),
             import("@replit/codemirror-indentation-markers"),
-            import("@codemirror/language-data")
+            import("@codemirror/language-data"),
+            import("@codemirror/search"),
+            import("@codemirror/commands")
         ]);
         
         Nexus.editorCore.modules = {
             basicSetup: cm6.basicSetup,
             EditorView: cmView.EditorView,
+            highlightWhitespace: cmView.highlightWhitespace,
+            highlightTrailingWhitespace: cmView.highlightTrailingWhitespace,
+            selectNextOccurrence: cmSearch.selectNextOccurrence,
+            // cursorMatchingBracket is a real, documented @codemirror/
+            // commands export — confirmed directly against that package's
+            // own source (commands.ts): "export const cursorMatchingBracket:
+            // StateCommand = ({state, dispatch}) => toMatchingBracket(state,
+            // dispatch, false)". Standard CM6 command signature: takes the
+            // view (or a {state, dispatch} target), returns a boolean, does
+            // its own dispatch internally — no custom bracket-matching
+            // logic needed here at all.
+            cursorMatchingBracket: cmCommands.cursorMatchingBracket,
+            // Bookmark gutter primitives — same set CodeMirror's own
+            // official "Gutter Example" page uses to build its breakpoint
+            // gutter (a per-line toggleable marker), which is structurally
+            // identical to what a bookmark gutter needs: gutter()/
+            // GutterMarker render the visual marks, StateField holds the
+            // current set of bookmarked positions as a RangeSet, and
+            // StateEffect is how external code (a button, in this app's
+            // case, rather than a gutter click like the official example)
+            // tells that StateField to add or remove one.
+            gutter: cmView.gutter,
+            GutterMarker: cmView.GutterMarker,
+            StateField: cmState.StateField,
+            StateEffect: cmState.StateEffect,
+            RangeSet: cmState.RangeSet,
             EditorState: cmState.EditorState,
             Compartment: cmState.Compartment,
             languages: cmLangData.languages,
@@ -6748,7 +6858,7 @@ try {
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment } = Nexus.editorCore.modules;
+    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment, highlightWhitespace, highlightTrailingWhitespace } = Nexus.editorCore.modules;
     
     // Match the active file against @codemirror/language-data's full
     // registry by filename (not just extension — this also correctly
@@ -6846,12 +6956,112 @@ try {
         // here.
     });
 
+    // Word wrap: same live-toggle-via-Compartment pattern as indent guides
+    // above. EditorView.lineWrapping is a built-in extension shipped
+    // directly in @codemirror/view — confirmed against CodeMirror's own
+    // "Example: Line Wrapping" reference page, no separate package needed.
+    // Off by default (matches a code editor's usual default — most people
+    // editing source want horizontal scroll on long lines, not reflow) but
+    // persisted per Nexus.state.prefs.wordWrap like every other editor
+    // preference in this app.
+    Nexus.editorCore.wordWrapCompartment = new Compartment();
+
+    // Bookmark gutter — structurally the same as CodeMirror's own official
+    // "Gutter Example" breakpoint gutter (confirmed against that page's
+    // real source): a StateEffect signals add/remove, a StateField holds
+    // the current set as a RangeSet<GutterMarker>, and gutter() renders
+    // whatever that RangeSet currently contains. The StateField's own
+    // update() calls set.map(transaction.changes) every transaction, which
+    // is what makes a bookmark stay attached to the SAME line of code as
+    // edits happen above/below it, rather than staying pinned to a raw
+    // character offset that drifts out of sync the moment anything before
+    // it is typed — the exact limitation the old shell-command-only
+    // bookmarks (Nexus.state.bookmarks, a flat name->offset map) had.
+    const bookmarkEffect = StateEffect.define({
+        map: (val, mapping) => ({ pos: mapping.mapPos(val.pos), on: val.on })
+    });
+
+    const bookmarkMarker = new (class extends GutterMarker {
+        toDOM() {
+            const span = document.createElement('span');
+            span.textContent = '🔖';
+            span.style.cssText = 'font-size:12px; cursor:pointer; line-height:1;';
+            return span;
+        }
+    })();
+
+    const bookmarkState = StateField.define({
+        create() { return RangeSet.empty; },
+        update(set, transaction) {
+            set = set.map(transaction.changes);
+            for (const e of transaction.effects) {
+                if (e.is(bookmarkEffect)) {
+                    if (e.value.on) set = set.update({ add: [bookmarkMarker.range(e.value.pos)] });
+                    else set = set.update({ filter: from => from !== e.value.pos });
+                }
+            }
+            return set;
+        }
+    });
+
+    function toggleBookmarkAt(view, pos) {
+        const line = view.state.doc.lineAt(pos);
+        let hasBookmark = false;
+        view.state.field(bookmarkState).between(line.from, line.from, () => { hasBookmark = true; });
+        view.dispatch({
+            effects: bookmarkEffect.of({ pos: line.from, on: !hasBookmark })
+        });
+        // Mirror into Nexus.state.bookmarks (per-file, persisted) so the
+        // list-and-jump panel and cross-session persistence both have a
+        // plain-data source of truth outside CM6's own in-memory state,
+        // which resets on every reload — see _syncBookmarksFromCM6 below.
+        Nexus.UI._syncBookmarksFromCM6(view);
+    }
+
+    const bookmarkGutter = [
+        bookmarkState,
+        gutter({
+            class: 'cm-bookmark-gutter',
+            markers: v => v.state.field(bookmarkState),
+            initialSpacer: () => bookmarkMarker,
+            domEventHandlers: {
+                mousedown(view, line) {
+                    toggleBookmarkAt(view, line.from);
+                    return true;
+                }
+            }
+        })
+    ];
+
+    // Whitespace visualization: same live-toggle-via-Compartment pattern
+    // again. highlightWhitespace() renders spaces/tabs as visible dots/
+    // arrows (confirmed against @codemirror/view's real source and
+    // CodeMirror's own changelog — "makes spaces and tabs in the editor
+    // visible"); highlightTrailingWhitespace() specifically flags trailing
+    // whitespace, which is the more actionable case in practice (leading/
+    // mid-line whitespace is usually intentional indentation, trailing
+    // whitespace is usually an accident). Both are bundled under one
+    // toggle rather than two separate buttons — this app's own project
+    // notes mention a prior real bug caused by exactly this class of
+    // invisible-whitespace issue (the camelCase rename's string-
+    // concatenation blind spot), so "show me all whitespace at once" is
+    // the more useful default than making it a two-step decision.
+    Nexus.editorCore.whitespaceCompartment = new Compartment();
+    const whitespaceExtension = [highlightWhitespace(), highlightTrailingWhitespace()];
+
+    Nexus.editorCore.bookmarkEffect = bookmarkEffect;
+    Nexus.editorCore.bookmarkState = bookmarkState;
+    Nexus.editorCore.toggleBookmarkAt = toggleBookmarkAt;
+
     Nexus.editorCore.currentExtensions = [
        basicSetup, 
        langExtension, 
        bracketMatching(), // JS {}/[]/() AND HTML <tag></tag> — same extension, same mechanism (see comment in Nexus.editorCore.modules above)
        indentGuideTheme, // always present — just defines CSS variables, harmless when the marker extension itself is toggled off via the compartment below
        Nexus.editorCore.indentGuideCompartment.of(Nexus.state.prefs.indentGuides ? indentGuideExtension : []),
+       Nexus.editorCore.wordWrapCompartment.of(Nexus.state.prefs.wordWrap ? EditorView.lineWrapping : []),
+       Nexus.editorCore.whitespaceCompartment.of(Nexus.state.prefs.showWhitespace ? whitespaceExtension : []),
+       bookmarkGutter,
        ...(wantsDark ? [oneDark] : []),
        fixedHeight,
        EditorView.updateListener.of((update) => {
@@ -6886,6 +7096,16 @@ try {
         }),
         parent: actualCmContainer
     });
+
+    // Restore bookmarks for whichever file is active on this very first
+    // CM6 boot — switchFile() handles this for every SUBSEQUENT file
+    // change, but the initial EditorView construction here doesn't go
+    // through that path at all, so without this the first file opened in
+    // a session would show no bookmark markers until you switched away
+    // and back.
+    if (Nexus.state.activeFile && typeof Nexus.UI._restoreBookmarksToCM6 === 'function') {
+        Nexus.UI._restoreBookmarksToCM6(Nexus.editorCore.view, Nexus.state.activeFile);
+    }
 
     // Scroll-past-end: lets the editor scroll ~15 lines past the last line
     // of code, so the last few lines aren't stuck pinned at the very bottom
@@ -8342,6 +8562,13 @@ settings: {
         const saved = await localforage.getItem('nexus_prefs_v42'); 
         if (saved) Nexus.state.prefs = saved; 
 
+        // Restore bookmarks — separate storage key from prefs, following
+        // the same "own dedicated key" pattern already used for vault/
+        // snapshots elsewhere in this file, since bookmarks are user
+        // content tied to specific files rather than an app preference.
+        const savedBookmarks = await localforage.getItem('nexus_bookmarks_v1');
+        if (savedBookmarks) Nexus.state.bookmarks = savedBookmarks;
+
         // Restore widget visibility (utility bar, D-pad, etc.) from the
         // preference toggleWidget() now actually saves it under. Merge onto
         // the existing defaults rather than replacing outright, so a widget
@@ -8449,6 +8676,12 @@ settings: {
         if(document.getElementById('prefGhToken')) document.getElementById('prefGhToken').value = Nexus.state.prefs.ghToken || "";
         const indentBtn = document.getElementById('indentGuidesBtn');
         if (indentBtn) indentBtn.classList.toggle('btn-accent', Nexus.state.prefs.indentGuides !== false);
+        const wordWrapBtn = document.getElementById('wordWrapBtn');
+        if (wordWrapBtn) wordWrapBtn.classList.toggle('btn-accent', !!Nexus.state.prefs.wordWrap);
+        const rawTerminalEl = document.getElementById('rawTerminal');
+        if (rawTerminalEl) rawTerminalEl.classList.toggle('word-wrap-on', !!Nexus.state.prefs.wordWrap);
+        const showWhitespaceBtn = document.getElementById('showWhitespaceBtn');
+        if (showWhitespaceBtn) showWhitespaceBtn.classList.toggle('btn-accent', !!Nexus.state.prefs.showWhitespace);
 
         // Sync local widget engine configs 
         Nexus.widgetConfig.keyboard.visibleRows = Nexus.state.prefs.kbRows || 1;
@@ -8755,6 +8988,15 @@ kb: {
                ed.scrollTop = (linesBefore - 1) * 22 - (ed.clientHeight / 2);
            }
        },
+       // CORRECTED: previously ignored Nexus.state.searchOpts.regex entirely
+       // — always escaped special characters regardless of the .* toggle
+       // button's state, so turning regex mode on never actually changed
+       // what replace() did (only findNext()/buildRegex() respected it).
+       // Now builds the same regex buildRegex() uses elsewhere, anchored to
+       // the current selection specifically (^...$ against just the
+       // selected text) so this remains "replace what's selected," not
+       // "replace the first match anywhere" — same intent as the original,
+       // just with regex mode and capture groups actually working.
        replace() {
    const ed = document.getElementById('rawTerminal');
    const find = document.getElementById('findInput').value;
@@ -8765,19 +9007,87 @@ kb: {
    const selStart = ed.selectionStart;
    const selEnd = ed.selectionEnd;
    const currentSelection = ed.value.substring(selStart, selEnd);
-   
-   let searchStr = find.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+   let searchStr = find;
+   if (!Nexus.state.searchOpts.regex) {
+       searchStr = searchStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+   }
    const flags = Nexus.state.searchOpts.case ? '' : 'i';
-   const matcher = new RegExp('^' + searchStr + '$', flags);
+   let matcher;
+   try {
+       matcher = new RegExp('^(?:' + searchStr + ')$', flags);
+   } catch (e) {
+       alert('Invalid regex: ' + e.message);
+       return;
+   }
 
    if (currentSelection && matcher.test(currentSelection)) {
-       ed.value = ed.value.substring(0, selStart) + rep + ed.value.substring(selEnd);
-       ed.setSelectionRange(selStart, selStart + rep.length);
+       // String.replace natively substitutes $1, $2, etc. from capture
+       // groups in `rep` when the pattern argument is a RegExp — exactly
+       // the behavior needed for "wrap every match in parens" or
+       // "swap two captured halves" style regex replacements. In
+       // non-regex mode this still works safely: a literal replacement
+       // string with no $-groups just passes through unchanged, and any
+       // literal $ the user typed is preserved as-is since there's
+       // nothing for it to reference.
+       const newSelectionText = currentSelection.replace(matcher, rep);
+       ed.value = ed.value.substring(0, selStart) + newSelectionText + ed.value.substring(selEnd);
+       ed.setSelectionRange(selStart, selStart + newSelectionText.length);
        Nexus.state.Vfs[Nexus.state.activeFile] = ed.value;
        Nexus.Vfs.save();
        Nexus.UI.updateGutter();
    }
    this.findNext(1);
+   },
+
+   // Replace every match in the whole file in one pass, rather than the
+   // find-select-replace-repeat cycle replace() is built for. Uses
+   // buildRegex() directly (already global + correctly escaped/not based
+   // on regex mode) so this stays in sync with whatever findNext() would
+   // actually match, rather than re-deriving the pattern separately and
+   // risking the two drifting apart.
+   replaceAll() {
+       const ed = document.getElementById('rawTerminal');
+       const rep = document.getElementById('replaceInput').value;
+       if (ed.hasAttribute('readonly')) return alert('UNLOCK EDITOR FIRST');
+
+       const regex = this.buildRegex();
+       if (!regex) return alert('Type something to find first.');
+
+       const original = ed.value;
+       let count = 0;
+       const updated = original.replace(regex, (...args) => {
+           count++;
+           // Callback signature is (fullMatch, group1, group2, ..., offset,
+           // string) — so args[0] is the WHOLE match and capture group N
+           // lives at args[N], not args[N-1]. Confirmed by direct testing:
+           // the first version of this line used args[Number(n) - 1],
+           // which put $1 at args[0] (the full match, wrong) and $2 at
+           // args[1] (actually group 1, also wrong) — every capture group
+           // reference was off by one, silently producing scrambled output
+           // (e.g. "foo_bar" -> "$2_$1" landed on "foo_foo_bar" instead of
+           // the correct "bar_foo").
+           return rep.replace(/\$(\d+)/g, (m, n) => args[Number(n)] ?? m).replace(/\$&/g, args[0]);
+       });
+       // The manual $-substitution above (rather than just returning `rep`
+       // directly) exists because the callback form of String.replace does
+       // NOT auto-expand $1/$2 the way the pattern-argument form does —
+       // that native expansion only happens when the second argument is a
+       // literal string, not a function. Using a callback here (needed to
+       // count matches) means the $-group expansion has to be done by hand.
+
+       if (count === 0) {
+           alert('No matches found.');
+           return;
+       }
+
+       ed.value = updated;
+       Nexus.state.Vfs[Nexus.state.activeFile] = updated;
+       Nexus.Vfs.save();
+       Nexus.UI.updateGutter();
+
+       const st = document.getElementById('footStatus');
+       if (st) { st.innerText = `REPLACED ${count} MATCH${count === 1 ? '' : 'ES'}`; setTimeout(() => Nexus.UI.syncStatus(), 2500); }
    }
 },
 
@@ -9759,6 +10069,11 @@ insertUUID() {
            { group: 'Editing', key: 'map', label: 'Save Structure Map' },
            { group: 'Fix & Format', key: 'oneLine', label: 'Format to One Line (function/class/const)' },
            { group: 'Fix & Format', key: 'editChunk', label: 'Edit Chunk (open function/class/const in mini-editor)' },
+           { group: 'Selection & Lines', key: 'selectNext', label: 'Select Next Occurrence (multi-cursor)' },
+           { group: 'Selection & Lines', key: 'selectAllMatches', label: 'Select All Occurrences (multi-cursor)' },
+           { group: 'Selection & Lines', key: 'jumpBracket', label: 'Jump to Matching Bracket' },
+           { group: 'Selection & Lines', key: 'bookmarkHere', label: 'Toggle Bookmark on Current Line' },
+           { group: 'Selection & Lines', key: 'bookmarksList', label: 'View All Bookmarks' },
            { group: 'Fix & Format', key: 'expandLine', label: 'Expand/Restore from One Line' },
            { group: 'Selection & Lines', key: 'selectall', label: 'Select All' },
            { group: 'Selection & Lines', key: 'duplicate', label: 'Duplicate Line' },
@@ -9913,6 +10228,11 @@ insertUUID() {
                'map': `<button class="sleek-btn" onclick="Nexus.UI.saveMap()" title="Save visible structure as map.filename.txt"><span style="font-size:18px;">🗺</span><span class="util-lbl">Map</span></button>`,
                'oneLine': `<button class="sleek-btn" onclick="Nexus.UI.collapseSelectionToOneLine()" title="Format function/class/const under cursor to one line"><span style="font-size:16px;">⟷</span><span class="util-lbl">To 1-Line</span></button>`,
                'editChunk': `<button class="sleek-btn" onclick="Nexus.chunkEditor.openForCursor()" title="Open the function/class/const under the cursor in a focused mini-editor"><span style="font-size:16px;">🔎</span><span class="util-lbl">Edit Chunk</span></button>`,
+               'selectNext': `<button class="sleek-btn" onclick="Nexus.UI.selectNextOccurrence()" title="Add the next occurrence of the current selection as another cursor"><span style="font-size:16px;">⊕</span><span class="util-lbl">+1 Match</span></button>`,
+               'selectAllMatches': `<button class="sleek-btn" onclick="Nexus.UI.selectAllOccurrences()" title="Select every occurrence of the current selection at once"><span style="font-size:16px;">⊛</span><span class="util-lbl">All Matches</span></button>`,
+               'jumpBracket': `<button class="sleek-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to the bracket matching the one next to the cursor"><span style="font-size:16px;">↔{}</span><span class="util-lbl">Match Bracket</span></button>`,
+               'bookmarkHere': `<button class="sleek-btn" onclick="Nexus.UI.toggleBookmarkHere()" title="Toggle a bookmark on the current line"><span style="font-size:16px;">🔖</span><span class="util-lbl">Bookmark</span></button>`,
+               'bookmarksList': `<button class="sleek-btn" onclick="Nexus.UI.openBookmarksPanel()" title="View and jump to all bookmarks"><span style="font-size:16px;">📑</span><span class="util-lbl">Bookmarks</span></button>`,
                'expandLine': `<button class="sleek-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat function/class/const under cursor"><span style="font-size:16px;">⟵⟶</span><span class="util-lbl">Expand</span></button>`,
            'readonly': `<button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only" aria-label="Toggle read-only mode">${Nexus.ICONS.readonly}️</button>`,
            // FIX: this used to be a crude document.execCommand('delete') —
@@ -10475,7 +10795,12 @@ runDiff(target) {
                        selection: { anchor: target.declFrom }
                    });
                } catch (e2) {
-                   alert("Couldn't reformat this fragment automatically:\n" + e.message);
+                   // Was referencing e (the OUTER prettier failure) instead
+                   // of e2 (this inner js_beautify failure) — meant the
+                   // alert always described why Prettier failed even when
+                   // Prettier succeeded at wrapping and the actual failure
+                   // was js_beautify itself (e.g. not loaded yet).
+                   alert("Couldn't reformat this fragment automatically:\n" + e2.message);
                }
            }
        },
@@ -11191,6 +11516,273 @@ initInfiniteRibbon() {
            const btn = document.getElementById('indentGuidesBtn');
            if (btn) btn.classList.toggle('btn-accent', Nexus.state.prefs.indentGuides);
        },
+
+       // Word wrap toggle — mirrors toggleIndentGuides' exact structure:
+       // flip the pref, persist it, live-update CM6 via its Compartment if
+       // already booted, and fall back to a CSS class for the vanilla
+       // textarea engine (which has no Compartment concept at all, since
+       // it's not CM6).
+       toggleWordWrap() {
+           Nexus.state.prefs.wordWrap = !Nexus.state.prefs.wordWrap;
+           Nexus.settings.update('wordWrap', Nexus.state.prefs.wordWrap);
+
+           if (Nexus.editorCore.isCM6 && Nexus.editorCore.view && Nexus.editorCore.wordWrapCompartment && Nexus.editorCore.modules && Nexus.editorCore.modules.EditorView) {
+               const { EditorView } = Nexus.editorCore.modules;
+               const newExtension = Nexus.state.prefs.wordWrap ? EditorView.lineWrapping : [];
+               Nexus.editorCore.view.dispatch({
+                   effects: Nexus.editorCore.wordWrapCompartment.reconfigure(newExtension)
+               });
+           }
+
+           const ed = document.getElementById('rawTerminal');
+           if (ed) ed.classList.toggle('word-wrap-on', Nexus.state.prefs.wordWrap);
+
+           const btn2 = document.getElementById('wordWrapBtn');
+           if (btn2) btn2.classList.toggle('btn-accent', Nexus.state.prefs.wordWrap);
+       },
+
+       // Whitespace visualization — CM6-only, unlike word wrap/indent
+       // guides which both have a (lesser) vanilla-textarea fallback. A
+       // plain <textarea> has no mechanism to style individual characters
+       // differently from their neighbors — CM6's decoration system is
+       // what makes rendering a space as a visible dot possible at all, so
+       // there's no honest equivalent to fall back to here. Rather than
+       // silently doing nothing on the vanilla engine (confusing — "I
+       // toggled it, why didn't anything change?"), this says so directly.
+       toggleShowWhitespace() {
+           if (!Nexus.editorCore.isCM6) {
+               return alert("Whitespace visualization requires the CM6 Engine — switch engines first (🔄 in the top bar).");
+           }
+
+           Nexus.state.prefs.showWhitespace = !Nexus.state.prefs.showWhitespace;
+           Nexus.settings.update('showWhitespace', Nexus.state.prefs.showWhitespace);
+
+           if (Nexus.editorCore.view && Nexus.editorCore.whitespaceCompartment && Nexus.editorCore.modules && Nexus.editorCore.modules.highlightWhitespace) {
+               const { highlightWhitespace, highlightTrailingWhitespace } = Nexus.editorCore.modules;
+               const newExtension = Nexus.state.prefs.showWhitespace
+                   ? [highlightWhitespace(), highlightTrailingWhitespace()]
+                   : [];
+               Nexus.editorCore.view.dispatch({
+                   effects: Nexus.editorCore.whitespaceCompartment.reconfigure(newExtension)
+               });
+           }
+
+           const btn = document.getElementById('showWhitespaceBtn');
+           if (btn) btn.classList.toggle('btn-accent', Nexus.state.prefs.showWhitespace);
+       },
+
+       // Multi-cursor: selects the next occurrence of the current
+       // selection (or the word under the cursor if nothing's selected —
+       // selectNextOccurrence's own documented behavior) and ADDS it as a
+       // second simultaneous selection range rather than replacing the
+       // current one. Repeated calls keep adding more. This is CM6-only —
+       // there's no vanilla-textarea equivalent at all, since a plain
+       // <textarea> fundamentally supports exactly one selection range;
+       // multiple simultaneous cursors require CM6's EditorSelection
+       // system and drawSelection (already included via basicSetup) to
+       // even render as more than one visible highlighted region.
+       selectNextOccurrence() {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("Multi-cursor selection requires the CM6 Engine — switch engines first (🔄 in the top bar).");
+           }
+           const { selectNextOccurrence } = Nexus.editorCore.modules;
+           if (typeof selectNextOccurrence !== 'function') {
+               return alert("Multi-cursor selection isn't available (module failed to load).");
+           }
+           const applied = selectNextOccurrence(Nexus.editorCore.view);
+           if (!applied) {
+               const st = document.getElementById('footStatus');
+               if (st) { st.innerText = "NO MORE MATCHES"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
+           }
+       },
+
+       // Select EVERY occurrence at once, rather than one more per tap —
+       // the more useful default on a phone screen where repeatedly
+       // finding and tapping a small toolbar button is more friction than
+       // on desktop with a keyboard shortcut. Implemented by calling
+       // selectNextOccurrence() in a loop until the selection's range
+       // count stops growing (meaning it's wrapped around or run out of
+       // matches), rather than reimplementing its matching logic —
+       // reuses CM6's own exact notion of "what counts as an occurrence"
+       // (word-boundary-aware per its changelog) instead of risking a
+       // second, subtly different definition living in this file.
+       selectAllOccurrences() {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("Multi-cursor selection requires the CM6 Engine — switch engines first (🔄 in the top bar).");
+           }
+           const { selectNextOccurrence } = Nexus.editorCore.modules;
+           if (typeof selectNextOccurrence !== 'function') {
+               return alert("Multi-cursor selection isn't available (module failed to load).");
+           }
+           const view = Nexus.editorCore.view;
+
+           if (view.state.selection.main.empty) {
+               return alert("Select a word or phrase first, then use this to select every other occurrence.");
+           }
+
+           let previousCount = view.state.selection.ranges.length;
+           // Hard cap purely as a safety net against an unforeseen infinite
+           // loop (e.g. a future CM6 version changing selectNextOccurrence's
+           // wraparound behavior) — 5,000 simultaneous selection ranges is
+           // already far beyond any realistic use of this feature.
+           for (let i = 0; i < 5000; i++) {
+               const applied = selectNextOccurrence(view);
+               if (!applied) break;
+               const newCount = view.state.selection.ranges.length;
+               if (newCount <= previousCount) break; // wrapped back to the start
+               previousCount = newCount;
+           }
+
+           const st = document.getElementById('footStatus');
+           if (st) { st.innerText = `SELECTED ${previousCount} OCCURRENCE${previousCount === 1 ? '' : 'S'}`; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
+       },
+
+       // Jump to matching bracket: moves the cursor to whichever bracket
+       // pairs with the one immediately next to the cursor. Uses CM6's own
+       // cursorMatchingBracket command directly rather than re-implementing
+       // bracket-pair-finding — that command already knows exactly what
+       // bracketMatching() (already active in this editor) considers a
+       // match, so this stays in sync with however that's configured
+       // rather than risking a second, subtly different definition of
+       // "matching" living in this file.
+       jumpToMatchingBracket() {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("Jump to matching bracket requires the CM6 Engine — switch engines first (🔄 in the top bar).");
+           }
+           const { cursorMatchingBracket } = Nexus.editorCore.modules;
+           if (typeof cursorMatchingBracket !== 'function') {
+               return alert("Bracket jump isn't available (module failed to load).");
+           }
+           const applied = cursorMatchingBracket(Nexus.editorCore.view);
+           if (!applied) {
+               const st = document.getElementById('footStatus');
+               if (st) { st.innerText = "NO BRACKET HERE"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
+           }
+           Nexus.editorCore.view.focus();
+       },
+
+       // Toggles a bookmark on the line the cursor is currently on —
+       // the toolbar-button equivalent of clicking the gutter directly,
+       // for when tapping a specific gutter pixel on a small screen is
+       // more fiddly than just having the cursor already where you want
+       // the bookmark.
+       toggleBookmarkHere() {
+           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
+               return alert("Bookmarks require the CM6 Engine — switch engines first (🔄 in the top bar).");
+           }
+           const view = Nexus.editorCore.view;
+           const pos = view.state.selection.main.head;
+           Nexus.editorCore.toggleBookmarkAt(view, pos);
+       },
+
+       // Reads the CM6 bookmark StateField's current RangeSet and mirrors
+       // it into Nexus.state.bookmarks[activeFile] as plain {line, label}
+       // data, then persists it. This is the bridge between CM6's live,
+       // in-memory, position-based bookmark state (which resets on every
+       // page reload) and this app's actual durable storage — called after
+       // every toggle so the two never drift out of sync.
+       _syncBookmarksFromCM6(view) {
+           if (!Nexus.state.activeFile) return;
+           const { bookmarkState } = Nexus.editorCore;
+           if (!bookmarkState) return;
+
+           const existing = Nexus.state.bookmarks[Nexus.state.activeFile] || [];
+           const labelByLine = new Map(existing.map(b => [b.line, b.label]));
+
+           const lines = [];
+           view.state.field(bookmarkState).between(0, view.state.doc.length, (from) => {
+               const lineNum = view.state.doc.lineAt(from).number;
+               lines.push({ line: lineNum, label: labelByLine.get(lineNum) || '' });
+           });
+           lines.sort((a, b) => a.line - b.line);
+
+           Nexus.state.bookmarks[Nexus.state.activeFile] = lines;
+           localforage.setItem('nexus_bookmarks_v1', Nexus.state.bookmarks);
+
+           if (document.getElementById('modalBookmarks')?.classList.contains('active')) {
+               Nexus.UI.renderBookmarksList();
+           }
+       },
+
+       // Applies whatever bookmarks are saved for the file CM6 just opened
+       // — called from the file-switch path (see Vfs.switchFile) since
+       // the gutter's StateField starts empty on every fresh EditorView
+       // and has no way to know about bookmarks from a previous session
+       // on its own.
+       _restoreBookmarksToCM6(view, filename) {
+           const { bookmarkEffect } = Nexus.editorCore;
+           if (!bookmarkEffect) return;
+           const saved = Nexus.state.bookmarks[filename] || [];
+           if (saved.length === 0) return;
+
+           const effects = [];
+           for (const b of saved) {
+               if (b.line >= 1 && b.line <= view.state.doc.lines) {
+                   const line = view.state.doc.line(b.line);
+                   effects.push(bookmarkEffect.of({ pos: line.from, on: true }));
+               }
+           }
+           if (effects.length) view.dispatch({ effects });
+       },
+
+       openBookmarksPanel() {
+           Nexus.UI.renderBookmarksList();
+           Nexus.UI.openModal('bookmarks');
+       },
+
+       renderBookmarksList() {
+           const container = document.getElementById('bookmarksList');
+           if (!container) return;
+
+           const allEntries = [];
+           for (const [filename, marks] of Object.entries(Nexus.state.bookmarks)) {
+               for (const b of marks) allEntries.push({ filename, ...b });
+           }
+
+           if (allEntries.length === 0) {
+               container.innerHTML = '<div style="padding:20px; text-align:center; opacity:0.6; font-size:12px;">No bookmarks yet. Place your cursor on a line and use "Bookmark Here," or tap the 🔖 gutter next to any line.</div>';
+               return;
+           }
+
+           container.innerHTML = allEntries.map((b, i) => `
+               <div style="display:flex; align-items:center; gap:8px; background:var(--surface); padding:10px 12px; margin-bottom:6px; border-radius:8px; border-left:3px solid var(--gold);">
+                   <span onclick="Nexus.UI.jumpToBookmark('${b.filename.replace(/'/g, "\\'")}', ${b.line})" style="flex:1; cursor:pointer; font-family:monospace; font-size:12px;">
+                       <span style="color:var(--gold); font-weight:800;">${b.filename}</span>
+                       <span style="opacity:0.6;"> : line ${b.line}</span>
+                       ${b.label ? `<div style="opacity:0.8; font-size:11px; margin-top:2px;">${b.label}</div>` : ''}
+                   </span>
+                   <button class="dock-btn special" style="height:24px; font-size:10px; padding:0 8px; border-radius:4px;" onclick="Nexus.UI.removeBookmark('${b.filename.replace(/'/g, "\\'")}', ${b.line})">REMOVE</button>
+               </div>
+           `).join('');
+       },
+
+       jumpToBookmark(filename, line) {
+           if (filename !== Nexus.state.activeFile) {
+               Nexus.Vfs.switchFile(filename);
+           }
+           document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+           Nexus.UI.jumpToLine(line);
+       },
+
+       removeBookmark(filename, line) {
+           const marks = Nexus.state.bookmarks[filename];
+           if (!marks) return;
+           Nexus.state.bookmarks[filename] = marks.filter(b => b.line !== line);
+           localforage.setItem('nexus_bookmarks_v1', Nexus.state.bookmarks);
+
+           // If this is the currently open file in CM6, also remove the
+           // live gutter marker so the two stay in sync immediately rather
+           // than only after the next toggle/reload.
+           if (filename === Nexus.state.activeFile && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+               const view = Nexus.editorCore.view;
+               if (line >= 1 && line <= view.state.doc.lines) {
+                   const lineObj = view.state.doc.line(line);
+                   view.dispatch({ effects: Nexus.editorCore.bookmarkEffect.of({ pos: lineObj.from, on: false }) });
+               }
+           }
+           Nexus.UI.renderBookmarksList();
+       },
+
   syncStatus() {
        const ed = document.getElementById('rawTerminal');
        const st = document.getElementById('footStatus');
