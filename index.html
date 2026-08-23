@@ -6858,7 +6858,7 @@ try {
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment, highlightWhitespace, highlightTrailingWhitespace } = Nexus.editorCore.modules;
+    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment, highlightWhitespace, highlightTrailingWhitespace, StateEffect, StateField, RangeSet, gutter, GutterMarker } = Nexus.editorCore.modules;
     
     // Match the active file against @codemirror/language-data's full
     // registry by filename (not just extension — this also correctly
