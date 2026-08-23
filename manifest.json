@@ -53,7 +53,11 @@
         "application/typescript": [".ts", ".tsx"],
         "text/x-python": [".py"],
         "application/xml": [".xml"],
-        "image/svg+xml": [".svg"]
+        "image/svg+xml": [".svg"],
+        "application/toml": [".toml"],
+        "application/yaml": [".yaml", ".yml"],
+        "application/x-sh": [".sh", ".bash"],
+        "application/sql": [".sql"]
       },
       "icons": [
         {

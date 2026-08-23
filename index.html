@@ -6296,7 +6296,17 @@ try {
     if (!Nexus.editorCore.isLoaded) {
         // FIX 1: Stripped version numbers. 
         // ESM.sh will now resolve a perfectly matched, conflict-free dependency tree.
-        const [cm6, cmState, cmView, cmJS, cmTheme, cmLang, cmHTML, cmIndentMarkers] = await Promise.all([
+        // Language coverage: .ts/.tsx/.mjs reuse @codemirror/lang-javascript
+        // (javascript({typescript, jsx}) covers all three — no separate
+        // package exists or is needed). .toml and .sh/.bash have no
+        // dedicated @codemirror/lang-* package; both are only available via
+        // @codemirror/legacy-modes' ported CodeMirror 5 stream-parsers,
+        // used through StreamLanguage.define() rather than a LanguageSupport
+        // factory function like the others. .json and .css were added
+        // alongside the explicitly requested set since they're common
+        // first-class web file types that were previously falling back to
+        // plain JS highlighting.
+        const [cm6, cmState, cmView, cmJS, cmTheme, cmLang, cmHTML, cmIndentMarkers, cmMarkdown, cmYaml, cmSQL, cmXML, cmJSON, cmCSS, cmLegacy] = await Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
             import("@codemirror/view"),
@@ -6304,7 +6314,16 @@ try {
             import("@codemirror/theme-one-dark"),
             import("@codemirror/language"),
             import("@codemirror/lang-html"),
-            import("@replit/codemirror-indentation-markers")
+            import("@replit/codemirror-indentation-markers"),
+            import("@codemirror/lang-markdown"),
+            import("@codemirror/lang-yaml"),
+            import("@codemirror/lang-sql"),
+            import("@codemirror/lang-xml"),
+            import("@codemirror/lang-json"),
+            import("@codemirror/lang-css"),
+            import("@codemirror/legacy-modes/mode/shell").then(shellMod =>
+                import("@codemirror/legacy-modes/mode/toml").then(tomlMod => ({ shell: shellMod.shell, toml: tomlMod.toml }))
+            )
         ]);
         
         Nexus.editorCore.modules = {
@@ -6314,6 +6333,15 @@ try {
             Compartment: cmState.Compartment,
             javascript: cmJS.javascript,
             html: cmHTML.html,
+            markdown: cmMarkdown.markdown,
+            yaml: cmYaml.yaml,
+            sql: cmSQL.sql,
+            xml: cmXML.xml,
+            json: cmJSON.json,
+            css: cmCSS.css,
+            StreamLanguage: cmLang.StreamLanguage,
+            shellMode: cmLegacy.shell,
+            tomlMode: cmLegacy.toml,
             oneDark: cmTheme.oneDark,
             foldAll: cmLang.foldAll,       
             unfoldAll: cmLang.unfoldAll,
@@ -6355,11 +6383,40 @@ try {
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, javascript, html, oneDark, bracketMatching, indentationMarkers, Compartment } = Nexus.editorCore.modules;
+    const { EditorState, EditorView, basicSetup, javascript, html, markdown, yaml, sql, xml, json, css, StreamLanguage, shellMode, tomlMode, oneDark, bracketMatching, indentationMarkers, Compartment } = Nexus.editorCore.modules;
     
-    // Choose language extension based on active file type
+    // Choose language extension based on active file type. .ts/.tsx/.mjs
+    // all route through the same javascript() factory — @codemirror/lang-
+    // javascript's typescript/jsx config flags are how CM6 represents all
+    // four JS-family variants, there's no separate package per extension.
+    // .toml and .sh/.bash have no LanguageSupport package at all (no
+    // syntax highlighting via a Lezer grammar) — they're only available as
+    // legacy CodeMirror-5-style stream parsers, wired in through
+    // StreamLanguage.define() instead of being called directly like the
+    // others.
     const activeExt = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
-    const langExtension = activeExt === 'html' ? html() : javascript();
+    const LANG_MAP = {
+        html: () => html(),
+        htm: () => html(),
+        svg: () => xml(),
+        xml: () => xml(),
+        md: () => markdown(),
+        markdown: () => markdown(),
+        yaml: () => yaml(),
+        yml: () => yaml(),
+        sql: () => sql(),
+        json: () => json(),
+        css: () => css(),
+        ts: () => javascript({ typescript: true }),
+        tsx: () => javascript({ typescript: true, jsx: true }),
+        jsx: () => javascript({ jsx: true }),
+        mjs: () => javascript(),
+        js: () => javascript(),
+        sh: () => StreamLanguage.define(shellMode),
+        bash: () => StreamLanguage.define(shellMode),
+        toml: () => StreamLanguage.define(tomlMode)
+    };
+    const langExtension = (LANG_MAP[activeExt] || LANG_MAP.js)();
     
     // CRITICAL FIX: Hide the parent wrapper element containing the vanilla editor assets
     if (actualRawTerminal && actualRawTerminal.parentElement) {
@@ -9956,15 +10013,74 @@ runDiff(target) {
        _generateMap(content, fileName) {
            const ext = fileName.split('.').pop().toLowerCase();
            let map = `# Map of ${fileName}\n\n`;
-           if (ext === 'js') map += this._mapJS(content);
-           else if (ext === 'html') map += this._mapHTML(content);
+           // ts/tsx/mjs/jsx share JS's actual syntax shape (classes,
+           // functions, arrows, consts) closely enough that the existing
+           // brace/depth-tracking JS mapper applies directly — TypeScript's
+           // extra type annotations don't change where a function or class
+           // starts, which is all the mapper looks for.
+           if (['js', 'mjs', 'ts', 'tsx', 'jsx'].includes(ext)) map += this._mapJS(content);
+           else if (ext === 'html' || ext === 'htm') map += this._mapHTML(content);
+           // SVG is XML, and its meaningful structure (groups, paths,
+           // symbols with ids/classes) is exactly the tag/id/class
+           // hierarchy _mapHTML already extracts — no separate mapper
+           // needed for what is structurally the same problem.
+           else if (ext === 'svg' || ext === 'xml') map += this._mapHTML(content);
            else if (ext === 'css') map += this._mapCSS(content);
+           else if (ext === 'yaml' || ext === 'yml') map += this._mapYAML(content);
+           else if (ext === 'md' || ext === 'markdown') map += this._mapMarkdown(content);
            else {
                map += content.split('\n').map((line, i) => {
                    if (line.trim()) return `${i + 1}: ${line.substring(0, 80)}`;
                }).filter(Boolean).join('\n');
            }
            return map;
+       },
+
+       // YAML's structure is entirely indentation-driven rather than
+       // brace-driven, so it needs its own outline logic rather than
+       // reusing the JS mapper's brace-depth tracking. Maps top-level and
+       // nested keys, using each line's actual leading-whitespace column
+       // as the nesting signal (YAML has no other way to express nesting).
+       _mapYAML(content) {
+           const lines = content.split('\n');
+           const entries = [];
+           const stack = []; // {indentCol}
+           for (let i = 0; i < lines.length; i++) {
+               const line = lines[i];
+               if (!line.trim() || line.trim().startsWith('#')) continue;
+               const match = line.match(/^(\s*)(-\s+)?([\w.-]+)\s*:/);
+               if (!match) continue;
+               const indentCol = match[1].length + (match[2] ? match[2].length : 0);
+               const key = match[3];
+               while (stack.length && stack[stack.length - 1].indentCol >= indentCol) stack.pop();
+               entries.push({ line: i + 1, indent: stack.length, label: key + ':' });
+               stack.push({ indentCol });
+           }
+           if (entries.length === 0) return '(no mappable structure)\n';
+           return entries.map(e => `${'  '.repeat(e.indent)}[${e.line}] ${e.label}`).join('\n') + '\n';
+       },
+
+       // Markdown's outline is its heading hierarchy (# down to ######) —
+       // the direct equivalent of a table of contents, which is exactly
+       // what the map/cheat-sheet feature is for on this file type.
+       _mapMarkdown(content) {
+           const lines = content.split('\n');
+           const entries = [];
+           let inCodeFence = false;
+           for (let i = 0; i < lines.length; i++) {
+               const trimmed = lines[i].trim();
+               // Don't pick up lines that merely look like headings (a
+               // shell comment, a Python type hint) if they appear inside
+               // a fenced code block quoted in the markdown itself.
+               if (trimmed.startsWith('```')) { inCodeFence = !inCodeFence; continue; }
+               if (inCodeFence) continue;
+               const match = trimmed.match(/^(#{1,6})\s+(.+)$/);
+               if (match) {
+                   entries.push({ line: i + 1, indent: match[1].length - 1, label: match[2].trim() });
+               }
+           }
+           if (entries.length === 0) return '(no mappable structure)\n';
+           return entries.map(e => `${'  '.repeat(e.indent)}[${e.line}] ${'#'.repeat(e.indent + 1)} ${e.label}`).join('\n') + '\n';
        },
 
        // Rebuilt from scratch — the original version was line-by-line regex
