@@ -6322,6 +6322,8 @@ try {
             unfoldEffect: cmLang.unfoldEffect,
             foldedRanges: cmLang.foldedRanges,
             syntaxTree: cmLang.syntaxTree,
+            foldNodeProp: cmLang.foldNodeProp,
+            foldInside: cmLang.foldInside,
             // Bracket & tag tracing: same extension covers both. For JS it
             // matches {}/[]/(); for HTML, lang-html's bracketMatchingHandle
             // routes tag-name text through this exact matcher, so <div>/</div>
@@ -9597,48 +9599,65 @@ runDiff(target) {
    // themselves. Depth here means "how many fold-brackets would you have
    // to cross to unfold your way out to this range", which is what -1
    // Fold / +1 Unfold actually need to reason about.
+   // CORRECTED from an earlier version that called foldable(view.state,
+   // node.from, node.to) — that is a documented misuse of the API.
+   // foldable() is a *line-lookup* helper: you give it a line's start/end
+   // and it searches the tree for whichever foldable region starts on
+   // that line. It is not a way to ask "what is this specific node's fold
+   // range" — passing a syntax node's own (often huge, multi-hundred-line)
+   // from/to as if it were a single line's start/end causes it to return
+   // null almost every time, which is exactly why -1 Fold/+1 Unfold always
+   // degraded to all-or-nothing. (Confirmed directly against
+   // @codemirror/language's source — see syntaxFolding() — and against
+   // CodeMirror's own maintainer: "You pass it the start/end of a line...
+   // If you know which range you want to fold, you should not be calling
+   // foldable, and definitely not with the extent of a syntax node.")
+   //
+   // The correct mechanism, used here: each node TYPE that supports
+   // folding has a fold function registered on it via foldNodeProp (this
+   // is exactly how foldInside works — see the language package source).
+   // Calling node.type.prop(foldNodeProp) retrieves that function; calling
+   // it with the node itself gives that specific node's own fold range,
+   // with no line-based guessing involved.
    _getFoldableRangesWithDepth(view) {
-       const { foldable, syntaxTree } = Nexus.editorCore.modules;
+       const { syntaxTree, foldNodeProp } = Nexus.editorCore.modules;
        const tree = syntaxTree(view.state);
        const ranges = [];
-       const stack = [];
-       // Some Lezer grammars report the identical foldable from/to for
-       // several nested ancestor nodes at once — e.g. a Statement and the
-       // Block it directly wraps both resolve to the same fold point. Each
-       // of those nodes still fires its own enter()/leave() pair, so
-       // without this counter the SAME key gets pushed onto `stack`
-       // multiple times for what is really one visual foldable region,
-       // inflating the depth of everything nested inside it. refCounts
-       // tracks how many enter() calls are "inside" each key so the stack
-       // only gains one real frame per unique key, while leave() still
-       // balances exactly against however many enters matched it.
-       const refCounts = new Map();
+       const seen = new Set();
 
        tree.iterate({
-           enter(node) {
-               const range = foldable(view.state, node.from, node.to);
-               if (range && range.from < range.to) {
-                   const key = range.from + ':' + range.to;
-                   const count = refCounts.get(key) || 0;
-                   if (count === 0) {
-                       ranges.push({ key, from: range.from, to: range.to, depth: stack.length });
-                       stack.push(key);
+           enter(nodeRef) {
+               const propFn = nodeRef.type.prop(foldNodeProp);
+               if (!propFn) return;
+               // node.node materializes the full SyntaxNode (with .parent
+               // walkable) from the lighter-weight NodeRef iterate() gives —
+               // needed for the depth walk below.
+               const node = nodeRef.node;
+               const range = propFn(node, view.state);
+               if (!range || range.from >= range.to) return;
+
+               const key = range.from + ':' + range.to;
+               if (seen.has(key)) return;
+               seen.add(key);
+
+               // Depth = how many ANCESTOR nodes (walking up via .parent)
+               // also have a foldable range of their own. This counts real
+               // nesting of fold points, not raw AST depth — a node buried
+               // under several non-foldable wrapper nodes (e.g. a bare
+               // ExpressionStatement) still correctly reads as depth 0 if
+               // nothing foldable actually encloses it.
+               let depth = 0;
+               let parent = node.parent;
+               while (parent) {
+                   const parentPropFn = parent.type.prop(foldNodeProp);
+                   if (parentPropFn) {
+                       const parentRange = parentPropFn(parent, view.state);
+                       if (parentRange && parentRange.from < parentRange.to) depth++;
                    }
-                   refCounts.set(key, count + 1);
+                   parent = parent.parent;
                }
-           },
-           leave(node) {
-               const range = foldable(view.state, node.from, node.to);
-               if (range && range.from < range.to) {
-                   const key = range.from + ':' + range.to;
-                   const count = refCounts.get(key) || 0;
-                   if (count <= 1) {
-                       if (stack[stack.length - 1] === key) stack.pop();
-                       refCounts.delete(key);
-                   } else {
-                       refCounts.set(key, count - 1);
-                   }
-               }
+
+               ranges.push({ key, from: range.from, to: range.to, depth });
            }
        });
 
@@ -9739,7 +9758,7 @@ runDiff(target) {
        // an if-statement body one level down) rather than the whole
        // function/class the user actually means by "this function."
        _getEnclosingDeclaration(view) {
-           const { syntaxTree, foldable } = Nexus.editorCore.modules;
+           const { syntaxTree } = Nexus.editorCore.modules;
            const pos = view.state.selection.main.head;
            const tree = syntaxTree(view.state);
            let node = tree.resolveInner(pos, 1);
@@ -9752,12 +9771,18 @@ runDiff(target) {
            // far more than the user actually meant to target.
            const DECL_PATTERN = /Function|Class|Method|Property|VariableDeclaration|Object|Array|Arrow/i;
 
+           // CORRECTED: previously called foldable(view.state, node.from,
+           // node.to) here, which is a documented misuse (foldable() is a
+           // line-lookup helper, not a way to validate/retrieve a specific
+           // node's own range — see the long comment on
+           // _getFoldableRangesWithDepth above for the full explanation).
+           // That call was also simply unnecessary: this function only
+           // ever needed the matched node's own from/to for the text
+           // collapse/expand logic below, which node.from/node.to already
+           // provide directly with no extra lookup required.
            while (node) {
-               if (DECL_PATTERN.test(node.type.name)) {
-                   const range = foldable(view.state, node.from, node.to);
-                   if (range && range.to > range.from) {
-                       return { declFrom: node.from, declTo: node.to, foldFrom: range.from, foldTo: range.to, nodeName: node.type.name };
-                   }
+               if (DECL_PATTERN.test(node.type.name) && node.to > node.from) {
+                   return { declFrom: node.from, declTo: node.to, nodeName: node.type.name };
                }
                node = node.parent;
            }
