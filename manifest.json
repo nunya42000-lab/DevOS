@@ -6,11 +6,18 @@
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": ["window-controls-overlay", "standalone"],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
   "orientation": "any",
   "background_color": "#0d1117",
   "theme_color": "#0d1117",
-  "categories": ["developer", "productivity", "utilities"],
+  "categories": [
+    "developer",
+    "productivity",
+    "utilities"
+  ],
   "launch_handler": {
     "client_mode": "focus-existing"
   },
@@ -44,20 +51,241 @@
     {
       "action": "./",
       "accept": {
-        "text/html": [".html", ".htm"],
-        "text/javascript": [".js", ".mjs", ".jsx"],
-        "text/css": [".css"],
-        "application/json": [".json"],
-        "text/markdown": [".md"],
-        "text/plain": [".txt"],
-        "application/typescript": [".ts", ".tsx"],
-        "text/x-python": [".py"],
-        "application/xml": [".xml"],
-        "image/svg+xml": [".svg"],
-        "application/toml": [".toml"],
-        "application/yaml": [".yaml", ".yml"],
-        "application/x-sh": [".sh", ".bash"],
-        "application/sql": [".sql"]
+        "text/x-csrc": [
+          ".c",
+          ".h"
+        ],
+        "text/x-c++src": [
+          ".cpp",
+          ".cc",
+          ".cxx",
+          ".hpp",
+          ".hh",
+          ".hxx"
+        ],
+        "text/css": [
+          ".css"
+        ],
+        "text/x-go": [
+          ".go"
+        ],
+        "text/html": [
+          ".html",
+          ".htm"
+        ],
+        "text/x-java-source": [
+          ".java"
+        ],
+        "text/javascript": [
+          ".js",
+          ".mjs",
+          ".cjs"
+        ],
+        "application/json": [
+          ".json",
+          ".map"
+        ],
+        "text/jsx": [
+          ".jsx"
+        ],
+        "text/x-less": [
+          ".less"
+        ],
+        "text/markdown": [
+          ".md",
+          ".markdown",
+          ".mkd"
+        ],
+        "application/x-httpd-php": [
+          ".php",
+          ".phtml"
+        ],
+        "text/x-python": [
+          ".py",
+          ".pyw",
+          ".pyx"
+        ],
+        "text/x-rustsrc": [
+          ".rs"
+        ],
+        "text/x-sass": [
+          ".sass"
+        ],
+        "text/x-scss": [
+          ".scss"
+        ],
+        "application/sql": [
+          ".sql"
+        ],
+        "text/tsx": [
+          ".tsx"
+        ],
+        "application/typescript": [
+          ".ts",
+          ".mts",
+          ".cts"
+        ],
+        "application/wasm": [
+          ".wat",
+          ".wast"
+        ],
+        "application/xml": [
+          ".xml",
+          ".xsl",
+          ".xsd"
+        ],
+        "image/svg+xml": [
+          ".svg"
+        ],
+        "application/yaml": [
+          ".yaml",
+          ".yml"
+        ],
+        "text/x-csharp": [
+          ".cs"
+        ],
+        "text/x-clojure": [
+          ".clj",
+          ".cljc",
+          ".cljx",
+          ".cljs",
+          ".edn"
+        ],
+        "text/x-cmake": [
+          ".cmake"
+        ],
+        "text/x-coffeescript": [
+          ".coffee"
+        ],
+        "text/x-dart": [
+          ".dart"
+        ],
+        "text/x-diff": [
+          ".diff",
+          ".patch"
+        ],
+        "text/x-erlang": [
+          ".erl"
+        ],
+        "text/x-fortran": [
+          ".f",
+          ".for",
+          ".f77",
+          ".f90",
+          ".f95"
+        ],
+        "text/x-fsharp": [
+          ".fs"
+        ],
+        "text/x-gherkin": [
+          ".feature"
+        ],
+        "text/x-groovy": [
+          ".groovy",
+          ".gradle"
+        ],
+        "text/x-haskell": [
+          ".hs"
+        ],
+        "text/x-ini": [
+          ".ini",
+          ".properties"
+        ],
+        "text/x-julia": [
+          ".jl"
+        ],
+        "text/x-kotlin": [
+          ".kt",
+          ".kts"
+        ],
+        "text/x-lisp": [
+          ".lisp",
+          ".cl",
+          ".el"
+        ],
+        "text/x-lua": [
+          ".lua"
+        ],
+        "text/x-objectivec": [
+          ".m",
+          ".mm"
+        ],
+        "text/x-ocaml": [
+          ".ml",
+          ".mli"
+        ],
+        "text/x-pascal": [
+          ".p",
+          ".pas"
+        ],
+        "text/x-perl": [
+          ".pl",
+          ".pm"
+        ],
+        "text/x-powershell": [
+          ".ps1",
+          ".psd1",
+          ".psm1"
+        ],
+        "text/x-protobuf": [
+          ".proto"
+        ],
+        "text/x-puppet": [
+          ".pp"
+        ],
+        "text/x-r": [
+          ".r"
+        ],
+        "text/x-ruby": [
+          ".rb"
+        ],
+        "text/x-scala": [
+          ".scala"
+        ],
+        "application/x-sh": [
+          ".sh",
+          ".bash",
+          ".ksh"
+        ],
+        "text/x-smalltalk": [
+          ".st"
+        ],
+        "application/toml": [
+          ".toml"
+        ],
+        "text/x-swift": [
+          ".swift"
+        ],
+        "text/x-tcl": [
+          ".tcl"
+        ],
+        "text/x-tex": [
+          ".tex",
+          ".ltx"
+        ],
+        "text/x-vb": [
+          ".vb"
+        ],
+        "text/vbscript": [
+          ".vbs"
+        ],
+        "text/x-verilog": [
+          ".v",
+          ".sv",
+          ".svh"
+        ],
+        "text/x-vhdl": [
+          ".vhd",
+          ".vhdl"
+        ],
+        "text/plain": [
+          ".txt",
+          ".text",
+          ".log",
+          ".cfg",
+          ".conf",
+          ".env"
+        ]
       },
       "icons": [
         {

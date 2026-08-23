@@ -415,6 +415,61 @@
         padding: 12px;
         box-shadow: 0 4px 10px rgba(0,0,0,0.2);
     }
+
+    /* Collapsible diagnostic panel sections — same visual language as
+       .slab, but using native <details>/<summary> so expand/collapse
+       needs zero JS and works well with touch. Replaces the old flat
+       stack of 9 always-open .slab blocks, which meant scrolling past
+       everything every time regardless of what you actually needed. */
+    .diag-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        overflow: hidden;
+    }
+    .diag-section > summary {
+        padding: 12px 14px;
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--gold);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        user-select: none;
+    }
+    .diag-section > summary::-webkit-details-marker { display: none; }
+    .diag-section > summary::after {
+        content: '▸';
+        font-size: 12px;
+        opacity: 0.6;
+        transition: transform 0.15s ease;
+    }
+    .diag-section[open] > summary::after { transform: rotate(90deg); }
+    .diag-section > summary .diag-badge {
+        margin-left: auto;
+        margin-right: 8px;
+        background: var(--danger);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 900;
+        padding: 1px 6px;
+        border-radius: 10px;
+        display: none;
+    }
+    .diag-section > summary .diag-badge.show { display: inline-block; }
+    .diag-section > .diag-body {
+        padding: 0 12px 12px;
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+    }
+    /* Hidden by Nexus.UI.filterDiagPanel() when a tool's relevant-file-type
+       list doesn't include the currently open file's extension. */
+    .diag-lang-hidden { display: none !important; }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .mini-console {
         background: #000;
@@ -1521,173 +1576,199 @@
         <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.toggleSidebar('right')">&times;</button>
     </div>
 
-    <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 15px;">
+    <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
 
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Diagnostics</div>
-            <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">One tap checks lint, structure, syntax, CSS, orphaned IDs, and brackets together.</div>
+        <details class="diag-section" open id="diagSecCore">
+            <summary>Diagnostics<span class="diag-badge" id="diagBadgeCore">0</span></summary>
+            <div class="diag-body">
+                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">One tap checks lint, structure, syntax, CSS, orphaned IDs, and brackets together.</div>
 
-            <button class="tool-btn btn-danger" style="width:100%; padding:14px; font-weight:800; margin-bottom:8px;" onclick="Nexus.auditor.runFullSweep()">🔍 RUN FULL DIAGNOSTIC SWEEP</button>
+                <button class="tool-btn btn-danger" style="width:100%; padding:14px; font-weight:800; margin-bottom:8px;" onclick="Nexus.auditor.runFullSweep()">🔍 RUN FULL DIAGNOSTIC SWEEP</button>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom: 10px;">
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runLintCard()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: #d2a8ff; font-weight: 700;">LINT ➔</span>
-                    <span id="auditCountLint" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom: 10px;">
+                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runLintCard()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #d2a8ff; font-weight: 700;">LINT ➔</span>
+                        <span id="auditCountLint" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                    </div>
+                    <div class="slab" data-langs="html,htm" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runHtmlAudit()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #ff7b72; font-weight: 700;">HTML ➔</span>
+                        <span id="auditCountHtml" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                    </div>
+                    <div class="slab" data-langs="js,mjs,ts,tsx,jsx" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runJsAudit()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #79c0ff; font-weight: 700;">JS ➔</span>
+                        <span id="auditCountJs" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                    </div>
+                    <div class="slab" data-langs="css,scss,less" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runCssAudit()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--warn); font-weight: 700;">CSS ➔</span>
+                        <span id="auditCountCss" style="font-size: 16px; font-weight: 900; color: var(--warn);">0</span>
+                    </div>
+                    <div class="slab" data-langs="html,htm" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runOrphanAudit()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--warn); font-weight: 700;">ORPHANS ➔</span>
+                        <span id="auditCountOrphans" style="font-size: 16px; font-weight: 900; color: var(--warn);">0</span>
+                    </div>
+                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runBracketsCard()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #ffa198; font-weight: 700;">BRACKETS ➔</span>
+                        <span id="auditCountBrackets" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                    </div>
+                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runTodoScan()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">TODOS ➔</span>
+                        <span id="auditCountTodo" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                    </div>
                 </div>
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runHtmlAudit()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: #ff7b72; font-weight: 700;">HTML ➔</span>
-                    <span id="auditCountHtml" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <span style="font-size: 11px; font-weight: 800; color: var(--accent);" id="auditorModeTitle">ACTIVE: FULL SYSTEM IDLE</span>
+                    <div style="display: flex; gap: 6px;">
+                        <button class="dock-btn special" style="height: 24px; font-size: 10px; padding: 0 8px; background: #21262d; border-radius: 4px;" onclick="Nexus.auditor.copyBox('auditorReportBox', 'DIAGNOSTIC REPORT')">COPY</button>
+                        <button class="dock-btn special" style="height: 24px; font-size: 10px; padding: 0 8px; border-radius: 4px;" onclick="Nexus.auditor.clearAuditor()">CLEAR</button>
+                    </div>
                 </div>
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runJsAudit()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: #79c0ff; font-weight: 700;">JS ➔</span>
-                    <span id="auditCountJs" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                </div>
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runCssAudit()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--warn); font-weight: 700;">CSS ➔</span>
-                    <span id="auditCountCss" style="font-size: 16px; font-weight: 900; color: var(--warn);">0</span>
-                </div>
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runOrphanAudit()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--warn); font-weight: 700;">ORPHANS ➔</span>
-                    <span id="auditCountOrphans" style="font-size: 16px; font-weight: 900; color: var(--warn);">0</span>
-                </div>
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runBracketsCard()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: #ffa198; font-weight: 700;">BRACKETS ➔</span>
-                    <span id="auditCountBrackets" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                </div>
-                <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runTodoScan()">
-                    <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">TODOS ➔</span>
-                    <span id="auditCountTodo" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+
+                <div id="auditorReportBox" style="min-height: 120px; max-height: 240px; overflow-y: auto; background: #0f1218; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.5;">
+                    <div style="color: #5c6370;">Run the full sweep, or tap a card above, to see findings here.</div>
                 </div>
             </div>
+        </details>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span style="font-size: 11px; font-weight: 800; color: var(--accent);" id="auditorModeTitle">ACTIVE: FULL SYSTEM IDLE</span>
-                <div style="display: flex; gap: 6px;">
-                    <button class="dock-btn special" style="height: 24px; font-size: 10px; padding: 0 8px; background: #21262d; border-radius: 4px;" onclick="Nexus.auditor.copyBox('auditorReportBox', 'DIAGNOSTIC REPORT')">COPY</button>
-                    <button class="dock-btn special" style="height: 24px; font-size: 10px; padding: 0 8px; border-radius: 4px;" onclick="Nexus.auditor.clearAuditor()">CLEAR</button>
+        <details class="diag-section" id="diagSecPower">
+            <summary>Power Tools</summary>
+            <div class="diag-body">
+                <div style="font-size:9px; opacity:0.6; margin-bottom:8px;">Auto-fixers and single-purpose checks, for when you want just one thing.</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                     <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm" onclick="Nexus.Sentinel.runMedicString()">MEDIC: STR PATCH</button>
+                     <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Sentinel.runMedicAST()">MEDIC: AST BUILD</button>
+                     <button class="tool-btn btn-accent" style="grid-column: span 2;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Sentinel.scanDeps()">SCAN IMPORTS (LOG VIEW)</button>
                 </div>
-            </div>
-
-            <div id="auditorReportBox" style="min-height: 120px; max-height: 240px; overflow-y: auto; background: #0f1218; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.5;">
-                <div style="color: #5c6370;">Run the full sweep, or tap a card above, to see findings here.</div>
-            </div>
-
-            <div style="height:1px; background:var(--border); margin:14px 0;"></div>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <div class="section-label" style="margin: 0;">Power Tools</div>
-                <div style="display: flex; gap: 6px;">
+                <div id="diagOut" class="mini-console" style="margin-top:10px; height: 100px; overflow-y: auto;">[System Standby]</div>
+                <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
                     <button class="dock-btn special" style="height: 22px; font-size: 10px; padding: 0 8px; background: #21262d; border-radius: 4px;" onclick="Nexus.auditor.copyBox('diagOut', 'DIAGNOSTICS LOGS')">COPY</button>
                     <button class="dock-btn special" style="height: 22px; font-size: 10px; padding: 0 8px; border-radius: 4px;" onclick="Nexus.auditor.clearBox('diagOut', '[System Standby]')">CLEAR</button>
                 </div>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:10px;" data-langs="js,mjs,ts,tsx,jsx,html,htm" onclick="Nexus.dreamer.startNightCycle()" title="Stress-tests every if-branch in your JS for exceptions" aria-label="Run night cycle stress test">🌙 RUN NIGHT CYCLE (STRESS TEST)</button>
             </div>
-            <div style="font-size:9px; opacity:0.6; margin-bottom:8px;">Auto-fixers and single-purpose checks, for when you want just one thing.</div>
+        </details>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; padding: 0 5px;">
-                 <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicString()">MEDIC: STR PATCH</button>
-                 <button class="tool-btn btn-gold" onclick="Nexus.Sentinel.runMedicAST()">MEDIC: AST BUILD</button>
-                 <button class="tool-btn btn-accent" style="grid-column: span 2;" onclick="Nexus.Sentinel.scanDeps()">SCAN IMPORTS (LOG VIEW)</button>
+        <details class="diag-section" id="diagSecUnderstand">
+            <summary>Understand Your Code</summary>
+            <div class="diag-body">
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
+                    <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
+                </div>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ PROJECT RADAR</button>
+                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.docStats.show()" title="Line, word, character, and byte counts" aria-label="Show document statistics">📊 DOCUMENT STATS</button>
             </div>
-            <div id="diagOut" class="mini-console" style="margin-top:10px; height: 100px; overflow-y: auto;">[System Standby]</div>
+        </details>
 
-            <button class="tool-btn btn-accent" style="width:100%; margin-top:10px;" onclick="Nexus.dreamer.startNightCycle()" title="Stress-tests every if-branch in your JS for exceptions" aria-label="Run night cycle stress test">🌙 RUN NIGHT CYCLE (STRESS TEST)</button>
-        </div>
+        <details class="diag-section" id="diagSecProject">
+            <summary>Project Tools</summary>
+            <div class="diag-body">
+                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Compare, merge, and reshape files within the project.</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                    <button class="tool-btn btn-gold" onclick="Nexus.UI.openModal('diff')">👯 COMPARE</button>
+                    <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
+                    <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
+                    <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">🔗 COMBINE</button>
+                    <button class="tool-btn btn-gold" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
+                    <button class="tool-btn btn-accent" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
+                </div>
+            </div>
+        </details>
 
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Understand Your Code</div>
-            <div class="grid-2">
-                <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
-                <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
+        <details class="diag-section" id="diagSecFormat">
+            <summary>Fix &amp; Format</summary>
+            <div class="diag-body">
+                <div class="grid-2">
+                    <button class="tool-btn btn-accent" data-langs="js,mjs,ts,tsx,jsx,html,htm,css,scss,less,json" onclick="Nexus.UI.runPrettier()">✨ PRETTIER</button>
+                    <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm,css,scss,less" onclick="Nexus.UI.runJSBeautify()">🧼 BEAUTIFY</button>
+                </div>
+                <div class="grid-2" style="margin-top:8px;">
+                    <button class="tool-btn" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.defrag.runJS()">🧹 DEFRAG JS</button>
+                    <button class="tool-btn" data-langs="html,htm" onclick="Nexus.defrag.sequenceHTML()">🧹 DEFRAG HTML</button>
+                </div>
+                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.pasteGuard.cleanActiveFile()" title="Fix smart quotes and dashes from mobile autocorrect" aria-label="Clean smart characters">📱 CLEAN SMART CHARACTERS</button>
+                <div class="grid-2" style="margin-top:8px;">
+                    <button class="tool-btn" onclick="Nexus.Sentinel.stripComments()" title="Remove all comments (.js/.css/.html)" aria-label="Strip comments">💬 STRIP COMMENTS</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.sortLines()" title="Sort selected lines A-Z, or the whole file if nothing's selected" aria-label="Sort lines alphabetically">🔤 SORT LINES</button>
+                </div>
+                <button class="tool-btn" style="width:100%; margin-top:8px;" data-langs="json" onclick="Nexus.Sentinel.formatJSON()" title="Validate and pretty-print JSON" aria-label="Format JSON">{ } FORMAT JSON</button>
+                <div class="grid-2" style="margin-top:8px;">
+                    <button class="tool-btn" data-langs="yaml,yml" onclick="Nexus.Sentinel.validateYAML()" title="Check for tabs and unclosed quotes" aria-label="Validate YAML">✓ VALIDATE YAML</button>
+                    <button class="tool-btn" data-langs="sql" onclick="Nexus.Sentinel.formatSQL()" title="Add line breaks before SQL clauses" aria-label="Format SQL">🗃️ FORMAT SQL</button>
+                </div>
+                <div style="font-size:9px; opacity:0.6; margin:8px 0 4px;">Change case (selection, or whole file if nothing's selected):</div>
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
+                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('upper')">UPPER</button>
+                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('lower')">lower</button>
+                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('title')">Title</button>
+                </div>
+                <div class="grid-2" style="margin-top:8px;">
+                    <button class="tool-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove every blank/whitespace-only line" aria-label="Remove blank lines">🧽 REMOVE BLANK LINES</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.alignLeft()" title="Strip all leading whitespace, flush every line to column 0" aria-label="Align everything to the left">⬅️ ALIGN LEFT</button>
+                </div>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.Sentinel.reindentByDepth()" title="1 tab per nesting level — matches whatever the editor's own folding considers nested" aria-label="Re-indent by nesting depth">📐 RE-INDENT BY DEPTH</button>
             </div>
-            <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ PROJECT RADAR</button>
-            <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.docStats.show()" title="Line, word, character, and byte counts" aria-label="Show document statistics">📊 DOCUMENT STATS</button>
-        </div>
+        </details>
 
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Project Tools</div>
-            <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">Compare, merge, and reshape files within the project.</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                <button class="tool-btn btn-gold" onclick="Nexus.UI.openModal('diff')">👯 COMPARE</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">🔗 COMBINE</button>
-                <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
-                <button class="tool-btn btn-accent" style="justify-content:center;" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
+        <details class="diag-section" id="diagSecLearn">
+            <summary>Learn</summary>
+            <div class="diag-body">
+                <div class="grid-2">
+                    <button class="tool-btn btn-gold" onclick="Nexus.tutor.openGlossary()" title="Look up common terms" aria-label="Open glossary">📖 GLOSSARY</button>
+                    <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm" onclick="Nexus.stepViz.start()" title="Watch your code run one line at a time" aria-label="Start step through">👣 STEP THROUGH</button>
+                </div>
+                <div style="font-size:9px; opacity:0.6; margin-top:6px; line-height:1.4;">Lint results have a "?" for a plain-English explanation. Step Through works on JS files, or HTML files with a &lt;script&gt; block.</div>
             </div>
-        </div>
+        </details>
 
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Fix &amp; Format</div>
-            <div class="grid-2">
-                <button class="tool-btn btn-accent" onclick="Nexus.UI.runPrettier()">✨ PRETTIER</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.UI.runJSBeautify()">🧼 BEAUTIFY</button>
+        <details class="diag-section" id="diagSecVault">
+            <summary>Snippets &amp; Vault</summary>
+            <div class="diag-body">
+                <div class="grid-2">
+                    <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('vault')">💾 VAULT</button>
+                    <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('dreamer')" title="Insert pre-built UI component boilerplate" aria-label="Open boilerplate template picker">🧩 TEMPLATES</button>
+                </div>
             </div>
-            <div class="grid-2" style="margin-top:8px;">
-                <button class="tool-btn" onclick="Nexus.defrag.runJS()">🧹 DEFRAG JS</button>
-                <button class="tool-btn" onclick="Nexus.defrag.sequenceHTML()">🧹 DEFRAG HTML</button>
-            </div>
-            <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.pasteGuard.cleanActiveFile()" title="Fix smart quotes and dashes from mobile autocorrect" aria-label="Clean smart characters">📱 CLEAN SMART CHARACTERS</button>
-            <div class="grid-2" style="margin-top:8px;">
-                <button class="tool-btn" onclick="Nexus.Sentinel.stripComments()" title="Remove all comments (.js/.css/.html)" aria-label="Strip comments">💬 STRIP COMMENTS</button>
-                <button class="tool-btn" onclick="Nexus.Sentinel.sortLines()" title="Sort selected lines A-Z, or the whole file if nothing's selected" aria-label="Sort lines alphabetically">🔤 SORT LINES</button>
-            </div>
-            <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.Sentinel.formatJSON()" title="Validate and pretty-print JSON" aria-label="Format JSON">{ } FORMAT JSON</button>
-            <div style="font-size:9px; opacity:0.6; margin:8px 0 4px;">Change case (selection, or whole file if nothing's selected):</div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
-                <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('upper')">UPPER</button>
-                <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('lower')">lower</button>
-                <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('title')">Title</button>
-            </div>
-            <div class="grid-2" style="margin-top:8px;">
-                <button class="tool-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove every blank/whitespace-only line" aria-label="Remove blank lines">🧽 REMOVE BLANK LINES</button>
-                <button class="tool-btn" onclick="Nexus.Sentinel.alignLeft()" title="Strip all leading whitespace, flush every line to column 0" aria-label="Align everything to the left">⬅️ ALIGN LEFT</button>
-            </div>
-            <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.Sentinel.reindentByDepth()" title="1 tab per nesting level — matches whatever the editor's own folding considers nested" aria-label="Re-indent by nesting depth">📐 RE-INDENT BY DEPTH</button>
-        </div>
+        </details>
 
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Learn</div>
-            <div class="grid-2">
-                <button class="tool-btn btn-gold" onclick="Nexus.tutor.openGlossary()" title="Look up common terms" aria-label="Open glossary">📖 GLOSSARY</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.stepViz.start()" title="Watch your code run one line at a time" aria-label="Start step through">👣 STEP THROUGH</button>
+        <details class="diag-section" id="diagSecDevUtils">
+            <summary>Dev Utilities</summary>
+            <div class="diag-body">
+                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Selection, or whole file if nothing's selected:</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Encode()">🔐 BASE64 ENCODE</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Decode()">🔓 BASE64 DECODE</button>
+                </div>
+                <div class="grid-2" style="margin-top:8px;">
+                    <button class="tool-btn" onclick="Nexus.Sentinel.urlEncode()">%20 URL ENCODE</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.urlDecode()">%20 URL DECODE</button>
+                </div>
+                <div class="grid-2" style="margin-top:8px;">
+                    <button class="tool-btn btn-gold" onclick="Nexus.UI.insertUUID()" title="Insert a random UUID at the cursor" aria-label="Insert UUID">🎲 UUID</button>
+                    <button class="tool-btn btn-gold" onclick="Nexus.UI.insertDateTime()" title="Insert current date/time at the cursor" aria-label="Insert date and time">🕐 DATE/TIME</button>
+                </div>
             </div>
-            <div style="font-size:9px; opacity:0.6; margin-top:6px; line-height:1.4;">Lint results have a "?" for a plain-English explanation. Step Through works on JS files, or HTML files with a &lt;script&gt; block.</div>
-        </div>
+        </details>
 
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Snippets &amp; Vault</div>
-            <div class="grid-2">
-                <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('vault')">💾 VAULT</button>
-                <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('dreamer')" title="Insert pre-built UI component boilerplate" aria-label="Open boilerplate template picker">🧩 TEMPLATES</button>
+        <details class="diag-section" id="diagSecBuild">
+            <summary>Build &amp; Export</summary>
+            <div class="diag-body">
+                <div class="grid-2">
+                    <button class="tool-btn btn-danger" onclick="Nexus.UI.openModal('compressor')">🗜️ COMPRESS</button>
+                    <button class="tool-btn btn-gold" data-langs="html,htm" onclick="Nexus.pwa.forge()">🔨 FORGE PWA</button>
+                </div>
             </div>
-        </div>
+        </details>
 
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Dev Utilities</div>
-            <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">Selection, or whole file if nothing's selected:</div>
-            <div class="grid-2">
-                <button class="tool-btn" onclick="Nexus.Sentinel.base64Encode()">🔐 BASE64 ENCODE</button>
-                <button class="tool-btn" onclick="Nexus.Sentinel.base64Decode()">🔓 BASE64 DECODE</button>
-            </div>
-            <div class="grid-2" style="margin-top:8px;">
-                <button class="tool-btn" onclick="Nexus.Sentinel.urlEncode()">%20 URL ENCODE</button>
-                <button class="tool-btn" onclick="Nexus.Sentinel.urlDecode()">%20 URL DECODE</button>
-            </div>
-            <div class="grid-2" style="margin-top:8px;">
-                <button class="tool-btn btn-gold" onclick="Nexus.UI.insertUUID()" title="Insert a random UUID at the cursor" aria-label="Insert UUID">🎲 UUID</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.UI.insertDateTime()" title="Insert current date/time at the cursor" aria-label="Insert date and time">🕐 DATE/TIME</button>
-            </div>
-        </div>
-
-        <div class="slab">
-            <div class="section-label" style="margin-top: 0;">Build &amp; Export</div>
-            <div class="grid-2">
-                <button class="tool-btn btn-danger" onclick="Nexus.UI.openModal('compressor')">🗜️ COMPRESS</button>
-                <button class="tool-btn btn-gold" onclick="Nexus.pwa.forge()">🔨 FORGE PWA</button>
-            </div>
+        <div style="display:flex; align-items:center; gap:8px; padding:2px 4px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:10px; opacity:0.7; cursor:pointer;">
+                <input type="checkbox" id="diagFilterToggle" onchange="Nexus.UI.toggleDiagFilter(this.checked)">
+                Only show tools relevant to the open file
+            </label>
         </div>
     </div>
 </aside>
+
 
 
 
@@ -2861,6 +2942,8 @@ auditor: {
         document.getElementById('auditCountLint').innerText = '0';
         document.getElementById('auditCountBrackets').innerText = '0';
         document.getElementById('auditCountTodo').innerText = '0';
+        const badge = document.getElementById('diagBadgeCore');
+        if (badge) badge.classList.remove('show');
     },
 
     // Universal multi-target clipboard router
@@ -2973,6 +3056,15 @@ auditor: {
 
         // --- Render one consolidated report ---
         const totalIssues = sections.reduce((sum, s) => sum + s.count, 0);
+        // Surface the total on the collapsible section's own <summary> badge
+        // so a collapsed Diagnostics section still shows at a glance
+        // whether anything needs attention, instead of requiring the
+        // section to be expanded just to see if a sweep found problems.
+        const badge = document.getElementById('diagBadgeCore');
+        if (badge) {
+            if (totalIssues > 0) { badge.innerText = totalIssues; badge.classList.add('show'); }
+            else { badge.classList.remove('show'); }
+        }
         let html = `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">`
             + `<span style="font-weight:900; font-size:13px; color:${totalIssues === 0 ? 'var(--success)' : 'var(--danger)'};">${totalIssues === 0 ? '✔ ALL CLEAR' : totalIssues + ' TOTAL ISSUE' + (totalIssues === 1 ? '' : 'S')}</span>`
             + `<span style="font-size:10px; opacity:0.6;">${Nexus.state.activeFile}</span>`
@@ -3922,6 +4014,15 @@ setEmptyState() {
         }
 
         this.renderAccordion();
+
+        // Keep the diagnostics panel's relevant-tools filter in sync if
+        // it's already open when the file changes — otherwise switching
+        // from a .js file to a .css file mid-session would leave stale
+        // JS-only tools visible (or CSS tools hidden) until the panel was
+        // closed and reopened.
+        if (Nexus.UI && typeof Nexus.UI.filterDiagPanel === 'function') {
+            Nexus.UI.filterDiagPanel();
+        }
 
         // Footer Status Sync
         const st = document.getElementById('footStatus');
@@ -5962,6 +6063,89 @@ Sentinel : {
            }
        },
 
+       // YAML validator: deliberately validation-only, not a formatter.
+       // Unlike JSON (parse -> stringify is safe and lossless), YAML's
+       // structure is indentation-significant and has enough syntax
+       // variety (anchors, block scalars, flow style, multi-document
+       // files) that a naive reparse-and-reprint here risks silently
+       // reformatting a person's config file into something subtly
+       // different from what they wrote — a much worse failure mode than
+       // just telling them where a problem is. Checks the things that
+       // reliably break YAML without needing a full parser: tabs (YAML
+       // forbids tab indentation entirely), inconsistent indent step
+       // sizes between sibling keys, and unclosed quotes.
+       validateYAML() {
+           if (!Nexus.state.activeFile) return this.log("[YAML CHECK] No file open — open or create a file first.", "warn");
+           const code = this.getLiveCode();
+           const lines = code.split('\n');
+           const problems = [];
+
+           lines.forEach((line, i) => {
+               if (line.startsWith('\t') || /^\s*\t/.test(line)) {
+                   problems.push(`Line ${i + 1}: tab character used for indentation (YAML requires spaces).`);
+               }
+               const singleQuotes = (line.match(/'/g) || []).length;
+               const doubleQuotes = (line.match(/"/g) || []).length;
+               if (singleQuotes % 2 !== 0 && !line.trim().startsWith('#')) {
+                   problems.push(`Line ${i + 1}: odd number of single quotes — possibly unclosed string.`);
+               }
+               if (doubleQuotes % 2 !== 0 && !line.trim().startsWith('#')) {
+                   problems.push(`Line ${i + 1}: odd number of double quotes — possibly unclosed string.`);
+               }
+           });
+
+           if (problems.length === 0) {
+               this.log("[YAML CHECK] No structural issues found (tabs, unclosed quotes).", "success");
+           } else {
+               this.log(`[YAML CHECK] ${problems.length} issue(s) found:\n` + problems.slice(0, 10).join('\n'), "warn");
+           }
+       },
+
+       // SQL formatter: adds line breaks before major clause keywords and
+       // uppercases them, which is the single highest-value readability
+       // fix for SQL pasted/written as one dense line — without attempting
+       // full dialect-aware parsing (MySQL/Postgres/SQLite/MSSQL all have
+       // enough syntax differences that a "real" formatter is its own
+       // sizable project). Deliberately conservative: does not touch
+       // anything inside string literals.
+       formatSQL() {
+           if (!Nexus.state.activeFile) return this.log("[FORMAT SQL] No file open — open or create a file first.", "warn");
+           if (this.isLocked()) return this.log("[FORMAT SQL] EDITOR LOCKED. Cannot modify.", "danger");
+           const code = this.getLiveCode();
+           const CLAUSES = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'JOIN', 'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN', 'UNION', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM', 'AND', 'OR'];
+
+           try {
+               // Protect string literals from keyword-casing/line-breaking
+               // by swapping them for placeholders, formatting, then
+               // restoring — the same guard technique used elsewhere in
+               // this file for comment-safe transforms.
+               const strings = [];
+               let protectedCode = code.replace(/'[^']*'|"[^"]*"/g, (m) => {
+                   strings.push(m);
+                   return `\u0000${strings.length - 1}\u0000`;
+               });
+
+               CLAUSES.forEach(clause => {
+                   const re = new RegExp(`\\b${clause.replace(' ', '\\s+')}\\b`, 'gi');
+                   protectedCode = protectedCode.replace(re, `\n${clause}`);
+               });
+
+               // Collapse any run of spaces left over from the clause
+               // replacement (e.g. two spaces where a keyword used to sit)
+               // without touching commas — a separate per-column line break
+               // was tried here but fought with clause breaking on SELECT
+               // lists, producing worse output than just leaving columns
+               // comma-separated on one line under their clause.
+               protectedCode = protectedCode.replace(/ {2,}/g, ' ').replace(/^\n+/, '').trim();
+
+               const restored = protectedCode.replace(/\u0000(\d+)\u0000/g, (_, idx) => strings[idx]);
+               this.setLiveCode(restored);
+               this.log("[FORMAT SQL] Reformatted with clause line breaks.", "success");
+           } catch (e) {
+               this.log(`[FORMAT SQL] Could not format: ${e.message}`, "danger");
+           }
+       },
+
        // Base64/URL encode-decode, operating on the selection if there is one
        // (whole file otherwise) — same pattern as Change Case / Sort Lines.
        // Base64 uses the Unicode-safe encode/decode pair (the same fix
@@ -6296,34 +6480,38 @@ try {
     if (!Nexus.editorCore.isLoaded) {
         // FIX 1: Stripped version numbers. 
         // ESM.sh will now resolve a perfectly matched, conflict-free dependency tree.
-        // Language coverage: .ts/.tsx/.mjs reuse @codemirror/lang-javascript
-        // (javascript({typescript, jsx}) covers all three — no separate
-        // package exists or is needed). .toml and .sh/.bash have no
-        // dedicated @codemirror/lang-* package; both are only available via
-        // @codemirror/legacy-modes' ported CodeMirror 5 stream-parsers,
-        // used through StreamLanguage.define() rather than a LanguageSupport
-        // factory function like the others. .json and .css were added
-        // alongside the explicitly requested set since they're common
-        // first-class web file types that were previously falling back to
-        // plain JS highlighting.
-        const [cm6, cmState, cmView, cmJS, cmTheme, cmLang, cmHTML, cmIndentMarkers, cmMarkdown, cmYaml, cmSQL, cmXML, cmJSON, cmCSS, cmLegacy] = await Promise.all([
+        //
+        // Language coverage: rather than hand-importing one @codemirror/
+        // lang-* (or @codemirror/legacy-modes/mode/*) package per extension
+        // — which would mean maintaining a manually-curated list forever,
+        // one line per language, and re-doing this exercise every time a
+        // new extension needs support — this loads @codemirror/language-
+        // data once. That package IS exactly this mapping, built and
+        // maintained by the CodeMirror team itself: a table of every
+        // language they publish a package for, each entry declaring its
+        // real extensions/filename patterns and a lazy load() that dynamic-
+        // imports only that one language's actual package. Confirmed
+        // directly against its published source (language-data.ts) — over
+        // 100 languages including every one requested here (toml, yaml,
+        // sh/bash, sql, mjs, tsx, svg, plus C/C++/Python/Rust/Go/PHP/Ruby/
+        // Perl/Lua/Swift/Kotlin/Dockerfile/nginx-conf/PowerShell/.ini/
+        // Markdown/LaTeX/dozens more) and using LanguageDescription's own
+        // matchFilename() as the selection mechanism means any language
+        // CodeMirror adds in the future is picked up automatically on next
+        // deploy, with zero code changes here.
+        //
+        // Nothing in this array is downloaded until matchFilename() picks
+        // one AND .load() is actually called on it below — so opening a
+        // .js file still only pulls lang-javascript over the wire, not all
+        // hundred-plus packages language-data merely lists.
+        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData] = await Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
             import("@codemirror/view"),
-            import("@codemirror/lang-javascript"),
             import("@codemirror/theme-one-dark"),
             import("@codemirror/language"),
-            import("@codemirror/lang-html"),
             import("@replit/codemirror-indentation-markers"),
-            import("@codemirror/lang-markdown"),
-            import("@codemirror/lang-yaml"),
-            import("@codemirror/lang-sql"),
-            import("@codemirror/lang-xml"),
-            import("@codemirror/lang-json"),
-            import("@codemirror/lang-css"),
-            import("@codemirror/legacy-modes/mode/shell").then(shellMod =>
-                import("@codemirror/legacy-modes/mode/toml").then(tomlMod => ({ shell: shellMod.shell, toml: tomlMod.toml }))
-            )
+            import("@codemirror/language-data")
         ]);
         
         Nexus.editorCore.modules = {
@@ -6331,17 +6519,8 @@ try {
             EditorView: cmView.EditorView,
             EditorState: cmState.EditorState,
             Compartment: cmState.Compartment,
-            javascript: cmJS.javascript,
-            html: cmHTML.html,
-            markdown: cmMarkdown.markdown,
-            yaml: cmYaml.yaml,
-            sql: cmSQL.sql,
-            xml: cmXML.xml,
-            json: cmJSON.json,
-            css: cmCSS.css,
-            StreamLanguage: cmLang.StreamLanguage,
-            shellMode: cmLegacy.shell,
-            tomlMode: cmLegacy.toml,
+            languages: cmLangData.languages,
+            LanguageDescription: cmLang.LanguageDescription,
             oneDark: cmTheme.oneDark,
             foldAll: cmLang.foldAll,       
             unfoldAll: cmLang.unfoldAll,
@@ -6352,6 +6531,7 @@ try {
             syntaxTree: cmLang.syntaxTree,
             foldNodeProp: cmLang.foldNodeProp,
             foldInside: cmLang.foldInside,
+            forceParsing: cmLang.forceParsing,
             // Bracket & tag tracing: same extension covers both. For JS it
             // matches {}/[]/(); for HTML, lang-html's bracketMatchingHandle
             // routes tag-name text through this exact matcher, so <div>/</div>
@@ -6383,40 +6563,20 @@ try {
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, javascript, html, markdown, yaml, sql, xml, json, css, StreamLanguage, shellMode, tomlMode, oneDark, bracketMatching, indentationMarkers, Compartment } = Nexus.editorCore.modules;
+    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment } = Nexus.editorCore.modules;
     
-    // Choose language extension based on active file type. .ts/.tsx/.mjs
-    // all route through the same javascript() factory — @codemirror/lang-
-    // javascript's typescript/jsx config flags are how CM6 represents all
-    // four JS-family variants, there's no separate package per extension.
-    // .toml and .sh/.bash have no LanguageSupport package at all (no
-    // syntax highlighting via a Lezer grammar) — they're only available as
-    // legacy CodeMirror-5-style stream parsers, wired in through
-    // StreamLanguage.define() instead of being called directly like the
-    // others.
-    const activeExt = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
-    const LANG_MAP = {
-        html: () => html(),
-        htm: () => html(),
-        svg: () => xml(),
-        xml: () => xml(),
-        md: () => markdown(),
-        markdown: () => markdown(),
-        yaml: () => yaml(),
-        yml: () => yaml(),
-        sql: () => sql(),
-        json: () => json(),
-        css: () => css(),
-        ts: () => javascript({ typescript: true }),
-        tsx: () => javascript({ typescript: true, jsx: true }),
-        jsx: () => javascript({ jsx: true }),
-        mjs: () => javascript(),
-        js: () => javascript(),
-        sh: () => StreamLanguage.define(shellMode),
-        bash: () => StreamLanguage.define(shellMode),
-        toml: () => StreamLanguage.define(tomlMode)
-    };
-    const langExtension = (LANG_MAP[activeExt] || LANG_MAP.js)();
+    // Match the active file against @codemirror/language-data's full
+    // registry by filename (not just extension — this also correctly
+    // handles the filename-pattern entries like Dockerfile, Makefile,
+    // Jenkinsfile, CMakeLists.txt that have no extension at all).
+    // Falls back to plain JavaScript highlighting for anything genuinely
+    // unrecognized (a .txt file, a new extension CodeMirror doesn't cover)
+    // rather than rendering with zero highlighting at all.
+    const activeFilename = Nexus.state.activeFile || 'untitled.js';
+    const matchedLang = LanguageDescription.matchFilename(languages, activeFilename);
+    const langExtension = matchedLang
+        ? await matchedLang.load()
+        : await LanguageDescription.matchFilename(languages, 'fallback.js').load();
     
     // CRITICAL FIX: Hide the parent wrapper element containing the vanilla editor assets
     if (actualRawTerminal && actualRawTerminal.parentElement) {
@@ -9307,6 +9467,8 @@ insertUUID() {
            { group: 'Fix & Format', key: 'stripcomments', label: 'Strip Comments' },
            { group: 'Fix & Format', key: 'sortlines', label: 'Sort Lines' },
            { group: 'Fix & Format', key: 'formatjson', label: 'Format JSON' },
+           { group: 'Fix & Format', key: 'validateyaml', label: 'Validate YAML' },
+           { group: 'Fix & Format', key: 'formatsql', label: 'Format SQL' },
            { group: 'Fix & Format', key: 'upper', label: 'UPPERCASE Selection' },
            { group: 'Fix & Format', key: 'lower', label: 'lowercase Selection' },
            { group: 'Fix & Format', key: 'title', label: 'Title Case Selection' },
@@ -9460,6 +9622,8 @@ insertUUID() {
            'stripcomments': `<button class="sleek-btn" onclick="Nexus.Sentinel.stripComments()" title="Strip Comments" aria-label="Strip comments"><span style="font-size:16px;">💬</span><span class="util-lbl">No Cmt</span></button>`,
            'sortlines': `<button class="sleek-btn" onclick="Nexus.Sentinel.sortLines()" title="Sort Lines A-Z" aria-label="Sort lines alphabetically"><span style="font-size:16px;">🔤</span><span class="util-lbl">Sort</span></button>`,
            'formatjson': `<button class="sleek-btn" onclick="Nexus.Sentinel.formatJSON()" title="Format JSON" aria-label="Format JSON"><span style="font-size:16px; font-weight:900;">{ }</span><span class="util-lbl">JSON</span></button>`,
+           'validateyaml': `<button class="sleek-btn" onclick="Nexus.Sentinel.validateYAML()" title="Check YAML for tabs/unclosed quotes" aria-label="Validate YAML"><span style="font-size:14px; font-weight:900;">✓</span><span class="util-lbl">YAML</span></button>`,
+           'formatsql': `<button class="sleek-btn" onclick="Nexus.Sentinel.formatSQL()" title="Add line breaks before SQL clauses" aria-label="Format SQL"><span style="font-size:14px; font-weight:900;">SQL</span><span class="util-lbl">Format</span></button>`,
            'upper': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('upper')" title="UPPERCASE Selection" aria-label="Convert selection to uppercase"><span style="font-size:14px; font-weight:900;">AB</span><span class="util-lbl">Upper</span></button>`,
            'lower': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('lower')" title="lowercase Selection" aria-label="Convert selection to lowercase"><span style="font-size:14px; font-weight:900;">ab</span><span class="util-lbl">Lower</span></button>`,
            'title': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('title')" title="Title Case Selection" aria-label="Convert selection to title case"><span style="font-size:14px; font-weight:900;">Ab</span><span class="util-lbl">Title</span></button>`,
@@ -9743,11 +9907,29 @@ runDiff(target) {
        // that depth. Repeated presses walk outward one layer at a time —
        // deepest nested blocks fold first, then their parents, etc. —
        // until everything's collapsed, matching foldAll's end state.
+       // CM6 parses lazily — syntaxTree(state) can return a PARTIAL tree if
+       // the background parse worker hasn't finished the whole document yet
+       // (see ParseContext/parseWorker in @codemirror/language's own
+       // source: parsing happens in idle-callback chunks, not all at once
+       // on every keystroke). Computing fold depths against a partial tree
+       // would silently see only whatever's been parsed so far, which
+       // could produce wrong/incomplete depth groupings depending on
+       // timing — forceParsing() makes sure the full document is parsed
+       // before depth calculation runs, so the fold/unfold buttons don't
+       // depend on how much background parsing luck already happened.
+       _ensureFullyParsed(view) {
+           const { forceParsing } = Nexus.editorCore.modules;
+           if (typeof forceParsing === 'function') {
+               forceParsing(view, view.state.doc.length, 500);
+           }
+       },
+
        foldToLayer() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Folding is only supported in the CM6 Engine.");
            }
            const view = Nexus.editorCore.view;
+           this._ensureFullyParsed(view);
            const { foldEffect, foldedRanges } = Nexus.editorCore.modules;
            const folded = foldedRanges(view.state);
 
@@ -9763,10 +9945,23 @@ runDiff(target) {
                .map(r => ({ ...r, folded: isAlreadyFolded(r.from, r.to) }));
 
            const unfoldedRanges = ranges.filter(r => !r.folded);
+
+           // Diagnostic surface: if you're seeing "does everything or
+           // nothing" again after this fix, check the console — this
+           // prints exactly how many foldable ranges were found and at
+           // what depths, which tells us immediately whether the tree
+           // walk is finding real nesting (multiple depth values) or
+           // collapsing everything into depth 0 (which would explain the
+           // symptom precisely).
+           const depthCounts = {};
+           ranges.forEach(r => { depthCounts[r.depth] = (depthCounts[r.depth] || 0) + 1; });
+           console.log('[divIDE fold debug] total foldable ranges:', ranges.length, '| by depth:', depthCounts, '| already folded:', ranges.length - unfoldedRanges.length);
+
            if (unfoldedRanges.length === 0) return; // everything's already fully folded
 
            const deepestUnfoldedDepth = Math.max(...unfoldedRanges.map(r => r.depth));
            const toFold = unfoldedRanges.filter(r => r.depth === deepestUnfoldedDepth);
+           console.log('[divIDE fold debug] folding', toFold.length, 'range(s) at depth', deepestUnfoldedDepth);
 
            view.dispatch({
                effects: toFold.map(r => foldEffect.of({ from: r.from, to: r.to }))
@@ -9783,6 +9978,7 @@ runDiff(target) {
                return alert("Folding is only supported in the CM6 Engine.");
            }
            const view = Nexus.editorCore.view;
+           this._ensureFullyParsed(view);
            const { unfoldEffect, foldedRanges } = Nexus.editorCore.modules;
            const folded = foldedRanges(view.state);
 
@@ -9796,10 +9992,14 @@ runDiff(target) {
 
            const ranges = this._getFoldableRangesWithDepth(view)
                .filter(r => isFolded(r.from, r.to));
+
+           console.log('[divIDE fold debug] currently folded ranges:', ranges.length, '| depths:', ranges.map(r => r.depth));
+
            if (ranges.length === 0) return; // nothing folded to open
 
            const shallowestFoldedDepth = Math.min(...ranges.map(r => r.depth));
            const toUnfold = ranges.filter(r => r.depth === shallowestFoldedDepth);
+           console.log('[divIDE fold debug] unfolding', toUnfold.length, 'range(s) at depth', shallowestFoldedDepth);
 
            view.dispatch({
                effects: toUnfold.map(r => unfoldEffect.of({ from: r.from, to: r.to }))
@@ -10025,15 +10225,128 @@ runDiff(target) {
            // hierarchy _mapHTML already extracts — no separate mapper
            // needed for what is structurally the same problem.
            else if (ext === 'svg' || ext === 'xml') map += this._mapHTML(content);
-           else if (ext === 'css') map += this._mapCSS(content);
+           // Sass/LESS are brace-based like CSS (SCSS/LESS both use { }
+           // nesting); plain Sass's indentation syntax falls through to
+           // the generic line-numbered listing below, since it shares
+           // neither CSS's braces nor Python's simple flat indentation.
+           else if (['css', 'scss', 'less'].includes(ext)) map += this._mapCSS(content);
            else if (ext === 'yaml' || ext === 'yml') map += this._mapYAML(content);
            else if (ext === 'md' || ext === 'markdown') map += this._mapMarkdown(content);
+           // Broad C-family brace languages: their function/class/method
+           // declarations are shaped closely enough alike (return-type-or-
+           // modifier, name, parens, opening brace) that one generic
+           // brace-depth mapper covers all of them reasonably, rather than
+           // needing ~15 near-identical bespoke mappers.
+           else if (['c','h','cpp','cc','cxx','hpp','java','cs','go','rs','kt','kts','swift','php','m','mm','scala','dart','groovy'].includes(ext)) {
+               map += this._mapBraceLanguage(content);
+           }
+           // Python (and Cython) have no braces at all — nesting is purely
+           // indentation, same category of problem as YAML but keyed off
+           // def/class instead of key:.
+           else if (['py','pyw','pyx'].includes(ext)) map += this._mapPython(content);
            else {
                map += content.split('\n').map((line, i) => {
                    if (line.trim()) return `${i + 1}: ${line.substring(0, 80)}`;
                }).filter(Boolean).join('\n');
            }
            return map;
+       },
+
+       // Generic brace-language mapper: covers C/C++/Java/C#/Go/Rust/
+       // Kotlin/Swift/PHP/Scala/Dart/Groovy/Objective-C reasonably well by
+       // looking for "class Name" and "word(...) {" shapes rather than
+       // JS-specific keywords like function/const/=>. Deliberately simpler
+       // than _mapJS — these languages' declaration syntax varies enough
+       // (Go's `func (r *Receiver) Name()`, Rust's `fn name<T>()`, Kotlin's
+       // `fun name()`) that one shared regex set aiming for "good outline,
+       // not perfect per-language parsing" is more honest than pretending
+       // this is as precise as the hand-tuned JS mapper.
+       _mapBraceLanguage(content) {
+           const lines = content.split('\n');
+           const entries = [];
+           const stack = [];
+           let depth = 0;
+           let inBlockComment = false;
+
+           const CLASS_RE = /^(?:public\s+|private\s+|internal\s+|final\s+|abstract\s+|export\s+)*(?:class|struct|interface|enum|trait|impl)\s+(\w+)/;
+           // Go declares structs as "type Name struct {" rather than
+           // "struct Name {" like C/Rust — needs its own pattern since it
+           // doesn't fit the leading-keyword shape CLASS_RE expects.
+           const GO_TYPE_RE = /^type\s+(\w+)\s+(?:struct|interface)\s*\{/;
+           // Go methods declare their name AFTER a receiver in parens:
+           // "func (s *Server) Start()" — a plain "word(...)" match would
+           // catch "Start" only if it skips the receiver group first.
+           const GO_METHOD_RE = /^func\s+(?:\([^)]*\)\s+)?(\w+)\s*\(/;
+           const FUNC_RE = /^(?:[\w<>\[\],\s*&]+\s+)?(?:func\s+|fn\s+|def\s+)?(\w+)\s*(?:<[^>]*>)?\s*\([^;]*\)\s*(?:\{|->.*\{)\s*$/;
+
+           for (let i = 0; i < lines.length; i++) {
+               let trimmed = lines[i].trim();
+               if (inBlockComment) { if (trimmed.includes('*/')) inBlockComment = false; continue; }
+               if (trimmed.startsWith('/*')) { if (!trimmed.includes('*/')) inBlockComment = true; continue; }
+               if (trimmed.startsWith('//')) continue;
+               trimmed = trimmed.replace(/\/\/.*$/, '').trim();
+               if (!trimmed) continue;
+
+               let label = null, isOpener = false;
+               let m;
+               if ((m = trimmed.match(GO_TYPE_RE))) {
+                   label = `struct ${m[1]}`;
+                   isOpener = true;
+               } else if ((m = trimmed.match(GO_METHOD_RE)) && trimmed.includes('{')) {
+                   label = `${m[1]}()`;
+                   isOpener = true;
+               } else if ((m = trimmed.match(CLASS_RE))) {
+                   label = `${trimmed.match(/^(class|struct|interface|enum|trait|impl)/)?.[1] || 'class'} ${m[1]}`;
+                   isOpener = true;
+               } else if ((m = trimmed.match(FUNC_RE)) && !/^(if|for|while|switch|catch|else)$/.test(m[1])) {
+                   label = `${m[1]}()`;
+                   isOpener = trimmed.includes('{');
+               }
+
+               const opens = (trimmed.match(/\{/g) || []).length;
+               const closes = (trimmed.match(/\}/g) || []).length;
+
+               if (label) {
+                   const entry = { line: i + 1, endLine: null, indent: stack.length, label };
+                   entries.push(entry);
+                   if (isOpener) stack.push({ depth: depth + opens, entry });
+               }
+
+               depth += opens;
+               depth -= closes;
+               while (stack.length && depth < stack[stack.length - 1].depth) {
+                   stack.pop().entry.endLine = i + 1;
+               }
+           }
+
+           if (entries.length === 0) return '(no mappable structure)\n';
+           return entries.map(e => {
+               const span = e.endLine && e.endLine > e.line ? `${e.line}-${e.endLine}` : `${e.line}`;
+               return `${'  '.repeat(e.indent)}[${span}] ${e.label}`;
+           }).join('\n') + '\n';
+       },
+
+       // Python has no braces — block structure is indentation only, so
+       // this tracks nesting the same way _mapYAML does (by comparing each
+       // line's actual leading-whitespace column), keyed off def/class
+       // instead of key:.
+       _mapPython(content) {
+           const lines = content.split('\n');
+           const entries = [];
+           const stack = []; // {indentCol}
+           for (let i = 0; i < lines.length; i++) {
+               const line = lines[i];
+               if (!line.trim() || line.trim().startsWith('#')) continue;
+               const indentCol = line.match(/^\s*/)[0].length;
+               const match = line.match(/^\s*(?:async\s+)?(def|class)\s+(\w+)/);
+               if (!match) continue;
+               while (stack.length && stack[stack.length - 1].indentCol >= indentCol) stack.pop();
+               const label = match[1] === 'class' ? `class ${match[2]}` : `${match[2]}()`;
+               entries.push({ line: i + 1, indent: stack.length, label });
+               stack.push({ indentCol });
+           }
+           if (entries.length === 0) return '(no mappable structure)\n';
+           return entries.map(e => `${'  '.repeat(e.indent)}[${e.line}] ${e.label}`).join('\n') + '\n';
        },
 
        // YAML's structure is entirely indentation-driven rather than
@@ -10440,8 +10753,40 @@ initInfiniteRibbon() {
            if (s === 'right') {
                const terminal = document.getElementById('panelTerminal');
                if (terminal && terminal.classList.contains('open')) terminal.classList.remove('open');
+               // Re-apply the relevant-tools filter every time the
+               // diagnostics panel opens, since the active file may have
+               // changed since it was last open — without this, switching
+               // from a .js file to a .css file while the panel was closed
+               // would leave stale JS-only tools visible/hidden wrong.
+               this.filterDiagPanel();
            }
            document.getElementById(id).classList.toggle('open'); 
+       },
+
+       // Hides any [data-langs] tool whose comma-separated extension list
+       // doesn't include the active file's extension — e.g. "FORMAT SQL"
+       // only shows for .sql files, "HTML" audit card only for .html/.htm.
+       // Tools with no data-langs attribute are considered universal and
+       // always shown. Controlled by the "Only show tools relevant to the
+       // open file" checkbox at the bottom of the panel; the checkbox
+       // state persists via Nexus.settings like every other UI preference
+       // in this app, so it doesn't reset every session.
+       toggleDiagFilter(enabled) {
+           Nexus.settings.update('diagFilterEnabled', enabled);
+           this.filterDiagPanel();
+       },
+
+       filterDiagPanel() {
+           const enabled = !!Nexus.state.prefs.diagFilterEnabled;
+           const checkbox = document.getElementById('diagFilterToggle');
+           if (checkbox) checkbox.checked = enabled;
+
+           const ext = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : '';
+           document.querySelectorAll('#panelRight [data-langs]').forEach(el => {
+               if (!enabled) { el.classList.remove('diag-lang-hidden'); return; }
+               const langs = el.dataset.langs.split(',').map(s => s.trim());
+               el.classList.toggle('diag-lang-hidden', !langs.includes(ext));
+           });
        },
 
        toggleSlide(t) { 
