@@ -1704,12 +1704,8 @@
         <details class="diag-section" id="diagSecUnderstand">
             <summary>Understand Your Code</summary>
             <div class="diag-body">
-                <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
-                    <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
-                </div>
-                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ PROJECT RADAR</button>
-                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.docStats.show()" title="Line, word, character, and byte counts" aria-label="Show document statistics">📊 DOCUMENT STATS</button>
+                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Intel, Outline, and Document Stats moved to the Utility Bar — see the ✏️ customize button there.</div>
+                <button class="tool-btn btn-accent" style="width:100%;" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ PROJECT RADAR</button>
             </div>
         </details>
 
@@ -1731,6 +1727,7 @@
         <details class="diag-section" id="diagSecFormat">
             <summary>Fix &amp; Format</summary>
             <div class="diag-body">
+                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Everything else in this category (clean chars, strip comments, sort, format JSON/YAML/SQL, case conversion, blank lines, align, re-indent) moved to the Utility Bar — see the ✏️ customize button there.</div>
                 <div class="grid-2">
                     <button class="tool-btn btn-accent" data-langs="js,mjs,ts,tsx,jsx,html,htm,css,scss,less,json" onclick="Nexus.UI.runPrettier()">✨ PRETTIER</button>
                     <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm,css,scss,less" onclick="Nexus.UI.runJSBeautify()">🧼 BEAUTIFY</button>
@@ -1739,41 +1736,10 @@
                     <button class="tool-btn" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.defrag.runJS()">🧹 DEFRAG JS</button>
                     <button class="tool-btn" data-langs="html,htm" onclick="Nexus.defrag.sequenceHTML()">🧹 DEFRAG HTML</button>
                 </div>
-                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.pasteGuard.cleanActiveFile()" title="Fix smart quotes and dashes from mobile autocorrect" aria-label="Clean smart characters">📱 CLEAN SMART CHARACTERS</button>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn" onclick="Nexus.Sentinel.stripComments()" title="Remove all comments (.js/.css/.html)" aria-label="Strip comments">💬 STRIP COMMENTS</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.sortLines()" title="Sort selected lines A-Z, or the whole file if nothing's selected" aria-label="Sort lines alphabetically">🔤 SORT LINES</button>
-                </div>
-                <button class="tool-btn" style="width:100%; margin-top:8px;" data-langs="json" onclick="Nexus.Sentinel.formatJSON()" title="Validate and pretty-print JSON" aria-label="Format JSON">{ } FORMAT JSON</button>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn" data-langs="yaml,yml" onclick="Nexus.Sentinel.validateYAML()" title="Check for tabs and unclosed quotes" aria-label="Validate YAML">✓ VALIDATE YAML</button>
-                    <button class="tool-btn" data-langs="sql" onclick="Nexus.Sentinel.formatSQL()" title="Add line breaks before SQL clauses" aria-label="Format SQL">🗃️ FORMAT SQL</button>
-                </div>
-                <div style="font-size:9px; opacity:0.6; margin:8px 0 4px;">Change case (selection, or whole file if nothing's selected):</div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('upper')">UPPER</button>
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('lower')">lower</button>
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('title')">Title</button>
-                </div>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove every blank/whitespace-only line" aria-label="Remove blank lines">🧽 REMOVE BLANK LINES</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.alignLeft()" title="Strip all leading whitespace, flush every line to column 0" aria-label="Align everything to the left">⬅️ ALIGN LEFT</button>
-                </div>
-                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.Sentinel.reindentByDepth()" title="1 tab per nesting level — matches whatever the editor's own folding considers nested" aria-label="Re-indent by nesting depth">📐 RE-INDENT BY DEPTH</button>
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecLearn">
-            <summary>Learn</summary>
-            <div class="diag-body">
-                <div class="grid-2">
-                    <button class="tool-btn btn-gold" onclick="Nexus.tutor.openGlossary()" title="Look up common terms" aria-label="Open glossary">📖 GLOSSARY</button>
-                    <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm" onclick="Nexus.stepViz.start()" title="Watch your code run one line at a time" aria-label="Start step through">👣 STEP THROUGH</button>
-                </div>
-                <div style="font-size:9px; opacity:0.6; margin-top:6px; line-height:1.4;">Lint results have a "?" for a plain-English explanation. Step Through works on JS files, or HTML files with a &lt;script&gt; block.</div>
-            </div>
-        </details>
-
+  
         <details class="diag-section" id="diagSecVault">
             <summary>Snippets &amp; Vault</summary>
             <div class="diag-body">
@@ -1784,26 +1750,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecDevUtils">
-            <summary>Dev Utilities</summary>
-            <div class="diag-body">
-                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Selection, or whole file if nothing's selected:</div>
-                <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Encode()">🔐 BASE64 ENCODE</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Decode()">🔓 BASE64 DECODE</button>
-                </div>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn" onclick="Nexus.Sentinel.urlEncode()">%20 URL ENCODE</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.urlDecode()">%20 URL DECODE</button>
-                </div>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn btn-gold" onclick="Nexus.UI.insertUUID()" title="Insert a random UUID at the cursor" aria-label="Insert UUID">🎲 UUID</button>
-                    <button class="tool-btn btn-gold" onclick="Nexus.UI.insertDateTime()" title="Insert current date/time at the cursor" aria-label="Insert date and time">🕐 DATE/TIME</button>
-                </div>
-            </div>
-        </details>
-
-        <details class="diag-section" id="diagSecBuild">
+          <details class="diag-section" id="diagSecBuild">
             <summary>Build &amp; Export</summary>
             <div class="diag-body">
                 <div class="grid-2">
@@ -4097,7 +4044,9 @@ setEmptyState() {
     
     const lockBtns = document.querySelectorAll('.edit-btn-trigger');
     lockBtns.forEach(btn => {
-        btn.innerHTML = "🔒 READ ONLY"; 
+        btn.innerHTML = "🔒"; 
+        btn.title = "Read Only — tap to unlock";
+        btn.setAttribute('aria-label', 'Editor is read-only, tap to change');
         btn.className = "tool-btn edit-btn-trigger btn-edit-lock";
     });
 
@@ -6058,9 +6007,27 @@ Sentinel : {
            const { text, from, to } = this.getSelectionRange();
            if (!text) return;
            let out;
+           // Word-splitting shared by camel/snake/kebab: breaks on existing
+           // separators (space, -, _) AND on case transitions (fooBar ->
+           // foo, Bar), so converting FROM any of these conventions TO any
+           // other works correctly in one pass, not just "from plain text."
+           const toWords = (s) => s
+               .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+               .replace(/[-_]+/g, ' ')
+               .trim()
+               .split(/\s+/)
+               .filter(Boolean)
+               .map(w => w.toLowerCase());
+
            if (mode === 'upper') out = text.toUpperCase();
            else if (mode === 'lower') out = text.toLowerCase();
            else if (mode === 'title') out = text.replace(/\w\S*/g, w => w[0].toUpperCase() + w.slice(1).toLowerCase());
+           else if (mode === 'camel') {
+               const words = toWords(text);
+               out = words.map((w, i) => i === 0 ? w : w[0].toUpperCase() + w.slice(1)).join('');
+           }
+           else if (mode === 'snake') out = toWords(text).join('_');
+           else if (mode === 'kebab') out = toWords(text).join('-');
            else return;
            this.replaceRange(from, to, out);
            this.log(`[CHANGE CASE] Applied ${mode} case.`, "success");
@@ -10381,7 +10348,6 @@ insertUUID() {
        UTIL_TOOL_META: [
            { group: 'History', key: 'undo', label: 'Undo' },
            { group: 'History', key: 'redo', label: 'Redo' },
-           { group: 'Editing', key: 'readonly', label: 'Read-Only Toggle' },
            { group: 'Editing', key: 'tab', label: 'Insert Tab' },
            { group: 'Editing', key: 'outtab', label: 'Outdent Line' },
            { group: 'Editing', key: 'fullFold', label: 'Full Fold (collapse to top level)' },
@@ -10405,23 +10371,17 @@ insertUUID() {
            { group: 'Clipboard', key: 'copy', label: 'Copy' },
            { group: 'Clipboard', key: 'cut', label: 'Cut' },
            { group: 'Clipboard', key: 'paste', label: 'Paste' },
-           { group: 'Navigation', key: 'find', label: 'Find & Replace' },
-           { group: 'Navigation', key: 'jump', label: 'Jump to Line' },
-           { group: 'Navigation', key: 'up20', label: 'Jump Up 20 Lines' },
-           { group: 'Navigation', key: 'down20', label: 'Jump Down 20 Lines' },
            { group: 'View', key: 'zoomin', label: 'Zoom In' },
            { group: 'View', key: 'zoomout', label: 'Zoom Out' },
            { group: 'View', key: 'color', label: 'Color Picker' },
            { group: 'File', key: 'newfile', label: 'New File' },
            { group: 'File', key: 'snapshot', label: 'Snapshot' },
-           { group: 'File', key: 'save', label: 'Save Now' },
            { group: 'Diagnostics', key: 'sweep', label: 'Run Full Sweep' },
            { group: 'Diagnostics', key: 'intel', label: 'Intel Scan' },
            { group: 'Diagnostics', key: 'outline', label: 'Code Outline' },
            { group: 'Diagnostics', key: 'docstats', label: 'Document Stats' },
            { group: 'Learn', key: 'glossary', label: 'Glossary' },
            { group: 'Learn', key: 'steptviz', label: 'Step Through' },
-           { group: 'Fix & Format', key: 'prettier', label: 'Prettier' },
            { group: 'Fix & Format', key: 'cleanchars', label: 'Clean Smart Characters' },
            { group: 'Fix & Format', key: 'stripcomments', label: 'Strip Comments' },
            { group: 'Fix & Format', key: 'sortlines', label: 'Sort Lines' },
@@ -10431,6 +10391,9 @@ insertUUID() {
            { group: 'Fix & Format', key: 'upper', label: 'UPPERCASE Selection' },
            { group: 'Fix & Format', key: 'lower', label: 'lowercase Selection' },
            { group: 'Fix & Format', key: 'title', label: 'Title Case Selection' },
+           { group: 'Fix & Format', key: 'camel', label: 'camelCase Selection' },
+           { group: 'Fix & Format', key: 'snake', label: 'snake_case Selection' },
+           { group: 'Fix & Format', key: 'kebab', label: 'kebab-case Selection' },
            { group: 'Fix & Format', key: 'blanklines', label: 'Remove Blank Lines' },
            { group: 'Fix & Format', key: 'alignleft', label: 'Align Left' },
            { group: 'Fix & Format', key: 'reindent', label: 'Re-indent by Depth' },
@@ -10442,7 +10405,7 @@ insertUUID() {
            { group: 'Other', key: 'run', label: 'Run Code' },
            { group: 'Other', key: 'datetime', label: 'Insert Date/Time' },
        ],
-       DEFAULT_UTIL_LAYOUT: 'undo, redo, readonly, tab, fullFold, oneFold, unfold, oneUnfold, map, oneLine, editChunk, expandLine, selectall, duplicate, comment, copy, cut, paste, find, jump, up20, down20, save, sweep, run, zoomin, zoomout, color',
+       DEFAULT_UTIL_LAYOUT: 'undo, redo, tab, fullFold, oneFold, unfold, oneUnfold, map, oneLine, editChunk, expandLine, selectall, duplicate, comment, copy, cut, paste, sweep, run, upper, lower, title, camel, snake, kebab, zoomin, zoomout, color',
 
        // Populates #modalUtilLayout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -10535,10 +10498,7 @@ insertUUID() {
            const layoutStr = Nexus.state.prefs.utilLayout || Nexus.UI.DEFAULT_UTIL_LAYOUT;
            const layout = layoutStr.split(',').map(s => s.trim());
            const tools = {
-               'jump': `<button class="sleek-btn" onclick="Nexus.UI.jumpPrompt()"><span style="font-size:16px;">|→</span><span class="util-lbl">Line</span></button>`,
-               'up20': `<button class="sleek-btn" onclick="Nexus.UI.jumpRelative(-20)"><span style="font-size:16px;">↑↑</span><span class="util-lbl">Up 20</span></button>`,
-               'down20': `<button class="sleek-btn" onclick="Nexus.UI.jumpRelative(20)"><span style="font-size:16px;">↓↓</span><span class="util-lbl">Dn 20</span></button>`,
-               'color': `<button class="sleek-btn" onclick="document.getElementById('colorPickerInput').click()"><img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Color_circle_%28hue_sat%29.png" style="width:20px; border-radius:50%;"><span class="util-lbl">Picker</span></button>`,       
+                'color': `<button class="sleek-btn" onclick="document.getElementById('colorPickerInput').click()"><img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Color_circle_%28hue_sat%29.png" style="width:20px; border-radius:50%;"><span class="util-lbl">Picker</span></button>`,       
                'undo': `<button class="sleek-btn" onclick="Nexus.history.undo()"><span style="font-size:18px;">↶</span><span class="util-lbl">Undo</span></button>`,
                'redo': `<button class="sleek-btn" onclick="Nexus.history.redo()"><span style="font-size:18px;">↷</span><span class="util-lbl">Redo</span></button>`,
                'tab': `<button class="sleek-btn" onclick="Nexus.UI.injectChar('\\t')"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
@@ -10555,8 +10515,7 @@ insertUUID() {
                'bookmarkHere': `<button class="sleek-btn" onclick="Nexus.UI.toggleBookmarkHere()" title="Toggle a bookmark on the current line"><span style="font-size:16px;">🔖</span><span class="util-lbl">Bookmark</span></button>`,
                'bookmarksList': `<button class="sleek-btn" onclick="Nexus.UI.openBookmarksPanel()" title="View and jump to all bookmarks"><span style="font-size:16px;">📑</span><span class="util-lbl">Bookmarks</span></button>`,
                'expandLine': `<button class="sleek-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat function/class/const under cursor"><span style="font-size:16px;">⟵⟶</span><span class="util-lbl">Expand</span></button>`,
-           'readonly': `<button class="sleek-btn" onclick="Nexus.UI.toggleEditMode()" title="Read Only" aria-label="Toggle read-only mode">${Nexus.ICONS.readonly}️</button>`,
-           // FIX: this used to be a crude document.execCommand('delete') —
+            // FIX: this used to be a crude document.execCommand('delete') —
            // effectively just "backspace once" regardless of cursor position,
            // which isn't an outdent at all. Now uses the real outdentLine(),
            // which removes exactly one tab-width of leading whitespace.
@@ -10566,8 +10525,7 @@ insertUUID() {
            'duplicate': `<button class="sleek-btn" onclick="Nexus.tools.duplicateLine()" title="Duplicate Line" aria-label="Duplicate current line"><span style="font-size:16px;">⧉</span><span class="util-lbl">Dup Ln</span></button>`,
            'comment': `<button class="sleek-btn" onclick="Nexus.tools.toggleComment()" title="Toggle Comment" aria-label="Toggle line comment"><span style="font-size:16px;">//</span><span class="util-lbl">Cmt</span></button>`,
            'copyline': `<button class="sleek-btn" onclick="Nexus.tools.copyLine()" title="Copy Line" aria-label="Copy current line"><span style="font-size:16px;">❐</span><span class="util-lbl">Cp Ln</span></button>`,
-           'find': `<button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('searchDrawer')" title="Find &amp; Replace" aria-label="Open find and replace"><span style="font-size:16px;">🔍</span><span class="util-lbl">Find</span></button>`,
-           'run': `<button class="sleek-btn btn-success" onclick="Nexus.codeRunner.execute()" title="Play/Run" aria-label="Run code"><span style="font-size:16px;">▶</span><span class="util-lbl">Run</span></button>`,
+            'run': `<button class="sleek-btn btn-success" onclick="Nexus.codeRunner.execute()" title="Play/Run" aria-label="Run code"><span style="font-size:16px;">▶</span><span class="util-lbl">Run</span></button>`,
            'copy': `<button class="sleek-btn" onclick="document.execCommand('copy')" title="Copy" aria-label="Copy">©</button>`,
            'cut': `<button class="sleek-btn" onclick="document.execCommand('cut')" title="Cut" aria-label="Cut">✂</button>`,
            'paste': `<button class="sleek-btn" onclick="navigator.clipboard.readText().then(t => Nexus.actions.insertText(t)).catch(()=>alert('Clipboard access denied. Long-press to paste.'))" title="Paste" aria-label="Paste">📋</button>`,
@@ -10575,14 +10533,12 @@ insertUUID() {
            'zoomout': `<button class="sleek-btn" onclick="Nexus.UI.adjustFontSize(-2)" title="Zoom Out" aria-label="Decrease font size"><span style="font-size:16px; font-weight:900;">A-</span><span class="util-lbl">Zoom-</span></button>`,
            'newfile': `<button class="sleek-btn" onclick="Nexus.Vfs.newFile()" title="New File" aria-label="Create new file"><span style="font-size:16px;">＋</span><span class="util-lbl">New</span></button>`,
            'snapshot': `<button class="sleek-btn" onclick="Nexus.snapshots.create()" title="Snapshot" aria-label="Create snapshot"><span style="font-size:16px;">📸</span><span class="util-lbl">Snap</span></button>`,
-           'save': `<button class="sleek-btn btn-success" onclick="Nexus.Vfs.manualSave()" title="Save Now" aria-label="Save current file now"><span style="font-size:16px;">💾</span><span class="util-lbl">Save</span></button>`,
-           'sweep': `<button class="sleek-btn" onclick="Nexus.UI.utilRunSweep()" title="Run Full Sweep" aria-label="Run full diagnostic sweep"><span style="font-size:16px;">🩺</span><span class="util-lbl">Sweep</span></button>`,
+            'sweep': `<button class="sleek-btn" onclick="Nexus.UI.utilRunSweep()" title="Run Full Sweep" aria-label="Run full diagnostic sweep"><span style="font-size:16px;">🩺</span><span class="util-lbl">Sweep</span></button>`,
            'intel': `<button class="sleek-btn" onclick="Nexus.intel.scan()" title="Intel Scan" aria-label="Run intel scan"><span style="font-size:16px;">🧠</span><span class="util-lbl">Intel</span></button>`,
            'outline': `<button class="sleek-btn" onclick="Nexus.outline.scan()" title="Code Outline" aria-label="Show code outline"><span style="font-size:16px;">🗺️</span><span class="util-lbl">Outln</span></button>`,
            'glossary': `<button class="sleek-btn" onclick="Nexus.tutor.openGlossary()" title="Glossary" aria-label="Open glossary"><span style="font-size:16px;">📖</span><span class="util-lbl">Gloss</span></button>`,
            'steptviz': `<button class="sleek-btn" onclick="Nexus.stepViz.start()" title="Step Through" aria-label="Start step through"><span style="font-size:16px;">👣</span><span class="util-lbl">Step</span></button>`,
-           'prettier': `<button class="sleek-btn" onclick="Nexus.UI.runPrettier()" title="Prettier" aria-label="Run prettier"><span style="font-size:16px;">✨</span><span class="util-lbl">Pretty</span></button>`,
-           'cleanchars': `<button class="sleek-btn" onclick="Nexus.pasteGuard.cleanActiveFile()" title="Clean Smart Characters" aria-label="Clean smart characters"><span style="font-size:16px;">📱</span><span class="util-lbl">Clean</span></button>`,
+            'cleanchars': `<button class="sleek-btn" onclick="Nexus.pasteGuard.cleanActiveFile()" title="Clean Smart Characters" aria-label="Clean smart characters"><span style="font-size:16px;">📱</span><span class="util-lbl">Clean</span></button>`,
            'stripcomments': `<button class="sleek-btn" onclick="Nexus.Sentinel.stripComments()" title="Strip Comments" aria-label="Strip comments"><span style="font-size:16px;">💬</span><span class="util-lbl">No Cmt</span></button>`,
            'sortlines': `<button class="sleek-btn" onclick="Nexus.Sentinel.sortLines()" title="Sort Lines A-Z" aria-label="Sort lines alphabetically"><span style="font-size:16px;">🔤</span><span class="util-lbl">Sort</span></button>`,
            'formatjson': `<button class="sleek-btn" onclick="Nexus.Sentinel.formatJSON()" title="Format JSON" aria-label="Format JSON"><span style="font-size:16px; font-weight:900;">{ }</span><span class="util-lbl">JSON</span></button>`,
@@ -10591,6 +10547,9 @@ insertUUID() {
            'upper': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('upper')" title="UPPERCASE Selection" aria-label="Convert selection to uppercase"><span style="font-size:14px; font-weight:900;">AB</span><span class="util-lbl">Upper</span></button>`,
            'lower': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('lower')" title="lowercase Selection" aria-label="Convert selection to lowercase"><span style="font-size:14px; font-weight:900;">ab</span><span class="util-lbl">Lower</span></button>`,
            'title': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('title')" title="Title Case Selection" aria-label="Convert selection to title case"><span style="font-size:14px; font-weight:900;">Ab</span><span class="util-lbl">Title</span></button>`,
+           'camel': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('camel')" title="camelCase Selection" aria-label="Convert selection to camel case"><span style="font-size:13px; font-weight:900;">aB</span><span class="util-lbl">Camel</span></button>`,
+           'snake': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('snake')" title="snake_case Selection" aria-label="Convert selection to snake case"><span style="font-size:13px; font-weight:900;">a_b</span><span class="util-lbl">Snake</span></button>`,
+           'kebab': `<button class="sleek-btn" onclick="Nexus.Sentinel.changeCase('kebab')" title="kebab-case Selection" aria-label="Convert selection to kebab case"><span style="font-size:13px; font-weight:900;">a-b</span><span class="util-lbl">Kebab</span></button>`,
            'blanklines': `<button class="sleek-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove Blank Lines" aria-label="Remove blank lines"><span style="font-size:16px;">🧽</span><span class="util-lbl">No Blank</span></button>`,
            'alignleft': `<button class="sleek-btn" onclick="Nexus.Sentinel.alignLeft()" title="Align Left" aria-label="Align everything to the left"><span style="font-size:16px;">⬅️</span><span class="util-lbl">Align</span></button>`,
            'reindent': `<button class="sleek-btn" onclick="Nexus.Sentinel.reindentByDepth()" title="Re-indent by Depth" aria-label="Re-indent by nesting depth"><span style="font-size:16px;">📐</span><span class="util-lbl">Indent</span></button>`,
@@ -11710,13 +11669,23 @@ initInfiniteRibbon() {
                ed.setAttribute('inputmode', 'none');
                if (cmDom) { cmDom.contentEditable = "true"; cmDom.setAttribute('inputmode', 'none'); }
                if (st) { st.innerText = "UTIL MODE"; st.style.color = "var(--accent)"; }
-               btns.forEach(btn => { btn.innerHTML = "🛠️ UTIL MODE"; btn.className = "tool-btn edit-btn-trigger btn-edit-util"; });
+               btns.forEach(btn => {
+                   btn.innerHTML = "🛠️";
+                   btn.title = "Util Mode — cursor/selection only, tap for full edit";
+                   btn.setAttribute('aria-label', 'Editor is in utility mode, tap to enable full editing');
+                   btn.className = "tool-btn edit-btn-trigger btn-edit-util";
+               });
            } else if (mode === 'full') {
                ed.removeAttribute('inputmode');
                ed.removeAttribute('readonly');
                if (cmDom) { cmDom.contentEditable = "true"; cmDom.removeAttribute('inputmode'); }
                if (st) { st.innerText = "READY (FULL)"; st.style.color = "var(--success)"; }
-               btns.forEach(btn => { btn.innerHTML = "🔓 FULL EDIT"; btn.className = "tool-btn edit-btn-trigger btn-edit-unlocked"; });
+               btns.forEach(btn => {
+                   btn.innerHTML = "🔓";
+                   btn.title = "Full Edit — tap to lock read-only";
+                   btn.setAttribute('aria-label', 'Editor is fully unlocked, tap to make read-only');
+                   btn.className = "tool-btn edit-btn-trigger btn-edit-unlocked";
+               });
            } else {
                // 'readonly' — also the safe fallback for any unrecognized
                // value, since locked-by-default is the least surprising/
@@ -11725,7 +11694,12 @@ initInfiniteRibbon() {
                ed.setAttribute('inputmode', 'none');
                if (cmDom) { cmDom.contentEditable = "false"; cmDom.setAttribute('inputmode', 'none'); }
                if (st) { st.innerText = "LOCKED"; st.style.color = "var(--danger)"; }
-               btns.forEach(btn => { btn.innerHTML = "🔒 READ ONLY"; btn.className = "tool-btn edit-btn-trigger btn-edit-lock"; });
+               btns.forEach(btn => {
+                   btn.innerHTML = "🔒";
+                   btn.title = "Read Only — tap to unlock";
+                   btn.setAttribute('aria-label', 'Editor is read-only, tap to change');
+                   btn.className = "tool-btn edit-btn-trigger btn-edit-lock";
+               });
                mode = 'readonly';
            }
 
