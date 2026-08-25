@@ -204,17 +204,26 @@
     #ribbonContainer::-webkit-scrollbar { display: none; }
     #ribbonTrack { display: inline-flex; padding: 0 10px; gap: 8px; }
 
-    /* Top-right ribbon dropdown menu */
+    /* Top-right ribbon dropdown menu. position: fixed — NOT absolute — is
+       the actual fix for the menu not appearing: the trigger button and
+       this menu both live outside #ribbonContainer now (see the HTML),
+       specifically so nothing here is a descendant of any element with
+       overflow: scroll/hidden/auto, which clips content on both axes
+       regardless of the child's own position value. Fixed positioning is
+       relative to the viewport itself, so it can't be clipped by a
+       scroll container anywhere above it in the tree. */
     .ribbon-dropdown {
         display: none;
-        position: absolute;
-        top: 48px;
+        position: fixed;
+        top: 52px;
         right: 8px;
         background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 10px;
         box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         min-width: 220px;
+        max-height: calc(100vh - 70px);
+        overflow-y: auto;
         padding: 6px;
         z-index: 2000;
     }
@@ -1493,7 +1502,7 @@
 
     <canvas id="omniCanvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
 
-    <nav id="ribbonContainer" aria-label="Main toolbar">
+    <nav id="ribbonContainer" aria-label="Main toolbar" style="padding-right: 48px;">
         <div id="ribbonTrack">
             <button id="ribbonSaveBtn" class="tool-btn btn-success" onclick="Nexus.Vfs.manualSave()" title="Save Now" aria-label="Save current file now">💾</button>
             <button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()" title="Refresh File" aria-label="Refresh current file">♻️</button>
@@ -1513,35 +1522,37 @@
 
             <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sandbox')" title="Run / Preview" aria-label="Run preview">▶️</button>
         </div>
-
-        <!-- Top-right dropdown menu. Deliberately a SIBLING of #ribbonTrack,
-             not a child of it — initInfiniteRibbon() (see that function)
-             clones #ribbonTrack's entire contents twice to build the
-             infinite-horizontal-scroll illusion, so anything placed inside
-             the track would render three times and the open dropdown would
-             visually break/orphan the moment the scroll position auto-snaps
-             (which happens continuously during normal scrolling). Living
-             here instead, position: sticky keeps it pinned at the right
-             edge of the visible viewport regardless of how far the track
-             underneath has scrolled. -->
-        <div id="ribbonMenuWrap" style="position: sticky; right: 0; flex-shrink: 0; margin-left: 8px; padding-right: 8px; background: var(--panel); z-index: 10;">
-            <button id="ribbonMenuBtn" class="tool-btn" onclick="Nexus.UI.toggleRibbonMenu()" title="More" aria-label="Open menu">⋮</button>
-            <div id="ribbonMenuDropdown" class="ribbon-dropdown">
-                <button onclick="Nexus.UI.toggleEditMode(); Nexus.UI.toggleRibbonMenu()"><span id="ribbonMenuEditIcon">🔒</span> Edit</button>
-                <button onclick="Nexus.toggleEditor(); Nexus.UI.toggleRibbonMenu()">🔄 Swap Editor Engine</button>
-                <button onclick="Nexus.UI.toggleSun(); Nexus.UI.toggleRibbonMenu()">☀️ Light/Dark Mode</button>
-                <div class="ribbon-dropdown-divider"></div>
-                <button id="ribbonMenuIndentGuides" onclick="Nexus.UI.toggleIndentGuides(); Nexus.UI.syncRibbonMenu()">📏 Indent Guides</button>
-                <button id="ribbonMenuWordWrap" onclick="Nexus.UI.toggleWordWrap(); Nexus.UI.syncRibbonMenu()">↩️ Word Wrap</button>
-                <button id="ribbonMenuWhitespace" onclick="Nexus.UI.toggleShowWhitespace(); Nexus.UI.syncRibbonMenu()">␣ Show Whitespace</button>
-                <button id="ribbonMenuBracketTracing" onclick="Nexus.UI.toggleBracketTracing(); Nexus.UI.syncRibbonMenu()">{ } Bracket Tracing</button>
-                <button id="ribbonMenuStickyScroll" onclick="Nexus.UI.toggleStickyScroll(); Nexus.UI.syncRibbonMenu()">📌 Sticky Scope Headers</button>
-                <div class="ribbon-dropdown-divider"></div>
-                <button onclick="Nexus.UI.openModal('manual'); Nexus.UI.toggleRibbonMenu()">❓ Help</button>
-                <button onclick="Nexus.UI.openModal('settings'); Nexus.UI.toggleRibbonMenu()">⚙️ Settings</button>
-            </div>
-        </div>
     </nav>
+
+    <!-- Ribbon dropdown trigger + menu: REAL FIX for "dropdown doesn't
+         open" — it was never actually invisible-because-JS-broken (the
+         .open class WAS being applied correctly), it was being CLIPPED.
+         #ribbonContainer has overflow-x: scroll, and any overflow value
+         other than visible on EITHER axis clips content on BOTH axes,
+         even content that's position: absolute/sticky and would
+         otherwise render outside the container's own bounds. The
+         dropdown was rendering at full size in the DOM, genuinely
+         "open" — just invisible, cut off by the ribbon's own 55px-tall
+         scroll box. Living here instead, as real position: fixed
+         siblings of #ribbonContainer rather than descendants of it,
+         there is no clipping ancestor to fight — fixed positioning is
+         relative to the viewport itself, unaffected by any scroll
+         container anywhere in the DOM tree above it. -->
+    <button id="ribbonMenuBtn" class="tool-btn" onclick="Nexus.UI.toggleRibbonMenu()" title="More" aria-label="Open menu" style="position: fixed; top: 8px; right: 8px; z-index: 2001;">⋮</button>
+    <div id="ribbonMenuDropdown" class="ribbon-dropdown">
+        <button onclick="Nexus.UI.toggleEditMode(); Nexus.UI.toggleRibbonMenu()"><span id="ribbonMenuEditIcon">🔒</span> Edit</button>
+        <button onclick="Nexus.toggleEditor(); Nexus.UI.toggleRibbonMenu()">🔄 Swap Editor Engine</button>
+        <button onclick="Nexus.UI.toggleSun(); Nexus.UI.toggleRibbonMenu()">☀️ Light/Dark Mode</button>
+        <div class="ribbon-dropdown-divider"></div>
+        <button id="ribbonMenuIndentGuides" onclick="Nexus.UI.toggleIndentGuides(); Nexus.UI.syncRibbonMenu()">📏 Indent Guides</button>
+        <button id="ribbonMenuWordWrap" onclick="Nexus.UI.toggleWordWrap(); Nexus.UI.syncRibbonMenu()">↩️ Word Wrap</button>
+        <button id="ribbonMenuWhitespace" onclick="Nexus.UI.toggleShowWhitespace(); Nexus.UI.syncRibbonMenu()">␣ Show Whitespace</button>
+        <button id="ribbonMenuBracketTracing" onclick="Nexus.UI.toggleBracketTracing(); Nexus.UI.syncRibbonMenu()">{ } Bracket Tracing</button>
+        <button id="ribbonMenuStickyScroll" onclick="Nexus.UI.toggleStickyScroll(); Nexus.UI.syncRibbonMenu()">📌 Sticky Scope Headers</button>
+        <div class="ribbon-dropdown-divider"></div>
+        <button onclick="Nexus.UI.openModal('manual'); Nexus.UI.toggleRibbonMenu()">❓ Help</button>
+        <button onclick="Nexus.UI.openModal('settings'); Nexus.UI.toggleRibbonMenu()">⚙️ Settings</button>
+    </div>
     <div id="workspace">
         <!-- Panel toggles moved here from the top ribbon, pinned at the
              very edges of the tab bar itself rather than buried in the
@@ -12025,8 +12036,10 @@ initInfiniteRibbon() {
                // close it again in the same event loop pass.
                setTimeout(() => {
                    this._ribbonMenuOutsideHandler = (e) => {
-                       const wrap = document.getElementById('ribbonMenuWrap');
-                       if (wrap && !wrap.contains(e.target)) this.toggleRibbonMenu();
+                       const btn = document.getElementById('ribbonMenuBtn');
+                       const menu = document.getElementById('ribbonMenuDropdown');
+                       const clickedInside = (btn && btn.contains(e.target)) || (menu && menu.contains(e.target));
+                       if (!clickedInside) this.toggleRibbonMenu();
                    };
                    document.addEventListener('click', this._ribbonMenuOutsideHandler);
                    document.addEventListener('touchstart', this._ribbonMenuOutsideHandler);
