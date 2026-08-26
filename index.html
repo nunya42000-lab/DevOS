@@ -109,6 +109,15 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/astring@1.8.1/dist/astring.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script>
+    <!-- Terser: real UMD build, confirmed against Terser's own published
+         dist/bundle.min.js — exposes window.Terser with an async .minify()
+         (Promise-based, matches the exact call shape used in
+         buildPipeline.run() below). Loaded eagerly alongside the other
+         formatting-tool CDNs above (js-beautify, prettier) rather than
+         lazily, consistent with how this app already treats every other
+         single-purpose formatting library — none of them are dynamically
+         imported on first use. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/terser/5.31.0/bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script>
@@ -168,24 +177,24 @@
         --gutter-text: #57606a;
     }
 
-    body {
-        --bg: #ffffff; 
-        --panel: #f6f8fa; 
-        --surface: #ffffff;
-        --border: #d0d7de; 
-        --text: #24292f; 
-        --accent: #0969da;
-        --gold: #9a6700;
-        --dock-bg: #f6f8fa;
-        --dock-border: #d0d7de;
-        --dock-text: #24292f;
-        --dock-hover-bg: #e5e9f0;
-        --dock-hover-text: #0d1117;
-        --dock-label: #57606a;
-        --dock-active-bg: #0969da;
-        --dock-active-text: #ffffff;
-        --gutter-text: #57606a;
-    }
+    /* FIX (real bug, not cosmetic): an unconditional `body { ... }` rule
+       used to sit right here, re-declaring every one of these same custom
+       properties with the light-mode values UNCONDITIONALLY — meaning it
+       applied regardless of whether .outdoor-mode was present or absent.
+       Since a direct property re-declaration on `body` wins over simple
+       inheritance from `:root` (where the real dark-mode defaults above
+       still correctly lived, untouched), this silently made dark mode
+       completely unreachable: toggleSun() was still correctly adding/
+       removing the .outdoor-mode class exactly as designed, but BOTH
+       states resolved to the exact same computed CSS values, because
+       .outdoor-mode's light values and this base rule's light values were
+       byte-for-byte identical. Toggling the theme did something (the
+       class really did flip) but was visually a no-op either way — light
+       mode was, in effect, permanently stuck on. Deleting this block
+       entirely restores the correct, original design: body with no class
+       inherits :root's real dark palette above; body.outdoor-mode
+       overrides to light, exactly as that block already (and always
+       correctly) did on its own. */
 
     * { 
         box-sizing: border-box; 
@@ -1589,12 +1598,20 @@
          otherwise render outside the container's own bounds. The
          dropdown was rendering at full size in the DOM, genuinely
          "open" — just invisible, cut off by the ribbon's own 55px-tall
-         scroll box. Living here instead, as real position: fixed
-         siblings of #ribbonContainer rather than descendants of it,
+         scroll box. Living here instead, as a real position: fixed
+         sibling of #ribbonContainer rather than a descendant of it,
          there is no clipping ancestor to fight — fixed positioning is
          relative to the viewport itself, unaffected by any scroll
-         container anywhere in the DOM tree above it. -->
-    <button id="ribbonMenuBtn" class="tool-btn" onclick="Nexus.UI.toggleRibbonMenu()" title="More" aria-label="Open menu" style="position: fixed; top: 8px; right: 8px; z-index: 2001;">⋮</button>
+         container anywhere in the DOM tree above it.
+
+         NOTE: the trigger BUTTON that used to sit right here (fixed,
+         top-right corner) was removed once the dropdown trigger moved to
+         the file tab bar's right edge (#fileTabMenuBtn, in the file tab
+         row below) — but this comment block and the dropdown div itself
+         stayed, since the clipping reasoning above still applies to
+         #ribbonMenuDropdown regardless of which button opens it. The old
+         fixed button was left behind by mistake and floated uselessly
+         over the top-right corner of every screen until removed here. -->
     <div id="ribbonMenuDropdown" class="ribbon-dropdown">
         <button onclick="Nexus.UI.toggleEditMode(); Nexus.UI.syncRibbonMenu()"><span id="ribbonMenuEditIcon">🛠️</span> Edit</button>
         <button onclick="Nexus.toggleEditor(); Nexus.UI.syncRibbonMenu()">🔄 Swap Editor Engine</button>
@@ -1844,6 +1861,10 @@
                         <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">TODOS ➔</span>
                         <span id="auditCountTodo" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
                     </div>
+                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runMissingImportsAudit()">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--danger); font-weight: 700;">IMPORTS ➔</span>
+                        <span id="auditCountMissingImports" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -1971,6 +1992,7 @@
                     <button class="tool-btn btn-gold" onclick="Nexus.UI.insertUUID()" title="Insert a random UUID at the cursor" aria-label="Insert UUID">🎲 UUID</button>
                     <button class="tool-btn btn-gold" onclick="Nexus.UI.insertDateTime()" title="Insert current date/time at the cursor" aria-label="Insert date and time">🕐 DATE/TIME</button>
                 </div>
+                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.UI.openModal('storage-inspector')" title="Inspect the previewed project's own localStorage" aria-label="Open localStorage inspector">🗄️ LOCALSTORAGE INSPECTOR</button>
             </div>
         </details>
 
@@ -1980,6 +2002,8 @@
                 <div class="grid-2">
                     <button class="tool-btn btn-danger" onclick="Nexus.UI.openModal('compressor')">🗜️ COMPRESS</button>
                     <button class="tool-btn btn-gold" data-langs="html,htm" onclick="Nexus.pwa.forge()">🔨 FORGE PWA</button>
+                    <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sprite')">🖼️ SPRITE SHEET</button>
+                    <button class="tool-btn btn-success" onclick="Nexus.buildPipeline.run()">📦 PRODUCTION BUILD</button>
                 </div>
             </div>
         </details>
@@ -2338,6 +2362,64 @@
                     <span style="color:#fff; font-weight:900;">LEVEL 3: NUCLEAR</span>
                     <span style="font-size:10px; opacity:0.9;">Total minification. The entire file becomes a single line.</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sprite Sheet -> CSS generator. Upload an image, specify a single
+         frame's width/height, get one .sprite base rule plus a
+         .sprite-N { background-position: ... } rule per cell, saved as
+         sprites.css in the Vfs. The uploaded image itself is never saved
+         anywhere — this only ever produces CSS text, the same way the
+         rest of this app treats generated output; the person still needs
+         to place their own actual image file/URL into the CSS themselves
+         (a placeholder comment says so directly in the generated output). -->
+    <div id="modalSprite" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>🖼️ SPRITE SHEET → CSS</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('sprite')">&times;</button></div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
+                <p style="font-size:12px; opacity:0.7;">Upload a sprite sheet image, specify one frame's size, and get a <code>.sprite-N</code> CSS rule per cell.</p>
+                <input type="file" id="spriteUpload" accept="image/*" class="sleek-input" style="padding:12px;" onchange="Nexus.spriteSheet.handleUpload(event)">
+                <canvas id="spriteCanvasPreview" style="display:none; max-width:100%; border:1px solid var(--border); border-radius:8px; image-rendering:pixelated;"></canvas>
+                <div id="spriteDims" style="font-size:11px; opacity:0.6;"></div>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="font-size:10px; color:var(--gold); display:block; margin-bottom:4px;">Frame Width (px)</label>
+                        <input type="number" id="spriteFrameW" class="sleek-input" value="32" min="1">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:10px; color:var(--gold); display:block; margin-bottom:4px;">Frame Height (px)</label>
+                        <input type="number" id="spriteFrameH" class="sleek-input" value="32" min="1">
+                    </div>
+                </div>
+                <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.spriteSheet.generate()">Generate sprites.css</button>
+                <div id="spriteStatus" style="font-size:11px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- LocalStorage inspector — debugs whatever the SANDBOXED/PREVIEWED
+         project (Run/▶️) writes to window.localStorage while it's running,
+         completely separate from divIDE's own persistence. divIDE's own
+         storage (Vfs, prefs, bookmarks, snapshots, vault) lives entirely
+         in IndexedDB via localforage/Dexie — neither has a localStorage
+         mode at all — so window.localStorage in this app is, in practice,
+         exclusively whatever an in-progress game/tool built INSIDE divIDE
+         uses for its own high scores, settings, etc. Ported from an
+         earlier standalone version of this app that had this as a
+         dedicated tab; ships here as a modal instead, matching how every
+         other tool in this rewrite is reached. -->
+    <div id="modalStorageInspector" class="modal-overlay">
+        <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
+            <div class="p-head"><span>🗄️ LOCALSTORAGE INSPECTOR</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('storage-inspector')">&times;</button></div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
+                <p style="font-size:11px; opacity:0.7; margin:0;">Debugs your <b>previewed project's own</b> localStorage — not divIDE's own data, which lives elsewhere and is never shown here.</p>
+                <div style="display:flex; gap:8px;">
+                    <button class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.storageInspector.openSeeder()">+ SEED DATA</button>
+                    <button class="tool-btn" style="flex:1;" onclick="Nexus.storageInspector.exportToJSON()">📤 EXPORT JSON</button>
+                    <button class="tool-btn btn-danger" style="flex:1;" onclick="Nexus.storageInspector.clearAll()">🗑️ WIPE ALL</button>
+                </div>
+                <div id="storageInspectorList" style="display:flex; flex-direction:column; gap:8px;"></div>
             </div>
         </div>
     </div>
@@ -3352,6 +3434,7 @@ auditor: {
         document.getElementById('auditCountLint').innerText = '0';
         document.getElementById('auditCountBrackets').innerText = '0';
         document.getElementById('auditCountTodo').innerText = '0';
+        document.getElementById('auditCountMissingImports').innerText = '0';
         const badge = document.getElementById('diagBadgeCore');
         if (badge) badge.classList.remove('show');
     },
@@ -3437,9 +3520,15 @@ auditor: {
         } catch (e) { /* best-effort; leave empty rather than break the whole sweep */ }
         sections.push({ label: 'BRACKETS', count: bracketIssues.length, items: bracketIssues });
 
-        // --- Dependencies (informational — not counted as a defect) ---
+        // --- Dependencies: total count (informational) + broken/missing
+        // ones specifically (a real, counted defect — see
+        // _detectMissingImports's own comment for why this is a distinct
+        // check from Project Radar's dead-code detection). ---
         const depMatches = srcCode.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g) || [];
         const uniqueDeps = [...new Set(depMatches.map(d => { const m = d.match(/['"]([^'"]+)['"]/); return m ? m[1] : d; }))];
+
+        const missingImports = this._detectMissingImports(srcCode).map(i => ({ text: `Unresolved: '${i.path}'`, line: i.line }));
+        sections.push({ label: 'MISSING IMPORTS', count: missingImports.length, items: missingImports });
 
         // --- TODOs (informational — reminders, not defects) ---
         const todos = this._detectTodos(srcCode);
@@ -3463,6 +3552,7 @@ auditor: {
         setCount('auditCountLint', lintIssues.length);
         setCount('auditCountBrackets', bracketIssues.length);
         setCount('auditCountTodo', todos.length);
+        setCount('auditCountMissingImports', missingImports.length);
 
         // --- Render one consolidated report ---
         const totalIssues = sections.reduce((sum, s) => sum + s.count, 0);
@@ -3668,6 +3758,37 @@ auditor: {
                 + `<span style="color:var(--gold); font-size:10px; font-weight:bold;">${t.tag}</span> `
                 + `<span style="font-size:11px;">${t.text}</span>`
                 + `<span style="float:right; font-size:9px; opacity:0.6;">LN ${t.line} →</span>`
+                + `</div>`;
+        });
+        reportBox.innerHTML = html;
+    },
+
+    // Standalone single-purpose runner, same pattern as runTodoScan()
+    // just above — reuses _detectMissingImports so Full Sweep and this
+    // tile can never disagree about what counts as unresolved.
+    runMissingImportsAudit() {
+        if (!Nexus.state.activeFile) {
+            document.getElementById('auditorModeTitle').innerText = "ACTIVE: MISSING IMPORTS";
+            const box = document.getElementById('auditorReportBox');
+            if (box) box.innerHTML = `<div style="color: var(--gold); font-weight: bold;">No file open — open or create a file first.</div>`;
+            return;
+        }
+        document.getElementById('auditorModeTitle').innerText = "ACTIVE: MISSING IMPORTS";
+        const srcCode = this.getEditorContent();
+        const missing = this._detectMissingImports(srcCode);
+        const counter = document.getElementById('auditCountMissingImports');
+        if (counter) counter.innerText = missing.length;
+        const reportBox = document.getElementById('auditorReportBox');
+        if (missing.length === 0) {
+            reportBox.innerHTML = `<div style="color: var(--success); font-weight: bold;">✔ Every local import/src/href in this file resolves to a real project file.</div>`;
+            return;
+        }
+        let html = `<div style="color:var(--danger); font-weight:bold; margin-bottom:6px;">${missing.length} UNRESOLVED IMPORT${missing.length === 1 ? '' : 'S'}</div>`;
+        missing.forEach(i => {
+            const clickable = i.line != null;
+            html += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${i.line})" style="cursor:pointer;"` : ''} style="background:var(--surface); padding:8px 10px; margin-bottom:6px; border-left:3px solid var(--danger); border-radius:4px; display:flex; justify-content:space-between; align-items:center;">`
+                + `<span style="font-size:11px;">'${i.path}'</span>`
+                + (clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap; padding-left:6px;">LN ${i.line} →</span>` : '')
                 + `</div>`;
         });
         reportBox.innerHTML = html;
@@ -3967,6 +4088,44 @@ _resolveVfsPath(refPath) {
     if (Nexus.state.Vfs[clean] !== undefined) return clean;
     const basename = clean.split('/').pop();
     return Object.keys(Nexus.state.Vfs).find(k => k === basename || k.endsWith('/' + basename)) || null;
+},
+
+// Ported from an earlier standalone version of this app that had a
+// dedicated "runDependencyCheck" — flags import/src/href paths that don't
+// resolve to any real file in the project. This is a genuinely different
+// check from Project Radar (Nexus.graph): Radar finds files that exist
+// but nothing reaches (dead code — the opposite failure), while this
+// finds references that point at files that DON'T exist at all (typos,
+// renamed/deleted files, wrong relative path). Neither one covers the
+// other. Reuses _resolveVfsPath — the same normalization (query/hash
+// stripping, ./ prefix, basename fallback) already trusted for the
+// orphan-ID checker's own cross-file resolution — rather than a separate,
+// simpler regex-based path match that could disagree with it on edge
+// cases. Skips anything that looks like a real URL (http/https/protocol-
+// relative //) since those are never meant to resolve against the local
+// Vfs at all.
+_detectMissingImports(srcCode) {
+    // Matches src=/href= on ANY tag (not just <script>/<link>) — a broken
+    // <img src="typo.png"> is exactly as real a bug as a broken <script
+    // src>, and scanDeps() (Nexus.Sentinel, a separate object reusing this
+    // same detector) already lists dependencies via this broader pattern;
+    // narrower matching here would silently disagree with what that log
+    // view shows for anything that isn't a <script>/<link> tag.
+    const importRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:\bsrc=['"]([^'"]+)['"])|(?:\bhref=['"]([^'"]+)['"])/g;
+    const seen = new Set();
+    const missing = [];
+    let m;
+    while ((m = importRegex.exec(srcCode)) !== null) {
+        const raw = m[1] || m[2] || m[3] || m[4];
+        if (!raw || seen.has(raw)) continue;
+        seen.add(raw);
+        if (/^(?:https?:)?\/\//i.test(raw) || raw.startsWith('data:') || raw.startsWith('#') || raw.startsWith('mailto:') || raw.startsWith('tel:')) continue; // remote URLs, same-page anchors, and mailto/tel links aren't local Vfs references at all
+        if (this._resolveVfsPath(raw)) continue; // resolves fine — not an issue
+        const idx = srcCode.indexOf(raw);
+        const line = idx >= 0 ? srcCode.slice(0, idx).split('\n').length : null;
+        missing.push({ path: raw, line });
+    }
+    return missing;
 },
 
 _detectOrphanIssues(srcCode) {
@@ -5406,6 +5565,28 @@ init() {
     const selToggle = document.getElementById('dpadSelectLock');
     const lineToggle = document.getElementById('dpadLineLock');
     const dragHandle = document.getElementById('dpadDragHandle');
+
+    // FIX: none of these four lookups were ever null-checked before this,
+    // despite every other init-style function in this file following a
+    // strict "guard before touching" convention. Under normal
+    // circumstances these elements exist by the time boot() reaches this
+    // point (DOMContentLoaded guarantees the static HTML is already
+    // parsed) — but "normal circumstances" isn't a substitute for an
+    // actual guard, and a single null here (a future markup edit renaming
+    // one of these ids, for instance) would throw a bare TypeError this
+    // deep inside the synchronous boot() chain, silently aborting EVERY
+    // later boot step queued after it — including setupFastHold()
+    // (binds the footer d-pad's own press-and-hold), Nexus.omni.init(),
+    // Nexus.Terminal.init(), and the engine/edit-mode restoration timers.
+    // That failure mode looks exactly like "the whole app stopped
+    // responding to taps" from the outside, even though the page itself
+    // rendered fine — because everything really did stop responding, just
+    // silently, with the actual error visible only in a console most
+    // people never open.
+    if (!dpad || !selToggle || !lineToggle || !dragHandle) {
+        console.error("DpadEngine.init: one or more required elements missing from the DOM (nexusDpad/dpadSelectLock/dpadLineLock/dpadDragHandle) — skipping floating d-pad wiring, but continuing boot.");
+        return;
+    }
 
     selToggle.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -6946,13 +7127,25 @@ Sentinel : {
                return match ? match[1] : d;
            });
            const uniqueDeps = [...new Set(cleanDeps)];
+           // Cross-object call: _resolveVfsPath/_detectMissingImports live
+           // on Nexus.auditor (that's where the orphan-ID checker's own
+           // cross-file resolution already needed this logic), while
+           // scanDeps itself lives on Nexus.Sentinel — reusing it here
+           // instead of a third separate resolution check means this
+           // terminal-style log view can never disagree with the
+           // Diagnostics Hub's IMPORTS tile or Full Sweep about what
+           // counts as unresolved.
+           const missingSet = new Set(Nexus.auditor._detectMissingImports(code).map(i => i.path));
 
            let htmlOut = `<div style="color:var(--accent); margin-bottom:10px; font-weight:bold;">DETECTED ${uniqueDeps.length} DEPENDENCIES:</div>`;
            uniqueDeps.forEach(dep => {
                const idx = code.indexOf(dep);
                const line = idx >= 0 ? code.slice(0, idx).split('\n').length : null;
                const clickable = line != null;
-               htmlOut += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${line})" style="cursor:pointer;"` : ''} style="color:var(--text); font-size:11px; margin-bottom:4px; padding-left:10px; border-left:2px solid var(--border); display:flex; justify-content:space-between; align-items:center;"><span>🔗 ${dep}</span>${clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap;">LN ${line} →</span>` : ''}</div>`;
+               const isMissing = missingSet.has(dep);
+               const color = isMissing ? 'var(--danger)' : 'var(--text)';
+               const icon = isMissing ? '❌' : '🔗';
+               htmlOut += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${line})" style="cursor:pointer;"` : ''} style="color:${color}; font-size:11px; margin-bottom:4px; padding-left:10px; border-left:2px solid ${isMissing ? 'var(--danger)' : 'var(--border)'}; display:flex; justify-content:space-between; align-items:center;"><span>${icon} ${dep}${isMissing ? ' (not found)' : ''}</span>${clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap;">LN ${line} →</span>` : ''}</div>`;
            });
 
            document.getElementById('diagOut').innerHTML = htmlOut;
@@ -8746,6 +8939,284 @@ self.addEventListener('fetch', (e) => {
                }
            };
            reader.readAsDataURL(file);
+       }
+   },
+
+   // Ported from an earlier standalone version of this app that had a
+   // dedicated sprite-sheet tool never carried forward into this rewrite.
+   // Purely a CSS-generation tool: the uploaded image is only ever drawn
+   // into an in-memory canvas to read its real pixel dimensions (needed to
+   // compute how many full frames fit) and shown as an on-screen preview —
+   // it is never saved into the Vfs or anywhere else. Only the generated
+   // CSS text is written to disk, as sprites.css.
+   spriteSheet: {
+       _img: null,
+
+       handleUpload(e) {
+           const file = e.target.files[0];
+           if (!file) return;
+           const reader = new FileReader();
+           reader.onload = (ev) => {
+               const img = new Image();
+               img.onload = () => {
+                   Nexus.spriteSheet._img = img;
+                   const canvas = document.getElementById('spriteCanvasPreview');
+                   const dims = document.getElementById('spriteDims');
+                   canvas.width = img.width;
+                   canvas.height = img.height;
+                   canvas.style.display = 'block';
+                   canvas.getContext('2d').drawImage(img, 0, 0);
+                   if (dims) dims.innerText = `Loaded: ${img.width}×${img.height}px`;
+               };
+               img.onerror = () => alert("Couldn't load that as an image.");
+               img.src = ev.target.result;
+           };
+           reader.readAsDataURL(file);
+       },
+
+       generate() {
+           const st = document.getElementById('spriteStatus');
+           if (!this._img) {
+               if (st) { st.innerText = 'Upload an image first.'; st.style.color = 'var(--danger)'; }
+               return;
+           }
+           const w = parseInt(document.getElementById('spriteFrameW').value) || 0;
+           const h = parseInt(document.getElementById('spriteFrameH').value) || 0;
+           if (w <= 0 || h <= 0) {
+               if (st) { st.innerText = 'Frame width/height must be positive numbers.'; st.style.color = 'var(--danger)'; }
+               return;
+           }
+           if (w > this._img.width || h > this._img.height) {
+               if (st) { st.innerText = 'Frame size is larger than the whole image.'; st.style.color = 'var(--danger)'; }
+               return;
+           }
+
+           const cols = Math.floor(this._img.width / w);
+           const rows = Math.floor(this._img.height / h);
+           const total = cols * rows;
+
+           let css = `/* Generated by divIDE's Sprite Sheet tool.\n`;
+           css += ` * Source sheet: ${this._img.width}x${this._img.height}px, ${w}x${h}px frames, ${cols}x${rows} grid (${total} frames).\n`;
+           css += ` * Replace YOUR_IMAGE_HERE below with the actual path/URL to this sheet\n`;
+           css += ` * once it's part of your project — this tool only reads pixel\n`;
+           css += ` * dimensions from what you uploaded, it doesn't save the image itself. */\n\n`;
+           css += `.sprite {\n    background-image: url('YOUR_IMAGE_HERE');\n    display: inline-block;\n    width: ${w}px;\n    height: ${h}px;\n    background-repeat: no-repeat;\n}\n\n`;
+
+           let index = 0;
+           for (let r = 0; r < rows; r++) {
+               for (let c = 0; c < cols; c++) {
+                   css += `.sprite-${index} { background-position: -${c * w}px -${r * h}px; }\n`;
+                   index++;
+               }
+           }
+
+           const targetName = Nexus.state.Vfs['sprites.css'] !== undefined
+               ? `sprites-${Date.now().toString(36).slice(-4)}.css`
+               : 'sprites.css';
+
+           Nexus.state.Vfs[targetName] = css;
+           Nexus.state.originals[targetName] = css;
+           Nexus.state.lastSavedContent[targetName] = css;
+           Nexus.Vfs.renderAccordion();
+           Nexus.Vfs.save();
+
+           if (st) { st.innerText = `✔ Saved ${total} frames to ${targetName}.`; st.style.color = 'var(--success)'; }
+       }
+   },
+
+   // Ported from an earlier standalone version of this app that had a
+   // dedicated production-build export — nothing else in the current
+   // codebase does actual minification or produces a deployable ZIP.
+   // This is deliberately a separate, distinct concept from the existing
+   // "⚡ BUNDLE" feature: BUNDLE merges the project into one standalone
+   // HTML file for portability/sharing (no minification, no packaging);
+   // this produces a minified, individually-packaged ZIP of every file,
+   // for actually deploying a built project somewhere. Neither replaces
+   // the other.
+   buildPipeline: {
+       async minifyJS(code) {
+           if (typeof Terser === 'undefined' || typeof Terser.minify !== 'function') {
+               throw new Error('Terser failed to load — check network/CDN access.');
+           }
+           const result = await Terser.minify(code, {
+               mangle: true,
+               compress: { dead_code: true, drop_console: false, drop_debugger: true }
+           });
+           if (result.error) throw result.error;
+           return result.code;
+       },
+
+       // CSS gets a simple, safe strip (comments + collapsed whitespace)
+       // rather than routed through Terser (which only understands JS) or
+       // a full CSS-aware minifier (not currently a dependency this app
+       // loads) — matching exactly what the ported feature's own original
+       // approach did, since a byte-perfect CSS minifier is a separate,
+       // heavier tool this app has no other use for.
+       minifyCSS(code) {
+           return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
+       },
+
+       async run() {
+           if (Object.keys(Nexus.state.Vfs).length === 0) {
+               return alert("No files to build — the project is empty.");
+           }
+           if (typeof JSZip === 'undefined') {
+               return alert("JSZip failed to load — check network/CDN access.");
+           }
+
+           const st = document.getElementById('footStatus');
+           if (st) { st.innerText = "BUILDING..."; st.style.color = "var(--gold)"; }
+
+           try {
+               const zip = new JSZip();
+               const buildFolder = zip.folder("production_build");
+
+               const jsFiles = Object.keys(Nexus.state.Vfs).filter(f => f.toLowerCase().endsWith('.js'));
+               const cssFiles = Object.keys(Nexus.state.Vfs).filter(f => f.toLowerCase().endsWith('.css'));
+               const otherFiles = Object.keys(Nexus.state.Vfs).filter(f => !jsFiles.includes(f) && !cssFiles.includes(f));
+
+               let minifiedCount = 0, failedCount = 0;
+
+               for (const file of jsFiles) {
+                   try {
+                       const minified = await this.minifyJS(Nexus.state.Vfs[file]);
+                       buildFolder.file(file, minified);
+                       minifiedCount++;
+                   } catch (err) {
+                       // Same fallback the ported original used: ship the
+                       // unminified original rather than drop the file
+                       // from the build entirely over one bad minify pass
+                       // (e.g. a syntax Terser's parser is stricter about
+                       // than this app's own editor).
+                       console.error(`Minification failed for ${file}:`, err);
+                       buildFolder.file(file, Nexus.state.Vfs[file]);
+                       failedCount++;
+                   }
+               }
+
+               for (const file of cssFiles) {
+                   buildFolder.file(file, this.minifyCSS(Nexus.state.Vfs[file]));
+                   minifiedCount++;
+               }
+
+               for (const file of otherFiles) {
+                   buildFolder.file(file, Nexus.state.Vfs[file]);
+               }
+
+               const content = await zip.generateAsync({ type: "blob" });
+               const url = URL.createObjectURL(content);
+               const a = document.createElement("a");
+               a.href = url;
+               a.download = `divIDE_Build_${Date.now()}.zip`;
+               document.body.appendChild(a);
+               a.click();
+               document.body.removeChild(a);
+               URL.revokeObjectURL(url);
+
+               if (st) { st.innerText = "BUILD READY"; st.style.color = "var(--success)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
+               if (Nexus.shell && typeof Nexus.shell.out === 'function') {
+                   Nexus.shell.out(`📦 Production build downloaded: ${minifiedCount} file(s) minified${failedCount > 0 ? `, ${failedCount} shipped unminified after a Terser error` : ''}, ${otherFiles.length} copied as-is.`, failedCount > 0 ? 'warn' : 'success');
+               }
+           } catch (e) {
+               console.error("Production build failed:", e);
+               alert("Build failed: " + e.message);
+               if (st) { st.innerText = "BUILD FAILED"; st.style.color = "var(--danger)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
+           }
+       }
+   },
+
+   // Debugs the SANDBOXED PROJECT's own localStorage (whatever a
+   // still-in-progress game/tool built inside divIDE writes for its own
+   // high scores, settings, etc.) — never divIDE's own data, which lives
+   // entirely in IndexedDB via localforage/Dexie (neither has a
+   // localStorage mode at all), so there's no real risk of this
+   // accidentally surfacing or letting someone wipe divIDE's own project
+   // files. The KNOWN_PREFIXES filter is kept anyway as cheap defensive
+   // insurance in case anything unexpected ever writes to localStorage
+   // directly, even though nothing in this app currently does.
+   storageInspector: {
+       KNOWN_PREFIXES: ['nexus_', 'Nexus.state.', 'devos_', 'settings_'],
+
+       _isOwnKey(key) {
+           return this.KNOWN_PREFIXES.some(p => key.startsWith(p)) || key === 'vault_snippets';
+       },
+
+       _projectKeys() {
+           return Object.keys(localStorage).filter(k => !this._isOwnKey(k));
+       },
+
+       render() {
+           const container = document.getElementById('storageInspectorList');
+           if (!container) return;
+           const keys = this._projectKeys();
+
+           if (keys.length === 0) {
+               container.innerHTML = '<div style="color:var(--text); opacity:0.6; font-style:italic; font-size:12px; text-align:center; padding:20px 0;">No data found. Run your project (▶️) and it\'ll appear here once it writes to localStorage.</div>';
+               return;
+           }
+
+           container.innerHTML = keys.map(key => {
+               const val = localStorage.getItem(key);
+               const safeKey = key.replace(/'/g, "\\'");
+               return `
+                   <div style="display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+                       <div style="display:flex; justify-content:space-between; align-items:center;">
+                           <strong style="color:var(--accent); font-size:12px; word-break:break-all;">${key}</strong>
+                           <button class="tool-btn btn-danger" style="padding:2px 8px; font-size:9px; flex-shrink:0; margin-left:8px;" onclick="Nexus.storageInspector.deleteKey('${safeKey}')">DEL</button>
+                       </div>
+                       <textarea id="storageVal-${btoa(encodeURIComponent(key))}" class="sleek-input" style="width:100%; height:50px; font-size:11px; box-sizing:border-box; resize:vertical;">${(val || '').replace(/</g, '&lt;')}</textarea>
+                       <button class="tool-btn" style="width:100%; padding:6px; font-size:10px;" onclick="Nexus.storageInspector.updateKey('${safeKey}')">Update Value</button>
+                   </div>`;
+           }).join('');
+       },
+
+       updateKey(key) {
+           const el = document.getElementById(`storageVal-${btoa(encodeURIComponent(key))}`);
+           if (!el) return;
+           localStorage.setItem(key, el.value);
+           if (Nexus.shell && typeof Nexus.shell.out === 'function') Nexus.shell.out(`Updated localStorage key: ${key}`, 'success');
+       },
+
+       deleteKey(key) {
+           if (!confirm(`Delete localStorage key "${key}"?`)) return;
+           localStorage.removeItem(key);
+           this.render();
+           if (Nexus.shell && typeof Nexus.shell.out === 'function') Nexus.shell.out(`Deleted localStorage key: ${key}`, 'warn');
+       },
+
+       openSeeder() {
+           const name = prompt("Key name for this data (e.g. 'high_score'):");
+           if (!name) return;
+           if (this._isOwnKey(name)) return alert("That key name is reserved by divIDE itself — pick a different one.");
+           const value = prompt("Value to store (plain text or JSON):");
+           if (value === null) return; // cancelled
+           localStorage.setItem(name, value);
+           this.render();
+       },
+
+       clearAll() {
+           const keys = this._projectKeys();
+           if (keys.length === 0) return alert("Nothing to clear.");
+           if (!confirm(`Wipe all ${keys.length} localStorage key(s) from your previewed project? divIDE's own files and settings are unaffected.`)) return;
+           keys.forEach(k => localStorage.removeItem(k));
+           this.render();
+           if (Nexus.shell && typeof Nexus.shell.out === 'function') Nexus.shell.out(`Wiped ${keys.length} localStorage key(s).`, 'warn');
+       },
+
+       exportToJSON() {
+           const keys = this._projectKeys();
+           if (keys.length === 0) return alert("Nothing to export.");
+           const data = {};
+           keys.forEach(k => data[k] = localStorage.getItem(k));
+           const blob = new Blob([JSON.stringify(data, null, 4)], { type: 'application/json' });
+           const url = URL.createObjectURL(blob);
+           const a = document.createElement('a');
+           a.href = url;
+           a.download = 'project_localstorage_export.json';
+           document.body.appendChild(a);
+           a.click();
+           document.body.removeChild(a);
+           URL.revokeObjectURL(url);
        }
    },
 
@@ -12790,6 +13261,7 @@ initInfiniteRibbon() {
            if (id === 'settings') Nexus.settings.calcStorage(); 
            if (id === 'util-layout') Nexus.UI.renderUtilLayoutModal();
            if (id === 'snapshots') Nexus.snapshots.render();
+           if (id === 'storage-inspector') Nexus.storageInspector.render();
            if (id === 'diff') {
            const sel = document.getElementById('diffFileSelector');
            sel.innerHTML = `<option value="">Compare ${Nexus.state.activeFile} with...</option>` + 
@@ -13152,7 +13624,20 @@ initInfiniteRibbon() {
                // close it again in the same event loop pass.
                setTimeout(() => {
                    this._ribbonMenuOutsideHandler = (e) => {
-                       const btn = document.getElementById('ribbonMenuBtn');
+                       // Was checking against #ribbonMenuBtn — a fixed
+                       // top-right button that got removed once the real
+                       // trigger moved to the file tab bar's right edge.
+                       // Left unfixed, this would have made clicking the
+                       // ACTUAL trigger button register as an "outside"
+                       // click and instantly re-close the menu it just
+                       // opened, the moment ribbonMenuBtn stopped existing
+                       // in the DOM to be found (querying a missing id
+                       // just returns null, which is falsy, so the OR
+                       // below would always fall through to menu.contains
+                       // alone — close enough to work by accident for
+                       // clicks on the menu itself, but never for clicks
+                       // on the trigger button).
+                       const btn = document.getElementById('fileTabMenuBtn');
                        const menu = document.getElementById('ribbonMenuDropdown');
                        const clickedInside = (btn && btn.contains(e.target)) || (menu && menu.contains(e.target));
                        if (!clickedInside) this.toggleRibbonMenu();
