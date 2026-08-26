@@ -118,6 +118,15 @@
          single-purpose formatting library — none of them are dynamically
          imported on first use. -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/terser/5.31.0/bundle.min.js"></script>
+    <!-- PeerJS: real UMD build, exposes window.Peer (a constructor) — used
+         for live device-to-device sync over a direct WebRTC data channel.
+         By default this connects through PeerJS's own public signaling
+         broker (0.peerjs.com) purely to help two devices find each other
+         and negotiate the connection; once established, the actual file
+         data flows peer-to-peer, not through that server. No account or
+         API key needed for this default broker — that's PeerJS's own
+         documented free-tier behavior, not something configured here. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script>
@@ -195,7 +204,7 @@
         <button id="ribbonMenuAutocomplete" onclick="Nexus.UI.toggleAutocomplete(); Nexus.UI.syncRibbonMenu()">💡 Autocomplete</button>
         <div class="ribbon-dropdown-divider"></div>
         <button onclick="Nexus.UI.toggleSidebar('right')">🧰 Diagnostics Hub</button>
-        <button onclick="Nexus.UI.toggleBookmarkHere(); Nexus.UI.syncRibbonMenu()">🔖 Bookmark Line</button>
+        <button id="ribbonMenuBookmark" onclick="Nexus.UI.toggleBookmarkHere(); Nexus.UI.syncRibbonMenu()">🔖 Bookmark Line</button>
         <button onclick="Nexus.UI.openBookmarksPanel()">📑 All Bookmarks</button>
         <div class="ribbon-dropdown-divider"></div>
         <button onclick="Nexus.UI.openModal('manual'); Nexus.UI.toggleRibbonMenu()">❓ Help</button>
@@ -294,16 +303,27 @@
     </div>
     </div>
 
-    <!-- Navigation Drawer (🎮): bottom-left transform drawer. Diamond of 4
-         directional arrows on the left (reuses .dpad-arrow so setupFastHold's
-         boot-time querySelectorAll wires press-and-hold-to-repeat onto these
-         for free — no separate JS needed), square of 4 hardcoded action
+    <!-- Navigation Drawer (🎮): left-edge transform drawer, same reliable
+         slide-and-fully-vanish mechanism as every other drawer (Find &
+         Replace, Boilerplate Architect, Suggestions) via the shared
+         .transform-drawer class. Diamond of 4 directional arrows on the
+         left (reuses .dpad-arrow so setupFastHold's boot-time
+         querySelectorAll wires press-and-hold-to-repeat onto these for
+         free — no separate JS needed), square of 4 hardcoded action
          buttons on the right: Match Bracket, To 1-Line, Select Lock, Edit
-         Chunk. Deliberately its own class (transform-drawer-bottom), NOT
-         transform-drawer — the earlier !important block pins anything named
-         transform-drawer to the left-middle edge, which would fight a
-         bottom-anchored drawer on every property it sets. -->
-    <div id="navDrawer" class="transform-drawer-bottom">
+         Chunk.
+
+         FIX: this used to be a separate bottom-anchored variant
+         (.transform-drawer-bottom) whose closed position depended on a
+         dynamic inline `bottom` value set by toggleDrawer() only on OPEN,
+         never reset on close — so translateY(115%) ended up sliding it
+         down relative to an already-elevated resting position instead of
+         the true bottom of the screen, leaving it visibly hanging over
+         the footer buttons while "closed." The shared .transform-drawer
+         class has no such dependency: `left: 0` and `translateX(-105%)`
+         are both static, so closed genuinely means fully off-screen,
+         every time, with no measurement step that can go stale. -->
+    <div id="navDrawer" class="transform-drawer" style="top: auto; bottom: 80px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <span style="font-size:10px; color:var(--accent); font-weight:bold; letter-spacing:1px;">🎮 NAVIGATION</span>
             <span style="color:var(--danger); cursor:pointer; font-size:20px; line-height:1;" onclick="Nexus.UI.toggleDrawer('navDrawer')">&times;</span>
@@ -487,7 +507,7 @@
                     <button class="tool-btn btn-gold" onclick="Nexus.UI.openModal('diff')">👯 COMPARE</button>
                     <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
                     <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
-                    <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">🔗 COMBINE</button>
+                    <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">📦 BUNDLE</button>
                     <button class="tool-btn btn-gold" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
                     <button class="tool-btn btn-accent" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
                 </div>
@@ -734,9 +754,12 @@
                         <li><b>⚡ BUNDLE:</b> Compiles the entire project (HTML+CSS+JS) into one standalone HTML file.</li>
                         <li><b>⚡ MERGE JS:</b> Concatenates all <code>.js</code> files into a single script.</li>
                         <li><b>✂️ SPLIT JS:</b> Uses the code's real structure (not just guessing from text) to break one file into several.</li>
-                        <li><b>🔗 COMBINE:</b> Merges specific files and automatically re-routes every <code>import</code>/<code>src</code> reference to match.</li>
+                        <li><b>📦 BUNDLE (Files panel):</b> Stacks specific selected files into one new file and automatically re-routes every <code>import</code>/<code>src</code>/<code>href</code> reference to match. For reconciling differences between two versions of the same file, use the separate <b>Merge</b> tool below instead — these solve different problems despite the similar names.</li>
                     </ul>
                 </div>
+
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Merge (reconcile two file versions)</div>
+                <div class="man-p">Pick two files to build a third from their differences. Two modes, switchable anytime: <b>⚡ Quick</b> shows every difference at once with its own Left/Right/Both/Skip buttons — decide in any order, revisit any choice, then Build Result. <b>✍️ Manual</b> gives you a single editable block of text with every conflict marked <code>&lt;&lt;&lt;LEFT / === / &gt;&gt;&gt;RIGHT</code> — edit it directly, deleting or rewriting each marked section by hand.</div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">3. DIAGNOSTICS (Command Hub)</div>
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">Sentinel Lint &amp; Medic</div>
@@ -779,6 +802,9 @@
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">7. GITHUB SYNC</div>
                 <div class="man-p">Settings → GitHub Sync: add a repository (<code>user/repo</code>) and a personal access token (needs "repo" scope), then <b>Push</b>/<b>Pull</b> the current file or <b>Sync Entire Project</b>. The token is stored locally on this device and only ever sent to <code>api.github.com</code>.</div>
+
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Device Sync</div>
+                <div class="man-p">Settings → Device Sync: connects two devices running divIDE directly over a peer-to-peer connection (no account, nothing stored on a server). One device taps <b>Start Hosting</b> and shares the 6-character room code shown; the other taps <b>Join a Device</b> and enters it. Once connected, either side can tap <b>Send My Project</b> — nothing syncs automatically, and the receiving device always gets a confirmation first (with a warning if it has unsaved changes) before anything is replaced.</div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TOOLING (CodeMirror 6 Engine)</div>
                 <div class="man-p">Three optional CM6 features, all off by default — enable from the ⋮ dropdown menu:
@@ -823,12 +849,22 @@
 
     <div id="modalCombine" class="modal-overlay">
         <div class="modal-content">
-            <div class="p-head"><span>🔗 COMBINE FILES</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('combine')">&times;</button></div>
+            <div class="p-head"><span>📦 BUNDLE FILES TOGETHER</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('combine')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
-                <span style="font-size:11px; color:var(--text);">Select multiple files to merge. All project imports will be updated.</span>
+                <!-- Renamed from "Combine"/"Merge & Re-route" — this stacks
+                     multiple DIFFERENT files' raw content into one file
+                     (with comment separators, plus rewriting other files'
+                     import/src/href references to point at the new
+                     bundle) and updates OTHER files that referenced the
+                     old ones. It does NOT reconcile differences between
+                     two versions of the SAME file — that's Merge (in the
+                     tools menu), a separate, real diff-based tool. Sharing
+                     the word "merge" between the two was exactly what was
+                     confusing them together. -->
+                <span style="font-size:11px; color:var(--text);">Stacks the selected files into one new file (with the others' imports/references automatically updated to point at it). For reconciling differences between two versions of the same file, use <b>Merge</b> instead.</span>
                 <div id="combineList" style="max-height: 200px; overflow-y:auto; background:var(--bg); border:1px solid var(--border); padding:10px; border-radius:8px; display:flex; flex-direction:column; gap:8px;"></div>
                 <input type="text" id="combineName" class="sleek-input" placeholder="New Filename (e.g., bundle.js)" style="padding:15px; font-size:14px; background:var(--bg); border:1px solid var(--border);">
-                <button class="tool-btn btn-accent" style="padding:15px; width:100%; justify-content:center;" onclick="Nexus.Vfs.combineFiles()">⚡ MERGE &amp; RE-ROUTE</button>
+                <button class="tool-btn btn-accent" style="padding:15px; width:100%; justify-content:center;" onclick="Nexus.Vfs.combineFiles()">📦 BUNDLE &amp; RE-ROUTE</button>
             </div>
         </div>
     </div>
@@ -994,19 +1030,51 @@
             </div>
         </div>
     </div>
+
+    <!-- Peer-to-peer device sync. Two-tab layout: Host generates a room
+         code, Join connects to one — both funnel into the same
+         #peerSyncControls once actually connected, since sending a
+         project works identically regardless of which side started the
+         connection. -->
+    <div id="modalPeerSync" class="modal-overlay">
+        <div class="modal-content" style="max-width: 420px;">
+            <div class="p-head"><span>📡 DEVICE SYNC</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.peerSync.disconnect(); Nexus.UI.closeModal('peer-sync')">&times;</button></div>
+            <div class="modal-body" style="display:flex; flex-direction:column; gap:14px;">
+                <p style="font-size:11px; opacity:0.7; margin:0;">Connects two devices directly (peer-to-peer, no account) so one can send its whole project to the other. Nothing syncs automatically — you choose when to send.</p>
+
+                <div style="display:flex; gap:8px;">
+                    <button class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.peerSync.host()">Start Hosting</button>
+                    <button class="tool-btn" style="flex:1;" onclick="document.getElementById('peerSyncJoinRow').style.display='flex'">Join a Device</button>
+                </div>
+
+                <div id="peerSyncJoinRow" style="display:none; gap:8px;">
+                    <input type="text" id="peerSyncJoinCode" class="sleek-input" placeholder="Room code (e.g. AB3XY9)" style="flex:1; text-transform:uppercase;" maxlength="6">
+                    <button class="tool-btn btn-accent" onclick="Nexus.peerSync.join(document.getElementById('peerSyncJoinCode').value)">Connect</button>
+                </div>
+
+                <div id="peerSyncCode" style="text-align:center; font-size:28px; font-weight:900; letter-spacing:4px; color:var(--accent);"></div>
+                <div id="peerSyncStatus" style="text-align:center; font-size:12px;">Not connected.</div>
+
+                <div id="peerSyncControls" style="display:none; flex-direction:column; gap:8px;">
+                    <button class="tool-btn btn-success" style="width:100%; padding:14px;" onclick="Nexus.peerSync.sendProject()">📤 Send My Project to the Other Device</button>
+                    <button class="tool-btn btn-danger" style="width:100%;" onclick="Nexus.peerSync.disconnect()">Disconnect</button>
+                </div>
+            </div>
+        </div>
+    </div>
     
 <div id="modalMerge" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content" style="width:92%; height:85%;">
         <div class="p-head">
             <span>MATRIX MERGE ENGINE</span>
             <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('merge')">×</button>
         </div>
-        <div class="p-body">
-            <div style="display:flex; gap:10px; margin-bottom:15px; background:var(--surface); padding:10px; border-radius:12px;">
-                <select id="mergeLeftSel" class="sleek-input" style="flex:1;"></select>
+
+        <div class="p-body" style="display:flex; flex-direction:column; overflow:hidden;">
+            <div style="display:flex; gap:10px; margin-bottom:10px; background:var(--surface); padding:10px; border-radius:12px; flex-shrink:0;">
+                <select id="mergeLeftSel" class="sleek-input" style="flex:1;" onchange="Nexus.merge.start()"></select>
                 <div style="align-self:center; color:var(--gold); font-weight:900;">VS</div>
-                <select id="mergeRightSel" class="sleek-input" style="flex:1;"></select>
-                <button class="tool-btn btn-accent" onclick="Nexus.merge.start()">COMPARE</button>
+                <select id="mergeRightSel" class="sleek-input" style="flex:1;" onchange="Nexus.merge.start()"></select>
             </div>
 
             <!-- Was previously nowhere in the DOM at all: snapshots.
@@ -1016,22 +1084,33 @@
                  check) — meaning snapshots were being SAVED successfully
                  via the 📸 button the whole time, just with no way to
                  ever see or restore them. -->
-            <details style="background:var(--surface); border-radius:12px; margin-bottom:15px;">
+            <details style="background:var(--surface); border-radius:12px; margin-bottom:10px; flex-shrink:0;">
                 <summary style="padding:12px; cursor:pointer; color:var(--gold); font-weight:800; font-size:12px;">📸 SNAPSHOTS — diff a saved version of the active file against now</summary>
                 <div id="mergeSnapshotList" style="padding:0 12px 12px;"></div>
             </details>
 
-            <div id="mergeDiffView" style="flex:1; overflow-y:auto; font-family:monospace; font-size:12px; background:#000; border-radius:8px; border:1px solid var(--border);">
-                </div>
-        </div>
-        <div id="mergeControls" class="p-head" style="display:none; background:var(--bg); border-top:1px solid var(--border); flex-wrap:wrap; gap:6px;">
-            <span id="mergeProgress">Conflict 0 of 0</span>
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button id="mergeBtnLeft" class="tool-btn btn-danger" onclick="Nexus.merge.choose('left')">TAKE LEFT</button>
-                <button id="mergeBtnBoth" class="tool-btn btn-gold" onclick="Nexus.merge.choose('both')">KEEP BOTH</button>
-                <button id="mergeBtnRight" class="tool-btn btn-accent" onclick="Nexus.merge.choose('right')">TAKE RIGHT</button>
-                <button id="mergeBtnSkip" class="tool-btn" onclick="Nexus.merge.choose('skip')">SKIP</button>
+            <!-- Two real, distinct ways to build a third file out of two
+                 existing ones — not two views of the same broken flow.
+                 QUICK: every difference shown at once, each with its own
+                 inline Left/Right/Both/Skip — no one-at-a-time modal gate,
+                 decide in any order, change your mind, then Build Result.
+                 MANUAL: a single editable textarea, pre-seeded with every
+                 unchanged line plus BOTH sides of every conflict marked
+                 with plain <<<LEFT / === / RIGHT>>> dividers (the same
+                 convention real merge tools use) — type freely to resolve
+                 it by hand instead of clicking through hunks. -->
+            <div style="display:flex; gap:8px; margin-bottom:10px; flex-shrink:0;">
+                <button id="mergeModeQuickBtn" class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.merge.setMode('quick')">⚡ QUICK (pick per-difference)</button>
+                <button id="mergeModeManualBtn" class="tool-btn" style="flex:1;" onclick="Nexus.merge.setMode('manual')">✍️ MANUAL (edit directly)</button>
             </div>
+
+            <div id="mergeQuickView" style="flex:1; overflow-y:auto; font-family:monospace; font-size:12px; background:#000; border-radius:8px; border:1px solid var(--border); padding:8px;"></div>
+
+            <textarea id="mergeManualView" class="sleek-input" style="display:none; flex:1; font-family:monospace; font-size:12px; resize:none; white-space:pre; overflow:auto;" spellcheck="false"></textarea>
+        </div>
+        <div id="mergeControls" class="p-head" style="background:var(--bg); border-top:1px solid var(--border); flex-wrap:wrap; gap:6px;">
+            <span id="mergeProgress">Select two files to begin.</span>
+            <button class="tool-btn btn-success" onclick="Nexus.merge.finish()">✔ BUILD RESULT</button>
         </div>
     </div>
 </div>
@@ -1182,6 +1261,14 @@
                     </div>
                     <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.github.pullAll()" title="Sync the entire project from GitHub" aria-label="Sync entire project from GitHub">🔄 SYNC ENTIRE PROJECT</button>
                     <div id="githubStatus" role="status" aria-live="polite" style="font-size:11px; margin-top:6px; min-height: 16px;"></div>
+                </div>
+            </div>
+
+            <div class="slab">
+                <div class="section-label" style="margin-top: 0;">Device Sync</div>
+                <div style="display: flex; flex-direction: column; gap: 8px; padding: 5px;">
+                    <span style="font-size:11px; opacity:0.7;">Send your project directly to another device running divIDE — peer-to-peer, no account, nothing stored on a server.</span>
+                    <button class="tool-btn btn-accent" style="width:100%;" onclick="Nexus.UI.openModal('peer-sync')">📡 OPEN DEVICE SYNC</button>
                 </div>
             </div>
 
@@ -1380,8 +1467,17 @@
 
     <!-- 3. Native Application Status Bar -->
     <div class="dock-status-bar">
-        <span id="footStatus" class="status-indicator">READY (FULL)</span>
-        <span id="footPos" class="position-indicator">LN 1, COL 1</span>
+        <!-- FIX: setEmptyState()/switchFile() have always written into
+             #footFile ("VORTEX EMPTY" / "FILE: x"), guarded against it
+             being missing — but it never actually existed anywhere in the
+             DOM, so the active filename was silently never shown at all,
+             this whole time. Restoring the real element instead of just
+             leaving the dead-but-guarded reference in place. -->
+        <span id="footFile" class="status-indicator" style="opacity:0.7;">VORTEX EMPTY</span>
+        <div style="display:flex; gap:12px; align-items:center;">
+            <span id="footStatus" class="status-indicator">READY (FULL)</span>
+            <span id="footPos" class="position-indicator">LN 1, COL 1</span>
+        </div>
     </div>
 </footer>
 

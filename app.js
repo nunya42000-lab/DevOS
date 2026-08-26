@@ -4537,10 +4537,10 @@ chunkEditor: {
    _originalText: null,
 
    // If there's an active, non-empty selection, that selection IS the
-   // chunk — this covers both: (1) Task 5's "manually highlighted code ->
-   // Edit Chunk opens exactly that", and (2) Task 2's bracket workflow
-   // (touch a bracket -> Select Lock on -> Match Bracket teleports AND
-   // extends the selection via selectMatchingBracket -> Edit Chunk opens
+   // chunk — this covers both: (1) manually highlighted code -> Edit
+   // Chunk opens exactly that, and (2) the bracket workflow (touch a
+   // bracket -> Select Lock on -> Match Bracket selects the full
+   // bracket-to-bracket or tag-to-tag range, inclusive -> Edit Chunk opens
    // exactly what's now highlighted). Falls back to the existing
    // cursor-position node lookup (_getEnclosingDeclaration) only when
    // there's no selection to honor, preserving the original "just place
@@ -5024,6 +5024,20 @@ try {
             foldNodeProp: cmLang.foldNodeProp,
             foldInside: cmLang.foldInside,
             forceParsing: cmLang.forceParsing,
+            // matchBrackets(state, pos, dir) is the real, lower-level
+            // primitive @codemirror/language's bracketMatching() extension
+            // itself is built on — it returns the actual bracket character
+            // positions ({start:{from,to}, end:{from,to}}), not just a
+            // cursor-move/selection-extend command. Needed for "select
+            // this bracket pair AND everything between them, inclusive" —
+            // cursorMatchingBracket/selectMatchingBracket (from
+            // @codemirror/commands, already imported below) are designed
+            // for navigation, and their selection naturally starts/ends
+            // wherever the cursor already was relative to the bracket, not
+            // at the bracket character's own position — which is why
+            // selectMatchingBracket alone left the brackets themselves out
+            // of the selection.
+            matchBrackets: cmLang.matchBrackets,
             // Bracket & tag tracing: same extension covers both. For JS it
             // matches {}/[]/(); for HTML, lang-html's bracketMatchingHandle
             // routes tag-name text through this exact matcher, so <div>/</div>
@@ -6453,6 +6467,187 @@ self.addEventListener('fetch', (e) => {
        }
    },
 
+   // Live device-to-device sync over a direct WebRTC data channel via
+   // PeerJS — connects two divIDE instances so one can mirror its project
+   // to the other with no server storage involved (PeerJS's public broker
+   // only helps the two devices find each other; once connected, data
+   // flows directly peer-to-peer). Ported from an earlier standalone
+   // version of this app that had this feature, rebuilt against this
+   // app's real current architecture rather than copied verbatim — the
+   // original's design would have silently overwritten Vfs wholesale on
+   // every incoming change, with no awareness that Vfs is now split into
+   // "loaded files" vs. "open tabs" or that per-file dirty-tracking
+   // exists at all. This version treats every incoming sync as an
+   // explicit, confirmable action instead of a silent background
+   // overwrite — the same posture this app already takes for closing a
+   // dirty tab or restoring a snapshot.
+   peerSync: {
+       peer: null,
+       conn: null,
+       role: null, // 'host' | 'guest'
+
+       // Six-character room code, uppercase, ambiguous-character-free
+       // (no 0/O/1/I) so it's easy to read aloud or type on a phone
+       // keyboard without a confusable-character mistake.
+       _genCode() {
+           const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+           let code = '';
+           for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+           return code;
+       },
+
+       _setStatus(text, color) {
+           const el = document.getElementById('peerSyncStatus');
+           if (el) { el.innerText = text; el.style.color = color || 'var(--text)'; }
+       },
+
+       // Host: generates a room code and waits for a guest to connect.
+       // divIDE's own PeerJS "id" IS the room code (prefixed so it can't
+       // collide with someone else's completely unrelated PeerJS app
+       // using the same public broker).
+       host() {
+           if (typeof Peer === 'undefined') return alert("PeerJS failed to load — check network/CDN access.");
+           this.disconnect(); // clean up any previous session first
+
+           const code = this._genCode();
+           this._setStatus('Starting…', 'var(--gold)');
+           this.role = 'host';
+           this.peer = new Peer('divide-' + code);
+
+           this.peer.on('open', () => {
+               const codeEl = document.getElementById('peerSyncCode');
+               if (codeEl) codeEl.innerText = code;
+               this._setStatus('Waiting for a device to join…', 'var(--gold)');
+           });
+
+           this.peer.on('connection', (conn) => {
+               // Only accept one guest at a time — a second incoming
+               // connection while already paired is rejected rather than
+               // silently juggling two peers with two different views of
+               // "the project."
+               if (this.conn) { conn.close(); return; }
+               this.conn = conn;
+               this._wireConnection();
+           });
+
+           this.peer.on('error', (err) => {
+               console.error('PeerSync host error:', err);
+               this._setStatus('Error: ' + err.type, 'var(--danger)');
+           });
+       },
+
+       // Guest: connects to an existing host's room code.
+       join(code) {
+           if (typeof Peer === 'undefined') return alert("PeerJS failed to load — check network/CDN access.");
+           if (!code) return alert("Enter the room code shown on the other device.");
+           this.disconnect();
+
+           this.role = 'guest';
+           this._setStatus('Connecting…', 'var(--gold)');
+           this.peer = new Peer();
+
+           this.peer.on('open', () => {
+               this.conn = this.peer.connect('divide-' + code.trim().toUpperCase(), { reliable: true });
+               this._wireConnection();
+           });
+
+           this.peer.on('error', (err) => {
+               console.error('PeerSync guest error:', err);
+               this._setStatus(err.type === 'peer-unavailable' ? 'No device found with that code.' : 'Error: ' + err.type, 'var(--danger)');
+           });
+       },
+
+       _wireConnection() {
+           this.conn.on('open', () => {
+               this._setStatus('✔ Connected — ready to sync.', 'var(--success)');
+               const controls = document.getElementById('peerSyncControls');
+               if (controls) controls.style.display = 'flex';
+           });
+
+           this.conn.on('data', (data) => this._handleIncoming(data));
+
+           this.conn.on('close', () => {
+               this._setStatus('Disconnected.', 'var(--danger)');
+               const controls = document.getElementById('peerSyncControls');
+               if (controls) controls.style.display = 'none';
+               this.conn = null;
+           });
+
+           this.conn.on('error', (err) => {
+               console.error('PeerSync connection error:', err);
+               this._setStatus('Connection error.', 'var(--danger)');
+           });
+       },
+
+       // Explicit push — the person taps "Send My Project," not something
+       // that fires automatically on every keystroke. Continuous
+       // background sync (the old version's actual design) means every
+       // typo gets mirrored instantly to the other device with no chance
+       // to review anything first; an explicit action matches how every
+       // other cross-device operation in this app already works (GitHub
+       // push/pull is also always explicit, never automatic).
+       sendProject() {
+           if (!this.conn || !this.conn.open) return alert("Not connected.");
+           this.conn.send({
+               type: 'project-sync',
+               vfs: Nexus.state.Vfs,
+               originals: Nexus.state.originals
+           });
+           this._setStatus('Sent — waiting for the other device to accept.', 'var(--gold)');
+       },
+
+       _handleIncoming(data) {
+           if (!data || data.type !== 'project-sync') return;
+
+           const dirtyTabs = (Nexus.state.openTabs || []).filter(fn => Nexus.Vfs.isDirty(fn));
+           const fileCount = Object.keys(data.vfs || {}).length;
+           const warning = dirtyTabs.length > 0
+               ? `\n\n⚠️ You have unsaved changes in: ${dirtyTabs.join(', ')} — these will be lost.`
+               : '';
+
+           const accept = confirm(`The other device wants to sync ${fileCount} file(s) to this one. This replaces your entire current project.${warning}`);
+           if (!accept) {
+               this._setStatus('Incoming sync declined.', 'var(--text)');
+               return;
+           }
+
+           const incomingVfs = JSON.parse(JSON.stringify(data.vfs || {}));
+           const incomingOriginals = JSON.parse(JSON.stringify(data.originals || incomingVfs));
+
+           Nexus.state.Vfs = incomingVfs;
+           Nexus.state.originals = incomingOriginals;
+           Nexus.state.lastSavedContent = JSON.parse(JSON.stringify(incomingVfs));
+           Nexus.state.openTabs = (Nexus.state.openTabs || []).filter(fn => incomingVfs[fn] !== undefined);
+           Nexus.Vfs.saveOpenTabs();
+
+           const files = Object.keys(incomingVfs);
+           const reopenTarget = (Nexus.state.activeFile && incomingVfs[Nexus.state.activeFile] !== undefined)
+               ? Nexus.state.activeFile
+               : files[0];
+
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           if (reopenTarget) {
+               Nexus.Vfs.switchFile(reopenTarget);
+           } else {
+               Nexus.Vfs.setEmptyState();
+           }
+
+           this._setStatus(`✔ Synced ${fileCount} file(s) from the other device.`, 'var(--success)');
+       },
+
+       disconnect() {
+           if (this.conn) { try { this.conn.close(); } catch (e) {} this.conn = null; }
+           if (this.peer) { try { this.peer.destroy(); } catch (e) {} this.peer = null; }
+           this.role = null;
+           this._setStatus('Not connected.', 'var(--text)');
+           const controls = document.getElementById('peerSyncControls');
+           if (controls) controls.style.display = 'none';
+           const codeEl = document.getElementById('peerSyncCode');
+           if (codeEl) codeEl.innerText = '';
+       }
+   },
+
    defrag: {
        runJS() {
            if (!Nexus.state.activeFile.endsWith('.js')) return alert("Select .js file.");
@@ -6703,11 +6898,17 @@ grab() {
 // re-render on every single auto-skipped hunk (now renders once per user-
 // facing decision), and finish() always creating a new file with no way
 // to save back into an existing one.
+// Rebuilt as two genuinely different modes for building a third file out of
+// two existing ones, not two views bolted onto the same broken one-hunk-at-
+// a-time flow. QUICK shows every difference at once with its own inline
+// controls (pick in any order, revisit any decision); MANUAL hands you a
+// single editable textarea pre-seeded with unchanged lines plus both sides
+// of every conflict clearly marked, to resolve by typing directly.
 merge: {
     hunks: [],
-    hIdx: 0,
-    finalCode: [],
-    
+    decisions: [], // parallel array to hunks: 'left' | 'right' | 'both' | 'skip' | null (unresolved)
+    mode: 'quick',
+
     open() {
         // Populate selectors with all Vfs files
         const files = Object.keys(Nexus.state.Vfs);
@@ -6717,6 +6918,10 @@ merge: {
         const options = files.map(f => `<option value="${f}">${f}</option>`).join('');
         lSel.innerHTML = options;
         rSel.innerHTML = options;
+        // Sensible default so opening Merge immediately shows something
+        // rather than an empty comparison of whatever happened to be
+        // first in both dropdowns.
+        if (files.length > 1) rSel.value = files.find(f => f !== lSel.value) || files[1];
 
         // Refresh the snapshot list every time this modal opens — it was
         // previously only re-rendered on boot and right after creating a
@@ -6726,140 +6931,188 @@ merge: {
         if (typeof Nexus.snapshots?.render === 'function') Nexus.snapshots.render();
         
         Nexus.UI.openModal('merge');
+        this.start();
     },
 
     start() {
         const leftFile = document.getElementById('mergeLeftSel').value;
         const rightFile = document.getElementById('mergeRightSel').value;
-        if (!leftFile || !rightFile) return alert("Select two files to compare.");
+        if (!leftFile || !rightFile) {
+            document.getElementById('mergeProgress').innerText = 'Select two files to begin.';
+            return;
+        }
         
         const leftText = Nexus.state.Vfs[leftFile] || '';
         const rightText = Nexus.state.Vfs[rightFile] || '';
         
         this.hunks = Diff.diffLines(leftText, rightText);
-        this.hIdx = 0;
-        this.finalCode = [];
-        this._skipUnchanged();
+        // Unchanged hunks are auto-resolved from the start (nothing to
+        // decide); conflicts start unresolved (null) so Build Result can
+        // warn about anything still needing a real decision.
+        this.decisions = this.hunks.map(h => (h.added || h.removed) ? null : 'both');
+        this.render();
     },
 
-    // Pushes every run of unchanged (context) hunks straight into the
-    // output and stops at the next hunk that actually needs a decision —
-    // a plain while loop, not self-recursion, so a file with hundreds of
-    // unchanged lines can't build an unbounded call stack the way the
-    // previous renderDiff()-calls-itself version could. Renders exactly
-    // once, after landing on the next real decision (or the end).
-    _skipUnchanged() {
-        while (this.hIdx < this.hunks.length && !this.hunks[this.hIdx].added && !this.hunks[this.hIdx].removed) {
-            this.finalCode.push(this.hunks[this.hIdx].value);
-            this.hIdx++;
-        }
-        if (this.hIdx >= this.hunks.length) {
-            this.finish();
-        } else {
-            this.renderDiff();
-        }
+    setMode(mode) {
+        if (mode === this.mode) return;
+        this.mode = mode;
+        document.getElementById('mergeModeQuickBtn').classList.toggle('btn-accent', mode === 'quick');
+        document.getElementById('mergeModeManualBtn').classList.toggle('btn-accent', mode === 'manual');
+        this.render();
+    },
+
+    render() {
+        document.getElementById('mergeQuickView').style.display = this.mode === 'quick' ? 'block' : 'none';
+        document.getElementById('mergeManualView').style.display = this.mode === 'manual' ? 'block' : 'none';
+        if (this.mode === 'quick') this._renderQuick();
+        else this._renderManual();
     },
 
     // True only for a genuine replacement: this hunk is removed AND the
     // very next one is added. This exact adjacency is how diffLines
-    // represents "this line became that line" — not a guess, the
-    // documented shape of a changed region in jsdiff's output.
-    _isReplacePair() {
-        const cur = this.hunks[this.hIdx];
-        const next = this.hunks[this.hIdx + 1];
+    // represents "this line became that line" — documented jsdiff output
+    // shape, not a guess.
+    _isReplacePair(i) {
+        const cur = this.hunks[i], next = this.hunks[i + 1];
         return !!(cur && cur.removed && next && next.added);
     },
 
-    renderDiff() {
-        const view = document.getElementById('mergeDiffView');
-        const controls = document.getElementById('mergeControls');
-        const isPair = this._isReplacePair();
-        
-        view.innerHTML = this.hunks.map((h, i) => {
-            const isCurrent = i === this.hIdx || (isPair && i === this.hIdx + 1);
-            let color = h.added ? 'var(--success)' : (h.removed ? 'var(--danger)' : 'var(--text)');
-            let bg = isCurrent ? 'rgba(210, 153, 34, 0.2)' : 'transparent';
-            let prefix = h.added ? '+ ' : (h.removed ? '- ' : '  ');
-            return `<div style="background:${bg}; color:${color}; padding:2px 10px; white-space:pre-wrap;">${prefix}${h.value}</div>`;
-        }).join('');
+    // QUICK MODE — every hunk rendered at once, each with its own inline
+    // controls. Replacement pairs (a removed hunk immediately followed by
+    // an added one) are rendered and decided together as a single row;
+    // one-sided hunks (pure insertion or pure deletion) get a single
+    // Keep/Skip choice instead of a meaningless three-way pick.
+    _renderQuick() {
+        const view = document.getElementById('mergeQuickView');
+        let html = '';
+        let unresolvedCount = 0;
 
-        const current = this.hunks[this.hIdx];
-        document.getElementById('mergeProgress').innerText = `Conflict at Hunk ${this.hIdx + 1}/${this.hunks.length}`;
-        controls.style.display = 'flex';
-
-        // Swap which buttons are shown depending on whether this is a real
-        // two-sided replacement or a one-sided pure insertion/deletion —
-        // this is the actual fix for buttons that silently did nothing.
-        const btnLeft = document.getElementById('mergeBtnLeft');
-        const btnBoth = document.getElementById('mergeBtnBoth');
-        const btnRight = document.getElementById('mergeBtnRight');
-        const btnSkip = document.getElementById('mergeBtnSkip');
-
-        if (isPair) {
-            btnLeft.style.display = ''; btnLeft.textContent = 'KEEP LEFT';
-            btnBoth.style.display = '';
-            btnRight.style.display = ''; btnRight.textContent = 'KEEP RIGHT';
-            btnSkip.style.display = '';
-        } else if (current.removed) {
-            btnLeft.style.display = ''; btnLeft.textContent = 'KEEP (this only exists on the left)';
-            btnBoth.style.display = 'none';
-            btnRight.style.display = 'none';
-            btnSkip.style.display = '';
-        } else { // current.added
-            btnLeft.style.display = 'none';
-            btnBoth.style.display = 'none';
-            btnRight.style.display = ''; btnRight.textContent = 'KEEP (this only exists on the right)';
-            btnSkip.style.display = '';
-        }
-    },
-
-    choose(side) {
-        const isPair = this._isReplacePair();
-        const current = this.hunks[this.hIdx];
-
-        if (isPair) {
-            const removedHunk = current, addedHunk = this.hunks[this.hIdx + 1];
-            if (side === 'left') this.finalCode.push(removedHunk.value);
-            if (side === 'right') this.finalCode.push(addedHunk.value);
-            if (side === 'both') { this.finalCode.push(removedHunk.value); this.finalCode.push(addedHunk.value); }
-            // 'skip' pushes neither
-            this.hIdx += 2; // consume both halves of the pair together
-        } else {
-            // One-sided hunk — only 'left' (for a removed-only hunk) or
-            // 'right' (for an added-only hunk) actually keeps it; 'skip'
-            // discards it. Guards against the impossible combination
-            // (e.g. choosing 'right' on a removed-only hunk) doing
-            // nothing silently, same failure as before — those buttons
-            // are simply hidden now instead (see renderDiff), so this
-            // path shouldn't be reachable with a mismatched side anyway.
-            if ((side === 'left' && current.removed) || (side === 'right' && current.added)) {
-                this.finalCode.push(current.value);
+        for (let i = 0; i < this.hunks.length; i++) {
+            const h = this.hunks[i];
+            if (!h.added && !h.removed) {
+                html += `<div style="color:var(--text); opacity:0.5; padding:2px 8px; white-space:pre-wrap;">  ${this._esc(h.value)}</div>`;
+                continue;
             }
-            this.hIdx += 1;
+
+            const isPair = this._isReplacePair(i);
+            const decision = this.decisions[i];
+            if (decision === null) unresolvedCount++;
+
+            if (isPair) {
+                const removedHunk = h, addedHunk = this.hunks[i + 1];
+                html += this._renderConflictRow(i, removedHunk.value, addedHunk.value, decision, true);
+                i++; // consumed the paired added hunk too
+            } else if (h.removed) {
+                html += this._renderConflictRow(i, h.value, null, decision, false);
+            } else { // pure addition
+                html += this._renderConflictRow(i, null, h.value, decision, false);
+            }
         }
 
-        this._skipUnchanged();
+        view.innerHTML = html || '<div style="opacity:0.6; padding:20px; text-align:center;">No differences — both files are identical.</div>';
+        document.getElementById('mergeProgress').innerText = unresolvedCount > 0
+            ? `${unresolvedCount} unresolved difference${unresolvedCount === 1 ? '' : 's'}`
+            : `All differences resolved (${this.hunks.filter((h,i)=>h.added||h.removed).length} total).`;
     },
+
+    _renderConflictRow(i, leftVal, rightVal, decision, isPair) {
+        const btn = (value, label, cls) => `<button class="tool-btn ${cls}" style="font-size:10px; padding:4px 8px;" onclick="Nexus.merge.decide(${i}, '${value}')">${decision === value ? '✔ ' : ''}${label}</button>`;
+        let buttons = '';
+        if (isPair) {
+            buttons = btn('left', 'LEFT', 'btn-danger') + btn('right', 'RIGHT', 'btn-accent') + btn('both', 'BOTH', 'btn-gold') + btn('skip', 'SKIP', '');
+        } else if (leftVal !== null) {
+            buttons = btn('left', 'KEEP', 'btn-danger') + btn('skip', 'SKIP', '');
+        } else {
+            buttons = btn('right', 'KEEP', 'btn-accent') + btn('skip', 'SKIP', '');
+        }
+
+        const borderColor = decision === null ? 'var(--gold)' : 'var(--border)';
+        let body = '';
+        if (leftVal !== null) body += `<div style="color:var(--danger); white-space:pre-wrap;">- ${this._esc(leftVal)}</div>`;
+        if (rightVal !== null) body += `<div style="color:var(--success); white-space:pre-wrap;">+ ${this._esc(rightVal)}</div>`;
+
+        return `<div style="border:1px solid ${borderColor}; border-radius:6px; margin:4px 0; padding:6px 8px;">
+            <div style="display:flex; justify-content:flex-end; gap:6px; margin-bottom:4px;">${buttons}</div>
+            ${body}
+        </div>`;
+    },
+
+    decide(i, value) {
+        this.decisions[i] = value;
+        this._renderQuick();
+    },
+
+    // MANUAL MODE — a single flat text blob. Unchanged lines pass through
+    // as-is; every conflict (pair or one-sided) is wrapped in plain
+    // <<<LEFT / === / RIGHT>>> markers, the same convention real merge
+    // tools use, so it reads clearly even to someone who's never used
+    // this specific app before. Regenerated fresh from the hunks every
+    // time you switch into this mode — it does not try to reflect
+    // whatever was already decided in Quick mode, since translating
+    // partial per-hunk decisions into markers and back is more complexity
+    // than it's worth; the two modes are independent means to the same
+    // end, not a synced pair.
+    _renderManual() {
+        let text = '';
+        for (let i = 0; i < this.hunks.length; i++) {
+            const h = this.hunks[i];
+            if (!h.added && !h.removed) { text += h.value; continue; }
+
+            if (this._isReplacePair(i)) {
+                text += `<<<LEFT\n${this.hunks[i].value}===\n${this.hunks[i + 1].value}>>>RIGHT\n`;
+                i++;
+            } else if (h.removed) {
+                text += `<<<LEFT (only on the left — delete this whole marked block to drop it)\n${h.value}>>>RIGHT\n`;
+            } else {
+                text += `<<<LEFT (only on the right — delete this whole marked block to drop it)\n${h.value}>>>RIGHT\n`;
+            }
+        }
+        document.getElementById('mergeManualView').value = text;
+        document.getElementById('mergeProgress').innerText = 'Edit directly — resolve or delete each <<<LEFT / >>>RIGHT block.';
+    },
+
+    _esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); },
 
     finish() {
-        document.getElementById('mergeControls').style.display = 'none';
-        const existingFiles = Object.keys(Nexus.state.Vfs);
-        const leftFile = document.getElementById('mergeLeftSel').value;
-        const saveMode = confirm(
-            `Merge complete.\n\nOK = save back into "${leftFile}"\nCancel = save as a new file`
-        );
+        let mergedContent;
 
-        const mergedContent = this.finalCode.join('');
-
-        if (saveMode) {
-            Nexus.state.Vfs[leftFile] = mergedContent;
-            if (Nexus.state.activeFile === leftFile) {
-                Nexus.Vfs.switchFile(leftFile); // refresh the open editor if it's showing this file right now
+        if (this.mode === 'manual') {
+            mergedContent = document.getElementById('mergeManualView').value;
+            if (/<<<LEFT|>>>RIGHT/.test(mergedContent)) {
+                if (!confirm("There are still unresolved <<<LEFT/>>>RIGHT markers in the text. Build anyway?")) return;
             }
         } else {
-            const mergedName = prompt("Save merged result as:", "merged_result.js");
-            if (!mergedName) return; // leave the diff view as-is rather than silently discarding the completed merge
-            Nexus.state.Vfs[mergedName] = mergedContent;
+            const unresolved = this.decisions.filter(d => d === null).length;
+            if (unresolved > 0 && !confirm(`${unresolved} difference(s) are still unresolved and will be skipped. Build anyway?`)) return;
+
+            const parts = [];
+            for (let i = 0; i < this.hunks.length; i++) {
+                const h = this.hunks[i];
+                const decision = this.decisions[i];
+                if (!h.added && !h.removed) { parts.push(h.value); continue; }
+
+                if (this._isReplacePair(i)) {
+                    if (decision === 'left') parts.push(this.hunks[i].value);
+                    if (decision === 'right') parts.push(this.hunks[i + 1].value);
+                    if (decision === 'both') { parts.push(this.hunks[i].value); parts.push(this.hunks[i + 1].value); }
+                    i++;
+                } else if (decision === 'left' || decision === 'right') {
+                    parts.push(h.value);
+                }
+            }
+            mergedContent = parts.join('');
+        }
+
+        const leftFile = document.getElementById('mergeLeftSel').value;
+        const rightFile = document.getElementById('mergeRightSel').value;
+        const dot = leftFile.lastIndexOf('.');
+        const suggestedName = dot === -1 ? leftFile + '.merged' : leftFile.slice(0, dot) + '.merged' + leftFile.slice(dot);
+        const mergedName = prompt("Save the merged result as:", suggestedName);
+        if (!mergedName) return;
+
+        const isNewFile = Nexus.state.Vfs[mergedName] === undefined;
+        Nexus.state.Vfs[mergedName] = mergedContent;
+        if (isNewFile) {
             Nexus.state.originals[mergedName] = mergedContent;
             Nexus.state.lastSavedContent[mergedName] = mergedContent;
         }
@@ -6867,21 +7120,27 @@ merge: {
         Nexus.Vfs.save();
         Nexus.Vfs.renderAccordion();
         Nexus.UI.closeModal('merge');
-        alert(saveMode ? `Saved into ${leftFile}.` : `Saved as a new file.`);
+        Nexus.Vfs.switchFile(mergedName);
+        alert(`Merged result saved as "${mergedName}".`);
     }
 },
 
 mergeEngine: {
     // Kicks off a diff between a saved snapshot's version of the active file
-    // and its current contents, reusing the existing merge/choose/finish engine.
+    // and its current contents, reusing the same merge engine — snapshot
+    // becomes "left," current content becomes "right." Opens straight into
+    // Quick mode since a snapshot-vs-now diff is usually reviewed quickly,
+    // not hand-edited.
     initiate(oldCode) {
         if (oldCode === undefined) return alert("That snapshot has no data for the active file.");
         const current = Nexus.state.Vfs[Nexus.state.activeFile] || '';
         Nexus.UI.openModal('merge');
         Nexus.merge.hunks = Diff.diffLines(oldCode, current);
-        Nexus.merge.hIdx = 0;
-        Nexus.merge.finalCode = [];
-        Nexus.merge.renderDiff();
+        Nexus.merge.decisions = Nexus.merge.hunks.map(h => (h.added || h.removed) ? null : 'both');
+        Nexus.merge.mode = 'quick';
+        document.getElementById('mergeModeQuickBtn').classList.add('btn-accent');
+        document.getElementById('mergeModeManualBtn').classList.remove('btn-accent');
+        Nexus.merge.render();
     }
 },
 
@@ -7366,6 +7625,27 @@ settings: {
     async boot() { 
         const saved = await localforage.getItem('nexus_prefs_v42'); 
         if (saved) Nexus.state.prefs = saved; 
+
+        // One-time migration: bookmarkHere/bookmarksList/select used to be
+        // part of DEFAULT_UTIL_LAYOUT and so could already be baked into
+        // an existing saved utilLayout string from before they were
+        // removed as duplicates of the dropdown menu / footer dock. This
+        // strips them out of whatever's already saved (if anything is
+        // saved at all — a person who never customized their layout was
+        // already fixed by the default change alone, and this simply has
+        // nothing to touch for them). Safe to run every boot: once
+        // they're gone from a saved layout, this is a no-op from then on.
+        if (Nexus.state.prefs.utilLayout) {
+            const stale = ['bookmarkHere', 'bookmarksList', 'select'];
+            const cleaned = Nexus.state.prefs.utilLayout
+                .split(',').map(s => s.trim()).filter(Boolean)
+                .filter(key => !stale.includes(key));
+            const cleanedStr = cleaned.join(', ');
+            if (cleanedStr !== Nexus.state.prefs.utilLayout) {
+                Nexus.state.prefs.utilLayout = cleanedStr;
+                localforage.setItem('nexus_prefs_v42', Nexus.state.prefs);
+            }
+        }
 
         // Restore bookmarks — separate storage key from prefs, following
         // the same "own dedicated key" pattern already used for vault/
@@ -9085,7 +9365,17 @@ insertUUID() {
            { group: 'Ribbon (Mirrored)', key: 'rbPaste', label: 'Paste' },
            { group: 'Ribbon (Mirrored)', key: 'rbRun', label: 'Run / Preview' },
        ],
-       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, bookmarkHere, bookmarksList, select, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
+       // FIX: bookmarkHere/bookmarksList removed from the default
+       // layout — they're already reachable from the ⋮ dropdown menu
+       // (🔖 Bookmark Line / 📑 All Bookmarks), so having them here too
+       // was pure duplication. `select` (Select-Lock) removed for the
+       // same reason: it's already a permanent fixture on the footer
+       // dock (the SEL button), not something that needs a second copy
+       // here by default. All three remain available to add back via
+       // Settings -> Customize Utility Bar for anyone who specifically
+       // wants them closer to their thumb — removed from the DEFAULT,
+       // not deleted from the tool map entirely.
+       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
 
        // Populates #modalUtilLayout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -10601,6 +10891,18 @@ initInfiniteRibbon() {
            if (id === 'util-layout') Nexus.UI.renderUtilLayoutModal();
            if (id === 'snapshots') Nexus.snapshots.render();
            if (id === 'storage-inspector') Nexus.storageInspector.render();
+           if (id === 'peer-sync') {
+               const joinRow = document.getElementById('peerSyncJoinRow');
+               if (joinRow) joinRow.style.display = 'none';
+               const codeEl = document.getElementById('peerSyncCode');
+               if (codeEl) codeEl.innerText = '';
+               const controls = document.getElementById('peerSyncControls');
+               if (controls) controls.style.display = 'none';
+               if (!Nexus.peerSync.conn) {
+                   const status = document.getElementById('peerSyncStatus');
+                   if (status) { status.innerText = 'Not connected.'; status.style.color = 'var(--text)'; }
+               }
+           }
            if (id === 'diff') {
                const files = Object.keys(Nexus.state.Vfs);
                const options = files.map(f => `<option value="${f}">${f}</option>`).join('');
@@ -11026,6 +11328,25 @@ initInfiniteRibbon() {
            setActive('ribbonMenuLint', !!Nexus.state.prefs.lintEnabled);
            setActive('ribbonMenuAutocomplete', !!Nexus.state.prefs.autocomplete);
 
+           // Bookmark is a per-line toggle, not a persisted preference —
+           // "is this on" depends on whether the CURRENT cursor line
+           // already has a bookmark, checked fresh every time the menu
+           // opens. FIX: this button previously showed no state at all,
+           // so there was no way to tell whether tapping it would add or
+           // remove a bookmark before actually doing it — exactly the
+           // "accidental bookmark" risk being avoided by having it read
+           // as a toggle in the first place.
+           const bmBtn = document.getElementById('ribbonMenuBookmark');
+           if (bmBtn) {
+               let hasBookmark = false;
+               if (Nexus.editorCore.isCM6 && Nexus.editorCore.view && Nexus.editorCore.bookmarkState) {
+                   const view = Nexus.editorCore.view;
+                   const line = view.state.doc.lineAt(view.state.selection.main.head);
+                   view.state.field(Nexus.editorCore.bookmarkState).between(line.from, line.from, () => { hasBookmark = true; });
+               }
+               setActive('ribbonMenuBookmark', hasBookmark);
+           }
+
            const editIcon = document.getElementById('ribbonMenuEditIcon');
            if (editIcon) {
                const mode = Nexus.state.prefs.editMode === 'full' ? 'full' : 'util';
@@ -11128,31 +11449,94 @@ initInfiniteRibbon() {
        // "matching" living in this file.
        // "Jump to matching bracket" respects Select Lock exactly the way
        // DpadEngine.navigate() already does for every other directional
-       // command in this app: Select Lock OFF moves the cursor only
-       // (cursorMatchingBracket, collapses any existing selection);
-       // Select Lock ON extends the selection from wherever the cursor
-       // currently is to the matching bracket (selectMatchingBracket).
-       // This is the piece that makes the documented workflow — touch a
-       // bracket, turn on Select Lock, tap Match Bracket to "teleport,"
-       // editor highlights everything between the two points — actually
-       // produce a highlighted range instead of just relocating the
-       // cursor and losing the start point.
+       // command in this app: Select Lock OFF moves the cursor only;
+       // Select Lock ON selects a full inclusive range instead of just
+       // relocating the cursor and losing the start point.
+       //
+       // FIX: previously used selectMatchingBracket directly, which
+       // extends the selection from wherever the cursor already sits to
+       // the matched position — since the cursor is normally adjacent to
+       // a bracket rather than exactly on top of it, the bracket
+       // characters themselves usually ended up OUTSIDE the resulting
+       // selection. For HTML, bracketMatching()'s tag-matching also
+       // operates at the level of individual </> tokens (confirmed by
+       // testing against lang-html's own bracketMatchingHandle setup
+       // referenced elsewhere in this file), so it could match one tag's
+       // own opening/closing angle brackets to each other rather than an
+       // opening tag to its actual closing tag — explaining "selects part
+       // of the tags." Now branches by content type: HTML resolves the
+       // enclosing Element syntax node and selects its exact full span
+       // (both tags, inclusive, whatever the cursor's precise position);
+       // everything else uses matchBrackets()'s own real bracket-position
+       // data to build a selection from the first bracket's start through
+       // the second bracket's end, brackets included.
        jumpToMatchingBracket() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Jump to matching bracket requires the CM6 Engine — switch engines first (🔄 in the top bar).");
            }
-           const { cursorMatchingBracket, selectMatchingBracket } = Nexus.editorCore.modules;
+           const view = Nexus.editorCore.view;
            const useSelect = !!(Nexus.DpadEngine && Nexus.DpadEngine.selectLock);
-           const cmd = useSelect ? selectMatchingBracket : cursorMatchingBracket;
-           if (typeof cmd !== 'function') {
+           const pos = view.state.selection.main.head;
+
+           // HTML: resolve the nearest enclosing Element node and use its
+           // exact span — this is the syntax tree's own record of exactly
+           // where the opening tag starts and the closing tag ends, so it
+           // is inherently "whole tags, inclusive" with no bracket-
+           // counting involved at all.
+           const { syntaxTree } = Nexus.editorCore.modules;
+           if (syntaxTree) {
+               const tree = syntaxTree(view.state);
+               let node = tree.resolveInner(pos, 1);
+               while (node) {
+                   if (node.type.name === 'Element') {
+                       if (useSelect) {
+                           view.dispatch({ selection: { anchor: node.from, head: node.to }, scrollIntoView: true });
+                       } else {
+                           view.dispatch({ selection: { anchor: node.to }, scrollIntoView: true });
+                       }
+                       view.focus();
+                       return;
+                   }
+                   if (!node.parent) break;
+                   node = node.parent;
+               }
+               // No enclosing Element found (not HTML, or cursor is
+               // outside any tag, e.g. in a <script> block's own JS) —
+               // fall through to the bracket-based path below.
+           }
+
+           const { matchBrackets, cursorMatchingBracket } = Nexus.editorCore.modules;
+           if (typeof matchBrackets !== 'function') {
                return alert("Bracket jump isn't available (module failed to load).");
            }
-           const applied = cmd(Nexus.editorCore.view);
-           if (!applied) {
+
+           // Check both directions (dir 1 and -1) since the cursor could
+           // be sitting just before an opening bracket or just after a
+           // closing one — matchBrackets only looks one direction at a
+           // time from a given position.
+           let match = matchBrackets(view.state, pos, 1) || matchBrackets(view.state, pos, -1);
+           if (!match || !match.end) {
                const st = document.getElementById('footStatus');
                if (st) { st.innerText = "NO BRACKET HERE"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
+               return;
            }
-           Nexus.editorCore.view.focus();
+
+           if (useSelect) {
+               // Inclusive of both bracket characters — from the earlier
+               // bracket's own start to the later bracket's own end,
+               // regardless of which direction was actually searched.
+               const from = Math.min(match.start.from, match.end.from);
+               const to = Math.max(match.start.to, match.end.to);
+               view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
+           } else if (typeof cursorMatchingBracket === 'function') {
+               cursorMatchingBracket(view);
+           } else {
+               // Fallback if the cursor-only command failed to load for
+               // some reason: still move the cursor using matchBrackets'
+               // own data rather than leaving the tap with zero effect.
+               view.dispatch({ selection: { anchor: match.end.to }, scrollIntoView: true });
+           }
+           view.focus();
        },
 
        // Toggles a bookmark on the line the cursor is currently on —
@@ -11588,30 +11972,12 @@ const inj = "<scr" + "ipt>\n" +
            } 
        },
 toggleDrawer(id) {
-    // Close other drawers automatically so they don't overlap. Sweeps both
-    // drawer variants (left-middle .transform-drawer and bottom-anchored
-    // .transform-drawer-bottom) so opening one always closes the other
-    // kind too — otherwise the nav drawer (bottom) and e.g. Find & Replace
-    // (left-middle) could both be open on screen at once, which nothing
-    // else in this app's drawer system allows.
-    document.querySelectorAll('.transform-drawer, .transform-drawer-bottom').forEach(el => {
+    // Close other drawers automatically so they don't overlap.
+    document.querySelectorAll('.transform-drawer').forEach(el => {
         if (el.id !== id) el.classList.remove('open');
     });
     const target = document.getElementById(id);
     if (!target) return;
-    const isOpening = !target.classList.contains('open');
-
-    // Bottom-anchored drawers (currently just navDrawer) sit directly above
-    // #nexusDock, whose height varies (keyboard rows on/off, 1-3 rows) — so
-    // instead of a hardcoded CSS `bottom`, measure the real dock height at
-    // the moment of opening and position exactly flush against it. Refreshed
-    // on every open rather than cached, since the dock's height can change
-    // between one open and the next (e.g. keyboard rows toggled meanwhile).
-    if (isOpening && target.classList.contains('transform-drawer-bottom')) {
-        const dock = document.getElementById('nexusDock');
-        target.style.bottom = dock ? dock.getBoundingClientRect().height + 'px' : '64px';
-    }
-
     target.classList.toggle('open');
 },
 // (Removed: toggleRibbonDpad() — dead code nothing called. It was also the
