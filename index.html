@@ -87,8 +87,7 @@
             "w3c-keyname": "https://esm.sh/*w3c-keyname",
             "crelt": "https://esm.sh/*crelt",
             "@replit/codemirror-indentation-markers": "https://esm.sh/*@replit/codemirror-indentation-markers",
-            "@fazelstudio/codemirror-stickyscroll": "https://esm.sh/*@fazelstudio/codemirror-stickyscroll",
-            "@replit/codemirror-minimap": "https://esm.sh/*@replit/codemirror-minimap"
+            "@fazelstudio/codemirror-stickyscroll": "https://esm.sh/*@fazelstudio/codemirror-stickyscroll"
         }
     }
     </script>
@@ -109,15 +108,6 @@
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/astring@1.8.1/dist/astring.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js"></script>
-    <!-- Terser: real UMD build, confirmed against Terser's own published
-         dist/bundle.min.js — exposes window.Terser with an async .minify()
-         (Promise-based, matches the exact call shape used in
-         buildPipeline.run() below). Loaded eagerly alongside the other
-         formatting-tool CDNs above (js-beautify, prettier) rather than
-         lazily, consistent with how this app already treats every other
-         single-purpose formatting library — none of them are dynamically
-         imported on first use. -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/terser/5.31.0/bundle.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
 <script>
@@ -176,25 +166,6 @@
         --dock-active-text: #ffffff;
         --gutter-text: #57606a;
     }
-
-    /* FIX (real bug, not cosmetic): an unconditional `body { ... }` rule
-       used to sit right here, re-declaring every one of these same custom
-       properties with the light-mode values UNCONDITIONALLY — meaning it
-       applied regardless of whether .outdoor-mode was present or absent.
-       Since a direct property re-declaration on `body` wins over simple
-       inheritance from `:root` (where the real dark-mode defaults above
-       still correctly lived, untouched), this silently made dark mode
-       completely unreachable: toggleSun() was still correctly adding/
-       removing the .outdoor-mode class exactly as designed, but BOTH
-       states resolved to the exact same computed CSS values, because
-       .outdoor-mode's light values and this base rule's light values were
-       byte-for-byte identical. Toggling the theme did something (the
-       class really did flip) but was visually a no-op either way — light
-       mode was, in effect, permanently stuck on. Deleting this block
-       entirely restores the correct, original design: body with no class
-       inherits :root's real dark palette above; body.outdoor-mode
-       overrides to light, exactly as that block already (and always
-       correctly) did on its own. */
 
     * { 
         box-sizing: border-box; 
@@ -629,13 +600,6 @@
         line-height: 1; 
     }
     .tab-close:hover { opacity: 1; }
-    .tab-dirty-dot {
-        color: var(--gold);
-        font-size: 8px;
-        margin-right: 5px;
-        line-height: 1;
-        vertical-align: middle;
-    }
 .diff-line { display: block; min-height: 1.2em; word-break: break-all; }
 .diff-line.equal { color: #8b949e; opacity: 0.7; }
 .diff-line.added { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
@@ -904,18 +868,6 @@
     }
     .sleek-btn:hover { background: var(--dock-hover-bg); color: var(--dock-hover-text); }
     .sleek-btn.active { background: var(--dock-active-bg); color: var(--dock-active-text); box-shadow: 0 0 10px rgba(255,255,255,0.1); }
-
-    /* Navigation Drawer buttons — deliberately larger than the standard
-       44px .sleek-btn floor (task spec calls for "larger" arrows/actions
-       here specifically), since this drawer's whole purpose is easy
-       big-target tapping, unlike the dense inline footer dock it's grown
-       out of. */
-    .nav-drawer-btn {
-        width: 56px; height: 56px; min-width: 56px; min-height: 56px;
-        font-size: 20px; background: var(--bg); border: 1px solid var(--border);
-        border-radius: 12px;
-    }
-    .nav-drawer-btn#navDrawerSelectLockBtn { font-size: 13px; }
         
     .sleek-input {
         background: #1e2227; border: 1px solid #3e4451; border-radius: 8px; color: #fff;
@@ -1255,26 +1207,6 @@
     box-shadow: 10px 10px 40px rgba(0,0,0,0.9); max-width: 85vw;
 }
 .transform-drawer.open { transform: translateX(0); }
-
-/* Bottom-left variant — used by the Navigation Drawer (🎮). Anchored to the
-   bottom-left corner instead of vertically centered, and slides straight
-   down out of view (translateY) rather than sideways (translateX), since
-   it sits directly above the footer dock rather than beside the editor.
-   `bottom` is intentionally NOT hardcoded here: #nexusDock is
-   position:relative with a variable height (keyboard rows toggle on/off,
-   KB row count is user-configurable 1-3 rows), so a fixed px offset would
-   drift out of alignment depending on dock state. Nexus.UI.toggleDrawer()
-   sets `bottom` inline from #nexusDock's live measured height every time
-   this drawer opens instead. */
-.transform-drawer-bottom {
-    position: fixed; left: 0; top: auto; bottom: 0; right: auto;
-    transform: translateY(115%) !important;
-    transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
-    background: var(--panel); border: 1px solid var(--border); border-bottom: none;
-    border-radius: 16px 16px 0 0 !important; z-index: 8500; padding: 16px;
-    box-shadow: 10px -10px 40px rgba(0,0,0,0.9); max-width: 92vw;
-}
-.transform-drawer-bottom.open { transform: translateY(0) !important; }
     /* --- B. THE GRAPH MATRIX (Visual Inter-file Imports & References) --- */
     .graph-viewport {
         flex: 1;
@@ -1443,10 +1375,8 @@
     max-height: 50vh; overflow-y: auto; margin-top: 15px; display: flex; flex-direction: column; gap: 8px;
     }
     /* CodeMirror 6 Strict Dimensions */
-    #cm6Container { touch-action: manipulation; }
-    .cm-editor { height: 100%; width: 100%; font-family: monospace; font-size: 14px; touch-action: manipulation; }
-    .cm-scroller { overflow: auto; touch-action: manipulation; }
-    #editorView { touch-action: manipulation; }
+    .cm-editor { height: 100%; width: 100%; font-family: monospace; font-size: 14px; }
+    .cm-scroller { overflow: auto; }
     /* Bracket & Tag Tracing — CM6's bracketMatching() extension drives BOTH
        of these through the exact same mechanism: JS {}/[]/() pairs directly,
        and HTML <tag></tag> pairs via lang-html's bracketMatchingHandle (which
@@ -1574,17 +1504,22 @@
 
     <nav id="ribbonContainer" aria-label="Main toolbar" style="padding-right: 48px;">
         <div id="ribbonTrack">
-            <button id="ribbonEditModeBtn" class="tool-btn edit-btn-trigger btn-edit-util" onclick="Nexus.UI.toggleEditMode()" title="Utility Mode — tap to switch to Full Edit" aria-label="Editor is in utility mode, tap to enable full editing">🛠️</button>
             <button id="ribbonSaveBtn" class="tool-btn btn-success" onclick="Nexus.Vfs.manualSave()" title="Save Now" aria-label="Save current file now">💾</button>
             <button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()" title="Refresh File" aria-label="Refresh current file">♻️</button>
+            <div class="dock-divider" role="separator"></div>
+
             <button class="tool-btn" onclick="Nexus.history.undo()" title="Undo" aria-label="Undo">↶</button>
             <button class="tool-btn" onclick="Nexus.history.redo()" title="Redo" aria-label="Redo">↷</button>
             <button class="tool-btn" onclick="Nexus.UI.injectChar('\t')" title="Insert Tab" aria-label="Insert tab">→|</button>
             <button class="tool-btn" onclick="Nexus.tools.outdentLine()" title="Outdent Line" aria-label="Outdent line">|←</button>
+            <div class="dock-divider" role="separator"></div>
+
             <button class="tool-btn" onclick="Nexus.tools.selectAll()" title="Select All" aria-label="Select all">⬚</button>
             <button class="tool-btn" onclick="document.execCommand('cut')" title="Cut" aria-label="Cut">✂️</button>
             <button class="tool-btn" onclick="document.execCommand('copy')" title="Copy" aria-label="Copy">⧉</button>
             <button class="tool-btn" onclick="Nexus.tools.clipboard('paste')" title="Paste" aria-label="Paste">📋</button>
+            <div class="dock-divider" role="separator"></div>
+
             <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sandbox')" title="Run / Preview" aria-label="Run preview">▶️</button>
         </div>
     </nav>
@@ -1598,37 +1533,22 @@
          otherwise render outside the container's own bounds. The
          dropdown was rendering at full size in the DOM, genuinely
          "open" — just invisible, cut off by the ribbon's own 55px-tall
-         scroll box. Living here instead, as a real position: fixed
-         sibling of #ribbonContainer rather than a descendant of it,
+         scroll box. Living here instead, as real position: fixed
+         siblings of #ribbonContainer rather than descendants of it,
          there is no clipping ancestor to fight — fixed positioning is
          relative to the viewport itself, unaffected by any scroll
-         container anywhere in the DOM tree above it.
-
-         NOTE: the trigger BUTTON that used to sit right here (fixed,
-         top-right corner) was removed once the dropdown trigger moved to
-         the file tab bar's right edge (#fileTabMenuBtn, in the file tab
-         row below) — but this comment block and the dropdown div itself
-         stayed, since the clipping reasoning above still applies to
-         #ribbonMenuDropdown regardless of which button opens it. The old
-         fixed button was left behind by mistake and floated uselessly
-         over the top-right corner of every screen until removed here. -->
+         container anywhere in the DOM tree above it. -->
+    <button id="ribbonMenuBtn" class="tool-btn" onclick="Nexus.UI.toggleRibbonMenu()" title="More" aria-label="Open menu" style="position: fixed; top: 8px; right: 8px; z-index: 2001;">⋮</button>
     <div id="ribbonMenuDropdown" class="ribbon-dropdown">
-        <button onclick="Nexus.UI.toggleEditMode(); Nexus.UI.syncRibbonMenu()"><span id="ribbonMenuEditIcon">🛠️</span> Edit</button>
-        <button onclick="Nexus.toggleEditor(); Nexus.UI.syncRibbonMenu()">🔄 Swap Editor Engine</button>
-        <button onclick="Nexus.UI.toggleSun()">☀️ Light/Dark Mode</button>
+        <button onclick="Nexus.UI.toggleEditMode(); Nexus.UI.toggleRibbonMenu()"><span id="ribbonMenuEditIcon">🔒</span> Edit</button>
+        <button onclick="Nexus.toggleEditor(); Nexus.UI.toggleRibbonMenu()">🔄 Swap Editor Engine</button>
+        <button onclick="Nexus.UI.toggleSun(); Nexus.UI.toggleRibbonMenu()">☀️ Light/Dark Mode</button>
         <div class="ribbon-dropdown-divider"></div>
         <button id="ribbonMenuIndentGuides" onclick="Nexus.UI.toggleIndentGuides(); Nexus.UI.syncRibbonMenu()">📏 Indent Guides</button>
         <button id="ribbonMenuWordWrap" onclick="Nexus.UI.toggleWordWrap(); Nexus.UI.syncRibbonMenu()">↩️ Word Wrap</button>
         <button id="ribbonMenuWhitespace" onclick="Nexus.UI.toggleShowWhitespace(); Nexus.UI.syncRibbonMenu()">␣ Show Whitespace</button>
         <button id="ribbonMenuBracketTracing" onclick="Nexus.UI.toggleBracketTracing(); Nexus.UI.syncRibbonMenu()">{ } Bracket Tracing</button>
         <button id="ribbonMenuStickyScroll" onclick="Nexus.UI.toggleStickyScroll(); Nexus.UI.syncRibbonMenu()">📌 Sticky Scope Headers</button>
-        <button id="ribbonMenuMinimap" onclick="Nexus.UI.toggleMinimap(); Nexus.UI.syncRibbonMenu()">🗺️ Minimap</button>
-        <button id="ribbonMenuLint" onclick="Nexus.UI.toggleLint(); Nexus.UI.syncRibbonMenu()">🩺 Inline Lint</button>
-        <button id="ribbonMenuAutocomplete" onclick="Nexus.UI.toggleAutocomplete(); Nexus.UI.syncRibbonMenu()">💡 Autocomplete</button>
-        <div class="ribbon-dropdown-divider"></div>
-        <button onclick="Nexus.UI.toggleSidebar('right')">🧰 Diagnostics Hub</button>
-        <button onclick="Nexus.UI.toggleBookmarkHere(); Nexus.UI.syncRibbonMenu()">🔖 Bookmark Line</button>
-        <button onclick="Nexus.UI.openBookmarksPanel()">📑 All Bookmarks</button>
         <div class="ribbon-dropdown-divider"></div>
         <button onclick="Nexus.UI.openModal('manual'); Nexus.UI.toggleRibbonMenu()">❓ Help</button>
         <button onclick="Nexus.UI.openModal('settings'); Nexus.UI.toggleRibbonMenu()">⚙️ Settings</button>
@@ -1644,16 +1564,16 @@
              every tab-bar re-render instead of being wiped out along with
              the old tab elements. -->
         <div id="fileTabsEdgeRow" style="display:flex; align-items:stretch; background:var(--panel); border-bottom:1px solid var(--border);">
-            <button id="navToggleBtn" class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleNavButtons()" title="Toggle Navigation Buttons" aria-label="Toggle navigation buttons">◀▶</button>
+            <button class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleSidebar('left')" title="Files Panel" aria-label="Toggle files panel">📁</button>
             <div id="fileTabsBar" style="border-bottom:none; flex:1; min-width:0;"></div>
-            <button id="fileTabMenuBtn" class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleRibbonMenu()" title="More" aria-label="Open menu">⋮</button>
+            <button class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleSidebar('right')" title="Diagnostics Hub" aria-label="Toggle diagnostics hub">🧰</button>
         </div>
 <div id="editorView">
     <div id="gutter" onclick="Nexus.UI.handleGutterClick(event)">1</div>
     <div style="position: relative; flex: 1; overflow: hidden; background: var(--bg);">
         <div id="highlightBackdrop" style="position: absolute; inset: 0; padding: 15px; padding-bottom: 50vh; font-family: 'Courier New', monospace; font-size: 14px; line-height: 22px; white-space: pre-wrap; word-wrap: break-word; color: transparent; pointer-events: none; z-index: 0; overflow: hidden;"></div>
         
-        <textarea id="rawTerminal" style="position: relative; z-index: 1; background: transparent; width: 100%; height: 100%; touch-action: manipulation;" readonly inputmode="none" spellcheck="false" autocomplete="off" placeholder="VORTEX EMPTY. Load or create a new file."></textarea>
+        <textarea id="rawTerminal" style="position: relative; z-index: 1; background: transparent; width: 100%; height: 100%;" readonly inputmode="none" spellcheck="false" autocomplete="off" placeholder="VORTEX EMPTY. Load or create a new file."></textarea>
     </div>
     <div id="cm6Container" style="display: none; flex: 1; overflow: auto; background: var(--bg); font-family: monospace; font-size: 14px;"></div>
 
@@ -1725,44 +1645,7 @@
     <div id="suggestList" style="display:flex; flex-direction:column; gap:6px; max-height: 60vh; overflow-y: auto; padding-right: 5px;">
     </div>
     </div>
-
-    <!-- Navigation Drawer (🎮): bottom-left transform drawer. Diamond of 4
-         directional arrows on the left (reuses .dpad-arrow so setupFastHold's
-         boot-time querySelectorAll wires press-and-hold-to-repeat onto these
-         for free — no separate JS needed), square of 4 hardcoded action
-         buttons on the right: Match Bracket, To 1-Line, Select Lock, Edit
-         Chunk. Deliberately its own class (transform-drawer-bottom), NOT
-         transform-drawer — the earlier !important block pins anything named
-         transform-drawer to the left-middle edge, which would fight a
-         bottom-anchored drawer on every property it sets. -->
-    <div id="navDrawer" class="transform-drawer-bottom">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <span style="font-size:10px; color:var(--accent); font-weight:bold; letter-spacing:1px;">🎮 NAVIGATION</span>
-            <span style="color:var(--danger); cursor:pointer; font-size:20px; line-height:1;" onclick="Nexus.UI.toggleDrawer('navDrawer')">&times;</span>
-        </div>
-        <div style="display:flex; gap:20px; align-items:center; justify-content:center;">
-            <!-- Diamond: 3x3 grid, arrows on the 4 edge cells, corners empty -->
-            <div style="display:grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap:4px;">
-                <div></div>
-                <button class="sleek-btn dpad-arrow nav-drawer-btn" data-dir="Up" title="Move Up" aria-label="Move cursor up">↑</button>
-                <div></div>
-                <button class="sleek-btn dpad-arrow nav-drawer-btn" data-dir="Left" title="Move Left" aria-label="Move cursor left">←</button>
-                <div></div>
-                <button class="sleek-btn dpad-arrow nav-drawer-btn" data-dir="Right" title="Move Right" aria-label="Move cursor right">→</button>
-                <div></div>
-                <button class="sleek-btn dpad-arrow nav-drawer-btn" data-dir="Down" title="Move Down" aria-label="Move cursor down">↓</button>
-                <div></div>
-            </div>
-            <!-- Square: 2x2 grid, 4 hardcoded reconfigurable-in-name-only actions -->
-            <div style="display:grid; grid-template-columns: repeat(2, 56px); grid-template-rows: repeat(2, 56px); gap:4px;">
-                <button id="navDrawerBracketBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to matching bracket" aria-label="Jump to matching bracket">↔{}</button>
-                <button id="navDrawerOneLineBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.UI.collapseSelectionToOneLine()" title="Collapse to one line" aria-label="Collapse to one line">⟷</button>
-                <button id="navDrawerSelectLockBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.DpadEngine.toggleSelectLock()" title="Toggle Select-Lock" aria-label="Toggle select lock">SEL</button>
-                <button id="navDrawerEditChunkBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.chunkEditor.openForCursor()" title="Edit Chunk" aria-label="Open chunk editor">🔎</button>
-            </div>
-        </div>
-    </div>
-
+    
 <div id="nexusDpad" class="floating-widget util-vertical" style="top: 200px; left: 10px; width: auto; background: var(--panel);">
     <div id="dpadDragHandle" class="util-grip" onmousedown="Nexus.UI.handleHandleTap(event, 'nexusDpad')" ontouchstart="Nexus.UI.handleHandleTap(event, 'nexusDpad')"></div>
     <div style="padding:10px; display:flex; flex-direction:column; gap:10px;">
@@ -1796,10 +1679,7 @@
 
             <div style="display:flex; justify-content:space-between; align-items:center; margin: 0 0 10px 0;">
                 <div class="section-label" style="margin:0;">Your Files</div>
-                <div style="display:flex; gap:6px;">
-                    <button class="tool-btn" style="padding:5px 8px; font-size:9px;" onclick="Nexus.UI.openModal('snapshots')" title="View and restore snapshots" aria-label="View snapshots">📂</button>
-                    <button class="tool-btn btn-accent" style="padding:5px 10px; font-size:9px;" onclick="Nexus.snapshots.create()">📸 SNAPSHOT</button>
-                </div>
+                <button class="tool-btn btn-accent" style="padding:5px 10px; font-size:9px;" onclick="Nexus.snapshots.create()">📸 SNAPSHOT</button>
             </div>
             
             <div id="accordionRoot"></div>
@@ -1861,11 +1741,9 @@
                         <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">TODOS ➔</span>
                         <span id="auditCountTodo" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
                     </div>
-                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runMissingImportsAudit()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--danger); font-weight: 700;">IMPORTS ➔</span>
-                        <span id="auditCountMissingImports" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
                 </div>
+
+                <button class="tool-btn" style="width:100%; margin-bottom:8px;" onclick="Nexus.UI.utilRunSweep()" title="Quick project-wide sweep" aria-label="Run sweep">🧹 SWEEP</button>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                     <span style="font-size: 11px; font-weight: 800; color: var(--accent);" id="auditorModeTitle">ACTIVE: FULL SYSTEM IDLE</span>
@@ -1992,7 +1870,6 @@
                     <button class="tool-btn btn-gold" onclick="Nexus.UI.insertUUID()" title="Insert a random UUID at the cursor" aria-label="Insert UUID">🎲 UUID</button>
                     <button class="tool-btn btn-gold" onclick="Nexus.UI.insertDateTime()" title="Insert current date/time at the cursor" aria-label="Insert date and time">🕐 DATE/TIME</button>
                 </div>
-                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.UI.openModal('storage-inspector')" title="Inspect the previewed project's own localStorage" aria-label="Open localStorage inspector">🗄️ LOCALSTORAGE INSPECTOR</button>
             </div>
         </details>
 
@@ -2002,8 +1879,6 @@
                 <div class="grid-2">
                     <button class="tool-btn btn-danger" onclick="Nexus.UI.openModal('compressor')">🗜️ COMPRESS</button>
                     <button class="tool-btn btn-gold" data-langs="html,htm" onclick="Nexus.pwa.forge()">🔨 FORGE PWA</button>
-                    <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sprite')">🖼️ SPRITE SHEET</button>
-                    <button class="tool-btn btn-success" onclick="Nexus.buildPipeline.run()">📦 PRODUCTION BUILD</button>
                 </div>
             </div>
         </details>
@@ -2014,13 +1889,6 @@
                 Only show tools relevant to the open file
             </label>
         </div>
-
-        <details class="diag-section" id="diagSecUtilMirror" style="margin-top: 16px;">
-            <summary>Quick Tools (Mirror)</summary>
-            <div class="diag-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="utilMirrorContainer">
-                <!-- Populated by Nexus.UI.renderUtilMirror() on boot and after every util layout change -->
-            </div>
-        </details>
     </div>
 </aside>
 
@@ -2128,37 +1996,26 @@
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-bottom:15px;">1. THE INTERFACE</div>
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">The Top Ribbon</div>
-                <div class="man-p">The main toolbar is a seamless horizontal loop — <b>swipe left/right</b> to reach every button; it wraps around infinitely (an <b>Infinite Scroll</b> toggle for this lives in Settings, off by default). The Edit/Utility Mode button lives first, followed by Save, Undo/Redo, Insert Tab, Outdent, Select All, Cut/Copy/Paste, and Run.</div>
+                <div class="man-p">The main toolbar is a seamless horizontal loop — <b>swipe left/right</b> to reach every button; it wraps around infinitely. Buttons are grouped: App settings, Panels, Editor actions, Run, and Danger (Factory Reset) kept separate at the end.</div>
 
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">The File Tab Bar</div>
-                <div class="man-p">Below the ribbon: a <b>◀▶ button</b> on the left to show/hide the footer's navigation arrows, a scrollable row of open file tabs in the middle, and a <b>⋮ dropdown menu</b> button on the far right.</div>
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Floating &amp; Docked Widgets</div>
+                <div class="man-p">The <b>d-pad</b> is a draggable floating widget — grab its handle to reposition it anywhere on screen. The <b>right-edge toolbar</b> (navigation, selection, undo/redo, clipboard) is docked to the editor's right edge rather than floating over your code — tap its grip to collapse it to a slim strip and get the space back. Toggle either one from the ribbon or Command Hub.</div>
 
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">The ⋮ Dropdown Menu</div>
-                <div class="man-p">Tap ⋮ at the right edge of the file tab bar for: Edit/Utility Mode, Swap Editor Engine, Light/Dark Mode (toggling this doesn't close the menu, so you can compare both instantly), the display toggles (Indent Guides, Word Wrap, Show Whitespace, Bracket Tracing, Sticky Scope Headers, Minimap, Inline Lint, Autocomplete), the 🧰 Diagnostics Hub, 🔖 Bookmark Line / 📑 All Bookmarks, and Help/Settings.</div>
-
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">The 🎮 Navigation Drawer</div>
-                <div class="man-p">Tap 🎮 in the footer to open a drawer sliding up from the bottom-left: a diamond of 4 directional arrows on the left for moving the cursor, and 4 fixed action buttons on the right — <b>Jump to Matching Bracket</b>, <b>To 1-Line</b>, <b>Select Lock</b>, and <b>Edit Chunk</b>.</div>
-
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Edit / Utility Mode</div>
-                <div class="man-p">One button, two states — tap to flip between them:
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Edit-Lock</div>
+                <div class="man-p">Tap the 🔒 <b>Edit Lock</b> icon to cycle states:
                     <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
-                        <li><b style="color:var(--accent);">🛠️ UTILITY MODE:</b> Full interaction — tap, select, use every tool — but the phone's on-screen keyboard stays hidden, for navigating with the D-pad/toolbar without it popping up.</li>
-                        <li><b style="color:var(--success);">🔓 FULL EDIT:</b> Standard typing mode. The keyboard activates on tap.</li>
+                        <li><b style="color:var(--danger);">READ ONLY:</b> Safe mode. No input possible.</li>
+                        <li><b style="color:var(--accent);">UTIL MODE:</b> Interaction enabled, but the phone's on-screen keyboard stays hidden — for navigating and using the d-pad/toolbar without it popping up.</li>
+                        <li><b style="color:var(--success);">FULL EDIT:</b> Standard typing mode. The keyboard activates on tap.</li>
                     </ul>
                 </div>
 
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Bracket → Select Lock → Chunk Editor</div>
-                <div class="man-p">Place your cursor on a bracket, turn on <b>Select Lock</b> (🎮 drawer, or the footer), then tap <b>Match Bracket</b> — instead of just moving the cursor, this now extends your selection across everything between the two brackets. Tap <b>Edit Chunk</b> next and that exact highlighted range opens in the isolated chunk editor, ready to edit on its own.</div>
-
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Right-Side Panel &amp; Utility Bar Mirror</div>
-                <div class="man-p">The right panel's <b>Quick Tools (Mirror)</b> section mirrors the last 6 tools from your utility bar layout, so frequently-used tools are reachable without opening the full utility bar. Customize which tools appear (Settings → Customize Utility Bar).</div>
-
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">Editor Shortcuts Bar</div>
-                <div class="man-p">The row directly under the ribbon: Undo, Redo, Insert Tab, Fold, Select All, <b>Duplicate Line</b>, <b>Toggle Comment</b> (works in JS/CSS with <code>//</code> or <code>/* */</code>, and in HTML with <code>&lt;!-- --&gt;</code> — auto-detected from the file's extension), Copy/Cut/Paste, Find &amp; Replace, and Run.</div>
+                <div class="man-p">The row directly under the ribbon: Undo, Redo, Read-Only toggle, Insert Tab, Fold, Select All, <b>Duplicate Line</b>, <b>Toggle Comment</b> (works in JS/CSS with <code>//</code> or <code>/* */</code>, and in HTML with <code>&lt;!-- --&gt;</code> — auto-detected from the file's extension), Copy/Cut/Paste, Find &amp; Replace, and Run.</div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">2. FILE SYSTEM</div>
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Files Panel &amp; Tabs</div>
-                <div class="man-p">Files are stored locally in this device's browser database — they persist even if you close the browser, with no account or server needed. Open the 📁 <b>Files</b> panel to see everything loaded into the project. <b>Loaded files sit in this list until you tap one</b> — only then does it open as a tab in the file tab bar. Tapping a tab's <b>×</b> closes just that tab; the file stays loaded and reappears in the Files panel. If a tab has unsaved changes, closing it asks: <b>Cancel</b>, <b>Save &amp; Close</b>, or <b>Close (Discard)</b>.</div>
+                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Files Panel</div>
+                <div class="man-p">Files are stored locally in this device's browser database — they persist even if you close the browser, with no account or server needed. Open the 📁 <b>Files</b> panel to manage them.</div>
 
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">Matrix Operations (Files panel)</div>
                 <div class="man-p">High-level, whole-project build commands, in the Files panel:
@@ -2200,9 +2057,6 @@
                 <div class="man-p">Phone keyboards silently turn straight quotes into curly ones and hyphens into em-dashes — both break code, and both are hard to spot by eye. Paste something affected and you'll get a one-tap fix offered automatically; or run <b>Clean Smart Characters</b> (Fix &amp; Format section) on the whole file any time, including catching characters typed with autocorrect on.</div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">6. SNAPSHOTS &amp; VAULT</div>
-                <div class="man-h2" style="color:var(--gold); font-weight:bold;">Snapshots</div>
-                <div class="man-p">Tap 📸 in the Files panel to capture your entire project as it is right now (up to the 10 most recent are kept). Tap the 📂 button next to it to browse saved snapshots — each one offers <b>Diff Current File</b> (compares it against the active file in the Merge engine) or <b>Restore Whole Project</b> (replaces every current file with that snapshot's contents; warns first if you have unsaved changes anywhere).</div>
-
                 <div class="man-h2" style="color:var(--gold); font-weight:bold;">Merge Engine</div>
                 <div class="man-p">For complex merges or restoring an older version: a line-by-line diff view where you pick <b>Left</b>, <b>Right</b>, or <b>Both</b> per conflict.</div>
 
@@ -2211,15 +2065,6 @@
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">7. GITHUB SYNC</div>
                 <div class="man-p">Settings → GitHub Sync: add a repository (<code>user/repo</code>) and a personal access token (needs "repo" scope), then <b>Push</b>/<b>Pull</b> the current file or <b>Sync Entire Project</b>. The token is stored locally on this device and only ever sent to <code>api.github.com</code>.</div>
-
-                <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">TOOLING (CodeMirror 6 Engine)</div>
-                <div class="man-p">Three optional CM6 features, all off by default — enable from the ⋮ dropdown menu:
-                    <ul style="padding-left:20px; font-size:12px; margin-top:5px;">
-                        <li><b>🗺️ Minimap:</b> A compact overview of the whole file for fast spatial navigation on long files.</li>
-                        <li><b>🩺 Inline Lint:</b> Live inline underlines and gutter markers for issues, powered by the same Sentinel engine behind the Diagnostics Hub — one set of rules, shown two ways.</li>
-                        <li><b>💡 Autocomplete:</b> Context-aware suggestions and tooltips while typing.</li>
-                    </ul>
-                </div>
 
                 <div class="man-h1" style="color:var(--accent); font-size:18px; border-bottom:2px solid var(--accent); margin-top:30px; margin-bottom:15px;">8. TERMINAL COMMANDS</div>
                 <div class="man-p">Type into the command slider:
@@ -2362,64 +2207,6 @@
                     <span style="color:#fff; font-weight:900;">LEVEL 3: NUCLEAR</span>
                     <span style="font-size:10px; opacity:0.9;">Total minification. The entire file becomes a single line.</span>
                 </button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sprite Sheet -> CSS generator. Upload an image, specify a single
-         frame's width/height, get one .sprite base rule plus a
-         .sprite-N { background-position: ... } rule per cell, saved as
-         sprites.css in the Vfs. The uploaded image itself is never saved
-         anywhere — this only ever produces CSS text, the same way the
-         rest of this app treats generated output; the person still needs
-         to place their own actual image file/URL into the CSS themselves
-         (a placeholder comment says so directly in the generated output). -->
-    <div id="modalSprite" class="modal-overlay">
-        <div class="modal-content">
-            <div class="p-head"><span>🖼️ SPRITE SHEET → CSS</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('sprite')">&times;</button></div>
-            <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
-                <p style="font-size:12px; opacity:0.7;">Upload a sprite sheet image, specify one frame's size, and get a <code>.sprite-N</code> CSS rule per cell.</p>
-                <input type="file" id="spriteUpload" accept="image/*" class="sleek-input" style="padding:12px;" onchange="Nexus.spriteSheet.handleUpload(event)">
-                <canvas id="spriteCanvasPreview" style="display:none; max-width:100%; border:1px solid var(--border); border-radius:8px; image-rendering:pixelated;"></canvas>
-                <div id="spriteDims" style="font-size:11px; opacity:0.6;"></div>
-                <div style="display:flex; gap:10px;">
-                    <div style="flex:1;">
-                        <label style="font-size:10px; color:var(--gold); display:block; margin-bottom:4px;">Frame Width (px)</label>
-                        <input type="number" id="spriteFrameW" class="sleek-input" value="32" min="1">
-                    </div>
-                    <div style="flex:1;">
-                        <label style="font-size:10px; color:var(--gold); display:block; margin-bottom:4px;">Frame Height (px)</label>
-                        <input type="number" id="spriteFrameH" class="sleek-input" value="32" min="1">
-                    </div>
-                </div>
-                <button class="tool-btn btn-accent" style="width:100%; padding:15px;" onclick="Nexus.spriteSheet.generate()">Generate sprites.css</button>
-                <div id="spriteStatus" style="font-size:11px;"></div>
-            </div>
-        </div>
-    </div>
-
-    <!-- LocalStorage inspector — debugs whatever the SANDBOXED/PREVIEWED
-         project (Run/▶️) writes to window.localStorage while it's running,
-         completely separate from divIDE's own persistence. divIDE's own
-         storage (Vfs, prefs, bookmarks, snapshots, vault) lives entirely
-         in IndexedDB via localforage/Dexie — neither has a localStorage
-         mode at all — so window.localStorage in this app is, in practice,
-         exclusively whatever an in-progress game/tool built INSIDE divIDE
-         uses for its own high scores, settings, etc. Ported from an
-         earlier standalone version of this app that had this as a
-         dedicated tab; ships here as a modal instead, matching how every
-         other tool in this rewrite is reached. -->
-    <div id="modalStorageInspector" class="modal-overlay">
-        <div class="modal-content" style="max-width: 500px; max-height: 80vh; overflow-y: auto;">
-            <div class="p-head"><span>🗄️ LOCALSTORAGE INSPECTOR</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('storage-inspector')">&times;</button></div>
-            <div class="modal-body" style="display:flex; flex-direction:column; gap:12px;">
-                <p style="font-size:11px; opacity:0.7; margin:0;">Debugs your <b>previewed project's own</b> localStorage — not divIDE's own data, which lives elsewhere and is never shown here.</p>
-                <div style="display:flex; gap:8px;">
-                    <button class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.storageInspector.openSeeder()">+ SEED DATA</button>
-                    <button class="tool-btn" style="flex:1;" onclick="Nexus.storageInspector.exportToJSON()">📤 EXPORT JSON</button>
-                    <button class="tool-btn btn-danger" style="flex:1;" onclick="Nexus.storageInspector.clearAll()">🗑️ WIPE ALL</button>
-                </div>
-                <div id="storageInspectorList" style="display:flex; flex-direction:column; gap:8px;"></div>
             </div>
         </div>
     </div>
@@ -2583,13 +2370,6 @@
                     </select>
                 </div>
 
-                <div style="display: flex; flex-direction: column; gap: 8px; padding: 5px; margin-bottom: 15px;">
-                    <label style="display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--gold);">
-                        <input type="checkbox" id="prefInfiniteScroll" onchange="Nexus.settings.update('infiniteScroll', this.checked)" style="width: 18px; height: 18px; cursor: pointer;">
-                        <span>Infinite Scroll (Ribbon)</span>
-                    </label>
-                </div>
-
                 <div style="display: flex; flex-direction: column; gap: 8px; padding: 5px;">
                     <span style="font-size: 11px; color: var(--gold);">Utility Bar Tools</span>
                     <button class="tool-btn btn-accent" style="width:100%;" onclick="Nexus.UI.openModal('util-layout')">🛠️ CUSTOMIZE UTILITY BAR</button>
@@ -2706,41 +2486,6 @@
             <button class="sleek-btn" style="width: calc(100% - 40px); margin: 0 20px 20px 20px; padding: 15px;" onclick="Nexus.UI.closeModal('graph')">Close Scanner</button>
         </div>
     </div>
-
-    <!-- Close-tab confirmation: the one place in this app with a genuine
-         3-way choice (Cancel / Save & Close / Close-discard), which plain
-         confirm() can't express — every other confirmation in this file is
-         a 2-option OK/Cancel via native confirm(). Backdrop click maps to
-         Cancel (closeModal only, no data touched), matching every other
-         modal's outside-tap behavior, and is the correct safe default here
-         specifically because it's the ONE option that changes nothing. -->
-    <div id="modalCloseTab" class="modal-overlay" onclick="if(event.target===this) Nexus.UI.closeModal('close-tab')">
-        <div class="modal-content" style="max-width: 400px; background: var(--bg);">
-            <h2 style="margin-top:0; color:var(--gold); padding: 20px 20px 0 20px;">Unsaved Changes</h2>
-            <p id="closeTabMessage" style="margin: 0 20px 20px 20px; color:var(--text); font-size:14px; line-height:1.5;"></p>
-            <div style="display:flex; flex-direction:column; gap:10px; margin: 0 20px 20px 20px;">
-                <button class="tool-btn btn-success" style="width:100%; padding:14px;" onclick="Nexus.Vfs._confirmCloseTab('save')">💾 Save &amp; Close</button>
-                <button class="tool-btn" style="width:100%; padding:14px; border-color:var(--danger); color:var(--danger);" onclick="Nexus.Vfs._confirmCloseTab('discard')">🗑️ Close (Discard Changes)</button>
-                <button class="sleek-btn" style="width:100%; padding:14px;" onclick="Nexus.Vfs._confirmCloseTab('cancel')">Cancel</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Snapshots browser: the actual fix for the routing gap where
-         creating a snapshot (📸, in the file explorer) and ever seeing one
-         again (previously buried inside the unrelated Merge modal, only
-         reachable if you already knew it was there) were two completely
-         disconnected places. Each entry offers both existing behavior
-         (Diff Current File, unchanged, still delegates to mergeEngine)
-         and the new one (Restore Whole Project, snapshots.restoreProject). -->
-    <div id="modalSnapshots" class="modal-overlay" onclick="if(event.target===this) Nexus.UI.closeModal('snapshots')">
-        <div class="modal-content" style="max-width: 460px; max-height: 80vh; overflow-y: auto; background: var(--bg);">
-            <h2 style="margin-top:0; color:var(--gold); padding: 20px 20px 0 20px;">📂 Snapshots</h2>
-            <p style="margin: 0 20px 15px 20px; font-size:12px; opacity:0.7;">Up to 10 most recent, oldest dropped automatically. Each one captured your entire project at that moment.</p>
-            <div id="snapshotBrowserList" style="display:flex; flex-direction:column; gap:10px; margin: 0 20px 20px 20px;"></div>
-            <button class="sleek-btn" style="width: calc(100% - 40px); margin: 0 20px 20px 20px; padding: 15px;" onclick="Nexus.UI.closeModal('snapshots')">Close</button>
-        </div>
-    </div>
 <div id="panelTerminal" class="side-panel right-p">
     <div class="p-head">
         <span>MATRIX TERMINAL</span>
@@ -2786,7 +2531,7 @@
             </div>
             
             <!-- Global Action Toggle Buttons -->
-            <button id="ribbonDpadToggle" class="sleek-btn" onclick="Nexus.UI.toggleDrawer('navDrawer')" title="Navigation Drawer" aria-label="Toggle navigation drawer">🎮</button>
+            <button id="ribbonDpadToggle" class="sleek-btn" onclick="Nexus.UI.toggleDpadPanel()" title="Toggle D-Pad Widget" aria-label="Toggle floating d-pad">🎮</button>
             <button id="rowToggleBtn" class="sleek-btn" onclick="Nexus.UI.toggleKeyboardRows()" title="Toggle Keyboard Rows" aria-label="Toggle extra keyboard rows">↕️</button>
         </div>
         
@@ -2856,24 +2601,6 @@ window.Nexus = {
        activeFile: "",
        isCM6: false,
        Vfs: {}, 
-       // Which loaded files currently have an open tab, in tab-bar order.
-       // Previously renderTabs() iterated Object.keys(Vfs) directly, which
-       // meant "loaded into the workspace" and "has an open tab" were the
-       // same thing — every file you'd ever opened stayed a tab forever,
-       // and the tab bar's own × button called deleteFile() (permanently
-       // destructive) because there was no lesser "just close the tab"
-       // concept to call instead. Files now sit in the left explorer until
-       // switchFile() (i.e. actually clicking one) adds them here.
-       openTabs: [],
-       // Per-file snapshot of content as of the last successful save,
-       // keyed by filename. This is what makes "unsaved work" a real,
-       // checkable fact instead of a guess: Vfs[fn] is written to
-       // continuously (every keystroke, via the CM6/vanilla autosave
-       // listeners) with no prior separate "committed" baseline to diff
-       // against, so closing a tab had no way to know whether anything
-       // had actually changed since disk. Written every time Vfs.save()
-       // actually persists successfully — see isDirty() and closeTab().
-       lastSavedContent: {},
        history: { past: [], future: [], isLocked: false },
        originals: {}, 
        vault: [], 
@@ -3434,7 +3161,6 @@ auditor: {
         document.getElementById('auditCountLint').innerText = '0';
         document.getElementById('auditCountBrackets').innerText = '0';
         document.getElementById('auditCountTodo').innerText = '0';
-        document.getElementById('auditCountMissingImports').innerText = '0';
         const badge = document.getElementById('diagBadgeCore');
         if (badge) badge.classList.remove('show');
     },
@@ -3520,15 +3246,9 @@ auditor: {
         } catch (e) { /* best-effort; leave empty rather than break the whole sweep */ }
         sections.push({ label: 'BRACKETS', count: bracketIssues.length, items: bracketIssues });
 
-        // --- Dependencies: total count (informational) + broken/missing
-        // ones specifically (a real, counted defect — see
-        // _detectMissingImports's own comment for why this is a distinct
-        // check from Project Radar's dead-code detection). ---
+        // --- Dependencies (informational — not counted as a defect) ---
         const depMatches = srcCode.match(/(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:src=['"]([^'"]+)['"])|(?:href=['"]([^'"]+)['"])/g) || [];
         const uniqueDeps = [...new Set(depMatches.map(d => { const m = d.match(/['"]([^'"]+)['"]/); return m ? m[1] : d; }))];
-
-        const missingImports = this._detectMissingImports(srcCode).map(i => ({ text: `Unresolved: '${i.path}'`, line: i.line }));
-        sections.push({ label: 'MISSING IMPORTS', count: missingImports.length, items: missingImports });
 
         // --- TODOs (informational — reminders, not defects) ---
         const todos = this._detectTodos(srcCode);
@@ -3552,7 +3272,6 @@ auditor: {
         setCount('auditCountLint', lintIssues.length);
         setCount('auditCountBrackets', bracketIssues.length);
         setCount('auditCountTodo', todos.length);
-        setCount('auditCountMissingImports', missingImports.length);
 
         // --- Render one consolidated report ---
         const totalIssues = sections.reduce((sum, s) => sum + s.count, 0);
@@ -3758,37 +3477,6 @@ auditor: {
                 + `<span style="color:var(--gold); font-size:10px; font-weight:bold;">${t.tag}</span> `
                 + `<span style="font-size:11px;">${t.text}</span>`
                 + `<span style="float:right; font-size:9px; opacity:0.6;">LN ${t.line} →</span>`
-                + `</div>`;
-        });
-        reportBox.innerHTML = html;
-    },
-
-    // Standalone single-purpose runner, same pattern as runTodoScan()
-    // just above — reuses _detectMissingImports so Full Sweep and this
-    // tile can never disagree about what counts as unresolved.
-    runMissingImportsAudit() {
-        if (!Nexus.state.activeFile) {
-            document.getElementById('auditorModeTitle').innerText = "ACTIVE: MISSING IMPORTS";
-            const box = document.getElementById('auditorReportBox');
-            if (box) box.innerHTML = `<div style="color: var(--gold); font-weight: bold;">No file open — open or create a file first.</div>`;
-            return;
-        }
-        document.getElementById('auditorModeTitle').innerText = "ACTIVE: MISSING IMPORTS";
-        const srcCode = this.getEditorContent();
-        const missing = this._detectMissingImports(srcCode);
-        const counter = document.getElementById('auditCountMissingImports');
-        if (counter) counter.innerText = missing.length;
-        const reportBox = document.getElementById('auditorReportBox');
-        if (missing.length === 0) {
-            reportBox.innerHTML = `<div style="color: var(--success); font-weight: bold;">✔ Every local import/src/href in this file resolves to a real project file.</div>`;
-            return;
-        }
-        let html = `<div style="color:var(--danger); font-weight:bold; margin-bottom:6px;">${missing.length} UNRESOLVED IMPORT${missing.length === 1 ? '' : 'S'}</div>`;
-        missing.forEach(i => {
-            const clickable = i.line != null;
-            html += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${i.line})" style="cursor:pointer;"` : ''} style="background:var(--surface); padding:8px 10px; margin-bottom:6px; border-left:3px solid var(--danger); border-radius:4px; display:flex; justify-content:space-between; align-items:center;">`
-                + `<span style="font-size:11px;">'${i.path}'</span>`
-                + (clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap; padding-left:6px;">LN ${i.line} →</span>` : '')
                 + `</div>`;
         });
         reportBox.innerHTML = html;
@@ -4090,44 +3778,6 @@ _resolveVfsPath(refPath) {
     return Object.keys(Nexus.state.Vfs).find(k => k === basename || k.endsWith('/' + basename)) || null;
 },
 
-// Ported from an earlier standalone version of this app that had a
-// dedicated "runDependencyCheck" — flags import/src/href paths that don't
-// resolve to any real file in the project. This is a genuinely different
-// check from Project Radar (Nexus.graph): Radar finds files that exist
-// but nothing reaches (dead code — the opposite failure), while this
-// finds references that point at files that DON'T exist at all (typos,
-// renamed/deleted files, wrong relative path). Neither one covers the
-// other. Reuses _resolveVfsPath — the same normalization (query/hash
-// stripping, ./ prefix, basename fallback) already trusted for the
-// orphan-ID checker's own cross-file resolution — rather than a separate,
-// simpler regex-based path match that could disagree with it on edge
-// cases. Skips anything that looks like a real URL (http/https/protocol-
-// relative //) since those are never meant to resolve against the local
-// Vfs at all.
-_detectMissingImports(srcCode) {
-    // Matches src=/href= on ANY tag (not just <script>/<link>) — a broken
-    // <img src="typo.png"> is exactly as real a bug as a broken <script
-    // src>, and scanDeps() (Nexus.Sentinel, a separate object reusing this
-    // same detector) already lists dependencies via this broader pattern;
-    // narrower matching here would silently disagree with what that log
-    // view shows for anything that isn't a <script>/<link> tag.
-    const importRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:\bsrc=['"]([^'"]+)['"])|(?:\bhref=['"]([^'"]+)['"])/g;
-    const seen = new Set();
-    const missing = [];
-    let m;
-    while ((m = importRegex.exec(srcCode)) !== null) {
-        const raw = m[1] || m[2] || m[3] || m[4];
-        if (!raw || seen.has(raw)) continue;
-        seen.add(raw);
-        if (/^(?:https?:)?\/\//i.test(raw) || raw.startsWith('data:') || raw.startsWith('#') || raw.startsWith('mailto:') || raw.startsWith('tel:')) continue; // remote URLs, same-page anchors, and mailto/tel links aren't local Vfs references at all
-        if (this._resolveVfsPath(raw)) continue; // resolves fine — not an issue
-        const idx = srcCode.indexOf(raw);
-        const line = idx >= 0 ? srcCode.slice(0, idx).split('\n').length : null;
-        missing.push({ path: raw, line });
-    }
-    return missing;
-},
-
 _detectOrphanIssues(srcCode) {
     const doc = this.getVirtualDoc(srcCode);
     const allElements = doc.querySelectorAll('[id]');
@@ -4424,24 +4074,6 @@ Vfs: {
                 if (!Nexus.state.originals[fn]) Nexus.state.originals[fn] = Nexus.state.Vfs[fn]; 
             });
 
-            // Seed the dirty-tracking baseline to whatever was actually
-            // loaded from disk — this IS "last saved" as far as this
-            // session is concerned, since it's what boot just read back
-            // out of IndexedDB. Anything typed after this point that
-            // differs from it is genuinely unsaved.
-            Nexus.state.lastSavedContent = { ...Nexus.state.Vfs };
-
-            // Restore which tabs were open last session. Filtered against
-            // the files that actually still exist, in case one was
-            // deleted through some other path (another device, a future
-            // sync feature) between sessions. Falls back to an empty tab
-            // bar — not "every file" — if nothing was saved, matching the
-            // new default of files sitting unopened in the explorer.
-            const savedTabs = await localforage.getItem('nexus_open_tabs_v1');
-            Nexus.state.openTabs = Array.isArray(savedTabs)
-                ? savedTabs.filter(fn => Nexus.state.Vfs[fn] !== undefined)
-                : [];
-
             const files = Object.keys(Nexus.state.Vfs);
             // Prefer the file the user was actually working in last session
             // (persisted by switchFile on every switch) — falling back to the
@@ -4459,15 +4091,6 @@ Vfs: {
             console.error("VORTEX CRITICAL FAILURE:", e);
             this.setEmptyState();
         }
-    },
-
-    // Persists the open-tabs list. Its own small dedicated write (not
-    // folded into the main Vfs save() below) because it changes on a
-    // different rhythm — every tab open/close, not every keystroke — and
-    // needs to survive independently of whether the user has unsaved file
-    // content sitting around.
-    saveOpenTabs() {
-        localforage.setItem('nexus_open_tabs_v1', Nexus.state.openTabs);
     },
 
     async save() {
@@ -4489,22 +4112,6 @@ Vfs: {
         }
     },
 
-    // True if fn's current in-memory content differs from its
-    // lastSavedContent baseline. IMPORTANT: this is NOT "differs from
-    // what's in IndexedDB right now" — this app autosaves to IndexedDB on
-    // basically every keystroke (400ms debounce), so almost nothing would
-    // ever read as dirty under that definition and the close-tab warning
-    // would be meaningless. lastSavedContent is instead updated only by
-    // manualSave() (the explicit 💾 tap) — "unsaved work" here means
-    // "changed since you last deliberately hit Save," which is what a
-    // person actually means by that phrase, autosave notwithstanding.
-    // Seeded to match Vfs at boot (see Vfs.boot()) so a freshly-loaded,
-    // untouched file never reads as dirty before any edit has happened.
-    isDirty(fn) {
-        if (Nexus.state.Vfs[fn] === undefined) return false;
-        return Nexus.state.Vfs[fn] !== Nexus.state.lastSavedContent[fn];
-    },
-
     // Explicit, tappable Save — autosave already runs silently in the
     // background, but a dedicated button gives an immediate, visible
     // confirmation instead of asking the user to just trust it happened.
@@ -4523,14 +4130,6 @@ Vfs: {
         if (btn) btn.classList.add('saving');
 
         const ok = await this.save();
-        // The ONE place lastSavedContent's baseline moves — see isDirty()'s
-        // own comment for why this is scoped to the explicit Save tap and
-        // not the constant autosave writes save() also serves. Only the
-        // file actually just saved gets its baseline updated, not every
-        // file in Vfs — a manual save of one tab shouldn't silently mark
-        // every OTHER open tab as "saved" too when their content was never
-        // touched by this action at all.
-        if (ok) Nexus.state.lastSavedContent[Nexus.state.activeFile] = code;
 
         if (btn) {
             btn.classList.remove('saving');
@@ -4545,14 +4144,6 @@ Vfs: {
 setEmptyState() {
     Nexus.state.activeFile = "";
     
-    // No file open at all is a distinct situation from either edit mode —
-    // there's nothing to type into either way — so this intentionally does
-    // NOT call setEditMode() or write to Nexus.state.prefs.editMode. Doing
-    // so would either resurrect a third persisted mode (exactly what this
-    // refactor removes) or silently overwrite the user's real last-used
-    // mode preference with a value that only ever meant "no file," making
-    // the next file they open forget what they had it set to. This is a
-    // purely visual "nothing to edit" display, locally scoped to the DOM.
     const ed = document.getElementById('rawTerminal');
     if (ed) {
         ed.value = "";
@@ -4570,25 +4161,17 @@ setEmptyState() {
     
     const st = document.getElementById('footStatus');
     if (st) {
-        st.innerText = "NO FILE OPEN";
+        st.innerText = "LOCKED";
         st.style.color = "var(--danger)";
     }
     
-    // Still visually shows the lock glyph on the edit button while no file
-    // is open — this bypasses .edit-btn-trigger's normal util/full classing
-    // on purpose, since neither state applies here, but does NOT touch
-    // Nexus.state.prefs.editMode, so whichever real mode was active before
-    // the file closed is exactly what's restored the next time a file
-    // actually opens (switchFile / boot both call setEditMode explicitly).
     const lockBtns = document.querySelectorAll('.edit-btn-trigger');
     lockBtns.forEach(btn => {
-        btn.innerHTML = "🚫"; 
-        btn.title = "No file open";
-        btn.setAttribute('aria-label', 'No file is open');
+        btn.innerHTML = "🔒"; 
+        btn.title = "Read Only — tap to unlock";
+        btn.setAttribute('aria-label', 'Editor is read-only, tap to change');
         btn.className = "tool-btn edit-btn-trigger btn-edit-lock";
     });
-    const editIcon = document.getElementById('ribbonMenuEditIcon');
-    if (editIcon) editIcon.textContent = "🚫";
 
     this.renderAccordion();
     if (Nexus.UI && typeof Nexus.UI.updateGutter === 'function') {
@@ -4606,27 +4189,17 @@ setEmptyState() {
 
         Nexus.state.Vfs[name] = ""; 
         Nexus.state.originals[name] = "";
-        // Seed the dirty-tracking baseline to match — a brand-new empty
-        // file hasn't diverged from anything yet, so it shouldn't
-        // immediately read as having "unsaved work" the instant it's
-        // created, before the user has typed a single character.
-        Nexus.state.lastSavedContent[name] = "";
         
         this.renderAccordion();
         this.switchFile(name);
         this.save();
         
-        // Route through the real state machine instead of poking
-        // readonly/inputmode attributes directly — the direct-poke version
-        // never updated Nexus.state.prefs.editMode, the dropdown menu icon,
-        // or the .edit-btn-trigger button class, so a brand-new file LOOKED
-        // unlocked but every other piece of edit-mode UI silently still
-        // showed the previous file's state until the next explicit toggle.
-        // A freshly created empty file goes straight to Full Edit — the
-        // whole point of "new file" is to start typing immediately.
-        Nexus.UI.setEditMode('full');
+        const ed = document.getElementById('rawTerminal');
         const st = document.getElementById('footStatus');
-        if (st) st.innerText = "READY (NEW)";
+        ed.removeAttribute('readonly');
+        ed.removeAttribute('inputmode'); 
+        st.innerText = "READY (NEW)";
+        st.style.color = "var(--success)";
     },
 
     switchFile(fn) {
@@ -4637,16 +4210,6 @@ setEmptyState() {
             clearTimeout(Nexus.editorCore._autosaveTimer);
             Nexus.editorCore._autosaveTimer = null;
             this.save();
-        }
-
-        // Files sit in the left explorer until explicitly clicked — THIS
-        // is that click. Opens (or re-focuses, if already open) a tab for
-        // fn without touching any other open tab. Order is append-if-new,
-        // so newly opened files land at the end of the tab bar rather than
-        // reordering existing tabs.
-        if (!Nexus.state.openTabs.includes(fn)) {
-            Nexus.state.openTabs.push(fn);
-            this.saveOpenTabs();
         }
 
         Nexus.state.activeFile = fn;
@@ -4722,17 +4285,12 @@ setEmptyState() {
             Nexus.UI.filterDiagPanel();
         }
 
-        // Footer Status Sync. switchFile() only ever runs for a real,
-        // existing file (guarded at the top of this function), and
-        // 'readonly' is now ONLY ever set by setEmptyState() — the
-        // no-file-open display — since the Task 2 edit-mode refactor
-        // removed the old 3-state 'readonly' mode entirely. So this can no
-        // longer actually be "LOCKED" here; it's always Util or Full.
+        // Footer Status Sync
         const st = document.getElementById('footStatus');
         if (st && (!Nexus.editorCore || !Nexus.editorCore.isCM6)) {
-            const ed = document.getElementById('rawTerminal');
-            st.innerText = ed.getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)";
-            st.style.color = "var(--success)";
+            const isReadonly = document.getElementById('rawTerminal').hasAttribute('readonly');
+            st.innerText = isReadonly ? "LOCKED" : (document.getElementById('rawTerminal').getAttribute('inputmode') === 'none' ? "UTIL MODE" : "READY (FULL)");
+            st.style.color = isReadonly ? "var(--danger)" : "var(--success)";
         }
     },
 
@@ -4742,25 +4300,8 @@ setEmptyState() {
         
         Nexus.state.Vfs[newName] = Nexus.state.Vfs[oldName];
         Nexus.state.originals[newName] = Nexus.state.originals[oldName];
-        // Carry the dirty-tracking baseline over under the new key too —
-        // a rename doesn't change the file's actual content or its saved
-        // state, so it shouldn't make an otherwise-clean file suddenly
-        // look dirty just because lastSavedContent[newName] doesn't exist
-        // yet (it would read as undefined !== <content>, i.e. dirty).
-        Nexus.state.lastSavedContent[newName] = Nexus.state.lastSavedContent[oldName];
         delete Nexus.state.Vfs[oldName];
         delete Nexus.state.originals[oldName];
-        delete Nexus.state.lastSavedContent[oldName];
-
-        // If the old name had an open tab, keep that tab open under the
-        // new name in the same position, rather than silently dropping it
-        // from the tab bar (the file would still be in Vfs, just with no
-        // tab pointing at it anymore).
-        const tabIdx = Nexus.state.openTabs.indexOf(oldName);
-        if (tabIdx !== -1) {
-            Nexus.state.openTabs[tabIdx] = newName;
-            this.saveOpenTabs();
-        }
         
         if (Nexus.state.activeFile === oldName) Nexus.state.activeFile = newName;
         
@@ -4773,144 +4314,17 @@ setEmptyState() {
         if (confirm(`☢ Delete ${fn}?`)) { 
             delete Nexus.state.Vfs[fn]; 
             delete Nexus.state.originals[fn]; 
-            delete Nexus.state.lastSavedContent[fn];
-
-            // A deleted file can't remain an open tab pointing at nothing.
-            const tabIdx = Nexus.state.openTabs.indexOf(fn);
-            if (tabIdx !== -1) {
-                Nexus.state.openTabs.splice(tabIdx, 1);
-                this.saveOpenTabs();
-            }
-
-            // Only forcibly switch files if the one just deleted was the
-            // one actually open — deleting an unrelated file from the
-            // explorer while working on something else shouldn't yank the
-            // user over to a different file they weren't touching.
-            if (Nexus.state.activeFile === fn) {
-                const remaining = Object.keys(Nexus.state.Vfs);
-                remaining.length > 0 ? this.switchFile(remaining[0]) : this.setEmptyState();
-            } else {
-                this.renderAccordion();
-            }
+            const remaining = Object.keys(Nexus.state.Vfs);
+            remaining.length > 0 ? this.switchFile(remaining[0]) : this.setEmptyState();
             this.save(); 
         }
     },
-
-    // Stashes which tab closeTab() is waiting on a decision for — set by
-    // closeTab() right before it opens the confirmation modal, read by
-    // _confirmCloseTab() when the person taps one of the three buttons.
-    _pendingCloseTab: null,
-
-    // Closing a tab's × — the tab-bar equivalent of Cmd/Ctrl+W, NOT
-    // deleteFile(). This never touches Vfs/originals for a clean file: the
-    // file stays loaded in the workspace and simply drops off the tab bar,
-    // exactly like the explorer/tab-list split this whole feature is
-    // built around. Only when there's genuine unsaved work (per
-    // isDirty() — see its own comment for what "unsaved" means in this
-    // autosave-everything app) does this branch into the 3-way popup;
-    // closing a clean tab is silent and instant, same as it always should
-    // have been.
-    closeTab(fn) {
-        if (!Nexus.state.openTabs.includes(fn)) return; // not actually open — nothing to close
-
-        if (!this.isDirty(fn)) {
-            this._removeTab(fn);
-            return;
-        }
-
-        this._pendingCloseTab = fn;
-        const msg = document.getElementById('closeTabMessage');
-        if (msg) msg.innerText = `"${fn}" has changes since your last Save. What would you like to do?`;
-        Nexus.UI.openModal('close-tab');
-    },
-
-    // The three-way decision itself, invoked by modalCloseTab's buttons.
-    async _confirmCloseTab(choice) {
-        const fn = this._pendingCloseTab;
-        Nexus.UI.closeModal('close-tab');
-        this._pendingCloseTab = null;
-        if (!fn) return;
-
-        if (choice === 'cancel') return; // literally nothing changes — tab stays open, file stays as-is
-
-        if (choice === 'save') {
-            // If fn is the currently active file, its live editor content
-            // needs pulling in before saving — Vfs[fn] only reflects the
-            // editor automatically while fn IS the active file (autosave
-            // writes there), so this matches manualSave()'s own approach
-            // rather than assuming Vfs[fn] is already current.
-            if (Nexus.state.activeFile === fn) {
-                Nexus.state.Vfs[fn] = Nexus.Sentinel.getLiveCode();
-            }
-            const ok = await this.save();
-            if (ok) {
-                Nexus.state.lastSavedContent[fn] = Nexus.state.Vfs[fn];
-            } else {
-                // Save failed (already surfaced its own toast) — do NOT
-                // close the tab out from under unsaved work the user
-                // explicitly asked to keep. Leaving the tab open with its
-                // dirty dot still showing is the honest outcome here.
-                return;
-            }
-        } else if (choice === 'discard') {
-            // "Discard" has to actually discard, not just close the tab
-            // while quietly leaving the unsaved edits sitting in Vfs[fn] —
-            // that would contradict the button's own label, since the
-            // very next autosave tick (or a manual save from ANY tab,
-            // since Vfs.save() persists the whole Vfs object at once)
-            // would still write those "discarded" edits to disk. Revert
-            // to lastSavedContent[fn] — this app's real "last known good"
-            // baseline for this file — so closing genuinely undoes the
-            // changes rather than just hiding the tab that showed them.
-            if (Nexus.state.lastSavedContent[fn] !== undefined) {
-                Nexus.state.Vfs[fn] = Nexus.state.lastSavedContent[fn];
-            }
-            this.save();
-        }
-
-        this._removeTab(fn);
-    },
-
-    // Shared tail end for both the clean-tab-instant-close path and the
-    // post-decision path from _confirmCloseTab(). Removes fn from
-    // openTabs only — Vfs/originals are never touched here, which is the
-    // whole point: a closed tab's file stays exactly where it was, sitting
-    // in the explorer, available to reopen with one click.
-    _removeTab(fn) {
-        const idx = Nexus.state.openTabs.indexOf(fn);
-        if (idx !== -1) Nexus.state.openTabs.splice(idx, 1);
-        this.saveOpenTabs();
-
-        if (Nexus.state.activeFile === fn) {
-            // Prefer another still-open tab (whatever's now last in the
-            // list) over jumping to an arbitrary Vfs entry — closing a tab
-            // should land you on another tab you already had open, not on
-            // some unrelated file you never asked to see.
-            const nextTab = Nexus.state.openTabs[Nexus.state.openTabs.length - 1];
-            if (nextTab) {
-                this.switchFile(nextTab);
-            } else {
-                this.setEmptyState();
-            }
-        } else {
-            Nexus.UI.renderTabs();
-        }
-    },
-
 
     refreshCurrent() {
         const fn = Nexus.state.activeFile;
         if(!fn) return;
         if (confirm(`🔄 Restore ${fn} to original state?`)) { 
             Nexus.state.Vfs[fn] = Nexus.state.originals[fn]; 
-            // This is itself a deliberate, explicitly-confirmed action
-            // (the confirm() above), same as manualSave() — so it also
-            // moves the dirty-tracking baseline. Without this, reverting
-            // an edited file back to its original content would leave it
-            // reading as "dirty" against the stale pre-revert save
-            // baseline, which is backwards: the user just intentionally
-            // restored a known-good state, not left it half-finished.
-            Nexus.state.lastSavedContent[fn] = Nexus.state.originals[fn];
             this.switchFile(fn); 
             this.save(); 
         }
@@ -4982,10 +4396,6 @@ loadFiles(fileList) {
         r.onload = (e) => { 
             Nexus.state.Vfs[file.name] = e.target.result; 
             Nexus.state.originals[file.name] = e.target.result; 
-            // Freshly loaded, unedited content — seed the dirty baseline
-            // to match so it doesn't read as having unsaved changes the
-            // instant it lands in the explorer, before anyone's touched it.
-            Nexus.state.lastSavedContent[file.name] = e.target.result;
             this.renderAccordion(); 
             if (!Nexus.state.activeFile) this.switchFile(file.name);
             this.save(); 
@@ -5007,9 +4417,6 @@ async importZIP(file) {
                 if (fn && !fn.startsWith(".")) {
                     Nexus.state.Vfs[fn] = content;
                     Nexus.state.originals[fn] = content;
-                    // Same reasoning as loadFiles(): freshly imported,
-                    // unedited content shouldn't read as dirty on arrival.
-                    Nexus.state.lastSavedContent[fn] = content;
                     imported++;
                 }
             }
@@ -5049,10 +4456,6 @@ combineFiles() {
 
     Nexus.state.Vfs[newName] = combinedCode;
     Nexus.state.originals[newName] = combinedCode;
-    // Genuinely new file, never edited by hand yet — seed its dirty
-    // baseline the same way newFile()/loadFiles() do, so it doesn't read
-    // as unsaved the instant Combine finishes.
-    Nexus.state.lastSavedContent[newName] = combinedCode;
     
     const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const escapedNames = selected.map(f => escapeRegex(f.replace('./', ''))).join('|');
@@ -5070,8 +4473,7 @@ combineFiles() {
         if(changed) { Nexus.state.Vfs[file] = code; Nexus.state.originals[file] = code; }
     });
     
-    selected.forEach(f => { if(f !== newName) { delete Nexus.state.Vfs[f]; delete Nexus.state.originals[f]; delete Nexus.state.lastSavedContent[f]; const ti = Nexus.state.openTabs.indexOf(f); if (ti !== -1) Nexus.state.openTabs.splice(ti, 1); } });
-    this.saveOpenTabs();
+    selected.forEach(f => { if(f !== newName) { delete Nexus.state.Vfs[f]; delete Nexus.state.originals[f]; } });
     this.save();
     this.renderAccordion();
     this.switchFile(newName);
@@ -5083,9 +4485,6 @@ clearAll() {
     if (!confirm("⚠️ This will permanently delete ALL files in the Vortex. Continue?")) return;
     Nexus.state.Vfs = {};
     Nexus.state.originals = {};
-    Nexus.state.lastSavedContent = {};
-    Nexus.state.openTabs = [];
-    this.saveOpenTabs();
     Nexus.state.activeFile = null;
     const ed = document.getElementById('rawTerminal');
     if (ed) ed.value = '';
@@ -5105,11 +4504,7 @@ mergeAllJS() {
 
     Nexus.state.Vfs[newName] = combined;
     Nexus.state.originals[newName] = combined;
-    // Same reasoning as combineFiles() just above — a freshly-merged
-    // bundle hasn't diverged from its own just-created content yet.
-    Nexus.state.lastSavedContent[newName] = combined;
-    jsFiles.forEach(f => { if (f !== newName) { delete Nexus.state.Vfs[f]; delete Nexus.state.originals[f]; delete Nexus.state.lastSavedContent[f]; const ti = Nexus.state.openTabs.indexOf(f); if (ti !== -1) Nexus.state.openTabs.splice(ti, 1); } });
-    this.saveOpenTabs();
+    jsFiles.forEach(f => { if (f !== newName) { delete Nexus.state.Vfs[f]; delete Nexus.state.originals[f]; } });
 
     this.save();
     this.renderAccordion();
@@ -5169,16 +4564,10 @@ splitJSFile() {
         const newName = `${base}.${found[i].name}.js`;
         Nexus.state.Vfs[newName] = chunk;
         Nexus.state.originals[newName] = chunk;
-        Nexus.state.lastSavedContent[newName] = chunk;
         created++;
     }
     delete Nexus.state.Vfs[file];
     delete Nexus.state.originals[file];
-    delete Nexus.state.lastSavedContent[file];
-    {
-        const ti = Nexus.state.openTabs.indexOf(file);
-        if (ti !== -1) { Nexus.state.openTabs.splice(ti, 1); this.saveOpenTabs(); }
-    }
 
     this.save();
     this.renderAccordion();
@@ -5520,7 +4909,7 @@ lineLock: false,
 ctrlLock: false,
 toggleSelectLock() {
     this.selectLock = !this.selectLock;
-    ['ribbonSelectBtn', 'dpadSelectLock', 'utilSelectLock', 'navDrawerSelectLockBtn'].forEach(id => {
+    ['ribbonSelectBtn', 'dpadSelectLock', 'utilSelectLock'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.toggle('active', this.selectLock);
     });
@@ -5565,28 +4954,6 @@ init() {
     const selToggle = document.getElementById('dpadSelectLock');
     const lineToggle = document.getElementById('dpadLineLock');
     const dragHandle = document.getElementById('dpadDragHandle');
-
-    // FIX: none of these four lookups were ever null-checked before this,
-    // despite every other init-style function in this file following a
-    // strict "guard before touching" convention. Under normal
-    // circumstances these elements exist by the time boot() reaches this
-    // point (DOMContentLoaded guarantees the static HTML is already
-    // parsed) — but "normal circumstances" isn't a substitute for an
-    // actual guard, and a single null here (a future markup edit renaming
-    // one of these ids, for instance) would throw a bare TypeError this
-    // deep inside the synchronous boot() chain, silently aborting EVERY
-    // later boot step queued after it — including setupFastHold()
-    // (binds the footer d-pad's own press-and-hold), Nexus.omni.init(),
-    // Nexus.Terminal.init(), and the engine/edit-mode restoration timers.
-    // That failure mode looks exactly like "the whole app stopped
-    // responding to taps" from the outside, even though the page itself
-    // rendered fine — because everything really did stop responding, just
-    // silently, with the actual error visible only in a console most
-    // people never open.
-    if (!dpad || !selToggle || !lineToggle || !dragHandle) {
-        console.error("DpadEngine.init: one or more required elements missing from the DOM (nexusDpad/dpadSelectLock/dpadLineLock/dpadDragHandle) — skipping floating d-pad wiring, but continuing boot.");
-        return;
-    }
 
     selToggle.addEventListener('pointerdown', (e) => {
         e.preventDefault();
@@ -7127,25 +6494,13 @@ Sentinel : {
                return match ? match[1] : d;
            });
            const uniqueDeps = [...new Set(cleanDeps)];
-           // Cross-object call: _resolveVfsPath/_detectMissingImports live
-           // on Nexus.auditor (that's where the orphan-ID checker's own
-           // cross-file resolution already needed this logic), while
-           // scanDeps itself lives on Nexus.Sentinel — reusing it here
-           // instead of a third separate resolution check means this
-           // terminal-style log view can never disagree with the
-           // Diagnostics Hub's IMPORTS tile or Full Sweep about what
-           // counts as unresolved.
-           const missingSet = new Set(Nexus.auditor._detectMissingImports(code).map(i => i.path));
 
            let htmlOut = `<div style="color:var(--accent); margin-bottom:10px; font-weight:bold;">DETECTED ${uniqueDeps.length} DEPENDENCIES:</div>`;
            uniqueDeps.forEach(dep => {
                const idx = code.indexOf(dep);
                const line = idx >= 0 ? code.slice(0, idx).split('\n').length : null;
                const clickable = line != null;
-               const isMissing = missingSet.has(dep);
-               const color = isMissing ? 'var(--danger)' : 'var(--text)';
-               const icon = isMissing ? '❌' : '🔗';
-               htmlOut += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${line})" style="cursor:pointer;"` : ''} style="color:${color}; font-size:11px; margin-bottom:4px; padding-left:10px; border-left:2px solid ${isMissing ? 'var(--danger)' : 'var(--border)'}; display:flex; justify-content:space-between; align-items:center;"><span>${icon} ${dep}${isMissing ? ' (not found)' : ''}</span>${clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap;">LN ${line} →</span>` : ''}</div>`;
+               htmlOut += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${line})" style="cursor:pointer;"` : ''} style="color:var(--text); font-size:11px; margin-bottom:4px; padding-left:10px; border-left:2px solid var(--border); display:flex; justify-content:space-between; align-items:center;"><span>🔗 ${dep}</span>${clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap;">LN ${line} →</span>` : ''}</div>`;
            });
 
            document.getElementById('diagOut').innerHTML = htmlOut;
@@ -7303,33 +6658,13 @@ chunkEditor: {
    _target: null,
    _originalText: null,
 
-   // If there's an active, non-empty selection, that selection IS the
-   // chunk — this covers both: (1) Task 5's "manually highlighted code ->
-   // Edit Chunk opens exactly that", and (2) Task 2's bracket workflow
-   // (touch a bracket -> Select Lock on -> Match Bracket teleports AND
-   // extends the selection via selectMatchingBracket -> Edit Chunk opens
-   // exactly what's now highlighted). Falls back to the existing
-   // cursor-position node lookup (_getEnclosingDeclaration) only when
-   // there's no selection to honor, preserving the original "just place
-   // your cursor inside a function" behavior for that case.
    openForCursor() {
        if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
            return alert("Chunk Editor requires the CM6 Engine.");
        }
        const view = Nexus.editorCore.view;
-       const sel = view.state.selection.main;
-       let target;
-
-       if (!sel.empty) {
-           // Manual/bracket-driven selection — use its exact bounds
-           // verbatim rather than snapping to the nearest syntax node, so
-           // "highlight exactly this" and "bracket-match to exactly this"
-           // both mean exactly that, not "the nearest enclosing function."
-           target = { declFrom: sel.from, declTo: sel.to, nodeName: 'selection' };
-       } else {
-           target = Nexus.UI._getEnclosingDeclaration(view);
-           if (!target) return alert("Place the cursor inside a function, class, const, or object first — or select a range of text.");
-       }
+       const target = Nexus.UI._getEnclosingDeclaration(view);
+       if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
 
        const text = view.state.doc.sliceString(target.declFrom, target.declTo);
        this._target = target;
@@ -7450,7 +6785,7 @@ chunkEditor: {
                    st.innerText = 'Beautified.'; st.style.color = 'var(--success)';
                }
            } else if (kind === 'oneline') {
-               textarea.value = Nexus.UI._toOneLine(code, this._target && this._target.nodeName);
+               textarea.value = Nexus.UI._toOneLine(code);
                st.innerText = 'Collapsed to one line.'; st.style.color = 'var(--success)';
            } else if (kind === 'stripcomments') {
                textarea.value = code
@@ -7622,48 +6957,7 @@ try {
         // one AND .load() is actually called on it below — so opening a
         // .js file still only pulls lang-javascript over the wire, not all
         // hundred-plus packages language-data merely lists.
-        //
-        // TREE SHAKING — scope and an explicit tradeoff NOT taken:
-        // This app has no build step at all (no bundler, no package.json,
-        // no compile pipeline — confirmed by the plain <script type=
-        // "importmap"> above) — every dependency is fetched at runtime as
-        // native ESM straight from esm.sh. "Tree shaking" here can't mean
-        // the traditional bundler sense (Rollup/Webpack/esbuild statically
-        // eliminating unused exports at compile time), because there's no
-        // compile step to do that elimination in. What IS real and already
-        // in place: (1) the importmap's `*` prefix on every entry — esm.sh's
-        // own documented "external" marker, which is what keeps shared
-        // transitive deps like @codemirror/state deduplicated to one
-        // instance instead of esm.sh silently inlining a separate copy
-        // per importer (see the importmap's own comment for the exact bug
-        // this prevents); (2) language-data's lazy per-language loading,
-        // described in the comment block just above this one — only the
-        // actually-opened file's language ever gets fetched.
-        //
-        // The one additional real lever considered and deliberately NOT
-        // taken: `codemirror`'s basicSetup (imported just below) is CM6's
-        // own "batteries-included" convenience bundle — it pulls in
-        // @codemirror/commands' defaultKeymap, @codemirror/search,
-        // @codemirror/autocomplete's closeBrackets, @codemirror/lint's
-        // lintKeymap, foldGutter, and more, ALWAYS, regardless of whether
-        // this specific app uses each piece — and this file separately,
-        // explicitly imports @codemirror/commands, @codemirror/search,
-        // @codemirror/lint, and @codemirror/autocomplete anyway for named
-        // exports, so there's real overlap between what basicSetup quietly
-        // bundles and what's already imported alongside it on purpose.
-        // Swapping basicSetup for CM6's documented "minimal setup"
-        // (assembling the same pieces individually, keeping only what's
-        // actually used) would meaningfully cut duplicate/unused code —
-        // but it's a foundational change everything else in this 14,000+
-        // line file is built on top of, and this sandbox has zero network
-        // access to import and test real CM6 rendering behavior against it
-        // (confirmed earlier this session — esm.sh/npm are both blocked
-        // here). Attempting that swap blind, with no way to verify it
-        // still renders correctly before shipping it, was judged too high
-        // a risk for too uncertain a payoff and intentionally left as-is.
-        // If this is revisited later, do it as its OWN isolated, on-device-
-        // tested change — not bundled in alongside unrelated feature work.
-        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands, cmSticky, cmMinimap, cmLint, cmAutocomplete] = await Promise.all([
+        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands, cmSticky] = await Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
             import("@codemirror/view"),
@@ -7673,16 +6967,12 @@ try {
             import("@codemirror/language-data"),
             import("@codemirror/search"),
             import("@codemirror/commands"),
-            import("@fazelstudio/codemirror-stickyscroll"),
-            import("@replit/codemirror-minimap"),
-            import("@codemirror/lint"),
-            import("@codemirror/autocomplete")
+            import("@fazelstudio/codemirror-stickyscroll")
         ]);
         
         Nexus.editorCore.modules = {
             basicSetup: cm6.basicSetup,
             EditorView: cmView.EditorView,
-            keymap: cmView.keymap,
             highlightWhitespace: cmView.highlightWhitespace,
             highlightTrailingWhitespace: cmView.highlightTrailingWhitespace,
             selectNextOccurrence: cmSearch.selectNextOccurrence,
@@ -7695,31 +6985,6 @@ try {
             // its own dispatch internally — no custom bracket-matching
             // logic needed here at all.
             cursorMatchingBracket: cmCommands.cursorMatchingBracket,
-            // selectMatchingBracket is cursorMatchingBracket's documented
-            // select-extending counterpart in @codemirror/commands — same
-            // cursor/select pairing convention this file already relies on
-            // everywhere else (cursorGroupLeft/selectGroupLeft,
-            // cursorLineUp/selectLineUp, etc. — see DpadEngine.navigate()).
-            // This is what makes "Select Lock on, then Match Bracket"
-            // actually extend a selection from the starting bracket to its
-            // match, instead of just moving the cursor there and losing
-            // the start point — which is what cursorMatchingBracket alone
-            // does, and is why that workflow didn't work before this.
-            selectMatchingBracket: cmCommands.selectMatchingBracket,
-            // FIX (unreliable Insert Tab): basicSetup's bundled
-            // defaultKeymap deliberately does NOT bind the physical Tab key
-            // to indentation — CM6's own docs call this out explicitly, Tab
-            // is left free for focus-shifting/accessibility unless the app
-            // opts in. Without this, the ONLY way to insert a tab was the
-            // dedicated ribbon button calling injectChar() directly via
-            // view.dispatch() — pressing an actual Tab key (hardware
-            // keyboard, or any future keyboard-row wiring that dispatches
-            // real key events rather than calling injectChar) did nothing.
-            // indentWithTab is CM6's own documented, real export for this
-            // exact situation (confirmed against @codemirror/commands'
-            // source — it's the maintainers' own recommended opt-in, not a
-            // custom reimplementation).
-            indentWithTab: cmCommands.indentWithTab,
             // Sticky scope headers (VS Code / Monaco "sticky scroll") —
             // pins the opening lines of enclosing scopes (class/function/
             // if-block) at the top of the editor as you scroll into them,
@@ -7732,36 +6997,6 @@ try {
             // chunk-editor, so it works across every language this editor
             // now supports with zero per-language configuration needed.
             stickyScroll: cmSticky.stickyScroll,
-            // Minimap: @replit/codemirror-minimap's real, documented export
-            // is showMinimap (a factory taking a config object with `create`
-            // returning the DOM overlay/gutter it renders into) — confirmed
-            // against the package's own real source/README structure, not
-            // guessed by analogy to other packages' naming. Off by default
-            // (see the toggle's own comment for why) — this only loads the
-            // module eagerly alongside everything else here because ALL of
-            // these imports already happen unconditionally on every CM6
-            // boot regardless of which toggles are on; the extension itself
-            // is what's conditionally applied via a compartment below, not
-            // the import.
-            showMinimap: cmMinimap.showMinimap,
-            // Lint: @codemirror/lint's two real exports for this — linter()
-            // is the extension factory (takes a source function returning
-            // Diagnostic[] and wires the gutter dots + inline underlines +
-            // hover tooltips together automatically), lintGutter() is a
-            // separate opt-in for the gutter-dot column specifically.
-            // Confirmed against the package's own documented API — these
-            // are the two functions CM6's own official lint example page
-            // uses together, not a custom reimplementation.
-            linter: cmLint.linter,
-            lintGutter: cmLint.lintGutter,
-            // Autocomplete: @codemirror/autocomplete's real export for
-            // enabling the whole feature (popup, keyboard navigation,
-            // fuzzy matching, tooltips) is autocompletion() — a single
-            // factory, not several pieces to assemble by hand. Confirmed
-            // against the package's own documented API (its README's own
-            // minimal example is literally `autocompletion()` alone in an
-            // extensions array).
-            autocompletion: cmAutocomplete.autocompletion,
             // Bookmark gutter primitives — same set CodeMirror's own
             // official "Gutter Example" page uses to build its breakpoint
             // gutter (a per-line toggleable marker), which is structurally
@@ -7822,7 +7057,7 @@ try {
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment, highlightWhitespace, highlightTrailingWhitespace, StateEffect, StateField, RangeSet, gutter, GutterMarker, stickyScroll, keymap, indentWithTab } = Nexus.editorCore.modules;
+    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment, highlightWhitespace, highlightTrailingWhitespace, StateEffect, StateField, RangeSet, gutter, GutterMarker, stickyScroll } = Nexus.editorCore.modules;
     
     // Match the active file against @codemirror/language-data's full
     // registry by filename (not just extension — this also correctly
@@ -8040,26 +7275,8 @@ try {
     // that same concern.
     Nexus.editorCore.stickyScrollCompartment = new Compartment();
 
-    // Minimap, Lint, Autocomplete: same live-toggle-via-Compartment pattern
-    // as every other optional feature above. All three default OFF (see
-    // each toggle function's own comment for the reasoning) — the
-    // Compartment always exists and is always wired into
-    // currentExtensions below with an empty [] when off, so turning one on
-    // later is a single reconfigure() call, not a full editor rebuild.
-    Nexus.editorCore.minimapCompartment = new Compartment();
-    Nexus.editorCore.lintCompartment = new Compartment();
-    Nexus.editorCore.autocompleteCompartment = new Compartment();
-
     Nexus.editorCore.currentExtensions = [
        basicSetup, 
-       // FIX (unreliable Insert Tab): see the indentWithTab module-loading
-       // comment above — basicSetup's defaultKeymap leaves Tab unbound on
-       // purpose, so without this the physical Tab key did nothing at all
-       // in CM6 mode (only the dedicated ribbon button worked, and only
-       // when its own separate readonly-check bug — fixed elsewhere this
-       // session — happened to pass). No precedence conflict with
-       // basicSetup to worry about here: it never claims Tab itself.
-       keymap.of([indentWithTab]),
        langExtension, 
        indentGuideTheme, // always present — just defines CSS variables, harmless when the marker extension itself is toggled off via the compartment below
        Nexus.editorCore.bracketTracingCompartment.of(Nexus.state.prefs.bracketTracing !== false ? bracketMatching() : []),
@@ -8067,16 +7284,6 @@ try {
        Nexus.editorCore.wordWrapCompartment.of(Nexus.state.prefs.wordWrap ? EditorView.lineWrapping : []),
        Nexus.editorCore.whitespaceCompartment.of(Nexus.state.prefs.showWhitespace ? whitespaceExtension : []),
        Nexus.editorCore.stickyScrollCompartment.of(Nexus.state.prefs.stickyScroll !== false ? stickyScroll({ maxStickyLines: 4 }) : []),
-       // Minimap/Lint/Autocomplete all start according to whatever was
-       // last saved (default: off, per each toggle's own reasoning) rather
-       // than unconditionally empty — this uses the exact same
-       // _build*Extension() helpers the toggle functions call later, so a
-       // saved "on" preference actually restores as on after a reload
-       // instead of silently resetting to off every time, and there's no
-       // separate copy of the construction logic to drift out of sync.
-       Nexus.editorCore.minimapCompartment.of(Nexus.state.prefs.minimap ? Nexus.UI._buildMinimapExtension() : []),
-       Nexus.editorCore.lintCompartment.of(Nexus.state.prefs.lintEnabled ? Nexus.UI._buildLintExtension() : []),
-       Nexus.editorCore.autocompleteCompartment.of(Nexus.state.prefs.autocomplete ? Nexus.UI._buildAutocompleteExtension() : []),
        bookmarkGutter,
        ...(wantsDark ? [oneDark] : []),
        fixedHeight,
@@ -8150,15 +7357,7 @@ try {
     // SAVE engine preference
     Nexus.settings.update('activeEngine', 'cm6');
 
-    // Sync the new CM6 surface to whatever lock state the editor was already
-    // in. Two real states now (util/full) plus the no-file-open display,
-    // which also sets the readonly attribute — all three are covered
-    // explicitly here now. Previously this was an if/else-if with no final
-    // else, so a textarea in Full Edit (no readonly attribute AND no
-    // inputmode="none") matched neither branch and the freshly-swapped CM6
-    // surface was left at whatever contentEditable default it booted with
-    // instead of being explicitly set to match — full edit could silently
-    // fail to carry over across an engine swap.
+    // Sync the new CM6 surface to whatever lock state the editor was already in
     const rawEd = document.getElementById('rawTerminal');
     const cmDom = Nexus.editorCore.view.contentDOM;
     if (rawEd && rawEd.hasAttribute('readonly')) {
@@ -8167,9 +7366,6 @@ try {
     } else if (rawEd && rawEd.getAttribute('inputmode') === 'none') {
         cmDom.contentEditable = "true";
         cmDom.setAttribute('inputmode', 'none');
-    } else {
-        cmDom.contentEditable = "true";
-        cmDom.removeAttribute('inputmode');
     }
     
 } catch (e) {
@@ -8767,9 +7963,6 @@ inject() {
                    }
                    Nexus.state.Vfs[name] = text;
                    Nexus.state.originals[name] = text;
-                   // Same reasoning as loadFiles()/importZIP(): freshly
-                   // imported content, nothing to consider "unsaved" yet.
-                   Nexus.state.lastSavedContent[name] = text;
                    lastImported = name;
                } catch (e) {
                    console.warn('File Handling: failed to read launched file:', e);
@@ -8942,284 +8135,6 @@ self.addEventListener('fetch', (e) => {
        }
    },
 
-   // Ported from an earlier standalone version of this app that had a
-   // dedicated sprite-sheet tool never carried forward into this rewrite.
-   // Purely a CSS-generation tool: the uploaded image is only ever drawn
-   // into an in-memory canvas to read its real pixel dimensions (needed to
-   // compute how many full frames fit) and shown as an on-screen preview —
-   // it is never saved into the Vfs or anywhere else. Only the generated
-   // CSS text is written to disk, as sprites.css.
-   spriteSheet: {
-       _img: null,
-
-       handleUpload(e) {
-           const file = e.target.files[0];
-           if (!file) return;
-           const reader = new FileReader();
-           reader.onload = (ev) => {
-               const img = new Image();
-               img.onload = () => {
-                   Nexus.spriteSheet._img = img;
-                   const canvas = document.getElementById('spriteCanvasPreview');
-                   const dims = document.getElementById('spriteDims');
-                   canvas.width = img.width;
-                   canvas.height = img.height;
-                   canvas.style.display = 'block';
-                   canvas.getContext('2d').drawImage(img, 0, 0);
-                   if (dims) dims.innerText = `Loaded: ${img.width}×${img.height}px`;
-               };
-               img.onerror = () => alert("Couldn't load that as an image.");
-               img.src = ev.target.result;
-           };
-           reader.readAsDataURL(file);
-       },
-
-       generate() {
-           const st = document.getElementById('spriteStatus');
-           if (!this._img) {
-               if (st) { st.innerText = 'Upload an image first.'; st.style.color = 'var(--danger)'; }
-               return;
-           }
-           const w = parseInt(document.getElementById('spriteFrameW').value) || 0;
-           const h = parseInt(document.getElementById('spriteFrameH').value) || 0;
-           if (w <= 0 || h <= 0) {
-               if (st) { st.innerText = 'Frame width/height must be positive numbers.'; st.style.color = 'var(--danger)'; }
-               return;
-           }
-           if (w > this._img.width || h > this._img.height) {
-               if (st) { st.innerText = 'Frame size is larger than the whole image.'; st.style.color = 'var(--danger)'; }
-               return;
-           }
-
-           const cols = Math.floor(this._img.width / w);
-           const rows = Math.floor(this._img.height / h);
-           const total = cols * rows;
-
-           let css = `/* Generated by divIDE's Sprite Sheet tool.\n`;
-           css += ` * Source sheet: ${this._img.width}x${this._img.height}px, ${w}x${h}px frames, ${cols}x${rows} grid (${total} frames).\n`;
-           css += ` * Replace YOUR_IMAGE_HERE below with the actual path/URL to this sheet\n`;
-           css += ` * once it's part of your project — this tool only reads pixel\n`;
-           css += ` * dimensions from what you uploaded, it doesn't save the image itself. */\n\n`;
-           css += `.sprite {\n    background-image: url('YOUR_IMAGE_HERE');\n    display: inline-block;\n    width: ${w}px;\n    height: ${h}px;\n    background-repeat: no-repeat;\n}\n\n`;
-
-           let index = 0;
-           for (let r = 0; r < rows; r++) {
-               for (let c = 0; c < cols; c++) {
-                   css += `.sprite-${index} { background-position: -${c * w}px -${r * h}px; }\n`;
-                   index++;
-               }
-           }
-
-           const targetName = Nexus.state.Vfs['sprites.css'] !== undefined
-               ? `sprites-${Date.now().toString(36).slice(-4)}.css`
-               : 'sprites.css';
-
-           Nexus.state.Vfs[targetName] = css;
-           Nexus.state.originals[targetName] = css;
-           Nexus.state.lastSavedContent[targetName] = css;
-           Nexus.Vfs.renderAccordion();
-           Nexus.Vfs.save();
-
-           if (st) { st.innerText = `✔ Saved ${total} frames to ${targetName}.`; st.style.color = 'var(--success)'; }
-       }
-   },
-
-   // Ported from an earlier standalone version of this app that had a
-   // dedicated production-build export — nothing else in the current
-   // codebase does actual minification or produces a deployable ZIP.
-   // This is deliberately a separate, distinct concept from the existing
-   // "⚡ BUNDLE" feature: BUNDLE merges the project into one standalone
-   // HTML file for portability/sharing (no minification, no packaging);
-   // this produces a minified, individually-packaged ZIP of every file,
-   // for actually deploying a built project somewhere. Neither replaces
-   // the other.
-   buildPipeline: {
-       async minifyJS(code) {
-           if (typeof Terser === 'undefined' || typeof Terser.minify !== 'function') {
-               throw new Error('Terser failed to load — check network/CDN access.');
-           }
-           const result = await Terser.minify(code, {
-               mangle: true,
-               compress: { dead_code: true, drop_console: false, drop_debugger: true }
-           });
-           if (result.error) throw result.error;
-           return result.code;
-       },
-
-       // CSS gets a simple, safe strip (comments + collapsed whitespace)
-       // rather than routed through Terser (which only understands JS) or
-       // a full CSS-aware minifier (not currently a dependency this app
-       // loads) — matching exactly what the ported feature's own original
-       // approach did, since a byte-perfect CSS minifier is a separate,
-       // heavier tool this app has no other use for.
-       minifyCSS(code) {
-           return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\s+/g, ' ').trim();
-       },
-
-       async run() {
-           if (Object.keys(Nexus.state.Vfs).length === 0) {
-               return alert("No files to build — the project is empty.");
-           }
-           if (typeof JSZip === 'undefined') {
-               return alert("JSZip failed to load — check network/CDN access.");
-           }
-
-           const st = document.getElementById('footStatus');
-           if (st) { st.innerText = "BUILDING..."; st.style.color = "var(--gold)"; }
-
-           try {
-               const zip = new JSZip();
-               const buildFolder = zip.folder("production_build");
-
-               const jsFiles = Object.keys(Nexus.state.Vfs).filter(f => f.toLowerCase().endsWith('.js'));
-               const cssFiles = Object.keys(Nexus.state.Vfs).filter(f => f.toLowerCase().endsWith('.css'));
-               const otherFiles = Object.keys(Nexus.state.Vfs).filter(f => !jsFiles.includes(f) && !cssFiles.includes(f));
-
-               let minifiedCount = 0, failedCount = 0;
-
-               for (const file of jsFiles) {
-                   try {
-                       const minified = await this.minifyJS(Nexus.state.Vfs[file]);
-                       buildFolder.file(file, minified);
-                       minifiedCount++;
-                   } catch (err) {
-                       // Same fallback the ported original used: ship the
-                       // unminified original rather than drop the file
-                       // from the build entirely over one bad minify pass
-                       // (e.g. a syntax Terser's parser is stricter about
-                       // than this app's own editor).
-                       console.error(`Minification failed for ${file}:`, err);
-                       buildFolder.file(file, Nexus.state.Vfs[file]);
-                       failedCount++;
-                   }
-               }
-
-               for (const file of cssFiles) {
-                   buildFolder.file(file, this.minifyCSS(Nexus.state.Vfs[file]));
-                   minifiedCount++;
-               }
-
-               for (const file of otherFiles) {
-                   buildFolder.file(file, Nexus.state.Vfs[file]);
-               }
-
-               const content = await zip.generateAsync({ type: "blob" });
-               const url = URL.createObjectURL(content);
-               const a = document.createElement("a");
-               a.href = url;
-               a.download = `divIDE_Build_${Date.now()}.zip`;
-               document.body.appendChild(a);
-               a.click();
-               document.body.removeChild(a);
-               URL.revokeObjectURL(url);
-
-               if (st) { st.innerText = "BUILD READY"; st.style.color = "var(--success)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
-               if (Nexus.shell && typeof Nexus.shell.out === 'function') {
-                   Nexus.shell.out(`📦 Production build downloaded: ${minifiedCount} file(s) minified${failedCount > 0 ? `, ${failedCount} shipped unminified after a Terser error` : ''}, ${otherFiles.length} copied as-is.`, failedCount > 0 ? 'warn' : 'success');
-               }
-           } catch (e) {
-               console.error("Production build failed:", e);
-               alert("Build failed: " + e.message);
-               if (st) { st.innerText = "BUILD FAILED"; st.style.color = "var(--danger)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
-           }
-       }
-   },
-
-   // Debugs the SANDBOXED PROJECT's own localStorage (whatever a
-   // still-in-progress game/tool built inside divIDE writes for its own
-   // high scores, settings, etc.) — never divIDE's own data, which lives
-   // entirely in IndexedDB via localforage/Dexie (neither has a
-   // localStorage mode at all), so there's no real risk of this
-   // accidentally surfacing or letting someone wipe divIDE's own project
-   // files. The KNOWN_PREFIXES filter is kept anyway as cheap defensive
-   // insurance in case anything unexpected ever writes to localStorage
-   // directly, even though nothing in this app currently does.
-   storageInspector: {
-       KNOWN_PREFIXES: ['nexus_', 'Nexus.state.', 'devos_', 'settings_'],
-
-       _isOwnKey(key) {
-           return this.KNOWN_PREFIXES.some(p => key.startsWith(p)) || key === 'vault_snippets';
-       },
-
-       _projectKeys() {
-           return Object.keys(localStorage).filter(k => !this._isOwnKey(k));
-       },
-
-       render() {
-           const container = document.getElementById('storageInspectorList');
-           if (!container) return;
-           const keys = this._projectKeys();
-
-           if (keys.length === 0) {
-               container.innerHTML = '<div style="color:var(--text); opacity:0.6; font-style:italic; font-size:12px; text-align:center; padding:20px 0;">No data found. Run your project (▶️) and it\'ll appear here once it writes to localStorage.</div>';
-               return;
-           }
-
-           container.innerHTML = keys.map(key => {
-               const val = localStorage.getItem(key);
-               const safeKey = key.replace(/'/g, "\\'");
-               return `
-                   <div style="display:flex; flex-direction:column; gap:6px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
-                       <div style="display:flex; justify-content:space-between; align-items:center;">
-                           <strong style="color:var(--accent); font-size:12px; word-break:break-all;">${key}</strong>
-                           <button class="tool-btn btn-danger" style="padding:2px 8px; font-size:9px; flex-shrink:0; margin-left:8px;" onclick="Nexus.storageInspector.deleteKey('${safeKey}')">DEL</button>
-                       </div>
-                       <textarea id="storageVal-${btoa(encodeURIComponent(key))}" class="sleek-input" style="width:100%; height:50px; font-size:11px; box-sizing:border-box; resize:vertical;">${(val || '').replace(/</g, '&lt;')}</textarea>
-                       <button class="tool-btn" style="width:100%; padding:6px; font-size:10px;" onclick="Nexus.storageInspector.updateKey('${safeKey}')">Update Value</button>
-                   </div>`;
-           }).join('');
-       },
-
-       updateKey(key) {
-           const el = document.getElementById(`storageVal-${btoa(encodeURIComponent(key))}`);
-           if (!el) return;
-           localStorage.setItem(key, el.value);
-           if (Nexus.shell && typeof Nexus.shell.out === 'function') Nexus.shell.out(`Updated localStorage key: ${key}`, 'success');
-       },
-
-       deleteKey(key) {
-           if (!confirm(`Delete localStorage key "${key}"?`)) return;
-           localStorage.removeItem(key);
-           this.render();
-           if (Nexus.shell && typeof Nexus.shell.out === 'function') Nexus.shell.out(`Deleted localStorage key: ${key}`, 'warn');
-       },
-
-       openSeeder() {
-           const name = prompt("Key name for this data (e.g. 'high_score'):");
-           if (!name) return;
-           if (this._isOwnKey(name)) return alert("That key name is reserved by divIDE itself — pick a different one.");
-           const value = prompt("Value to store (plain text or JSON):");
-           if (value === null) return; // cancelled
-           localStorage.setItem(name, value);
-           this.render();
-       },
-
-       clearAll() {
-           const keys = this._projectKeys();
-           if (keys.length === 0) return alert("Nothing to clear.");
-           if (!confirm(`Wipe all ${keys.length} localStorage key(s) from your previewed project? divIDE's own files and settings are unaffected.`)) return;
-           keys.forEach(k => localStorage.removeItem(k));
-           this.render();
-           if (Nexus.shell && typeof Nexus.shell.out === 'function') Nexus.shell.out(`Wiped ${keys.length} localStorage key(s).`, 'warn');
-       },
-
-       exportToJSON() {
-           const keys = this._projectKeys();
-           if (keys.length === 0) return alert("Nothing to export.");
-           const data = {};
-           keys.forEach(k => data[k] = localStorage.getItem(k));
-           const blob = new Blob([JSON.stringify(data, null, 4)], { type: 'application/json' });
-           const url = URL.createObjectURL(blob);
-           const a = document.createElement('a');
-           a.href = url;
-           a.download = 'project_localstorage_export.json';
-           document.body.appendChild(a);
-           a.click();
-           document.body.removeChild(a);
-           URL.revokeObjectURL(url);
-       }
-   },
-
    defrag: {
        runJS() {
            if (!Nexus.state.activeFile.endsWith('.js')) return alert("Select .js file.");
@@ -9359,95 +8274,12 @@ grab() {
            this.save(); this.render(); 
            alert("Snapshot Created."); 
        },
-       // Renders into BOTH surfaces snapshots can now be acted on from:
-       // #mergeSnapshotList (unchanged — the existing per-file diff-against-
-       // current-file entry point, reached from inside the Merge modal) and
-       // the new #snapshotBrowserList (a real, standalone Snapshots
-       // browser reachable directly from the 📸 button itself, which is
-       // where this app's own 📸 SNAPSHOT button actually lives — right
-       // above the file explorer, nowhere near Merge). Previously the only
-       // way to ever see a snapshot again was to already know it was
-       // hiding inside an unrelated modal; snapshots themselves worked
-       // (saved/loaded correctly), this was purely a discoverability gap.
        render() { 
            const m = document.getElementById('mergeSnapshotList'); 
            if (m) m.innerHTML = Nexus.state.snapshots.map((s, i) => `
                <div class="item-row" onclick="Nexus.mergeEngine.initiate(Nexus.state.snapshots[${i}].data['${Nexus.state.activeFile}'])">
                    <span>${s.time}</span> <span style="color:var(--gold)">DIFF →</span>
                </div>`).reverse().join('') || "No Snapshots."; 
-
-           const b = document.getElementById('snapshotBrowserList');
-           if (b) b.innerHTML = Nexus.state.snapshots.map((s, i) => {
-               const fileCount = Object.keys(s.data).length;
-               return `
-               <div class="item-row" style="flex-direction:column; align-items:stretch; gap:8px; cursor:default;">
-                   <div style="display:flex; justify-content:space-between; align-items:center;">
-                       <span>${s.time}</span>
-                       <span style="opacity:0.6; font-size:11px;">${fileCount} file${fileCount === 1 ? '' : 's'}</span>
-                   </div>
-                   <div style="display:flex; gap:8px;">
-                       <button class="tool-btn" style="flex:1; padding:8px; font-size:10px;" onclick="Nexus.mergeEngine.initiate(Nexus.state.snapshots[${i}].data['${Nexus.state.activeFile}']); Nexus.UI.closeModal('snapshots')">Diff Current File</button>
-                       <button class="tool-btn btn-accent" style="flex:1; padding:8px; font-size:10px;" onclick="Nexus.snapshots.restoreProject(${i})">Restore Whole Project</button>
-                   </div>
-               </div>`;
-           }).reverse().join('') || '<div style="padding:16px; text-align:center; opacity:0.6; font-size:12px;">No snapshots yet — tap 📸 SNAPSHOT in the file explorer to create one.</div>';
-       },
-
-       // Real project-wide restore, not just a diff source — this is the
-       // actual fix for the routing gap: the 📸 button implies "checkpoint
-       // my whole project," and until now there was no way to act on that
-       // implication at all, only to diff one file against Merge.
-       // Wholesale-replaces Vfs/originals/lastSavedContent with the
-       // snapshot's own captured data, keyed the same way Vfs.clearAll()
-       // resets things, then reopens whatever tab was active if it still
-       // exists in the restored set.
-       async restoreProject(index) {
-           const snap = Nexus.state.snapshots[index];
-           if (!snap) return;
-
-           // Reuses the exact same dirty-check this app already relies on
-           // for closeTab() — restoring wholesale is strictly more
-           // destructive than closing one tab, so it deserves at least the
-           // same warning, not less. Checks every open tab, not just the
-           // active one, since restore replaces everything at once.
-           const dirtyTabs = Nexus.state.openTabs.filter(fn => Nexus.Vfs.isDirty(fn));
-           if (dirtyTabs.length > 0) {
-               const proceed = confirm(
-                   `Restoring "${snap.time}" will replace your ENTIRE project with this snapshot.\n\n` +
-                   `You have unsaved changes in: ${dirtyTabs.join(', ')}\n\n` +
-                   `These changes will be lost. Continue?`
-               );
-               if (!proceed) return;
-           } else {
-               const proceed = confirm(`Restore your entire project to the "${snap.time}" snapshot? This replaces every current file.`);
-               if (!proceed) return;
-           }
-
-           const restored = JSON.parse(JSON.stringify(snap.data));
-           Nexus.state.Vfs = restored;
-           Nexus.state.originals = JSON.parse(JSON.stringify(restored));
-           Nexus.state.lastSavedContent = JSON.parse(JSON.stringify(restored));
-           // Keep only tabs for files that still exist in the restored
-           // set — a tab for a file the snapshot doesn't have would point
-           // at nothing.
-           Nexus.state.openTabs = Nexus.state.openTabs.filter(fn => restored[fn] !== undefined);
-           Nexus.Vfs.saveOpenTabs();
-
-           const files = Object.keys(restored);
-           const reopenTarget = (Nexus.state.activeFile && restored[Nexus.state.activeFile] !== undefined)
-               ? Nexus.state.activeFile
-               : files[0];
-
-           await Nexus.Vfs.save();
-           Nexus.Vfs.renderAccordion();
-           if (reopenTarget) {
-               Nexus.Vfs.switchFile(reopenTarget);
-           } else {
-               Nexus.Vfs.setEmptyState();
-           }
-
-           Nexus.UI.closeModal('snapshots');
-           alert(`Project restored to snapshot from ${snap.time}.`);
        }
    },
 // Add this inside the Nexus.UI object
@@ -10235,7 +9067,6 @@ settings: {
         if(document.getElementById('prefFont')) document.getElementById('prefFont').value = Nexus.state.prefs.fontSize;
         if(document.getElementById('prefTabs')) document.getElementById('prefTabs').value = Nexus.state.prefs.tabWidth;
         if(document.getElementById('prefKbRows')) document.getElementById('prefKbRows').value = Nexus.state.prefs.kbRows;
-        if(document.getElementById('prefInfiniteScroll')) document.getElementById('prefInfiniteScroll').checked = !!Nexus.state.prefs.infiniteScroll;
         if(document.getElementById('prefWriterCustom')) document.getElementById('prefWriterCustom').value = Nexus.state.prefs.customVocab || "";
         if(document.getElementById('prefGhRepo')) document.getElementById('prefGhRepo').value = Nexus.state.prefs.ghRepo || "";
         if(document.getElementById('prefGhToken')) document.getElementById('prefGhToken').value = Nexus.state.prefs.ghToken || "";
@@ -10789,9 +9620,6 @@ shell: {
            
            Nexus.state.Vfs[path] = "";
            Nexus.state.originals[path] = ""; 
-           // Same reasoning as newFile(): a brand-new empty file, nothing
-           // typed into it yet, shouldn't read as having unsaved changes.
-           Nexus.state.lastSavedContent[path] = "";
            Nexus.Vfs.renderAccordion();
            Nexus.Vfs.save();
            return `Created: ${path}`;
@@ -10803,15 +9631,6 @@ shell: {
            
            delete Nexus.state.Vfs[path];
            delete Nexus.state.originals[path];
-           delete Nexus.state.lastSavedContent[path];
-           // Terminal rm bypasses Vfs.deleteFile()/closeTab() entirely, so
-           // it needs its own cleanup of any dangling open tab pointing at
-           // the now-deleted file — otherwise the tab bar keeps showing a
-           // tab for a file that no longer exists in Vfs at all.
-           {
-               const ti = Nexus.state.openTabs.indexOf(path);
-               if (ti !== -1) { Nexus.state.openTabs.splice(ti, 1); Nexus.Vfs.saveOpenTabs(); }
-           }
            if (Nexus.state.activeFile === path) Nexus.state.activeFile = null;
            Nexus.Vfs.renderAccordion();
            Nexus.Vfs.save();
@@ -10832,11 +9651,7 @@ shell: {
            toDelete.forEach(p => {
                delete Nexus.state.Vfs[p];
                delete Nexus.state.originals[p];
-               delete Nexus.state.lastSavedContent[p];
-               const ti = Nexus.state.openTabs.indexOf(p);
-               if (ti !== -1) Nexus.state.openTabs.splice(ti, 1);
            });
-           Nexus.Vfs.saveOpenTabs();
 
            Nexus.Vfs.renderAccordion();
            Nexus.Vfs.save();
@@ -10874,17 +9689,7 @@ shell: {
                const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
                if (!res.ok) throw new Error("File not found.");
                const data = await res.json();
-               const pulled = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
-               Nexus.state.Vfs[path] = pulled;
-               // Treats a pull the same as a fresh load for dirty-tracking
-               // purposes: content just came from the remote, so it isn't
-               // "unsaved" relative to anything yet. Note this file's
-               // pre-existing behavior of never touching originals[path]
-               // here is untouched by this change — that's a separate,
-               // pre-existing gap (refreshCurrent() on a pulled file would
-               // revert to whatever was there before the pull, not to the
-               // pulled content) outside this session's scope.
-               Nexus.state.lastSavedContent[path] = pulled;
+               Nexus.state.Vfs[path] = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
                Nexus.Vfs.renderAccordion();
                return `${path}: Pulled 📥`;
            } catch (e) { return `Error: ${e.message}`; }
@@ -10902,9 +9707,7 @@ shell: {
                    if (item.type === "file") {
                        const fRes = await fetch(item.url, { headers: { "Authorization": `token ${token}` } });
                        const fData = await fRes.json();
-                       const pulled = decodeURIComponent(escape(atob(fData.content.replace(/\s/g, ''))));
-                       Nexus.state.Vfs[item.path] = pulled;
-                       Nexus.state.lastSavedContent[item.path] = pulled;
+                       Nexus.state.Vfs[item.path] = decodeURIComponent(escape(atob(fData.content.replace(/\s/g, ''))));
                        count++;
                    }
                }
@@ -11021,7 +9824,6 @@ UI: {
         // to the screen once loaded. Do it again now that they're in.
         if (typeof this.updateWidgets === 'function') this.updateWidgets();
         if (typeof this.renderUtilBar === 'function') this.renderUtilBar();
-        if (typeof this.renderUtilMirror === 'function') this.renderUtilMirror();
         
         // 3. Engine Initializations
         if (Nexus.DpadEngine && typeof Nexus.DpadEngine.init === 'function') Nexus.DpadEngine.init();
@@ -11039,21 +9841,16 @@ UI: {
             setTimeout(() => Nexus.toggleEditor(), 300);
         }
 
-        // RESTORE saved edit-mode (util/full — 'readonly' no longer exists
-        // as a mode) — chained after a longer delay than the engine
-        // restoration above so it applies once CM6 (if being restored) has
-        // actually finished swapping in; applying inputmode/contentEditable
-        // state before that would touch Nexus.editorCore.view.contentDOM
-        // before that view exists.
-        // Defaults to 'util' (the safer of the two remaining states — still
-        // fully interactive, just keyboard-suppressed) if nothing was ever
-        // saved, or if a pre-refactor save still has the old 'readonly'
-        // value sitting in storage — setEditMode() itself also collapses
-        // any unrecognized value to 'util' as a second layer of the same
-        // guard.
+        // RESTORE saved edit-mode (readonly/util/full) — chained after a
+        // longer delay than the engine restoration above so it applies
+        // once CM6 (if being restored) has actually finished swapping in;
+        // applying readonly/contentEditable state before that would touch
+        // Nexus.editorCore.view.contentDOM before that view exists.
+        // Defaults to 'readonly' (the pre-existing default state new files
+        // opened in, unchanged) if nothing was ever saved.
         if (Nexus.state.activeFile) {
             setTimeout(() => {
-                Nexus.UI.setEditMode(Nexus.state.prefs.editMode || 'util');
+                Nexus.UI.setEditMode(Nexus.state.prefs.editMode || 'readonly');
             }, 500);
         }
         
@@ -11071,7 +9868,6 @@ UI: {
   // Fixed initialization block structure with explicit method wrapping and closing brace
   initSubSystems() {  
       if (typeof this.renderUtilBar === 'function') this.renderUtilBar();  
-      if (typeof this.renderUtilMirror === 'function') this.renderUtilMirror();
       if (typeof this.initInfiniteRibbon === 'function') this.initInfiniteRibbon(); 
       if (typeof this.initEdgeSwipes === 'function') this.initEdgeSwipes(); 
       if (typeof this.syncStatus === 'function') this.syncStatus(); 
@@ -11168,12 +9964,6 @@ UI: {
    },
 // --- Place these inside Nexus.UI ---
 
-// NOTE: no longer wired to any button. 🎮 (#ribbonDpadToggle) now opens
-// #navDrawer via toggleDrawer('navDrawer') instead — this used to be that
-// button's onclick, toggling the inline arrow/SEL/CTRL strip's visibility
-// in the footer dock. Left defined (harmless, still callable) rather than
-// deleted in case a future footer-decluttering pass wants to re-expose
-// #dpadContainer's show/hide separately from the drawer.
 toggleDpadPanel() {
     const container = document.getElementById('dpadContainer');
     const btn = document.getElementById('ribbonDpadToggle');
@@ -11479,23 +10269,7 @@ toggleKeyboardRows() {
 
                injectChar(val) {
    const ed = document.getElementById('rawTerminal');
-
-   // FIX (unreliable Insert Tab): this always checked #rawTerminal's own
-   // readonly attribute as a stand-in for "is editing locked right now,"
-   // even when CM6 was the actual live engine. #rawTerminal and CM6's
-   // contentDOM are supposed to be kept in lockstep by setEditMode() and
-   // the engine-swap sync block, but that's several separate code paths
-   // agreeing to stay in sync by convention, not one shared source of
-   // truth being read from directly — any gap between them (one existed
-   // until this session's engine-swap fix) left this check silently
-   // testing the WRONG surface's lock state while CM6 was active, which
-   // is exactly the kind of intermittent "works/doesn't work" behavior
-   // reported. Check whichever engine is actually live, directly.
-   const cmDom = (Nexus.editorCore && Nexus.editorCore.view && Nexus.editorCore.view.contentDOM) || null;
-   const isLocked = (Nexus.editorCore.isCM6 && cmDom)
-       ? cmDom.contentEditable === "false"
-       : ed.hasAttribute('readonly');
-   if (isLocked || !Nexus.state.activeFile) return;
+   if (ed.hasAttribute('readonly') || !Nexus.state.activeFile) return;
 
    let processed = val.replace(/\*\+/g, '\t').replace(/\\t/g, '\t'); 
    let cursorOffset = processed.indexOf('*#'); 
@@ -11721,25 +10495,6 @@ insertUUID() {
            { group: 'Fix & Format', key: 'blanklines', label: 'Remove Blank Lines' },
            { group: 'Fix & Format', key: 'alignleft', label: 'Align Left' },
            { group: 'Fix & Format', key: 'reindent', label: 'Re-indent by Depth' },
-           // Ribbon-mirrored tools — the ribbon's own fixed set (Save,
-           // Refresh, Undo, Redo, Insert Tab, Outdent, Cut, Copy, Paste,
-           // Run) mirrored here so they're also available as optional
-           // utility-bar entries, per the "mirror ribbon options onto the
-           // utility toolbar" requirement. Deliberately NOT added to
-           // DEFAULT_UTIL_LAYOUT below — they start available-but-unchecked
-           // in "Available Tools," same as every other opt-in tool, so
-           // nobody's existing custom layout gets tools silently injected
-           // into it that they never asked for.
-           { group: 'Ribbon (Mirrored)', key: 'rbSave', label: 'Save Now' },
-           { group: 'Ribbon (Mirrored)', key: 'rbRefresh', label: 'Refresh File (restore to original)' },
-           { group: 'Ribbon (Mirrored)', key: 'rbUndo', label: 'Undo' },
-           { group: 'Ribbon (Mirrored)', key: 'rbRedo', label: 'Redo' },
-           { group: 'Ribbon (Mirrored)', key: 'rbInsertTab', label: 'Insert Tab' },
-           { group: 'Ribbon (Mirrored)', key: 'rbOutdent', label: 'Outdent Line' },
-           { group: 'Ribbon (Mirrored)', key: 'rbCut', label: 'Cut' },
-           { group: 'Ribbon (Mirrored)', key: 'rbCopy', label: 'Copy' },
-           { group: 'Ribbon (Mirrored)', key: 'rbPaste', label: 'Paste' },
-           { group: 'Ribbon (Mirrored)', key: 'rbRun', label: 'Run / Preview' },
        ],
        DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, bookmarkHere, bookmarksList, select, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
 
@@ -11814,7 +10569,6 @@ insertUUID() {
            }
            Nexus.settings.update('utilLayout', current.join(', '));
            Nexus.UI.renderUtilBar();
-           Nexus.UI.renderUtilMirror();
            Nexus.UI.renderUtilLayoutModal();
        },
 
@@ -11828,7 +10582,6 @@ insertUUID() {
            [current[idx], current[newIdx]] = [current[newIdx], current[idx]];
            Nexus.settings.update('utilLayout', current.join(', '));
            Nexus.UI.renderUtilBar();
-           Nexus.UI.renderUtilMirror();
            Nexus.UI.renderUtilLayoutModal();
        },
 
@@ -11866,21 +10619,6 @@ insertUUID() {
            'blanklines': `<button class="sleek-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove Blank Lines" aria-label="Remove blank lines"><span style="font-size:16px;">🧽</span><span class="util-lbl">No Blank</span></button>`,
            'alignleft': `<button class="sleek-btn" onclick="Nexus.Sentinel.alignLeft()" title="Align Left" aria-label="Align everything to the left"><span style="font-size:16px;">⬅️</span><span class="util-lbl">Align</span></button>`,
            'reindent': `<button class="sleek-btn" onclick="Nexus.Sentinel.reindentByDepth()" title="Re-indent by Depth" aria-label="Re-indent by nesting depth"><span style="font-size:16px;">📐</span><span class="util-lbl">Indent</span></button>`,
-           // Ribbon-mirrored entries — same onclick handlers as the actual
-           // ribbon buttons, just reachable from the utility bar too for
-           // anyone who wants them closer to their thumb or wants to
-           // remove the ribbon's own copy from view eventually. See
-           // UTIL_TOOL_META's own comment for why these default off.
-           'rbSave': `<button class="sleek-btn" onclick="Nexus.Vfs.manualSave()" title="Save Now" aria-label="Save current file now"><span style="font-size:16px;">💾</span><span class="util-lbl">Save</span></button>`,
-           'rbRefresh': `<button class="sleek-btn" onclick="Nexus.Vfs.refreshCurrent()" title="Refresh File" aria-label="Refresh current file"><span style="font-size:16px;">♻️</span><span class="util-lbl">Refresh</span></button>`,
-           'rbUndo': `<button class="sleek-btn" onclick="Nexus.history.undo()" title="Undo" aria-label="Undo"><span style="font-size:16px;">↶</span><span class="util-lbl">Undo</span></button>`,
-           'rbRedo': `<button class="sleek-btn" onclick="Nexus.history.redo()" title="Redo" aria-label="Redo"><span style="font-size:16px;">↷</span><span class="util-lbl">Redo</span></button>`,
-           'rbInsertTab': `<button class="sleek-btn" onclick="Nexus.UI.injectChar('\\t')" title="Insert Tab" aria-label="Insert tab"><span style="font-size:16px;">→|</span><span class="util-lbl">Tab</span></button>`,
-           'rbOutdent': `<button class="sleek-btn" onclick="Nexus.tools.outdentLine()" title="Outdent Line" aria-label="Outdent line"><span style="font-size:16px;">|←</span><span class="util-lbl">Outdent</span></button>`,
-           'rbCut': `<button class="sleek-btn" onclick="document.execCommand('cut')" title="Cut" aria-label="Cut"><span style="font-size:16px;">✂️</span><span class="util-lbl">Cut</span></button>`,
-           'rbCopy': `<button class="sleek-btn" onclick="document.execCommand('copy')" title="Copy" aria-label="Copy"><span style="font-size:16px;">⧉</span><span class="util-lbl">Copy</span></button>`,
-           'rbPaste': `<button class="sleek-btn" onclick="Nexus.tools.clipboard('paste')" title="Paste" aria-label="Paste"><span style="font-size:16px;">📋</span><span class="util-lbl">Paste</span></button>`,
-           'rbRun': `<button class="sleek-btn" onclick="Nexus.UI.openModal('sandbox')" title="Run / Preview" aria-label="Run preview"><span style="font-size:16px;">▶️</span><span class="util-lbl">Run</span></button>`,
            };
            
            const container = document.querySelector('#utilityBar .sleek-bar-content');
@@ -11891,65 +10629,6 @@ insertUUID() {
                    .join('');
            }
        },
-
-       renderUtilMirror() {
-           const layoutStr = Nexus.state.prefs.utilLayout || Nexus.UI.DEFAULT_UTIL_LAYOUT;
-           const layout = layoutStr.split(',').map(s => s.trim());
-           // Take the last 6 tools from the layout
-           const lastSix = layout.slice(-6);
-           const tools = {
-                'color': `<button class="tool-btn" onclick="document.getElementById('colorPickerInput').click()" title="Color Picker" style="flex:1;">🎨 Picker</button>`,       
-                'fullFold': `<button class="tool-btn" onclick="Nexus.UI.collapseAll()" title="Fold everything to top level" style="flex:1;">⇐⇒ Fold</button>`,
-                'oneFold': `<button class="tool-btn" onclick="Nexus.UI.foldToLayer()" title="Fold deepest layer" style="flex:1;">│ -1</button>`,
-                'unfold': `<button class="tool-btn" onclick="Nexus.UI.expandAll()" title="Unfold all" style="flex:1;">≤≥ All</button>`,
-                'oneUnfold': `<button class="tool-btn" onclick="Nexus.UI.unfoldOnce()" title="Unfold highest folded level" style="flex:1;">∧ +1</button>`,
-                'map': `<button class="tool-btn" onclick="Nexus.UI.saveMap()" title="Save visible structure as map.filename.txt" style="flex:1;">🗺 Map</button>`,
-                'oneLine': `<button class="tool-btn" onclick="Nexus.UI.collapseSelectionToOneLine()" title="Format to one line" style="flex:1;">⟷ 1-Line</button>`,
-                'editChunk': `<button class="tool-btn" onclick="Nexus.chunkEditor.openForCursor()" title="Open function/class in mini-editor" style="flex:1;">🔎 Edit</button>`,
-                'selectNext': `<button class="tool-btn" onclick="Nexus.UI.selectNextOccurrence()" title="Add next occurrence as cursor" style="flex:1;">⊕ Next</button>`,
-                'selectAllMatches': `<button class="tool-btn" onclick="Nexus.UI.selectAllOccurrences()" title="Select all occurrences" style="flex:1;">⊛ All</button>`,
-                'jumpBracket': `<button class="tool-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to matching bracket" style="flex:1;">↔{} Bracket</button>`,
-                'bookmarkHere': `<button class="tool-btn" onclick="Nexus.UI.toggleBookmarkHere()" title="Toggle bookmark on current line" style="flex:1;">🔖 Bk</button>`,
-                'bookmarksList': `<button class="tool-btn" onclick="Nexus.UI.openBookmarksPanel()" title="View all bookmarks" style="flex:1;">📑 All</button>`,
-                'expandLine': `<button class="tool-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat" style="flex:1;">⟵⟶ Exp</button>`,
-                'select': `<button class="tool-btn" onclick="Nexus.DpadEngine.toggleSelectLock()" title="Toggle Select-Lock" style="flex:1;">📌 Sel</button>`,
-                'duplicate': `<button class="tool-btn" onclick="Nexus.tools.duplicateLine()" title="Duplicate Line" style="flex:1;">⧉ Dup</button>`,
-                'comment': `<button class="tool-btn" onclick="Nexus.tools.toggleComment()" title="Toggle Comment" style="flex:1;">//  Cmt</button>`,
-                'copyline': `<button class="tool-btn" onclick="Nexus.tools.copyLine()" title="Copy Line" style="flex:1;">❐ Cp</button>`,
-                'zoomin': `<button class="tool-btn" onclick="Nexus.UI.adjustFontSize(2)" title="Zoom In" style="flex:1;">A+ In</button>`,
-                'zoomout': `<button class="tool-btn" onclick="Nexus.UI.adjustFontSize(-2)" title="Zoom Out" style="flex:1;">A- Out</button>`,
-                'cleanchars': `<button class="tool-btn" onclick="Nexus.pasteGuard.cleanActiveFile()" title="Clean Smart Characters" style="flex:1;">📱 Clean</button>`,
-                'stripcomments': `<button class="tool-btn" onclick="Nexus.Sentinel.stripComments()" title="Strip Comments" style="flex:1;">💬 Strip</button>`,
-                'sortlines': `<button class="tool-btn" onclick="Nexus.Sentinel.sortLines()" title="Sort Lines A-Z" style="flex:1;">🔤 Sort</button>`,
-                'blanklines': `<button class="tool-btn" onclick="Nexus.Sentinel.removeBlankLines()" title="Remove Blank Lines" style="flex:1;">🧽 Clean</button>`,
-                'alignleft': `<button class="tool-btn" onclick="Nexus.Sentinel.alignLeft()" title="Align Left" style="flex:1;">⬅️ Align</button>`,
-                'reindent': `<button class="tool-btn" onclick="Nexus.Sentinel.reindentByDepth()" title="Re-indent by Depth" style="flex:1;">📐 Indent</button>`,
-                // Ribbon-mirrored entries, same reasoning/handlers as
-                // renderUtilBar()'s copy above — kept in sync manually
-                // since these are two separate template-string maps by
-                // design (compact vs. full-size button markup), not two
-                // copies that happened to drift.
-                'rbSave': `<button class="tool-btn" onclick="Nexus.Vfs.manualSave()" title="Save Now" style="flex:1;">💾 Save</button>`,
-                'rbRefresh': `<button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()" title="Refresh File" style="flex:1;">♻️ Refresh</button>`,
-                'rbUndo': `<button class="tool-btn" onclick="Nexus.history.undo()" title="Undo" style="flex:1;">↶ Undo</button>`,
-                'rbRedo': `<button class="tool-btn" onclick="Nexus.history.redo()" title="Redo" style="flex:1;">↷ Redo</button>`,
-                'rbInsertTab': `<button class="tool-btn" onclick="Nexus.UI.injectChar('\\t')" title="Insert Tab" style="flex:1;">→| Tab</button>`,
-                'rbOutdent': `<button class="tool-btn" onclick="Nexus.tools.outdentLine()" title="Outdent Line" style="flex:1;">|← Outdent</button>`,
-                'rbCut': `<button class="tool-btn" onclick="document.execCommand('cut')" title="Cut" style="flex:1;">✂️ Cut</button>`,
-                'rbCopy': `<button class="tool-btn" onclick="document.execCommand('copy')" title="Copy" style="flex:1;">⧉ Copy</button>`,
-                'rbPaste': `<button class="tool-btn" onclick="Nexus.tools.clipboard('paste')" title="Paste" style="flex:1;">📋 Paste</button>`,
-                'rbRun': `<button class="tool-btn" onclick="Nexus.UI.openModal('sandbox')" title="Run / Preview" style="flex:1;">▶️ Run</button>`,
-           };
-           
-           const container = document.getElementById('utilMirrorContainer');
-           if(container) {
-               container.innerHTML = lastSix
-                   .filter(k => tools[k])
-                   .map(k => tools[k])
-                   .join('');
-           }
-       },
-
        toggleWidgetDrop(e) {
        const menu = document.getElementById('widgetDropMenu');
        const rect = e.target.getBoundingClientRect();
@@ -12394,7 +11073,7 @@ runDiff(target) {
            if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
 
            const original = view.state.doc.sliceString(target.declFrom, target.declTo);
-           const oneLined = this._toOneLine(original, target.nodeName);
+           const oneLined = this._toOneLine(original);
 
            if (oneLined === original) return; // already minimal, nothing to do
 
@@ -12451,21 +11130,6 @@ runDiff(target) {
            // babel's parser happy for fragments that aren't valid as a
            // top-level Program on their own (a bare object literal, for
            // instance, parses as a block statement without this).
-           //
-           // HTML has no snapshot-less fallback here: Prettier's babel
-           // parser and js_beautify are both JS-shaped tools and would
-           // either throw or silently mangle a raw <div>...</div> fragment
-           // (mis-parsing tag syntax as JSX, for instance). Since the
-           // normal path for any HTML chunk this app itself collapsed
-           // ALWAYS has a snapshot (collapseSelectionToOneLine always
-           // writes one before collapsing), the only way to reach this
-           // branch with an Element target is a hand-typed one-liner with
-           // no collapse history — an honest "can't do this one
-           // automatically" beats a corrupted rewrite.
-           if (target.nodeName === 'Element') {
-               return alert("No collapse history for this markup, and automatic HTML reformatting isn't supported here — expand it by hand, or use Prettier/Beautify on the whole file instead.");
-           }
-
            try {
                const wrapped = `const __nexus_fold_wrap__ = (${current.trim().replace(/;$/, '')});`;
                const formatted = await prettier.format(wrapped, {
@@ -12512,66 +11176,7 @@ runDiff(target) {
        // immediately inside/around braces and after semicolons/commas so
        // the result reads like a real one-liner rather than just
        // "multi-line with the breaks removed."
-       // Dispatches to a content-appropriate one-line collapse instead of
-       // applying one universal regex pass to everything. The original
-       // version was JS/CSS-shaped only (comment stripping tuned for // and
-       // /* */, brace/paren tightening) and actively corrupted HTML when
-       // applied to it: its "// comment" stripper has no concept of being
-       // inside a quoted attribute, so `<a href="//example.com/path">`
-       // loses everything after the // on that line, and its blanket
-       // \s+ -> ' ' collapse flattens meaningful whitespace inside quoted
-       // attribute values (e.g. style="content: '  a  b  '"). Routed by
-       // target.nodeName, which _getEnclosingDeclaration already provides
-       // for free — Lezer's HTML grammar names a full tag+content node
-       // 'Element' (this exact string is asserted from documented Lezer
-       // HTML grammar naming, not verified live in this sandbox — network
-       // access to import and inspect the real parser is blocked here;
-       // confirm on-device). If that name assumption is ever wrong, this
-       // simply falls through to the original JS/CSS-shaped path below
-       // rather than throwing or silently no-op'ing — degrades to the old
-       // (imperfect-for-HTML, but previously-shipped) behavior instead of
-       // breaking. A <script>/<style> block's own contents still resolve
-       // through the nested JS/CSS grammar and get real JS/CSS node names
-       // (FunctionDeclaration, RuleSet, etc.) via syntaxTree()'s automatic
-       // mixed-parser handling, so embedded code keeps using the JS/CSS
-       // path correctly without any special-casing needed here for that.
-       _toOneLine(code, nodeName) {
-           if (nodeName === 'Element') return this._toOneLineHTML(code);
-           return this._toOneLineJS(code);
-       },
-
-       // HTML-safe one-line collapse: only touches whitespace that sits
-       // BETWEEN tags (`>   <` -> `><`) and leading/trailing whitespace of
-       // the whole chunk, and does nothing else — no comment stripping, no
-       // brace tightening, nothing that requires understanding what's
-       // inside a quoted attribute value well enough to leave it alone.
-       // Comments in HTML are <!-- --> (not // or /* */) and are left
-       // untouched entirely: safely detecting "is this <!-- inside a
-       // quoted attribute" with the same reliability the app already has
-       // for JS/CSS isn't worth the risk of corrupting markup for what's
-       // primarily a compaction tool, not a comment-stripping one, for
-       // this content type.
-       _toOneLineHTML(code) {
-           let out = code.trim();
-           // Collapse runs of whitespace that occur strictly between a
-           // closing `>` and the next `<` — i.e. text/whitespace-only gaps
-           // between tags — down to nothing, matching how a human would
-           // actually compact markup by hand. Never touches whitespace
-           // that isn't immediately tag-adjacent, so text content and
-           // attribute values are never at risk.
-           out = out.replace(/>\s+</g, '><');
-           // Collapse any remaining internal newlines/tabs (e.g. inside a
-           // single tag's own attribute list spanning multiple lines) to
-           // single spaces — safe because this only fires on whitespace
-           // that was already a run of 2+ chars including a newline/tab,
-           // never a single meaningful space, and multi-line attribute
-           // lists don't rely on preserved internal newlines the way
-           // quoted CSS/text content can.
-           out = out.replace(/[ \t]*\n[ \t]*/g, ' ');
-           return out;
-       },
-
-       _toOneLineJS(code) {
+       _toOneLine(code) {
            let out = code;
            // Strip // line comments (careful not to eat http:// or similar
            // — only treat // as a comment start when not inside a string;
@@ -13054,20 +11659,14 @@ runDiff(target) {
            return entries.map(e => `${'  '.repeat(e.indent)}[${e.line}] ${e.label}`).join('\n') + '\n';
        },
 
-       // Renders exactly the open tabs (Nexus.state.openTabs), not every
-       // loaded file — this is the actual fix for "files should sit in
-       // the explorer until clicked to open." A small dot marks any tab
-       // with unsaved work (Vfs.isDirty()) so the popup closeTab() can
-       // show isn't a surprise — the person can see which tabs it'll
-       // apply to before they ever tap ×.
        renderTabs() {
            const bar = document.getElementById('fileTabsBar');
            if (!bar) return;
            
-           bar.innerHTML = Nexus.state.openTabs.map(fn => `
+           bar.innerHTML = Object.keys(Nexus.state.Vfs).map(fn => `
                <div class="file-tab ${fn === Nexus.state.activeFile ? 'active' : ''}" onclick="Nexus.Vfs.switchFile('${fn}')">
-                   ${Nexus.Vfs.isDirty(fn) ? '<span class="tab-dirty-dot" title="Unsaved changes">●</span>' : ''}${fn}
-                   <span class="tab-close" onclick="event.stopPropagation(); Nexus.Vfs.closeTab('${fn}')">&times;</span>
+                   ${fn}
+                   <span class="tab-close" onclick="event.stopPropagation(); Nexus.Vfs.deleteFile('${fn}')">&times;</span>
                </div>
            `).join('');
            
@@ -13110,26 +11709,13 @@ initInfiniteRibbon() {
            }); 
        },
        
-       // Pure 2-state toggle: 'util' and 'full' only. The former 'readonly'
-       // (Regular Read Only) mode has been removed entirely per spec — this
-       // app now has exactly two edit states, not three. Kept as a settable
-       // function (not just a cycling button handler) for the same reason
-       // as before: boot-time restoration needs to jump straight to
-       // whatever was last saved, not advance one step at a time.
-       //
-       // 'util' is the fallback for any unrecognized/missing saved value —
-       // it's still the least-surprising default of the two remaining
-       // states: the editor is fully interactive (tap, select, cursor,
-       // every tool button) but the OS soft keyboard stays suppressed via
-       // inputmode="none" until the person explicitly asks for raw
-       // keyboard input via Full Edit. Nothing about 'util' blocks typing
-       // at the DOM level (contentEditable/readonly are both already
-       // "true"/absent) — inputmode="none" only hints the OS soft keyboard
-       // not to appear; it does not by itself prevent input from an
-       // already-visible keyboard, a hardware keyboard, or any of this
-       // app's own tool-driven insertions (chunk editor, keyboard rows,
-       // paste, etc.), which is exactly why every hasAttribute('readonly')
-       // gate elsewhere in this file already passes through in Util Mode.
+       // Refactored so the three states (readonly/util/full-edit) can be
+       // SET directly, not just cycled through — needed so boot-time
+       // restoration can jump straight to whatever state was last saved,
+       // rather than only being able to advance one step at a time the
+       // way the button itself works. toggleEditMode() below still cycles
+       // exactly as before; it's now a thin wrapper that figures out which
+       // state comes next and calls setEditMode with it.
        setEditMode(mode) {
            const ed = document.getElementById('rawTerminal');
            const st = document.getElementById('footStatus');
@@ -13137,45 +11723,47 @@ initInfiniteRibbon() {
            const cmDom = (Nexus.editorCore && Nexus.editorCore.view && Nexus.editorCore.view.contentDOM) || null;
            if (!ed) return;
 
-           if (mode !== 'full') mode = 'util'; // collapse any unrecognized value (including the old 'readonly') to the safe default
-
-           ed.removeAttribute('readonly');
-           if (cmDom) cmDom.contentEditable = "true";
-
            if (mode === 'util') {
+               ed.removeAttribute('readonly');
                ed.setAttribute('inputmode', 'none');
-               if (cmDom) cmDom.setAttribute('inputmode', 'none');
+               if (cmDom) { cmDom.contentEditable = "true"; cmDom.setAttribute('inputmode', 'none'); }
                if (st) { st.innerText = "UTIL MODE"; st.style.color = "var(--accent)"; }
                btns.forEach(btn => {
                    btn.innerHTML = "🛠️";
-                   btn.title = "Utility Mode — tap to switch to Full Edit";
+                   btn.title = "Util Mode — cursor/selection only, tap for full edit";
                    btn.setAttribute('aria-label', 'Editor is in utility mode, tap to enable full editing');
                    btn.className = "tool-btn edit-btn-trigger btn-edit-util";
                });
-           } else {
+           } else if (mode === 'full') {
                ed.removeAttribute('inputmode');
-               if (cmDom) cmDom.removeAttribute('inputmode');
+               ed.removeAttribute('readonly');
+               if (cmDom) { cmDom.contentEditable = "true"; cmDom.removeAttribute('inputmode'); }
                if (st) { st.innerText = "READY (FULL)"; st.style.color = "var(--success)"; }
                btns.forEach(btn => {
                    btn.innerHTML = "🔓";
-                   btn.title = "Full Edit — tap to switch to Utility Mode";
-                   btn.setAttribute('aria-label', 'Editor is fully unlocked, tap to switch to utility mode');
+                   btn.title = "Full Edit — tap to lock read-only";
+                   btn.setAttribute('aria-label', 'Editor is fully unlocked, tap to make read-only');
                    btn.className = "tool-btn edit-btn-trigger btn-edit-unlocked";
                });
+           } else {
+               // 'readonly' — also the safe fallback for any unrecognized
+               // value, since locked-by-default is the least surprising/
+               // least destructive state to land on if something's wrong.
+               ed.setAttribute('readonly', 'true');
+               ed.setAttribute('inputmode', 'none');
+               if (cmDom) { cmDom.contentEditable = "false"; cmDom.setAttribute('inputmode', 'none'); }
+               if (st) { st.innerText = "LOCKED"; st.style.color = "var(--danger)"; }
+               btns.forEach(btn => {
+                   btn.innerHTML = "🔒";
+                   btn.title = "Read Only — tap to unlock";
+                   btn.setAttribute('aria-label', 'Editor is read-only, tap to change');
+                   btn.className = "tool-btn edit-btn-trigger btn-edit-lock";
+               });
+               mode = 'readonly';
            }
 
            Nexus.state.prefs.editMode = mode;
            Nexus.settings.update('editMode', mode);
-
-           // Sync the dropdown's icon/state here, at the single source of
-           // truth, instead of relying on every caller to remember a
-           // separate syncRibbonMenu() afterward — newFile() used to skip
-           // this entirely (see its own comment), leaving the dropdown
-           // showing a stale icon after creating a file. Guarded with
-           // typeof since setEditMode can run during boot restoration
-           // before syncRibbonMenu (defined later in this same object
-           // literal) has necessarily been assigned yet on some engines.
-           if (typeof this.syncRibbonMenu === 'function') this.syncRibbonMenu();
        },
 
        toggleEditMode() { 
@@ -13187,11 +11775,13 @@ initInfiniteRibbon() {
                return;
            }
 
-           // Two states only — flip between them directly instead of
-           // cycling through a third. Whatever the current inputmode is,
-           // toggling means "the other one."
-           const currentlyFull = ed.getAttribute('inputmode') !== 'none';
-           this.setEditMode(currentlyFull ? 'util' : 'full');
+           if (ed.hasAttribute('readonly')) { 
+               this.setEditMode('util');
+           } else if (ed.getAttribute('inputmode') === 'none') { 
+               this.setEditMode('full');
+           } else {
+               this.setEditMode('readonly');
+           }
        },
 
        toggleSidebar(s) { 
@@ -13260,8 +11850,6 @@ initInfiniteRibbon() {
            if (id === 'graph') Nexus.graph.render(); 
            if (id === 'settings') Nexus.settings.calcStorage(); 
            if (id === 'util-layout') Nexus.UI.renderUtilLayoutModal();
-           if (id === 'snapshots') Nexus.snapshots.render();
-           if (id === 'storage-inspector') Nexus.storageInspector.render();
            if (id === 'diff') {
            const sel = document.getElementById('diffFileSelector');
            sel.innerHTML = `<option value="">Compare ${Nexus.state.activeFile} with...</option>` + 
@@ -13429,182 +12017,6 @@ initInfiniteRibbon() {
            if (btn3) btn3.classList.toggle('btn-accent', newValue);
        },
 
-       // Minimap toggle. Defaults OFF, unlike bracket tracing/sticky
-       // scroll — a minimap is a genuinely more opinionated addition to a
-       // small phone screen (it permanently claims a vertical strip of an
-       // already-limited editor width) rather than a background aid, so
-       // it's opt-in rather than on-by-default.
-       //
-       // CONFIDENCE NOTE: showMinimap's exact configuration shape (whether
-       // `create` must return a bare DOM node vs. an object wrapping one,
-       // valid `showOverlay` values, whether Facet.compute is required
-       // around it) is asserted with meaningfully LESS confidence than
-       // this session's other CM6 API calls (keymap/indentWithTab/
-       // selectMatchingBracket, all extremely well-established, ubiquitous
-       // exports) — @replit/codemirror-minimap is a smaller, less
-       // standardized third-party package, and this sandbox has no
-       // network access to import and inspect its real source directly.
-       // This is written to the best of documented knowledge of its
-       // public API, but treat this one specifically as needing on-device
-       // confirmation before trusting it, more so than anything else
-       // shipped this session.
-       // Shared extension builders for minimap/lint/autocomplete — used by
-       // BOTH the boot-time compartment initialization (so a saved "on"
-       // preference actually restores as on, not silently reset to off on
-       // every reload) and the toggle functions below, so there's exactly
-       // one definition of what each feature's extension looks like rather
-       // than two copies that could drift apart.
-       _buildMinimapExtension() {
-           const { showMinimap } = Nexus.editorCore.modules || {};
-           if (!showMinimap) return [];
-           return showMinimap.compute(['doc'], () => ({
-               create: () => ({ dom: document.createElement('div') }),
-               displayText: 'blocks'
-           }));
-       },
-       _buildLintExtension() {
-           const { linter, lintGutter } = Nexus.editorCore.modules || {};
-           if (!linter) return [];
-           const source = (view) => {
-               const diagnostics = [];
-               const fn = Nexus.state.activeFile;
-               if (!fn || !fn.toLowerCase().endsWith('.js')) return diagnostics;
-               try {
-                   Nexus.Sentinel.initEngine();
-                   const { issues } = Nexus.Sentinel.engine.analyzeAndMutate(view.state.doc.toString(), 'LINT');
-                   (issues || []).forEach(issue => {
-                       if (!issue.line) return;
-                       const lineObj = view.state.doc.line(Math.min(issue.line, view.state.doc.lines));
-                       diagnostics.push({
-                           from: lineObj.from,
-                           to: lineObj.to,
-                           severity: issue.severity === 'error' ? 'error' : 'warning',
-                           message: issue.message || 'Issue detected'
-                       });
-                   });
-               } catch (e) { /* mid-typing syntax errors are normal — degrade to no diagnostics, same as the Hub does elsewhere */ }
-               return diagnostics;
-           };
-           return [linter(source), lintGutter()];
-       },
-       _buildAutocompleteExtension() {
-           const { autocompletion } = Nexus.editorCore.modules || {};
-           return autocompletion ? autocompletion() : [];
-       },
-
-       // Minimap toggle. Defaults OFF, unlike bracket tracing/sticky
-       // scroll — a minimap is a genuinely more opinionated addition to a
-       // small phone screen (it permanently claims a vertical strip of an
-       // already-limited editor width) rather than a background aid, so
-       // it's opt-in rather than on-by-default.
-       //
-       // CONFIDENCE NOTE: showMinimap's exact configuration shape (whether
-       // `create` must return a bare DOM node vs. an object wrapping one,
-       // valid `showOverlay` values, whether Facet.compute is required
-       // around it) is asserted with meaningfully LESS confidence than
-       // this session's other CM6 API calls (keymap/indentWithTab/
-       // selectMatchingBracket, all extremely well-established, ubiquitous
-       // exports) — @replit/codemirror-minimap is a smaller, less
-       // standardized third-party package, and this sandbox has no
-       // network access to import and inspect its real source directly.
-       // This is written to the best of documented knowledge of its
-       // public API, but treat this one specifically as needing on-device
-       // confirmation before trusting it, more so than anything else
-       // shipped this session.
-       toggleMinimap() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Minimap requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
-
-           const newValue = !Nexus.state.prefs.minimap;
-           Nexus.state.prefs.minimap = newValue;
-           Nexus.settings.update('minimap', newValue);
-
-           if (Nexus.editorCore.view && Nexus.editorCore.minimapCompartment) {
-               Nexus.editorCore.view.dispatch({
-                   effects: Nexus.editorCore.minimapCompartment.reconfigure(newValue ? this._buildMinimapExtension() : [])
-               });
-           }
-
-           const btn = document.getElementById('ribbonMenuMinimap');
-           if (btn) btn.classList.toggle('active-toggle', newValue);
-       },
-
-       // Lint toggle. Defaults OFF — this app has its own separate,
-       // extensive Diagnostics Hub (Sentinel lint suite, fuzzy scanner,
-       // BracketCartographer, etc.) already covering error-surfacing;
-       // adding CM6's own inline lint decorations on top, always-on, would
-       // be two overlapping systems fighting for the same visual space by
-       // default. Opt-in avoids that collision until the user specifically
-       // wants live inline squiggles alongside the existing Hub.
-       //
-       // linter() takes a source function: (view) => Diagnostic[]. This
-       // wires it to Sentinel's own existing JS analysis engine
-       // (Nexus.Sentinel.engine.analyzeAndMutate, already used throughout
-       // this file for the Diagnostics Hub) rather than inventing a
-       // second, separate lint ruleset — one source of truth for "what
-       // counts as an issue" in JS files, surfaced through two different
-       // UIs (the Hub's cards, and now optionally CM6's own inline
-       // markers) instead of two disagreeing engines.
-       // Lint toggle. Defaults OFF — this app has its own separate,
-       // extensive Diagnostics Hub (Sentinel lint suite, fuzzy scanner,
-       // BracketCartographer, etc.) already covering error-surfacing;
-       // adding CM6's own inline lint decorations on top, always-on, would
-       // be two overlapping systems fighting for the same visual space by
-       // default. Opt-in avoids that collision until the user specifically
-       // wants live inline squiggles alongside the existing Hub.
-       //
-       // _buildLintExtension() wires linter()'s source function to
-       // Sentinel's own existing JS analysis engine
-       // (Nexus.Sentinel.engine.analyzeAndMutate, already used throughout
-       // this file for the Diagnostics Hub) rather than inventing a
-       // second, separate lint ruleset — one source of truth for "what
-       // counts as an issue" in JS files, surfaced through two different
-       // UIs (the Hub's cards, and now optionally CM6's own inline
-       // markers) instead of two disagreeing engines.
-       toggleLint() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Inline linting requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
-
-           const newValue = !Nexus.state.prefs.lintEnabled;
-           Nexus.state.prefs.lintEnabled = newValue;
-           Nexus.settings.update('lintEnabled', newValue);
-
-           if (Nexus.editorCore.view && Nexus.editorCore.lintCompartment) {
-               Nexus.editorCore.view.dispatch({
-                   effects: Nexus.editorCore.lintCompartment.reconfigure(newValue ? this._buildLintExtension() : [])
-               });
-           }
-
-           const btn = document.getElementById('ribbonMenuLint');
-           if (btn) btn.classList.toggle('active-toggle', newValue);
-       },
-
-       // Autocomplete toggle. Defaults OFF — a popup that appears while
-       // typing is a significant behavior change (it can intercept Enter/
-       // Tab, cover nearby text on a small screen) that shouldn't switch
-       // on for someone without them asking for it first, unlike a purely
-       // passive visual aid.
-       toggleAutocomplete() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Autocomplete requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
-
-           const newValue = !Nexus.state.prefs.autocomplete;
-           Nexus.state.prefs.autocomplete = newValue;
-           Nexus.settings.update('autocomplete', newValue);
-
-           if (Nexus.editorCore.view && Nexus.editorCore.autocompleteCompartment) {
-               Nexus.editorCore.view.dispatch({
-                   effects: Nexus.editorCore.autocompleteCompartment.reconfigure(newValue ? this._buildAutocompleteExtension() : [])
-               });
-           }
-
-           const btn = document.getElementById('ribbonMenuAutocomplete');
-           if (btn) btn.classList.toggle('active-toggle', newValue);
-       },
-
        // Top-right ribbon dropdown. Standard anchored-menu pattern: toggle
        // the .open class, and close automatically on an outside click/tap
        // so it doesn't stay stuck open and block the editor underneath it.
@@ -13624,20 +12036,7 @@ initInfiniteRibbon() {
                // close it again in the same event loop pass.
                setTimeout(() => {
                    this._ribbonMenuOutsideHandler = (e) => {
-                       // Was checking against #ribbonMenuBtn — a fixed
-                       // top-right button that got removed once the real
-                       // trigger moved to the file tab bar's right edge.
-                       // Left unfixed, this would have made clicking the
-                       // ACTUAL trigger button register as an "outside"
-                       // click and instantly re-close the menu it just
-                       // opened, the moment ribbonMenuBtn stopped existing
-                       // in the DOM to be found (querying a missing id
-                       // just returns null, which is falsy, so the OR
-                       // below would always fall through to menu.contains
-                       // alone — close enough to work by accident for
-                       // clicks on the menu itself, but never for clicks
-                       // on the trigger button).
-                       const btn = document.getElementById('fileTabMenuBtn');
+                       const btn = document.getElementById('ribbonMenuBtn');
                        const menu = document.getElementById('ribbonMenuDropdown');
                        const clickedInside = (btn && btn.contains(e.target)) || (menu && menu.contains(e.target));
                        if (!clickedInside) this.toggleRibbonMenu();
@@ -13674,22 +12073,12 @@ initInfiniteRibbon() {
            setActive('ribbonMenuWhitespace', !!Nexus.state.prefs.showWhitespace);
            setActive('ribbonMenuBracketTracing', Nexus.state.prefs.bracketTracing !== false);
            setActive('ribbonMenuStickyScroll', Nexus.state.prefs.stickyScroll !== false);
-           setActive('ribbonMenuMinimap', !!Nexus.state.prefs.minimap);
-           setActive('ribbonMenuLint', !!Nexus.state.prefs.lintEnabled);
-           setActive('ribbonMenuAutocomplete', !!Nexus.state.prefs.autocomplete);
 
            const editIcon = document.getElementById('ribbonMenuEditIcon');
            if (editIcon) {
-               const mode = Nexus.state.prefs.editMode === 'full' ? 'full' : 'util';
-               editIcon.textContent = mode === 'full' ? '🔓' : '🛠️';
+               const mode = Nexus.state.prefs.editMode || 'readonly';
+               editIcon.textContent = mode === 'full' ? '🔓' : mode === 'util' ? '🛠️' : '🔒';
            }
-       },
-
-       toggleNavButtons() {
-           const navBtn = document.getElementById('navToggleBtn');
-           if (!navBtn) return;
-           navBtn.classList.toggle('nav-hidden');
-           Nexus.settings.update('navButtonsHidden', navBtn.classList.contains('nav-hidden'));
        },
 
        // Multi-cursor: selects the next occurrence of the current
@@ -13766,28 +12155,15 @@ initInfiniteRibbon() {
        // match, so this stays in sync with however that's configured
        // rather than risking a second, subtly different definition of
        // "matching" living in this file.
-       // "Jump to matching bracket" respects Select Lock exactly the way
-       // DpadEngine.navigate() already does for every other directional
-       // command in this app: Select Lock OFF moves the cursor only
-       // (cursorMatchingBracket, collapses any existing selection);
-       // Select Lock ON extends the selection from wherever the cursor
-       // currently is to the matching bracket (selectMatchingBracket).
-       // This is the piece that makes the documented workflow — touch a
-       // bracket, turn on Select Lock, tap Match Bracket to "teleport,"
-       // editor highlights everything between the two points — actually
-       // produce a highlighted range instead of just relocating the
-       // cursor and losing the start point.
        jumpToMatchingBracket() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Jump to matching bracket requires the CM6 Engine — switch engines first (🔄 in the top bar).");
            }
-           const { cursorMatchingBracket, selectMatchingBracket } = Nexus.editorCore.modules;
-           const useSelect = !!(Nexus.DpadEngine && Nexus.DpadEngine.selectLock);
-           const cmd = useSelect ? selectMatchingBracket : cursorMatchingBracket;
-           if (typeof cmd !== 'function') {
+           const { cursorMatchingBracket } = Nexus.editorCore.modules;
+           if (typeof cursorMatchingBracket !== 'function') {
                return alert("Bracket jump isn't available (module failed to load).");
            }
-           const applied = cmd(Nexus.editorCore.view);
+           const applied = cursorMatchingBracket(Nexus.editorCore.view);
            if (!applied) {
                const st = document.getElementById('footStatus');
                if (st) { st.innerText = "NO BRACKET HERE"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
@@ -14228,31 +12604,11 @@ const inj = "<scr" + "ipt>\n" +
            } 
        },
 toggleDrawer(id) {
-    // Close other drawers automatically so they don't overlap. Sweeps both
-    // drawer variants (left-middle .transform-drawer and bottom-anchored
-    // .transform-drawer-bottom) so opening one always closes the other
-    // kind too — otherwise the nav drawer (bottom) and e.g. Find & Replace
-    // (left-middle) could both be open on screen at once, which nothing
-    // else in this app's drawer system allows.
-    document.querySelectorAll('.transform-drawer, .transform-drawer-bottom').forEach(el => {
+    // Close other drawers automatically so they don't overlap
+    document.querySelectorAll('.transform-drawer').forEach(el => {
         if (el.id !== id) el.classList.remove('open');
     });
-    const target = document.getElementById(id);
-    if (!target) return;
-    const isOpening = !target.classList.contains('open');
-
-    // Bottom-anchored drawers (currently just navDrawer) sit directly above
-    // #nexusDock, whose height varies (keyboard rows on/off, 1-3 rows) — so
-    // instead of a hardcoded CSS `bottom`, measure the real dock height at
-    // the moment of opening and position exactly flush against it. Refreshed
-    // on every open rather than cached, since the dock's height can change
-    // between one open and the next (e.g. keyboard rows toggled meanwhile).
-    if (isOpening && target.classList.contains('transform-drawer-bottom')) {
-        const dock = document.getElementById('nexusDock');
-        target.style.bottom = dock ? dock.getBoundingClientRect().height + 'px' : '64px';
-    }
-
-    target.classList.toggle('open');
+    document.getElementById(id).classList.toggle('open');
 },
 // (Removed: toggleRibbonDpad() — dead code nothing called. It was also the
 // only place setupFastHold() ever ran, which is why the dock's arrow buttons
@@ -14473,25 +12829,15 @@ editor.oninput = () => {
 editor.onkeydown = (e) => { 
    if (e.key === 'Tab') { 
        e.preventDefault(); 
-       // FIX (unreliable Insert Tab / inconsistent with the ribbon button):
-       // this used to insert N literal spaces (tabWidth-controlled) via its
-       // own separate execCommand call, while the dedicated ribbon button
-       // (injectChar('\t')) inserts one real tab character via direct
-       // value splicing — two different code paths producing two different
-       // characters for what's supposed to be the same action, depending
-       // on which one you happened to use. Routing both through the exact
-       // same injectChar() call means there is now exactly one definition
-       // of "what Insert Tab does" for this engine, not two that can drift
-       // apart. The old comment here said execCommand was needed to
-       // "preserve Undo/Redo" — but injectChar() already calls
-       // Nexus.history.record() itself (this app's own 50-entry undo
-       // stack, not the browser's native one), so nothing is actually lost
-       // by switching to direct value splicing; the vanilla engine's undo
-       // was never relying on native execCommand history to begin with.
-       // injectChar() also re-checks the lock state itself, so the
-       // readonly return here is a redundant-but-harmless fast bailout.
        if (editor.hasAttribute('readonly')) return;
-       Nexus.UI.injectChar('\t');
+       
+       const tabSpaces = " ".repeat(Nexus.state.prefs.tabWidth || 2);
+       
+       // Preserve Undo/Redo history by using execCommand instead of mutating editor.value
+       document.execCommand('insertText', false, tabSpaces);
+       
+       Nexus.state.Vfs[Nexus.state.activeFile] = editor.value;
+       Nexus.UI.updateGutter();
        return;
    } 
 
