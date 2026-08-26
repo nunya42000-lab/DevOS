@@ -1,0 +1,1431 @@
+    :root {
+        --bg: #0d1117; 
+        --panel: #161b22; 
+        --surface: #21262d;
+        --border: #30363d; 
+        --text: #c9d1d9; 
+        --accent: #2f81f7;
+        --success: #3fb950; 
+        --warn: #d29922; 
+        --danger: #f85149;
+        --gold: #d29922; 
+        --font-UI: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        --sidebar-w: 88vw; 
+        --sidebar-max: 450px;
+        /* Dock/keyboard/floating-widget chrome — previously hardcoded dark
+           and unaffected by outdoor-mode, so switching themes left these
+           surfaces stuck dark while everything else went light. */
+        --dock-bg: #282c34;
+        --dock-border: #3e4451;
+        --dock-text: #abb2bf;
+        --dock-hover-bg: #3e4451;
+        --dock-hover-text: #fff;
+        --dock-label: #9da5b4;
+        --dock-active-bg: #e5e9f0;
+        --dock-active-text: #282c34;
+        --gutter-text: #7d8590;
+    }
+
+    body.outdoor-mode {
+        --bg: #ffffff; 
+        --panel: #f6f8fa; 
+        --surface: #ffffff;
+        --border: #d0d7de; 
+        --text: #24292f; 
+        --accent: #0969da;
+        --gold: #9a6700;
+        --dock-bg: #f6f8fa;
+        --dock-border: #d0d7de;
+        --dock-text: #24292f;
+        --dock-hover-bg: #e5e9f0;
+        --dock-hover-text: #0d1117;
+        --dock-label: #57606a;
+        --dock-active-bg: #0969da;
+        --dock-active-text: #ffffff;
+        --gutter-text: #57606a;
+    }
+
+    /* FIX (real bug, not cosmetic): an unconditional `body { ... }` rule
+       used to sit right here, re-declaring every one of these same custom
+       properties with the light-mode values UNCONDITIONALLY — meaning it
+       applied regardless of whether .outdoor-mode was present or absent.
+       Since a direct property re-declaration on `body` wins over simple
+       inheritance from `:root` (where the real dark-mode defaults above
+       still correctly lived, untouched), this silently made dark mode
+       completely unreachable: toggleSun() was still correctly adding/
+       removing the .outdoor-mode class exactly as designed, but BOTH
+       states resolved to the exact same computed CSS values, because
+       .outdoor-mode's light values and this base rule's light values were
+       byte-for-byte identical. Toggling the theme did something (the
+       class really did flip) but was visually a no-op either way — light
+       mode was, in effect, permanently stuck on. Deleting this block
+       entirely restores the correct, original design: body with no class
+       inherits :root's real dark palette above; body.outdoor-mode
+       overrides to light, exactly as that block already (and always
+       correctly) did on its own. */
+
+    * { 
+        box-sizing: border-box; 
+        -webkit-tap-highlight-color: transparent; 
+        outline: none; 
+    }
+    
+    body, html { 
+        margin: 0; 
+        padding: 0; 
+        width: 100vw; 
+        height: 100vh; 
+        background: var(--bg); 
+        color: var(--text); 
+        font-family: var(--font-UI); 
+        overflow: hidden; 
+        overscroll-behavior: none; 
+        /* UI is non-selectable, Editor will override this */
+        user-select: none; 
+    }
+
+    /* --- 1. INFINITE RIBBON --- */
+    #ribbonContainer { 
+        height: 55px; 
+        flex-shrink: 0;    
+        background: var(--panel); 
+        border-bottom: 1px solid var(--border); 
+        overflow-x: scroll; 
+        white-space: nowrap; 
+        position: relative; 
+        z-index: 1000; 
+        display: flex; 
+        align-items: center; 
+        -webkit-overflow-scrolling: touch;
+    }
+    #ribbonContainer::-webkit-scrollbar { display: none; }
+    #ribbonTrack { display: inline-flex; padding: 0 10px; gap: 8px; }
+
+    /* Top-right ribbon dropdown menu. position: fixed — NOT absolute — is
+       the actual fix for the menu not appearing: the trigger button and
+       this menu both live outside #ribbonContainer now (see the HTML),
+       specifically so nothing here is a descendant of any element with
+       overflow: scroll/hidden/auto, which clips content on both axes
+       regardless of the child's own position value. Fixed positioning is
+       relative to the viewport itself, so it can't be clipped by a
+       scroll container anywhere above it in the tree. */
+    .ribbon-dropdown {
+        display: none;
+        position: fixed;
+        top: 52px;
+        right: 8px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        min-width: 220px;
+        max-height: calc(100vh - 70px);
+        overflow-y: auto;
+        padding: 6px;
+        z-index: 2000;
+    }
+    .ribbon-dropdown.open { display: flex; flex-direction: column; gap: 2px; }
+    .ribbon-dropdown button {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+        text-align: left;
+        padding: 10px 12px;
+        background: transparent;
+        border: none;
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        min-height: 40px;
+    }
+    .ribbon-dropdown button:active { background: rgba(255,255,255,0.08); }
+    .ribbon-dropdown button.active-toggle { color: var(--accent); }
+    .ribbon-dropdown button.active-toggle::after { content: '✓'; margin-left: auto; }
+    .ribbon-dropdown-divider { height: 1px; background: var(--border); margin: 4px 2px; }
+    .tool-btn { 
+        padding: 10px 18px; 
+        border-radius: 14px; 
+        background: var(--surface); 
+        color: var(--text); 
+        border: 1px solid var(--border); 
+        font-size: 11px; 
+        font-weight: 800; 
+        cursor: pointer; 
+        display: inline-flex; 
+        align-items: center; 
+        justify-content: center;
+        gap: 8px; 
+        letter-spacing: 0.5px; 
+        transition: all 0.2s ease; 
+        flex-shrink: 0; 
+        min-height: 44px;
+        min-width: 44px;
+        touch-action: manipulation;
+    }
+    
+    .btn-edit-lock { color: var(--text); opacity: 0.5; }
+    .btn-edit-util { color: var(--accent); border-color: var(--accent); opacity: 1; box-shadow: 0 0 10px rgba(47, 129, 247, 0.3); }
+    .btn-edit-unlocked { color: var(--gold); border-color: var(--gold); opacity: 1; box-shadow: 0 0 10px rgba(210, 153, 34, 0.3); }
+    
+    .btn-gold { color: var(--gold); border-color: var(--gold); }
+    .btn-accent { background: var(--accent); color: #fff; border: none; }
+    .btn-danger { background: var(--danger); color: #fff; border: none; }
+    .btn-success { background: var(--success); color: #06210f; border: none; font-weight: 800; }
+
+    #ribbonSaveBtn.saving { animation: save-pulse 0.6s ease-in-out infinite; }
+    @keyframes save-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    #ribbonSaveBtn.saved-flash { animation: save-flash 0.7s ease-out; }
+    @keyframes save-flash { 0% { background: #fff; } 100% { background: var(--success); } }
+/* Dreamer Architect UI */
+.dreamer-section { margin-bottom: 25px; }
+.section-header {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 10px;
+    font-weight: 900;
+    opacity: 0.7;
+    padding-left: 5px;
+}
+
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.dreamer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-align: left;
+    transition: 0.2s;
+}
+
+.dreamer-card:active {
+    transform: scale(0.95);
+    background: var(--accent-dim);
+    border-color: var(--accent);
+}
+
+.card-icon { font-size: 20px; }
+.card-label { display: block; font-weight: bold; font-size: 13px; color: var(--text); }
+.card-meta { font-size: 9px; opacity: 0.5; font-family: monospace; }
+
+    /* --- 2. MAIN WORKSPACE & TABS --- */
+#appRoot { 
+    display: flex; 
+    flex-direction: column; 
+    height: 100dvh; /* dvh prevents mobile browser bars from hiding the footer */
+    /* Keyboard-aware fallback for browsers where <meta interactive-widget=
+       resizes-content> isn't implemented (iOS Safari, and any other engine
+       that ignores it) — see Nexus.UI.trackKeyboardViewport for how
+       --app-vh-px gets set. On browsers where the meta tag DOES work
+       (Chrome/Firefox Android), 100dvh is already correct once the keyboard
+       opens, --app-vh-px will equal (or be extremely close to) the same
+       value, and min() picks whichever is smaller — so this is a pure
+       fallback that activates only where the primary fix doesn't reach, and
+       never fights it or overrides correct behavior elsewhere. Falls back
+       cleanly to plain 100dvh if the custom property was never set (var()
+       with no fallback inside min() is simply ignored by that browser). */
+    height: min(100dvh, var(--app-vh-px, 100dvh));
+    width: 100vw; 
+    position: relative; 
+    overflow: hidden;
+}
+
+#workspace { 
+    flex: 1 1 auto; /* Allows workspace to absorb space but forces it to respect flex limits */
+    display: flex; 
+    flex-direction: column; 
+    position: relative; 
+    overflow: hidden; 
+    min-height: 0; /* Critical flexbox failsafe */
+}
+
+#nexusDock {
+    flex-shrink: 0; /* Forces the dock to never compress, acting as a hard boundary */
+    position: relative; /* Remove fixed positioning so flexbox naturally stacks it */
+    width: 100%;
+    z-index: 1000;
+    background-color: var(--dock-bg);
+    border-top: 1px solid var(--dock-border);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+    
+    #fileTabsBar { 
+        display: flex; 
+        overflow-x: auto; 
+        background: var(--panel); 
+        border-bottom: 1px solid var(--border); 
+        min-height: 38px; 
+        scroll-behavior: smooth; 
+        -webkit-overflow-scrolling: touch;
+    }
+    #fileTabsBar::-webkit-scrollbar { display: none; }
+    
+    .file-tab { 
+        padding: 8px 15px; 
+        font-size: 12px; 
+        font-family: monospace; 
+        cursor: pointer; 
+        border-right: 1px solid var(--border); 
+        display: flex; 
+        align-items: center; 
+        gap: 10px; 
+        color: var(--text); 
+        white-space: nowrap; 
+        border-top: 2px solid transparent; 
+        background: var(--surface); 
+        transition: background 0.2s;
+    }
+    .file-tab.active { 
+        background: var(--bg); 
+        border-top: 2px solid var(--accent); 
+        color: var(--accent); 
+        font-weight: bold; 
+    }
+
+    /* Help Modal Refined Styling */
+    #modalManual .modal-body {
+        background: #0d1117; 
+        color: #c9d1d9;
+        scrollbar-width: thin;
+    }
+
+    .man-h1 { 
+        color: var(--accent); 
+        font-size: 1.2rem; 
+        font-weight: 800; 
+        border-bottom: 1px solid var(--border); 
+        padding-bottom: 10px; 
+        margin: 25px 0 15px 0; 
+        letter-spacing: 1px;
+    }
+
+    .man-h2 { 
+        color: var(--gold); 
+        font-size: 0.95rem; 
+        font-weight: 700; 
+        margin-top: 20px; 
+    }
+
+    .man-p { 
+        font-size: 13px; 
+        line-height: 1.6; 
+        opacity: 0.85; 
+        margin-bottom: 15px; 
+    }
+
+    .man-p b { color: #fff; }
+
+    .modal-body ul {
+        padding-left: 18px;
+        list-style-type: square;
+        color: var(--accent);
+    }
+    .modal-body li {
+        margin-bottom: 8px;
+    }
+    .stab {
+        background: transparent;
+        border: none;
+        color: var(--text);
+        padding: 8px 12px;
+        font-size: 10px;
+        font-weight: 800;
+        cursor: pointer;
+        border-radius: 4px;
+        transition: all 0.2s;
+        opacity: 0.6;
+    }
+    .slab {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    /* Collapsible diagnostic panel sections — same visual language as
+       .slab, but using native <details>/<summary> so expand/collapse
+       needs zero JS and works well with touch. Replaces the old flat
+       stack of 9 always-open .slab blocks, which meant scrolling past
+       everything every time regardless of what you actually needed. */
+    .diag-section {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+        overflow: hidden;
+    }
+    .diag-section > summary {
+        padding: 12px 14px;
+        cursor: pointer;
+        list-style: none;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 11px;
+        font-weight: 800;
+        color: var(--gold);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        user-select: none;
+    }
+    .diag-section > summary::-webkit-details-marker { display: none; }
+    .diag-section > summary::after {
+        content: '▸';
+        font-size: 12px;
+        opacity: 0.6;
+        transition: transform 0.15s ease;
+    }
+    .diag-section[open] > summary::after { transform: rotate(90deg); }
+    .diag-section > summary .diag-badge {
+        margin-left: auto;
+        margin-right: 8px;
+        background: var(--danger);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 900;
+        padding: 1px 6px;
+        border-radius: 10px;
+        display: none;
+    }
+    .diag-section > summary .diag-badge.show { display: inline-block; }
+    .diag-section > .diag-body {
+        padding: 0 12px 12px;
+        border-top: 1px solid var(--border);
+        padding-top: 12px;
+    }
+    /* Hidden by Nexus.UI.filterDiagPanel() when a tool's relevant-file-type
+       list doesn't include the currently open file's extension. */
+    .diag-lang-hidden { display: none !important; }
+
+    /* Bookmark gutter (CM6). Narrow fixed-width column, subtle hover state
+       so it's clear the gutter itself is clickable to toggle a bookmark —
+       matches the interaction CodeMirror's own breakpoint-gutter example
+       uses (click anywhere in the gutter next to a line to toggle). */
+    .cm-bookmark-gutter {
+        width: 18px;
+        cursor: pointer;
+    }
+    .cm-bookmark-gutter:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    /* Sticky scope headers (@fazelstudio/codemirror-stickyscroll). The
+       package documents these exact custom properties for restyling —
+       mapped here to this app's own theme variables instead of its
+       hardcoded defaults, so the pinned bar reads as part of the editor
+       rather than a visually distinct third-party overlay. */
+    .cm-stickyscroll-container {
+        --cm-stickyscroll-bg: var(--panel, #161b22);
+        --cm-stickyscroll-border: var(--border, #30363d);
+        --cm-stickyscroll-lineNumber: var(--text, #c9d1d9);
+        --cm-stickyscroll-hoverBg: rgba(255, 255, 255, 0.06);
+        --cm-stickyscroll-accent: var(--gold, #d29922);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.35);
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .mini-console {
+        background: #000;
+        color: var(--success);
+        font-family: 'Courier New', monospace;
+        font-size: 10px;
+        padding: 10px;
+        border-radius: 8px;
+        overflow-y: auto;
+        border: 1px solid var(--border);
+    }
+
+    /* Segmented Buttons */
+    .seg-btn {
+        flex: 1;
+        background: var(--surface);
+        border: none;
+        color: var(--text);
+        padding: 10px;
+        font-size: 11px;
+        font-weight: 900;
+        border-radius: 6px;
+        opacity: 0.5;
+    }
+    .seg-btn.active {
+        background: var(--accent);
+        color: #fff;
+        opacity: 1;
+    }
+
+    .sb-page { display: none; flex: 1; overflow: hidden; }
+    .sb-page.active { display: flex; flex-direction: column; }
+    
+    .stab.active {
+        background: var(--surface);
+        color: var(--accent);
+        opacity: 1;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+    }
+    .side-tab-content, .sandbox-tab-content {
+        display: none;
+        flex-direction: column;
+        flex: 1;
+        overflow-y: auto;
+    }
+    .side-tab-content.active, .sandbox-tab-content.active {
+        display: flex;
+    }
+    #panelRight .side-tab-content { padding: 15px; }
+
+    .tab-close { 
+        color: var(--danger); 
+        font-size: 16px; 
+        font-weight: bold; 
+        cursor: pointer; 
+        opacity: 0.6; 
+        line-height: 1; 
+    }
+    .tab-close:hover { opacity: 1; }
+    .tab-dirty-dot {
+        color: var(--gold);
+        font-size: 8px;
+        margin-right: 5px;
+        line-height: 1;
+        vertical-align: middle;
+    }
+.diff-line { display: block; min-height: 1.2em; word-break: break-all; }
+.diff-line.equal { color: #8b949e; opacity: 0.7; }
+.diff-line.added { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+.diff-line.removed { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+.diff-line.blank-pad { background: rgba(255,255,255,0.02); user-select: none; }
+    #editorView { 
+        flex: 1; 
+        display: flex; 
+        background: var(--bg); 
+        position: relative; 
+        overflow: hidden; 
+        min-height: 0;    
+    }
+
+    #gutter { 
+        width: 45px; 
+        background: var(--bg); 
+        border-right: 1px solid var(--border); 
+        color: var(--gutter-text); 
+        font-family: monospace; 
+        font-size: 14px; 
+        line-height: 22px; 
+        text-align: right; 
+        padding: 15px 10px 50vh 0; 
+        cursor: pointer;
+        overflow: hidden; 
+        height: 100%; 
+        touch-action: manipulation; 
+    }
+    #rawTerminal { 
+        flex: 1; 
+        background: transparent; 
+        color: var(--text); 
+        border: none; 
+        padding: 15px; 
+        padding-bottom: 50vh; 
+        font-family: 'Courier New', monospace; 
+        font-size: 14px; 
+        line-height: 22px; 
+        outline: none; 
+        resize: none; 
+        white-space: pre; 
+        overflow: auto; 
+        user-select: text !important;
+        -webkit-user-select: text !important;
+        touch-action: pan-y pan-x; 
+        -webkit-overflow-scrolling: touch; 
+        overscroll-behavior: contain;
+    }
+    /* Word wrap toggle (vanilla textarea engine). CM6's own wrapping is
+       handled separately via EditorView.lineWrapping in a Compartment —
+       see toggleWordWrap() — since CM6 renders its own DOM structure and
+       doesn't share this textarea's CSS at all. */
+    #rawTerminal.word-wrap-on {
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+    #raw-terminal[readonly] { opacity: 0.4; user-select: none !important; }
+
+
+    /* --- 3. SIDEBARS --- */
+    .side-panel { 
+        position: fixed; 
+        top: 0; 
+        bottom: 0; 
+        width: var(--sidebar-w); 
+        max-width: var(--sidebar-max); 
+        background: var(--panel); 
+        border: 1px solid var(--border); 
+        z-index: 9000; 
+        transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); 
+        display: flex; 
+        flex-direction: column; 
+        box-shadow: 0 0 50px rgba(0,0,0,0.9); 
+    }
+    .left-p { left: 0; transform: translateX(-105%); border-right: 3px solid var(--gold); }
+    .right-p { right: 0; transform: translateX(105%); border-left: 3px solid var(--accent); width: 100vw; max-width: 100vw; }
+    .side-panel.open { transform: translateX(0); }
+    
+    .p-head { 
+        padding: 20px; 
+        border-bottom: 1px solid var(--border); 
+        display: flex; 
+        justify-content: space-between; 
+        align-items: center; 
+        font-weight: 900; 
+        font-size: 14px; 
+        color: var(--gold); 
+        letter-spacing: 1px; 
+    }
+    .p-body { 
+        flex: 1; 
+        padding: 15px; 
+        overflow-y: auto; 
+        font-family: monospace; 
+        -webkit-overflow-scrolling: touch; 
+    }
+    .section-label { 
+        font-size: 10px; 
+        opacity: 0.5; 
+        margin: 25px 0 10px 0; 
+        text-transform: uppercase; 
+        font-weight: 800; 
+        letter-spacing: 2px; 
+    }
+
+    /* Accordion */
+    .acc-section { margin-bottom: 5px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .acc-head { 
+        padding: 12px; 
+        background: var(--surface); 
+        cursor: pointer; 
+        display: flex; 
+        justify-content: space-between; 
+        font-size: 11px; 
+        font-weight: 800; 
+        color: var(--gold); 
+    }
+    .acc-content { display: none; background: var(--bg); }
+    .acc-content.open { display: block; }
+    .active-file { border-left: 3px solid var(--accent); background: rgba(47, 129, 247, 0.1); }
+
+    /* --- 4. SLIDE PANELS --- */
+    #diagHub { 
+        position: fixed; 
+        top: 0; left: 0; right: 0; 
+        height: 60vh; 
+        background: var(--panel); 
+        border-bottom: 4px solid var(--danger); 
+        z-index: 3000; 
+        transform: translateY(-105%); 
+        transition: transform 0.4s ease; 
+        padding: 10px; 
+        box-shadow: 0 10px 40px rgba(0,0,0,0.8); 
+        display: flex; 
+        flex-direction: column; 
+    }
+    #diagHub.open { transform: translateY(0); }
+
+    #shellSlide { 
+        position: fixed; 
+        bottom: 0; left: 0; right: 0; 
+        height: 100px; 
+        background: var(--surface); 
+        border-top: 4px solid var(--accent); 
+        z-index: 4000; 
+        transform: translateY(105%); 
+        transition: transform 0.3s ease; 
+        display: flex; 
+        align-items: center; 
+        padding: 0 20px; 
+        box-shadow: 0 -10px 40px rgba(0,0,0,0.8); 
+    }
+    #shellSlide.open { transform: translateY(0); }
+    #shellInput { 
+        flex: 1; 
+        background: transparent; 
+        border: none; 
+        color: var(--text); 
+        font-family: monospace; 
+        font-size: 18px; 
+        outline: none; 
+        user-select: text !important;
+    }
+
+    /* --- 5. MODALS --- */
+    .modal-overlay { 
+        position: fixed; 
+        inset: 0; 
+        background: rgba(0,0,0,0.85); 
+        z-index: 10000;
+        display: none;
+        align-items: center; 
+        justify-content: center; 
+        backdrop-filter: blur(10px); 
+    }
+    .modal-overlay.active { display: flex; }
+    .modal-content { 
+        width: 90%; 
+        height: 80%; 
+        background: var(--panel); 
+        border: 1px solid var(--border); 
+        border-radius: 20px; 
+        display: flex; 
+        flex-direction: column; 
+        overflow: hidden; 
+        box-shadow: 0 25px 80px rgba(0,0,0,1); 
+    }
+    .modal-body { flex: 1; padding: 25px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+    /* --- 6. SANDBOX & CONSOLE --- */
+    #sandboxWrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
+    #sandboxFrame { flex: 1; border: none; }
+    #ghostConsole { 
+        height: 35vh; 
+        background: #000; 
+        color: #3fb950; 
+        padding: 15px; 
+        font-family: monospace; 
+        font-size: 11px; 
+        overflow-y: auto; 
+        border-top: 3px solid var(--accent); 
+        line-height: 1.5; 
+        scroll-behavior: smooth; 
+    }
+
+    /* --- 7. SVS-WIDGET STYLING --- */
+    .floating-widget {
+        position: fixed; 
+        background: var(--dock-bg); 
+        backdrop-filter: blur(12px);
+        border: 1px solid var(--dock-border); 
+        border-radius: 12px; 
+        z-index: 8000;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
+        display: none; 
+        flex-direction: column;
+        color: var(--dock-text); 
+        overflow: hidden;
+        transition: opacity 0.3s, transform 0.4s cubic-bezier(0.19, 1, 0.22, 1), top 0.4s cubic-bezier(0.19, 1, 0.22, 1), left 0.4s cubic-bezier(0.19, 1, 0.22, 1);
+    }
+    .floating-widget.active { display: flex; }
+    .util-grip, .search-grip, .kb-drag-handle, .drag-handle {
+        background: #21252b; 
+        cursor: move; 
+        color: #5c6370;
+        display: flex; 
+        align-items: center; 
+        justify-content: center;
+        flex-shrink: 0; 
+        font-family: monospace; 
+        font-weight: bold;
+        touch-action: none; 
+    }
+    
+    .util-vertical { flex-direction: column; width: 46px; border-radius: 12px; }
+    .util-vertical .util-grip { 
+        height: 24px; width: 100%; border-bottom: 1px solid #181a1f; 
+        border-radius: 12px 12px 0 0; font-size: 14px; letter-spacing: 2px;
+    }
+    .util-vertical .util-grip::before { content: '⋯⋯'; }
+    .util-vertical .sleek-bar-content { flex-direction: column; padding: 4px; gap: 6px; }
+    .util-vertical .util-lbl { display: block; font-size: 9px; margin-top: 2px; color: var(--dock-label); font-weight: 800; text-transform: uppercase; text-align: center; }
+    .util-vertical .sleek-btn { flex-direction: column; padding: 8px 2px; width: 100%; }
+
+    .search-grip {
+        width: 28px; 
+        border-right: 1px solid #181a1f; 
+        border-radius: 12px 0 0 12px;
+        flex-direction: column; 
+        font-size: 14px; 
+        line-height: 0.8; 
+        letter-spacing: -2px;
+    }
+    .search-grip::before { content: '⋮\n⋮\n⋮'; white-space: pre; }
+
+    .sleek-bar-content { display: flex; padding: 6px; gap: 8px; align-items: center; flex: 1; }
+    .sleek-btn {
+        background: transparent; border: none; color: var(--dock-text); cursor: pointer;
+        border-radius: 6px; padding: 8px 10px; font-size: 12px; display: flex; 
+        align-items: center; justify-content: center; gap: 4px; font-weight: bold;
+        transition: background 0.2s;
+        min-height: 44px;
+        min-width: 44px;
+        touch-action: manipulation;
+    }
+    .sleek-btn:hover { background: var(--dock-hover-bg); color: var(--dock-hover-text); }
+    .sleek-btn.active { background: var(--dock-active-bg); color: var(--dock-active-text); box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+
+    /* Navigation Drawer buttons — deliberately larger than the standard
+       44px .sleek-btn floor (task spec calls for "larger" arrows/actions
+       here specifically), since this drawer's whole purpose is easy
+       big-target tapping, unlike the dense inline footer dock it's grown
+       out of. */
+    .nav-drawer-btn {
+        width: 56px; height: 56px; min-width: 56px; min-height: 56px;
+        font-size: 20px; background: var(--bg); border: 1px solid var(--border);
+        border-radius: 12px;
+    }
+    .nav-drawer-btn#navDrawerSelectLockBtn { font-size: 13px; }
+        
+    .sleek-input {
+        background: #1e2227; border: 1px solid #3e4451; border-radius: 8px; color: #fff;
+        padding: 10px 12px; font-size: 13px; outline: none; width: 100%;
+        font-family: 'Courier New', monospace;
+    }
+    .sleek-input:focus { border-color: var(--accent); background: #000; }
+
+    /* Toggle switch — a native checkbox underneath for accessibility, styled
+       as a track + thumb. Used by the utility-bar tools modal. */
+    .pref-toggle { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; flex-shrink: 0; touch-action: manipulation; }
+    .pref-toggle input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+    .pref-toggle-track { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 44px; height: 24px; background: var(--border); border-radius: 12px; transition: background 0.2s; pointer-events: none; }
+    .pref-toggle-track::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform 0.2s; }
+    .pref-toggle input:checked + .pref-toggle-track { background: var(--success); }
+    .pref-toggle input:checked + .pref-toggle-track::before { transform: translateX(20px); }
+    .pref-toggle input:focus-visible + .pref-toggle-track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    /* Sovereign Patch for Custom Keyboard and UI Helpers */
+    #kbMonolith { 
+        background: #181a1f; width: 100vw; left: 0; border-radius: 0; border: none; 
+        border-top: 2px solid #30363d; touch-action: none;
+    }
+    .kb-drag-handle { height: 20px; width: 100%; border-bottom: 1px solid #000; letter-spacing: 4px; }
+    .kb-drag-handle::before { content: '⋯⋯⋯⋯'; }
+    
+    .kb-header { display: flex; justify-content: space-between; align-items: center; padding: 0 15px; height: 44px; }
+    .kb-tabs { display: flex; gap: 4px; height: 100%; align-items: flex-end; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+    .kb-tabs::-webkit-scrollbar { display: none; }
+    .kb-tab { flex-shrink: 0; }
+    .kb-tab { 
+        background: #21252b; color: #5c6370; padding: 6px 14px; border-radius: 8px 8px 0 0;
+        font-size: 11px; font-weight: 900; border: none; cursor: pointer; transition: all 0.2s;
+        min-height: 44px; min-width: 44px;
+        display: inline-flex; align-items: center; justify-content: center;
+        touch-action: manipulation;
+    }
+    .kb-tab.active { background: #e5e9f0; color: #282c34; }
+    .kb-tab.active::after { content: ' •'; color: var(--danger); } 
+
+    .kb-row-container { padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #282c34; }
+
+    .kb-key {
+        background: #d0d3d8; color: #282c34; border: none; border-radius: 6px;
+        padding: 12px 16px; font-size: 14px; font-family: monospace; font-weight: bold;
+        box-shadow: 0 3px 0 #8b92a0; cursor: pointer; flex-shrink: 0; white-space: nowrap;
+    }
+    .kb-key:active { transform: translateY(2px); box-shadow: 0 1px 0 #8b92a0; background: #fff; }
+
+    .item-row { padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; cursor: pointer; }
+    .close-x { font-size: 32px; cursor: pointer; color: var(--text); background: none; border: none; line-height: 1; padding: 0 10px; min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; touch-action: manipulation; }
+    #footer { height: 35px; background: var(--panel); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 15px; font-size: 10px; font-family: monospace; font-weight: bold; }
+
+    #omniCanvas.active { pointer-events: auto; background: rgba(0,0,0,0.4); backdrop-filter: blur(2px); }
+
+    /* --- 8. XTERM BASE --- */
+    .xterm { cursor: text; position: relative; user-select: none; -ms-user-select: none; -webkit-user-select: none; } 
+    .xterm.focus, .xterm:focus { outline: none; } 
+    .xterm .xterm-helpers { position: absolute; top: 0; z-index: 5; } 
+    .xterm .xterm-helper-textarea { padding: 0; border: 0; margin: 0; position: absolute; opacity: 0; left: -9999em; top: 0; width: 0; height: 0; z-index: -5; white-space: nowrap; overflow: hidden; resize: none; } 
+    .xterm .composition-view { background: #000; color: #FFF; display: none; position: absolute; white-space: nowrap; z-index: 1; } 
+    .xterm .composition-view.active { display: block; } 
+    .xterm .xterm-viewport { background-color: #000; overflow-y: scroll; cursor: default; position: absolute; right: 0; left: 0; top: 0; bottom: 0; } 
+    .xterm .xterm-screen { position: relative; } 
+    .xterm .xterm-screen canvas { position: absolute; left: 0; top: 0; } 
+    .xterm .xterm-scroll-area { visibility: hidden; } 
+    .xterm-char-measure-element { display: inline-block; visibility: hidden; position: absolute; top: 0; left: -9999em; line-height: normal; } 
+    .xterm.enable-mouse-events { cursor: default; } 
+    .xterm.xterm-cursor-pointer, .xterm .xterm-cursor-pointer { cursor: pointer; } 
+    .xterm.column-select.focus { cursor: crosshair; } 
+    .xterm .xterm-accessibility, .xterm .xterm-message { position: absolute; left: 0; top: 0; bottom: 0; right: 0; z-index: 10; color: transparent; pointer-events: none; } 
+    .xterm .live-region { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; } 
+    .xterm-dim { opacity: 1 !important; } 
+    .xterm-underline-1 { text-decoration: underline; } 
+    .xterm-underline-2 { text-decoration: double underline; } 
+    .xterm-underline-3 { text-decoration: wavy underline; } 
+    .xterm-underline-4 { text-decoration: dotted underline; } 
+    .xterm-underline-5 { text-decoration: dashed underline; } 
+    .xterm-overline { text-decoration: overline; } 
+    .xterm-overline.xterm-underline-1 { text-decoration: overline underline; } 
+    .xterm-overline.xterm-underline-2 { text-decoration: overline double underline; } 
+    .xterm-overline.xterm-underline-3 { text-decoration: overline wavy underline; } 
+    .xterm-overline.xterm-underline-4 { text-decoration: overline dotted underline; } 
+    .xterm-overline.xterm-underline-5 { text-decoration: overline dashed underline; } 
+    .xterm-strikethrough { text-decoration: line-through; } 
+    .xterm-screen .xterm-decoration-container .xterm-decoration { z-index: 6; position: absolute; } 
+    .xterm-screen .xterm-decoration-container .xterm-decoration.xterm-decoration-top-layer { z-index: 7; } 
+    .xterm-decoration-overview-ruler { z-index: 8; position: absolute; top: 0; right: 0; pointer-events: none; } 
+    .xterm-decoration-top { z-index: 2; position: relative; }
+
+    /* ==========================================
+       SOVEREIGN UI: CARTOGRAPHY LAYER
+       (Outline Trees, Node Graphs, and Code Cartology)
+       ========================================== */
+
+    /* Container holding both spatial structures */
+    #cartographyPanel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        width: 100%;
+    }
+
+    /* Tab switcher for Cartography sidebar pages */
+    .carto-switcher {
+        display: flex;
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 4px;
+        gap: 4px;
+    }
+/* =======================================================
+   CLEAN COHERENT KEYBOARD MATRIX: UNIFIED DOCK LAYER
+   ======================================================= */
+
+/* 1. Core Wrapper: Stacks the tracks strictly top-to-bottom */
+#kbRowsWrapper {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    padding: 10px !important;
+    width: 100% !important;
+    background: #282c34 !important; /* Matches your background row container color exactly */
+    box-sizing: border-box;
+    -ms-overflow-style: none;  /* IE/Edge: hide native scrollbar */
+    scrollbar-width: none;  /* Firefox: hide native scrollbar */
+}
+
+/* 2. The Tracks: Independent horizontal scroll containers */
+.kb-scroll-row {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    padding-bottom: 5px !important;
+    -webkit-overflow-scrolling: touch !important; /* Keeps momentum smooth on your Pixel */
+    scroll-snap-type: x proximity;
+    scroll-behavior: smooth;
+    gap: 8px !important;
+    -ms-overflow-style: none;  /* IE/Edge: hide native scrollbar */
+    scrollbar-width: none;  /* Firefox: hide native scrollbar */
+}
+
+/* Hide native scrollbars on rows completely (WebKit/Blink) */
+.kb-scroll-row::-webkit-scrollbar {
+    display: none !important;
+}
+
+/* 3. The Custom Keys: Fixed, crisp physical touch boxes */
+.kb-scroll-row .kb-key {
+    display: inline-block !important;
+    flex: 0 0 auto !important; /* CRITICAL: Prevents keys from compressing or elongating */
+    min-width: 54px !important; /* Slightly padded for the mobile screen target */
+    height: 44px !important; /* Generous vertical target height */
+    padding: 0 14px !important;
+    background: #d0d3d8 !important; /* Original light key background style */
+    color: #282c34 !important; /* Clear dark text contrast */
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 14px !important;
+    font-family: monospace !important;
+    font-weight: bold !important;
+    box-shadow: 0 3px 0 #8b92a0 !important; /* Restores physical tactile look */
+    cursor: pointer !important;
+    text-align: center !important;
+    line-height: 44px !important; /* Centers text perfectly within bounding box */
+    white-space: nowrap !important;
+}
+
+/* Maintain special overrides for wide inputs like space/backspace */
+.kb-scroll-row .kb-key[style*="width: 80px"] {
+    width: 80px !important;
+}
+
+.kb-scroll-row .kb-key:active {
+    transform: translateY(2px) !important;
+    box-shadow: 0 1px 0 #8b92a0 !important;
+    background: #fff !important;
+}
+/* =======================================================
+   HYBRID CONFIG: RIGHT-SIDE HANDLES // LEFT-SIDE DRAWERS
+   ======================================================= */
+
+/* 1. THE TRIGGER HANDLES: Locked to the right edge */
+.transform-handle-zone {
+    left: auto !important;
+    right: 0 !important;
+    top: 25% !important;
+}
+
+.transform-handle {
+    border-right: none !important;
+    border-left: 1px solid var(--border) !important;
+    border-radius: 10px 0 0 10px !important; /* Rounded on the left where you tap */
+}
+
+/* 2. THE SLIDING DRAWERS: Locked to fly out from the left edge */
+.transform-drawer {
+    right: auto !important;
+    left: 0 !important; /* Pins the container box to the left boundary */
+    transform: translateX(-105%) !important; /* Conceals it off-screen to the left when shut */
+    border-left: none !important;
+    border-right: 1px solid var(--border) !important;
+    border-radius: 0 16px 16px 0 !important; /* Rounded on the right side */
+}
+
+/* When active, snap the panel into view from the left side */
+.transform-drawer.open {
+    transform: translateX(0) !important;
+}
+/* =======================================================
+   UTILITY TOOLBAR DOCKING: RIGHT-EDGE VISUAL STYLING
+   ======================================================= */
+
+/* Scoped to #utilityBar specifically — NOT the shared .util-vertical class,
+   which the D-pad also uses. Position and height are intentionally left to
+   .util-docked (position:relative + height:auto) and #editorView's default
+   flex "stretch" behavior, so the bar always fills exactly the space
+   available between the ribbon and the bottom dock, however tall that space
+   actually is — no viewport-relative magic numbers to keep in sync by hand. */
+#utilityBar.util-vertical {
+    border-radius: 12px 0 0 12px !important; /* Softens just the inside edges */
+    border-right: none !important;
+    border-left: 1px solid #181a1f !important;
+}
+
+/* Ensure the grab handle reflects the right-hand anchor placement */
+#utilityBar .util-grip {
+    border-radius: 12px 0 0 0 !important;
+}
+
+/* Docked right-edge toolbar: a real flex column inside #editorView (reserving
+   its own space, so the editor visibly narrows to make room) instead of the
+   position:fixed overlay every other .floating-widget uses (which just sits
+   on top of whatever's underneath it, covering code). */
+.util-docked {
+    position: relative !important;
+    top: auto !important; left: auto !important; right: auto !important; bottom: auto !important;
+    height: auto !important;
+    flex-shrink: 0;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    transition: width 0.25s ease;
+}
+.util-docked .util-grip {
+    border-radius: 0 !important;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: bold; color: var(--dock-label);
+    height: 28px; cursor: pointer;
+}
+.util-docked.util-collapsed {
+    width: 22px !important;
+}
+.util-docked.util-collapsed .sleek-bar-content {
+    opacity: 0;
+    pointer-events: none;
+}
+
+    /* --- A. THE PHYSICAL OUTLINE (Vertical Tree Layout) --- */
+    .outline-scroller {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .outline-item {
+        display: flex;
+        align-items: center;
+        padding: 6px 10px;
+        margin-bottom: 4px;
+        border-radius: 6px;
+        font-family: monospace;
+        font-size: 11px;
+        cursor: pointer;
+        transition: background 0.15s;
+        border-left: 2px solid transparent;
+    }
+    .outline-item:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .outline-item.active {
+        background: rgba(47, 129, 247, 0.1);
+        border-left-color: var(--accent);
+    }
+
+    /* Specialized symbol markers for instant recognition */
+    .outline-badge {
+        font-size: 8px;
+        font-weight: 900;
+        padding: 2px 5px;
+        border-radius: 4px;
+        margin-right: 8px;
+        text-transform: uppercase;
+        flex-shrink: 0;
+        min-width: 32px;
+        text-align: center;
+    }
+    .outline-badge.fn { background: rgba(63, 185, 80, 0.15); color: var(--success); border: 1px solid rgba(63, 185, 80, 0.3); }
+    .outline-badge.class { background: rgba(210, 153, 34, 0.15); color: var(--gold); border: 1px solid rgba(210, 153, 34, 0.3); }
+    .outline-badge.method { background: rgba(47, 129, 247, 0.15); color: var(--accent); border: 1px solid rgba(47, 129, 247, 0.3); }
+    .outline-badge.var { background: rgba(248, 81, 73, 0.15); color: var(--danger); border: 1px solid rgba(248, 81, 73, 0.3); }
+
+    .outline-name {
+        color: var(--text);
+        font-weight: 700;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .outline-line-number {
+        margin-left: auto;
+        opacity: 0.4;
+        font-size: 9px;
+    }
+/* Edge Handles */
+.transform-handle-zone {
+    position: fixed; left: 0; top: 25%; z-index: 8600; pointer-events: none; 
+    display: flex; flex-direction: column; gap: 15px;
+}
+.transform-handle {
+    background: var(--surface); border: 1px solid var(--border); border-left: none;
+    padding: 15px 10px; border-radius: 0 10px 10px 0; cursor: pointer; color: var(--gold);
+    font-size: 16px; box-shadow: 2px 0 10px rgba(0,0,0,0.5); pointer-events: auto;
+    transition: background 0.2s;
+}
+.transform-handle:active { background: var(--accent); color: #fff; }
+
+/* The Drawers */
+.transform-drawer {
+    position: fixed; left: 0; top: 20%; transform: translateX(-105%);
+    transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+    background: var(--panel); border: 1px solid var(--border); border-left: none;
+    border-radius: 0 16px 16px 0; z-index: 8500; padding: 15px; 
+    box-shadow: 10px 10px 40px rgba(0,0,0,0.9); max-width: 85vw;
+}
+.transform-drawer.open { transform: translateX(0); }
+
+/* Bottom-left variant — used by the Navigation Drawer (🎮). Anchored to the
+   bottom-left corner instead of vertically centered, and slides straight
+   down out of view (translateY) rather than sideways (translateX), since
+   it sits directly above the footer dock rather than beside the editor.
+   `bottom` is intentionally NOT hardcoded here: #nexusDock is
+   position:relative with a variable height (keyboard rows toggle on/off,
+   KB row count is user-configurable 1-3 rows), so a fixed px offset would
+   drift out of alignment depending on dock state. Nexus.UI.toggleDrawer()
+   sets `bottom` inline from #nexusDock's live measured height every time
+   this drawer opens instead. */
+.transform-drawer-bottom {
+    position: fixed; left: 0; top: auto; bottom: 0; right: auto;
+    transform: translateY(115%) !important;
+    transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
+    background: var(--panel); border: 1px solid var(--border); border-bottom: none;
+    border-radius: 16px 16px 0 0 !important; z-index: 8500; padding: 16px;
+    box-shadow: 10px -10px 40px rgba(0,0,0,0.9); max-width: 92vw;
+}
+.transform-drawer-bottom.open { transform: translateY(0) !important; }
+    /* --- B. THE GRAPH MATRIX (Visual Inter-file Imports & References) --- */
+    .graph-viewport {
+        flex: 1;
+        position: relative;
+        background: #090d13;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Floating Graph Controls */
+    .graph-controls {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        gap: 6px;
+        z-index: 10;
+    }
+    .graph-btn {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text);
+        border-radius: 6px;
+        padding: 6px;
+        font-size: 11px;
+        font-weight: bold;
+        cursor: pointer;
+    }
+    .graph-btn:active {
+        background: var(--border);
+    }
+
+    /* Real-time scalable workspace mesh */
+    #graphCanvasLayer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    .graph-canvas-container {
+        position: absolute;
+        width: 2000px;
+        height: 2000px;
+        transform-origin: center center;
+        cursor: grab;
+        z-index: 2;
+    }
+    .graph-canvas-container:active {
+        cursor: grabbing;
+    }
+.sleek-btn.active { background: var(--accent); color: #fff; }
+    /* Micro-Nodes inside the Graph view */
+    .graph-node {
+        position: absolute;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 12px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        cursor: pointer;
+        font-family: monospace;
+        font-size: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        transition: border-color 0.2s, box-shadow 0.2s;
+        transform: translate(-50%, -50%);
+        z-index: 3;
+    }
+    .graph-node:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 10px rgba(47, 129, 247, 0.4);
+    }
+    .graph-node.active-node {
+        border-color: var(--gold);
+        box-shadow: 0 0 12px rgba(210, 153, 34, 0.4);
+    }
+
+    .graph-node-title {
+        font-weight: 900;
+        color: #fff;
+        font-size: 11px;
+    }
+    .graph-node-meta {
+        font-size: 8px;
+        opacity: 0.5;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    /* Unified Bottom Dock */
+
+    /* Container for the dynamic keyboard rows */
+    
+    /* Ensure individual keys generated by Nexus.kb don't shrink or break layout */
+    #kbRowsWrapper .dock-btn, 
+    #kbRowsWrapper .kb-key {
+    flex: 0 0 auto; 
+    display: inline-block;
+    }
+    
+    /* Hide scrollbars completely to maintain the clean native IDE look */
+    #kbRowsWrapper::-webkit-scrollbar {
+    display: none;
+    }
+    #kbRowsWrapper {
+    -ms-overflow-style: none;  /* IE/Edge */
+    scrollbar-width: none;  /* Firefox */
+    }
+    /* Ensure the integrated panel forces layout space */
+    #keyboardRowsContainer {
+    width: 100% !important;
+    min-height: 50px;
+    background: #21252b !important;
+    display: none; /* Controlled strictly via JS inline overrides */
+    }
+    
+    /* Tier 1: Toolbar/D-pad Row */
+    .dock-toolbar {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    gap: 8px;
+    background-color: #21252b;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Hide scrollbar for clean aesthetic */
+    .dock-toolbar::-webkit-scrollbar {
+    display: none;
+    }
+    
+    .dock-group {
+    display: flex;
+    gap: 4px;
+    }
+    
+    .dock-divider {
+    width: 1px;
+    height: 24px;
+    background-color: #3e4451;
+    margin: 0 4px;
+    }
+    /* --- devIDE: CM6 & SPOTLIGHT STYLES --- */
+    #spotlightModal { 
+    display: none; position: fixed; inset: 0; 
+    background: rgba(0,0,0,0.85); z-index: 9999; 
+    justify-content: center; align-items: start; padding-top: 10vh; 
+    backdrop-filter: blur(5px);
+    }
+    #spotlightModal.active { display: flex; }
+    .spotlight-box { 
+    width: 90%; max-width: 600px; background: var(--surface); 
+    border: 1px solid var(--accent); border-radius: 12px; 
+    padding: 20px; box-shadow: 0 15px 50px rgba(0,0,0,0.8); 
+    }
+    #spotlightInput {
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    color: #fff; padding: 15px; font-family: monospace; border-radius: 8px; outline: none;
+    }
+    #spotlightResults {
+    max-height: 50vh; overflow-y: auto; margin-top: 15px; display: flex; flex-direction: column; gap: 8px;
+    }
+    /* CodeMirror 6 Strict Dimensions */
+    #cm6Container { touch-action: manipulation; }
+    .cm-editor { height: 100%; width: 100%; font-family: monospace; font-size: 14px; touch-action: manipulation; }
+    .cm-scroller { overflow: auto; touch-action: manipulation; }
+    #editorView { touch-action: manipulation; }
+    /* Bracket & Tag Tracing — CM6's bracketMatching() extension drives BOTH
+       of these through the exact same mechanism: JS {}/[]/() pairs directly,
+       and HTML <tag></tag> pairs via lang-html's bracketMatchingHandle (which
+       hands the tag-NAME text to the same matcher). Both render through
+       .cm-matchingBracket / .cm-nonmatchingBracket — there is no separate
+       "tag" class to target. CM6's own baseTheme already applies these
+       classes with a low-opacity fill (#328c8252 / #bb555544), which is
+       correct behavior but reads as barely-there against this editor's dark
+       theme/small phone screen — so this overrides with the app's own
+       --accent/--danger palette at higher opacity, plus an underline (not
+       background alone) so a matched/mismatched pair is legible at a glance
+       while scrolling past it, not just when squinting at the highlight. */
+    .cm-matchingBracket {
+        background: color-mix(in srgb, var(--accent) 35%, transparent) !important;
+        color: inherit !important;
+        border-bottom: 2px solid var(--accent);
+        border-radius: 2px;
+    }
+    .cm-nonmatchingBracket {
+        background: color-mix(in srgb, var(--danger) 40%, transparent) !important;
+        color: inherit !important;
+        border-bottom: 2px solid var(--danger);
+        border-radius: 2px;
+    }
+    /* Utility Touch Buttons */
+    .dock-btn {
+    background-color: #2c313c;
+    color: #abb2bf;
+    border: 1px solid #3e4451;
+    border-radius: 4px;
+    min-width: 40px;
+    height: 38px;
+    font-family: monospace;
+    font-size: 14px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    touch-action: manipulation;
+    }
+    
+    .dock-btn:active {
+    background-color: #4b5263;
+    color: #ffffff;
+    }
+    
+    .dock-btn.special {
+    background-color: #3e4451;
+    color: #61afef;
+    }
+    #xtermContainer .terminal {
+    height: 100%;
+    }
+    /* Ensure the xterm scrollbar matches your Nexus theme */
+    #xtermContainer .xterm-viewport::-webkit-scrollbar {
+    width: 6px;
+    }
+    #xtermContainer .xterm-viewport::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+    }
+    /* Tier 2: Status Ribbon */
+    .dock-status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 12px;
+    font-family: monospace;
+    font-size: 11px;
+    color: #5c6370;
+    background-color: #1e2227;
+    border-top: 1px solid #21252b;
+    }
+    /* --- NEXUS REGEX PLAYGROUND & MACRO STYLES --- */
+    #regexSlide { 
+    position: fixed; 
+    bottom: 0; left: 0; right: 0; 
+    height: 45vh; 
+    background: var(--surface); 
+    border-top: 4px solid #a371f7; /* Purple for Regex */
+    z-index: 5000; 
+    transform: translateY(105%); 
+    transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1); 
+    display: flex; 
+    flex-direction: column; 
+    padding: 15px; 
+    box-shadow: 0 -10px 40px rgba(0,0,0,0.9); 
+    }
+    #regexSlide.open { transform: translateY(0); }
+    .regex-box { background: var(--bg); color: #fff; border: 1px solid var(--border); padding: 10px; font-family: monospace; border-radius: 6px; width: 100%; outline: none; }
+    .regex-results { flex: 1; overflow-y: auto; background: #000; color: var(--success); font-family: monospace; font-size: 12px; padding: 10px; border-radius: 6px; margin-top: 10px; }
+    .macro-recording { color: var(--danger); animation: pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    .status-indicator {
+    font-weight: bold;
+    color: #98c379; /* Green match for ready state */
+    }
+    #highlightBackdrop mark {
+    background: rgba(47, 129, 247, 0.4); /* Subtle blue highlight */
+    border-radius: 3px;
+    color: transparent;
+    }
+    /* Axis Locking */
+    .lock-x { overflow-x: hidden !important; }
+    .lock-y { overflow-y: hidden !important; }
+
+    /* Visible keyboard focus, scoped so mouse/touch taps stay clean.
+       (Previously "* { outline: none }" removed focus indicators app-wide
+       with nothing standing in for keyboard/switch-device users.) */
+    :focus-visible {
+        outline: 2px solid var(--accent) !important;
+        outline-offset: 2px !important;
+    }

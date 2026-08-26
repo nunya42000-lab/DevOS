@@ -4,7 +4,18 @@
 // be a real sibling file rather than inlined (blob:/data: registration is
 // rejected by spec: "Script URL's scheme is not 'http' or 'https'").
 
-const CACHE = 'divide-shell-v1';
+// Bumped from v1: index.html was split into three real sibling files
+// (index.html/app.js/styles.css) instead of one monolithic HTML file with
+// inline <style>/<script>. The cache key itself has to change too, not
+// just APP_SHELL's contents — reusing the old CACHE name would mean an
+// already-installed client's existing cache (keyed under 'divide-shell-v1',
+// holding only the old single-file shell) just silently sits there
+// unused/stale rather than being replaced, since caches.open() with an
+// existing name reopens the same store rather than resetting it. The
+// activate handler below already deletes any cache key that isn't the
+// current CACHE constant, so bumping this version string is what actually
+// triggers that cleanup and forces a real re-fetch of the new 3-file shell.
+const CACHE = 'divide-shell-v2';
 
 // Everything needed to boot divIDE with no network. The CDN scripts
 // (CodeMirror deps, localforage, acorn, prettier, etc.) are cached
@@ -16,6 +27,8 @@ const CACHE = 'divide-shell-v1';
 const APP_SHELL = [
   './',
   './index.html',
+  './app.js',
+  './styles.css',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
@@ -57,14 +70,35 @@ self.addEventListener('fetch', (e) => {
 
   e.respondWith(
     caches.match(e.request).then((cached) => {
-      // Network-first for same-origin HTML (so edits to index.html show up
+      // Network-first for same-origin HTML/JS/CSS (so edits show up
       // immediately on reload instead of serving a stale cached shell),
       // cache-first for everything else (CDN deps, fonts, icons — these
       // are version-pinned URLs that never change content, so cache-first
       // saves a round trip every load with zero staleness risk).
-      const isHTML = e.request.mode === 'navigate' || e.request.destination === 'document';
+      //
+      // Widened from "HTML only" now that index.html was split into three
+      // files: before the split, ALL of divIDE's own first-party code
+      // lived inside index.html itself and correctly got network-first
+      // treatment. app.js/styles.css now hold that exact same
+      // continuously-edited first-party code — they are NOT third-party,
+      // version-pinned CDN dependencies the way the original cache-first
+      // branch's reasoning was written for — so routing them into
+      // cache-first by only checking for "document" destination would be
+      // a real regression: a fresh index.html could load an old, stale
+      // app.js sitting in cache next to it. Checked by same-origin +
+      // filename rather than Request.destination, since destination for a
+      // <script src>/<link rel=stylesheet> request is "script"/"style"
+      // either way regardless of which file it is — there's no built-in
+      // way to distinguish "our own script" from "a vendor script" by
+      // destination alone.
+      const isOwnCode = isSameOrigin && (
+        e.request.mode === 'navigate' ||
+        e.request.destination === 'document' ||
+        url.pathname.endsWith('/app.js') ||
+        url.pathname.endsWith('/styles.css')
+      );
 
-      if (isSameOrigin && isHTML) {
+      if (isOwnCode) {
         return fetch(e.request)
           .then((res) => {
             if (res && res.ok) {
