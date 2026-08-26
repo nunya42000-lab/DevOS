@@ -6957,7 +6957,7 @@ try {
         // one AND .load() is actually called on it below — so opening a
         // .js file still only pulls lang-javascript over the wire, not all
         // hundred-plus packages language-data merely lists.
-        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands, cmSticky] = await Promise.all([
+                const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands, cmSticky, cmLint] = await Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
             import("@codemirror/view"),
@@ -6967,8 +6967,10 @@ try {
             import("@codemirror/language-data"),
             import("@codemirror/search"),
             import("@codemirror/commands"),
-            import("@fazelstudio/codemirror-stickyscroll")
+            import("@fazelstudio/codemirror-stickyscroll"),
+            import("@codemirror/lint") // NEW LINT IMPORT
         ]);
+
         
         Nexus.editorCore.modules = {
             basicSetup: cm6.basicSetup,
@@ -7051,14 +7053,17 @@ try {
             // those (via the importmap above) rather than bundling its own
             // — the same conflict-avoidance strategy already proven correct
             // for every other @codemirror/* package here.
-            indentationMarkers: cmIndentMarkers.indentationMarkers
+            indentationMarkers: cmIndentMarkers.indentationMarkers,
+       		linter: cmLint.linter,         // NEW
+            lintGutter: cmLint.lintGutter  // NEW
+        
         };
 
         Nexus.editorCore.isLoaded = true;
     }
 
-    const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment, highlightWhitespace, highlightTrailingWhitespace, StateEffect, StateField, RangeSet, gutter, GutterMarker, stickyScroll } = Nexus.editorCore.modules;
-    
+        const { EditorState, EditorView, basicSetup, languages, LanguageDescription, oneDark, bracketMatching, indentationMarkers, Compartment, highlightWhitespace, highlightTrailingWhitespace, StateEffect, StateField, RangeSet, gutter, GutterMarker, stickyScroll, linter, lintGutter } = Nexus.editorCore.modules;
+
     // Match the active file against @codemirror/language-data's full
     // registry by filename (not just extension — this also correctly
     // handles the filename-pattern entries like Dockerfile, Makefile,
@@ -7275,6 +7280,60 @@ try {
     // that same concern.
     Nexus.editorCore.stickyScrollCompartment = new Compartment();
 
+    // Bridge Sentinel into CM6 native linting
+    const nexusLinterSource = (view) => {
+        const code = view.state.doc.toString();
+        const ext = Nexus.state.activeFile ? Nexus.state.activeFile.split('.').pop().toLowerCase() : 'js';
+        
+        // Sentinel's AST engine currently processes JS and embedded HTML scripts
+        if (ext !== 'js' && ext !== 'html') return [];
+        if (typeof Nexus.Sentinel.initEngine === 'function') Nexus.Sentinel.initEngine();
+        if (!Nexus.Sentinel.engine) return [];
+        
+        try {
+            let lintCode = code;
+            let codeOffset = 0;
+            
+            if (ext === 'html') {
+                const block = Nexus.Sentinel.findMainScript(code);
+                if (block) {
+                    lintCode = block.code;
+                    codeOffset = block.start;
+                } else return [];
+            }
+            
+            // Run the Acorn AST pass in LINT (read-only) mode
+            const { issues } = Nexus.Sentinel.engine.analyzeAndMutate(lintCode, 'LINT');
+            
+            return issues.map(iss => {
+                const from = Math.min(iss.range[0] + codeOffset, view.state.doc.length);
+                const to = Math.max(from, Math.min(iss.range[1] + codeOffset, view.state.doc.length));
+                
+                // Inject the plain-English explanation directly into the native tooltip
+                const tutorInfo = Nexus.tutor.lintLibrary[iss.id];
+                const fullMessage = tutorInfo 
+                    ? `${iss.id}: ${iss.message}\n\n💡 ${tutorInfo.title}\n${tutorInfo.plain}\n\nFix: ${tutorInfo.fix}`
+                    : `${iss.id}: ${iss.message}`;
+
+                return {
+                    from,
+                    to,
+                    severity: (iss.severity === 'CRITICAL' || iss.severity === 'HIGH') ? 'error' : 'warning',
+                    message: fullMessage
+                };
+            });
+        } catch (e) {
+            // Surface fatal AST syntax errors on the first line
+            return [{
+                from: 0,
+                to: Math.min(5, view.state.doc.length),
+                severity: 'error',
+                message: `Parse Error: ${e.message}`
+            }];
+        }
+    };
+  
+  
     Nexus.editorCore.currentExtensions = [
        basicSetup, 
        langExtension, 
@@ -7285,6 +7344,8 @@ try {
        Nexus.editorCore.whitespaceCompartment.of(Nexus.state.prefs.showWhitespace ? whitespaceExtension : []),
        Nexus.editorCore.stickyScrollCompartment.of(Nexus.state.prefs.stickyScroll !== false ? stickyScroll({ maxStickyLines: 4 }) : []),
        bookmarkGutter,
+       lintGutter(),        
+       linter(nexusLinterSource),
        ...(wantsDark ? [oneDark] : []),
        fixedHeight,
        EditorView.updateListener.of((update) => {
