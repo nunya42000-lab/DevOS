@@ -341,12 +341,18 @@
                 <button class="sleek-btn dpad-arrow nav-drawer-btn" data-dir="Down" title="Move Down" aria-label="Move cursor down">↓</button>
                 <div></div>
             </div>
-            <!-- Square: 2x2 grid, 4 hardcoded reconfigurable-in-name-only actions -->
+            <!-- Square: 2x2 grid, 4 genuinely customizable action slots
+                 (Settings -> Navigation Drawer). Populated by
+                 Nexus.UI.renderNavDrawerButtons() from
+                 Nexus.state.prefs.navDrawerLayout — starts empty/inert in
+                 markup on purpose so there's exactly one place (that
+                 function) deciding each slot's icon/onclick, rather than
+                 static HTML that render() has to overwrite/fight with. -->
             <div style="display:grid; grid-template-columns: repeat(2, 56px); grid-template-rows: repeat(2, 56px); gap:4px;">
-                <button id="navDrawerBracketBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to matching bracket" aria-label="Jump to matching bracket">↔{}</button>
-                <button id="navDrawerOneLineBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.UI.collapseSelectionToOneLine()" title="Collapse to one line" aria-label="Collapse to one line">⟷</button>
-                <button id="navDrawerSelectLockBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.DpadEngine.toggleSelectLock()" title="Toggle Select-Lock" aria-label="Toggle select lock">SEL</button>
-                <button id="navDrawerEditChunkBtn" class="sleek-btn nav-drawer-btn" onclick="Nexus.chunkEditor.openForCursor()" title="Edit Chunk" aria-label="Open chunk editor">🔎</button>
+                <button id="navDrawerSlot0" class="sleek-btn nav-drawer-btn"></button>
+                <button id="navDrawerSlot1" class="sleek-btn nav-drawer-btn"></button>
+                <button id="navDrawerSlot2" class="sleek-btn nav-drawer-btn"></button>
+                <button id="navDrawerSlot3" class="sleek-btn nav-drawer-btn"></button>
             </div>
         </div>
     </div>
@@ -1236,7 +1242,7 @@
 
                 <div style="display: flex; flex-direction: column; gap: 8px; padding: 5px; margin-bottom: 15px;">
                     <label style="display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--gold);">
-                        <input type="checkbox" id="prefInfiniteScroll" onchange="Nexus.settings.update('infiniteScroll', this.checked)" style="width: 18px; height: 18px; cursor: pointer;">
+                        <input type="checkbox" id="prefInfiniteScroll" onchange="Nexus.settings.update('infiniteScroll', this.checked); Nexus.UI.initInfiniteRibbon();" style="width: 18px; height: 18px; cursor: pointer;">
                         <span>Infinite Scroll (Ribbon)</span>
                     </label>
                 </div>
@@ -1270,6 +1276,12 @@
                     <span style="font-size:11px; opacity:0.7;">Send your project directly to another device running divIDE — peer-to-peer, no account, nothing stored on a server.</span>
                     <button class="tool-btn btn-accent" style="width:100%;" onclick="Nexus.UI.openModal('peer-sync')">📡 OPEN DEVICE SYNC</button>
                 </div>
+            </div>
+
+            <div class="slab">
+                <div class="section-label" style="margin-top: 0;">Navigation Drawer (🎮)</div>
+                <div style="font-size:9px; opacity:0.6; margin:-6px 0 8px;">Assign any tool to each of the drawer's 4 action buttons.</div>
+                <div id="navDrawerLayoutList"></div>
             </div>
 
             <div class="slab">

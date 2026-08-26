@@ -4617,16 +4617,13 @@ chunkEditor: {
        Nexus.state.Vfs[Nexus.state.activeFile] = view.state.doc.toString();
        Nexus.Vfs.save();
 
-       const st = document.getElementById('chunkEditorStatus');
-       st.innerText = '✔ Saved to file.';
-       st.style.color = 'var(--success)';
-
-       // Keep the modal open with the now-current text as the new
-       // baseline, so further edits/formats in the same session diff
-       // against what's actually on disk now rather than the stale
-       // pre-save version.
-       this._originalText = newText;
-       this._target = { ...this._target, declTo: this._target.declFrom + newText.length };
+       // FIX: this used to leave the modal open after saving, on purpose
+       // (to keep editing against a fresh baseline) — but paired next to
+       // a CANCEL button that closes immediately, SAVE TO FILE not
+       // closing read as broken rather than intentional. Closes now,
+       // matching what tapping a "save" button next to a "cancel" button
+       // actually implies.
+       Nexus.UI.closeModal('chunk-editor');
    },
 
    // Scoped formatting: runs the same engines used elsewhere in this
@@ -5103,11 +5100,14 @@ try {
         ".cm-content": { fontSize: (Nexus.state.prefs.fontSize || 14) + "px" }
     });
 
-    // CM6's basicSetup has a clean light appearance by default, so oneDark is
-    // only added when outdoor-mode is off. (Toggling outdoor-mode while CM6
-    // is already open won't repaint live — that needs CM6 Compartments to
-    // swap extensions in-place — but every fresh editor boot/file-switch now
-    // picks up whichever theme is current.)
+    // CM6's basicSetup has a clean light appearance by default, so oneDark
+    // is only added when outdoor-mode is off. Lives in a real Compartment
+    // (themeCompartment, declared above) so toggleSun() can reconfigure it
+    // live on an already-open editor — this used to only decide the theme
+    // once at construction time, so toggling light/dark while a file was
+    // open wouldn't repaint the editor itself until the next file switch
+    // or reload, even though every other part of the UI (chrome, panels,
+    // footer) responded instantly via CSS variables.
     const wantsDark = !document.body.classList.contains('outdoor-mode');
 
     // Indent/tag guide lines live inside a Compartment so the toolbar toggle
@@ -5297,6 +5297,18 @@ try {
     Nexus.editorCore.lintCompartment = new Compartment();
     Nexus.editorCore.autocompleteCompartment = new Compartment();
 
+    // FIX (light mode didn't affect the editor): oneDark used to be
+    // spliced directly into the extensions array based on a one-time
+    // wantsDark check at construction time — the comment even documented
+    // this as a known gap ("toggling outdoor-mode while CM6 is already
+    // open won't repaint live"). A Compartment is this app's own
+    // established, working pattern for every other live-togglable CM6
+    // feature (indent guides, bracket tracing, minimap, etc.) — applying
+    // it here the same way means toggleSun() can now actually repaint the
+    // already-open editor instantly instead of only affecting the NEXT
+    // file switch or reload.
+    Nexus.editorCore.themeCompartment = new Compartment();
+
     Nexus.editorCore.currentExtensions = [
        basicSetup, 
        // FIX (unreliable Insert Tab): see the indentWithTab module-loading
@@ -5325,7 +5337,7 @@ try {
        Nexus.editorCore.lintCompartment.of(Nexus.state.prefs.lintEnabled ? Nexus.UI._buildLintExtension() : []),
        Nexus.editorCore.autocompleteCompartment.of(Nexus.state.prefs.autocomplete ? Nexus.UI._buildAutocompleteExtension() : []),
        bookmarkGutter,
-       ...(wantsDark ? [oneDark] : []),
+       Nexus.editorCore.themeCompartment.of(wantsDark ? [oneDark] : []),
        fixedHeight,
        EditorView.updateListener.of((update) => {
            // FIX: `update.userEvent` does not exist on CM6's ViewUpdate (it was
@@ -5359,6 +5371,13 @@ try {
         }),
         parent: actualCmContainer
     });
+
+    // Wire the same diagonal-scroll-drift fix the vanilla textarea already
+    // has onto this fresh view's real scrolling element — a new EditorView
+    // means a brand new .cm-scroller/scrollDOM each time (engine swaps,
+    // first boot), so this has to be re-wired here rather than once
+    // globally at page load.
+    if (typeof wireCM6ScrollLock === 'function') wireCM6ScrollLock();
 
     // Restore bookmarks for whichever file is active on this very first
     // CM6 boot — switchFile() handles this for every SUBSEQUENT file
@@ -5606,15 +5625,50 @@ try {
        worker: null,
        init() {
            if (this.worker) return;
-           // The logic-dilation engine for background stress testing
+           // FIX (real freeze source): setTimeout used to be mocked as
+           // `(fn) => fn()` — fires immediately AND synchronously. Any
+           // tested code that uses setTimeout to recursively schedule its
+           // next step (a common, legitimate pattern for things like
+           // polling loops or animation-style code) would have that
+           // recursive call fire instantly instead of after a real delay,
+           // turning what was a normal async loop into a synchronous
+           // infinite one — inside the worker thread, with no yield point
+           // ever reached. Since runTest() below has no per-test timeout,
+           // a worker wedged this way would never post back a result, so
+           // its Promise never resolves — and since Promise.all() (in
+           // startNightCycle) waits for EVERY queued test, one single
+           // problem branch anywhere in the project could hang the whole
+           // stress test run indefinitely. This explains "some diagnostics
+           // freeze it, not every time" precisely: whether this fires
+           // depends entirely on whether the specific file being tested
+           // happens to contain a setTimeout-recursive branch, which
+           // varies file to file.
+           //
+           // Real fix, two parts: (1) the mock now uses the worker's own
+           // real setTimeout (self.setTimeout already exists before this
+           // override — capturing it first, then wrapping it, preserves
+           // actual async delay/scheduling instead of collapsing it to
+           // zero); (2) runTest() below now races every test against a
+           // hard per-test timeout, so even a genuinely runaway branch
+           // can't hang the worker or the Promise.all waiting on it
+           // forever — it times out, gets reported as a failure, and the
+           // worker moves on to the next queued test.
            const workerCode = `
+               const realSetTimeout = self.setTimeout;
                self.onmessage = function(e) {
                    const { code, iterations } = e.data;
                    const start = (typeof performance !== 'undefined') ? performance.now() : Date.now();
                    try {
-                       // Mocking async globals to force logical density
-                       self.setTimeout = (fn) => fn(); 
-                       self.requestAnimationFrame = (fn) => fn(start);
+                       // Still mocked (so tested code doesn't sit around
+                       // waiting on real timer delays during a 1000x
+                       // density-test loop) but now via the worker's real
+                       // setTimeout with a 0ms delay — genuinely
+                       // asynchronous (yields back to the event loop),
+                       // not synchronous re-entry. A recursive setTimeout
+                       // chain now behaves like an actual async loop
+                       // again instead of a synchronous stack-diving one.
+                       self.setTimeout = (fn) => realSetTimeout(fn, 0);
+                       self.requestAnimationFrame = (fn) => realSetTimeout(() => fn(start), 0);
                        
                        const testRunner = new Function(code);
                        for(let i = 0; i < iterations; i++) {
@@ -5633,14 +5687,50 @@ try {
            this.worker = new Worker(workerUrl);
            URL.revokeObjectURL(workerUrl);
        },
+
+       // FIX: previously no timeout at all — if the worker never posted
+       // back (see init()'s own comment for exactly how that happened),
+       // this Promise sat pending forever, and since startNightCycle()
+       // awaits Promise.all() of every queued test, one hung branch
+       // anywhere in the project would freeze the entire stress test run
+       // with no way to recover short of reloading the whole app. Races
+       // the real result against a hard timeout instead — a branch that
+       // genuinely can't finish in reasonable time is reported as a
+       // failure (which is honestly what "this branch hangs" IS, for a
+       // stress test whose whole purpose is catching exactly that), and
+       // everything else queued keeps moving.
+       TIMEOUT_MS: 3000,
+
        runTest(code) {
            this.init();
            return new Promise((resolve) => {
+               let settled = false;
+               let timer = null;
+
                const handler = (e) => {
+                   if (settled) return;
+                   settled = true;
+                   clearTimeout(timer);
                    this.worker.removeEventListener('message', handler);
                    resolve(e.data);
                };
                this.worker.addEventListener('message', handler);
+
+               timer = setTimeout(() => {
+                   if (settled) return;
+                   settled = true;
+                   this.worker.removeEventListener('message', handler);
+                   // The worker itself may still be spinning on this one
+                   // (recreating it is the only real way to reclaim it,
+                   // since a Worker has no way to interrupt code already
+                   // running inside it) — torn down and rebuilt fresh so
+                   // the NEXT queued test isn't stuck waiting behind this
+                   // one forever too.
+                   try { this.worker.terminate(); } catch (e) {}
+                   this.worker = null;
+                   resolve({ success: false, error: `Timed out after ${this.TIMEOUT_MS}ms — this branch likely contains an infinite or runaway loop.` });
+               }, this.TIMEOUT_MS);
+
                this.worker.postMessage({ code, iterations: 1000 });
            });
        }
@@ -8683,6 +8773,7 @@ UI: {
   initSubSystems() {  
       if (typeof this.renderUtilBar === 'function') this.renderUtilBar();  
       if (typeof this.renderUtilMirror === 'function') this.renderUtilMirror();
+      if (typeof this.renderNavDrawerButtons === 'function') this.renderNavDrawerButtons();
       if (typeof this.initInfiniteRibbon === 'function') this.initInfiniteRibbon(); 
       if (typeof this.initEdgeSwipes === 'function') this.initEdgeSwipes(); 
       if (typeof this.syncStatus === 'function') this.syncStatus(); 
@@ -9365,6 +9456,130 @@ insertUUID() {
            { group: 'Ribbon (Mirrored)', key: 'rbPaste', label: 'Paste' },
            { group: 'Ribbon (Mirrored)', key: 'rbRun', label: 'Run / Preview' },
        ],
+
+       // Nav Drawer's 4 action-button slots are independently customizable
+       // (each a dropdown over the same tool catalog as the utility bar,
+       // UTIL_TOOL_META, rather than a second parallel list of "what tools
+       // exist" that could drift out of sync with it). This map supplies
+       // just the two things the utility bar's own per-key HTML doesn't
+       // cleanly separate out (onclick + a single icon glyph) — the
+       // utility bar's own entries bundle in .util-lbl text labels and
+       // icon sizing built for a horizontal scroll strip, which doesn't
+       // fit the drawer's fixed 56x56px square buttons, so reusing that
+       // markup directly wasn't a good fit. Every key here should also
+       // exist in UTIL_TOOL_META (for its label, shown in the picker) —
+       // intentionally a SUBSET, not every single utility tool, since a
+       // few (color picker, save-structure-map) don't make sense as a
+       // one-tap drawer action the way they do as a labeled bar button.
+       NAV_DRAWER_TOOL_ICONS: {
+           jumpBracket: { icon: '↔{}', onclick: 'Nexus.UI.jumpToMatchingBracket()' },
+           oneLine: { icon: '⟷', onclick: 'Nexus.UI.collapseSelectionToOneLine()' },
+           expandLine: { icon: '⟵⟶', onclick: 'Nexus.UI.expandSelectionFromOneLine()' },
+           select: { icon: 'SEL', onclick: 'Nexus.DpadEngine.toggleSelectLock()' },
+           editChunk: { icon: '🔎', onclick: 'Nexus.chunkEditor.openForCursor()' },
+           fullFold: { icon: '⇐⇒', onclick: 'Nexus.UI.collapseAll()' },
+           oneFold: { icon: '│', onclick: 'Nexus.UI.foldToLayer()' },
+           unfold: { icon: '≤≥', onclick: 'Nexus.UI.expandAll()' },
+           oneUnfold: { icon: '∧', onclick: 'Nexus.UI.unfoldOnce()' },
+           selectNext: { icon: '⊕', onclick: 'Nexus.UI.selectNextOccurrence()' },
+           selectAllMatches: { icon: '⊛', onclick: 'Nexus.UI.selectAllOccurrences()' },
+           bookmarkHere: { icon: '🔖', onclick: 'Nexus.UI.toggleBookmarkHere()' },
+           bookmarksList: { icon: '📑', onclick: 'Nexus.UI.openBookmarksPanel()' },
+           duplicate: { icon: '⧉', onclick: 'Nexus.tools.duplicateLine()' },
+           comment: { icon: '//', onclick: 'Nexus.tools.toggleComment()' },
+           copyline: { icon: '❐', onclick: 'Nexus.tools.copyLine()' },
+           zoomin: { icon: 'A+', onclick: "Nexus.UI.adjustFontSize(2)" },
+           zoomout: { icon: 'A-', onclick: "Nexus.UI.adjustFontSize(-2)" },
+           cleanchars: { icon: '📱', onclick: 'Nexus.pasteGuard.cleanActiveFile()' },
+           stripcomments: { icon: '💬', onclick: 'Nexus.Sentinel.stripComments()' },
+           sortlines: { icon: '🔤', onclick: 'Nexus.Sentinel.sortLines()' },
+           blanklines: { icon: '🧽', onclick: 'Nexus.Sentinel.removeBlankLines()' },
+           alignleft: { icon: '⬅️', onclick: 'Nexus.Sentinel.alignLeft()' },
+           reindent: { icon: '📐', onclick: 'Nexus.Sentinel.reindentByDepth()' },
+       },
+       DEFAULT_NAV_DRAWER_LAYOUT: 'jumpBracket, oneLine, select, editChunk',
+
+       renderNavDrawerButtons() {
+           const layout = (Nexus.state.prefs.navDrawerLayout || Nexus.UI.DEFAULT_NAV_DRAWER_LAYOUT)
+               .split(',').map(s => s.trim()).filter(Boolean);
+           const metaByKey = {};
+           Nexus.UI.UTIL_TOOL_META.forEach(t => { metaByKey[t.key] = t; });
+           const slotIds = ['navDrawerSlot0', 'navDrawerSlot1', 'navDrawerSlot2', 'navDrawerSlot3'];
+
+           slotIds.forEach((slotId, i) => {
+               const el = document.getElementById(slotId);
+               if (!el) return;
+               const key = layout[i];
+               const entry = key && Nexus.UI.NAV_DRAWER_TOOL_ICONS[key];
+               if (!entry) {
+                   el.innerHTML = '';
+                   el.onclick = null;
+                   el.title = 'Empty — assign a tool in Settings';
+                   el.style.opacity = '0.3';
+                   return;
+               }
+               el.style.opacity = '1';
+               el.textContent = entry.icon;
+               el.title = (metaByKey[key] && metaByKey[key].label) || key;
+               el.setAttribute('aria-label', el.title);
+               // Assigned via a real onclick attribute (not addEventListener)
+               // so this survives being re-rendered — same convention every
+               // other dynamically-populated button map in this file uses,
+               // and keeps Select-Lock's own id (needed elsewhere for its
+               // active-state sync) attachable when that's the assigned tool.
+               el.setAttribute('onclick', entry.onclick + "; Nexus.UI.syncNavDrawerSelectLockId()");
+           });
+       },
+
+       // Select-Lock's active/inactive visual state is synced by ID
+       // elsewhere (DpadEngine.toggleSelectLock's own id list) — since
+       // which drawer slot (if any) holds Select-Lock can change via
+       // customization, this keeps exactly one slot tagged with the
+       // expected id at a time rather than a fixed button always having it.
+       syncNavDrawerSelectLockId() {
+           const layout = (Nexus.state.prefs.navDrawerLayout || Nexus.UI.DEFAULT_NAV_DRAWER_LAYOUT).split(',').map(s => s.trim());
+           ['navDrawerSlot0', 'navDrawerSlot1', 'navDrawerSlot2', 'navDrawerSlot3'].forEach((slotId, i) => {
+               const el = document.getElementById(slotId);
+               if (!el) return;
+               if (layout[i] === 'select') el.id = 'navDrawerSelectLockBtn'; 
+               // Restore the generic slot id afterward so the next render
+               // pass can still find it by slot index — navDrawerSelectLockBtn
+               // is only needed transiently for toggleSelectLock's own
+               // classList sync, not as this element's permanent identity.
+               else if (el.id === 'navDrawerSelectLockBtn') el.id = slotId;
+           });
+       },
+
+       renderNavDrawerCustomizer() {
+           const layout = (Nexus.state.prefs.navDrawerLayout || Nexus.UI.DEFAULT_NAV_DRAWER_LAYOUT).split(',').map(s => s.trim());
+           const options = Object.keys(Nexus.UI.NAV_DRAWER_TOOL_ICONS);
+           const metaByKey = {};
+           Nexus.UI.UTIL_TOOL_META.forEach(t => { metaByKey[t.key] = t; });
+           const labelFor = (key) => (metaByKey[key] && metaByKey[key].label) || key;
+
+           let html = '';
+           for (let i = 0; i < 4; i++) {
+               const current = layout[i] || '';
+               html += `<div style="display:flex; align-items:center; gap:8px; padding:6px 0;">
+                   <span style="font-size:11px; opacity:0.6; width:56px; flex-shrink:0;">Slot ${i + 1}</span>
+                   <select class="sleek-input" style="flex:1; font-size:12px;" onchange="Nexus.UI.setNavDrawerSlot(${i}, this.value)">
+                       <option value="">— Empty —</option>
+                       ${options.map(k => `<option value="${k}" ${k === current ? 'selected' : ''}>${labelFor(k)}</option>`).join('')}
+                   </select>
+               </div>`;
+           }
+           const list = document.getElementById('navDrawerLayoutList');
+           if (list) list.innerHTML = html;
+       },
+
+       setNavDrawerSlot(index, key) {
+           const layout = (Nexus.state.prefs.navDrawerLayout || Nexus.UI.DEFAULT_NAV_DRAWER_LAYOUT).split(',').map(s => s.trim());
+           while (layout.length < 4) layout.push('');
+           layout[index] = key;
+           const cleaned = layout.slice(0, 4);
+           Nexus.settings.update('navDrawerLayout', cleaned.join(', '));
+           Nexus.UI.renderNavDrawerButtons();
+       },
        // FIX: bookmarkHere/bookmarksList removed from the default
        // layout — they're already reachable from the ⋮ dropdown menu
        // (🔖 Bookmark Line / 📑 All Bookmarks), so having them here too
@@ -10705,22 +10920,61 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
                activeTab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
            }
        },
+// FIX: this ran unconditionally on every boot regardless of the Infinite
+// Scroll setting (Settings -> Kinetic Widgets, off by default) — the
+// checkbox correctly read/wrote Nexus.state.prefs.infiniteScroll, but
+// nothing ever actually checked that value before cloning the ribbon
+// track, so the setting was purely decorative. Also handles turning it
+// OFF after the clones already exist (not just skipping creation when
+// off from the start) — the checkbox's onchange calls this directly (see
+// its own handler), so toggling it needs to be able to undo a live
+// infinite-scroll setup, not just gate the boot-time one.
 initInfiniteRibbon() {
    const c = document.getElementById('ribbonContainer');
    const t = document.getElementById('ribbonTrack');
    if (!c || !t) return;
+
+   const wantsInfinite = !!Nexus.state.prefs.infiniteScroll;
+
+   if (!wantsInfinite) {
+       // If clones exist from a previous session/toggle, remove them and
+       // detach the scroll listener so a disabled setting genuinely means
+       // disabled, not just "no new clones going forward."
+       if (c._infiniteScrollHandler) {
+           c.removeEventListener('scroll', c._infiniteScrollHandler);
+           c._infiniteScrollHandler = null;
+       }
+       if (t._infiniteScrollWired) {
+           // The real, single, original track content is exactly the
+           // first third of what's currently in there (two clones were
+           // appended after it) — slicing back to that undoes the clone
+           // without needing to have kept a separate backup copy around.
+           const originalChildCount = t.children.length / 3;
+           while (t.children.length > originalChildCount) {
+               t.removeChild(t.lastElementChild);
+           }
+           t._infiniteScrollWired = false;
+       }
+       c.scrollLeft = 0;
+       return;
+   }
+
+   if (t._infiniteScrollWired) return; // already set up — toggling on when it's already on is a no-op, not a re-clone
 
    const fragment = document.createDocumentFragment();
    // Clone the track twice to create the infinite loop nodes
    fragment.appendChild(t.cloneNode(true));
    fragment.appendChild(t.cloneNode(true));
    t.appendChild(fragment);
+   t._infiniteScrollWired = true;
 
-   c.addEventListener('scroll', () => {
+   const handler = () => {
        const w = t.scrollWidth / 3;
        if (c.scrollLeft >= w * 2) c.scrollLeft -= w;
        if (c.scrollLeft <= 0) c.scrollLeft += w;
-   }, { passive: true }); // Passive = Smoother scrolling
+   };
+   c._infiniteScrollHandler = handler;
+   c.addEventListener('scroll', handler, { passive: true }); // Passive = Smoother scrolling
 
    // Use requestAnimationFrame to ensure the initial jump is invisible
    requestAnimationFrame(() => { c.scrollLeft = t.scrollWidth / 3; });
@@ -10887,7 +11141,7 @@ initInfiniteRibbon() {
        openModal(id) { 
            if (id === 'dreamer') Nexus.dreamer.updatePreview(); 
            if (id === 'graph') Nexus.graph.render(); 
-           if (id === 'settings') Nexus.settings.calcStorage(); 
+           if (id === 'settings') { Nexus.settings.calcStorage(); Nexus.UI.renderNavDrawerCustomizer(); }
            if (id === 'util-layout') Nexus.UI.renderUtilLayoutModal();
            if (id === 'snapshots') Nexus.snapshots.render();
            if (id === 'storage-inspector') Nexus.storageInspector.render();
@@ -10944,6 +11198,22 @@ initInfiniteRibbon() {
            // Persist — this used to be a bare class toggle with no memory,
            // so the display mode silently reset to dark on every reload.
            Nexus.settings.update('outdoorMode', document.body.classList.contains('outdoor-mode'));
+
+           // FIX (light mode didn't affect the editor): live-reconfigure
+           // the theme Compartment immediately, same pattern as every
+           // other CM6 toggle in this app (see toggleIndentGuides() right
+           // below for the reference version this copies) — previously
+           // oneDark was decided once at construction time, so this class
+           // toggle correctly repainted the chrome/panels/footer via CSS
+           // variables but left an already-open editor's own syntax
+           // highlighting on whatever theme it booted with until the next
+           // file switch or reload.
+           if (Nexus.editorCore.isCM6 && Nexus.editorCore.view && Nexus.editorCore.themeCompartment && Nexus.editorCore.modules && Nexus.editorCore.modules.oneDark) {
+               const wantsDark = !document.body.classList.contains('outdoor-mode');
+               Nexus.editorCore.view.dispatch({
+                   effects: Nexus.editorCore.themeCompartment.reconfigure(wantsDark ? [Nexus.editorCore.modules.oneDark] : [])
+               });
+           }
        },
 
        toggleIndentGuides() {
@@ -12113,6 +12383,77 @@ let saveDelayTimer = null;
 let visualResetTimer = null; // New timer to prevent race conditions
 let editorTouchStart = 0;
 let longPressTimer;
+
+// FIX (diagonal scroll drift): touch-action's own CSS values (manipulation,
+// pan-x, pan-y, pan-x pan-y) can only allow or disallow WHOLE axes — there
+// is no touch-action value in the spec that means "allow both, but lock to
+// whichever direction the gesture actually starts in." That's why setting
+// touch-action alone couldn't fix this: any value that keeps both vertical
+// AND horizontal scrolling working at all (needed for long files / long
+// unwrapped lines respectively) also permits scrolling diagonally at the
+// same time, with no way to constrain it further from CSS. Real axis
+// locking needs to detect the gesture's dominant direction in JS and then
+// suppress the other axis for the rest of that same touch, which this
+// does via toggling overflow-x/overflow-y rather than calling
+// preventDefault() + manually driving scrollLeft/scrollTop — overflow
+// toggling lets the browser's own native scroll/momentum physics keep
+// handling the actual scrolling, so this doesn't introduce any jank or
+// lose momentum scrolling to get the lock.
+function lockScrollAxis(el) {
+    if (!el || el._axisLockWired) return;
+    el._axisLockWired = true;
+
+    let startX = 0, startY = 0, locked = null;
+    const THRESHOLD = 8; // px of movement before committing to an axis — avoids locking on jitter from a near-stationary touch
+
+    el.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return; // pinch-zoom etc. — leave multi-touch alone entirely
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        locked = null;
+    }, { passive: true });
+
+    el.addEventListener('touchmove', (e) => {
+        if (e.touches.length !== 1) return;
+        if (locked) return; // already committed for this gesture — nothing more to decide
+        const dx = Math.abs(e.touches[0].clientX - startX);
+        const dy = Math.abs(e.touches[0].clientY - startY);
+        if (dx < THRESHOLD && dy < THRESHOLD) return; // not enough movement yet to tell direction
+
+        locked = dx > dy ? 'x' : 'y';
+        // Suppress the OTHER axis for the rest of this gesture by
+        // collapsing its overflow — the browser then has nothing to
+        // scroll on that axis, which is what actually stops diagonal
+        // drift without touching the axis that's supposed to keep moving.
+        el.style.overflowX = locked === 'x' ? 'auto' : 'hidden';
+        el.style.overflowY = locked === 'y' ? 'auto' : 'hidden';
+    }, { passive: true });
+
+    const release = () => {
+        locked = null;
+        // Restore both axes once the touch ends, so the NEXT gesture (or
+        // a mouse wheel, or a keyboard-driven scroll) isn't left
+        // permanently locked to whatever direction the last touch happened
+        // to be.
+        el.style.overflowX = '';
+        el.style.overflowY = '';
+    };
+    el.addEventListener('touchend', release, { passive: true });
+    el.addEventListener('touchcancel', release, { passive: true });
+}
+
+lockScrollAxis(editor);
+// CM6's real scrolling element is view.scrollDOM, not the outer container
+// (#cm6Container itself doesn't scroll — CM6 renders its own internal
+// .cm-scroller and that's what actually has overflow:auto) — wired
+// whenever the CM6 view exists, called again after every engine swap
+// since a fresh view means a fresh scrollDOM element to wire.
+function wireCM6ScrollLock() {
+    if (Nexus.editorCore && Nexus.editorCore.view && Nexus.editorCore.view.scrollDOM) {
+        lockScrollAxis(Nexus.editorCore.view.scrollDOM);
+    }
+}
+wireCM6ScrollLock();
 
 editor.addEventListener('touchstart', (e) => {
     // Give the browser a split second to update cursor position from the touch
