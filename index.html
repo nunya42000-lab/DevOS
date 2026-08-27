@@ -524,6 +524,7 @@
                     <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
                     <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
                 </div>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.idMap.open()" title="Every id used anywhere in the project, grouped and searchable" aria-label="Open ID usage map">🔗 ID USAGE MAP</button>
                 <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.docStats.show()" title="Line, word, character, and byte counts" aria-label="Show document statistics">📊 DOC STATS</button>
             </div>
         </details>
@@ -1221,6 +1222,34 @@
             <div class="modal-body">
                 <div style="font-size:11px; color:var(--text); opacity:0.8; margin-bottom:15px;">Tap a node to instantly warp to that line.</div>
                 <div id="outlineList" style="display:flex; flex-direction:column; gap:8px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ID Usage Map: every id used anywhere in the project (declared in
+         HTML, or referenced via getElementById/querySelector/CSS #selector/
+         label-for/anchor-href from any file), one accordion per id,
+         expanding to every file+line it appears in. Scoped to the whole
+         Vfs, not just the active file — the point is seeing an id's full
+         footprint across the project at once. -->
+    <div id="modalIdMap" class="modal-overlay">
+        <div class="modal-content">
+            <div class="p-head"><span>🔗 ID USAGE MAP</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('id-map')">&times;</button></div>
+            <div class="modal-body" style="display:flex; flex-direction:column; overflow:hidden;">
+                <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px; flex-shrink:0;">
+                    <input type="text" id="idMapFilter" class="sleek-input" placeholder="Filter ids..." style="flex:1;" oninput="Nexus.idMap.render()">
+                    <select id="idMapSort" class="sleek-input" style="flex-shrink:0; width:auto;" onchange="Nexus.idMap.render()">
+                        <option value="alpha">A → Z</option>
+                        <option value="alpha-desc">Z → A</option>
+                        <option value="first-use">Order of First Use</option>
+                        <option value="most-used">Most Referenced</option>
+                        <option value="least-used">Least Referenced</option>
+                        <option value="unused">Unused First (Orphans)</option>
+                        <option value="most-files">Spans Most Files</option>
+                    </select>
+                </div>
+                <div id="idMapSummary" style="font-size:11px; opacity:0.7; margin-bottom:10px; flex-shrink:0;"></div>
+                <div id="idMapList" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
             </div>
         </div>
     </div>

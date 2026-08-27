@@ -7867,6 +7867,159 @@ docStats: {
    }
 },
 
+// Maps every id used anywhere in the project — declared in HTML markup,
+// or referenced from any file via getElementById, querySelector(All),
+// a CSS #selector, a <label for>, or an anchor href="#..." — to every
+// file+line it appears in. One accordion per id; expanding shows the
+// full list. Scoped to the whole Vfs on purpose: the point of this tool
+// is seeing an id's footprint across the entire project in one place,
+// not just the currently-open file.
+idMap: {
+    _cache: null, // { results, firstUseOrder } — rebuilt each time the modal opens, not kept live across edits
+
+    open() {
+        this._cache = this._scan();
+        Nexus.UI.openModal('id-map');
+        this.render();
+    },
+
+    // Regex choices here were verified against real false-positive risks
+    // before shipping, not assumed: hex colors (#ccc, #fff) inside CSS
+    // property VALUES are excluded by requiring the '#' to sit at an
+    // actual selector position (start of file, or right after one of
+    // , { } or a newline) and by rejecting anything immediately followed
+    // by `: <hex digits>` (a color value written right after the id-
+    // shaped word, e.g. accidentally matching part of `#eee}`).
+    _scan() {
+        const results = {}; // id -> { uses: [{file, line, kind}], firstSeen: {file, line} }
+        const fileOrder = Object.keys(Nexus.state.Vfs);
+        let globalOrder = 0;
+
+        const record = (id, file, line, kind) => {
+            if (!id) return;
+            if (!results[id]) results[id] = { uses: [], firstSeen: null, firstOrder: null };
+            results[id].uses.push({ file, line, kind });
+            if (results[id].firstOrder === null) {
+                results[id].firstSeen = { file, line };
+                results[id].firstOrder = globalOrder;
+            }
+            globalOrder++;
+        };
+
+        // Pass 1: declarations — id="..." in HTML files, walked file-by-
+        // file in Vfs key order so "first use" reflects the project's own
+        // file ordering, not scan-pattern order.
+        fileOrder.forEach(file => {
+            const ext = file.split('.').pop().toLowerCase();
+            if (ext !== 'html' && ext !== 'htm') return;
+            const code = Nexus.state.Vfs[file];
+            const re = /\bid\s*=\s*["']([^"']+)["']/g;
+            let m;
+            while ((m = re.exec(code))) {
+                const line = code.slice(0, m.index).split('\n').length;
+                record(m[1], file, line, 'declared');
+            }
+        });
+
+        // Pass 2: references. CSS selector pattern only runs on .css files;
+        // the rest only run on non-.css files (avoids matching a JS
+        // string that happens to contain '#foo' inside e.g. a URL hash).
+        const refPatterns = [
+            { re: /getElementById\(\s*['"]([^'"]+)['"]\s*\)/g, kind: 'getElementById' },
+            { re: /querySelector(?:All)?\(\s*['"]#([A-Za-z_][\w-]*)['"]\s*\)/g, kind: 'querySelector' },
+            { re: /\bfor\s*=\s*["']([^"']+)["']/g, kind: 'label-for' },
+            { re: /href\s*=\s*["']#([^"']+)["']/g, kind: 'anchor-link' },
+        ];
+        const cssPattern = { re: /(?:^|[,{}\n]|\})\s*#([A-Za-z_][\w-]*)\b(?!\s*:\s*[0-9a-fA-F])/gm, kind: 'css-selector' };
+
+        fileOrder.forEach(file => {
+            const code = Nexus.state.Vfs[file];
+            const ext = file.split('.').pop().toLowerCase();
+            const patterns = ext === 'css' ? [cssPattern] : refPatterns;
+            patterns.forEach(({ re, kind }) => {
+                re.lastIndex = 0;
+                let m;
+                while ((m = re.exec(code))) {
+                    // For the css-selector pattern, m.index can point at a
+                    // boundary character that's itself a newline consumed
+                    // by the alternation — anchoring on the actual '#'
+                    // position inside the match avoids undercounting
+                    // lines by one whenever that happens.
+                    const hashOffset = m[0].indexOf('#');
+                    const anchor = hashOffset >= 0 ? m.index + hashOffset : m.index;
+                    const line = code.slice(0, anchor).split('\n').length;
+                    record(m[1], file, line, kind);
+                }
+            });
+        });
+
+        return results;
+    },
+
+    render() {
+        if (!this._cache) return;
+        const filterEl = document.getElementById('idMapFilter');
+        const sortEl = document.getElementById('idMapSort');
+        const filter = (filterEl && filterEl.value || '').toLowerCase().trim();
+        const sortMode = sortEl ? sortEl.value : 'alpha';
+
+        let entries = Object.entries(this._cache)
+            .filter(([id]) => !filter || id.toLowerCase().includes(filter));
+
+        const filesOf = ([, info]) => new Set(info.uses.map(u => u.file)).size;
+
+        switch (sortMode) {
+            case 'alpha': entries.sort((a, b) => a[0].localeCompare(b[0])); break;
+            case 'alpha-desc': entries.sort((a, b) => b[0].localeCompare(a[0])); break;
+            case 'first-use': entries.sort((a, b) => a[1].firstOrder - b[1].firstOrder); break;
+            case 'most-used': entries.sort((a, b) => b[1].uses.length - a[1].uses.length); break;
+            case 'least-used': entries.sort((a, b) => a[1].uses.length - b[1].uses.length); break;
+            case 'unused': entries.sort((a, b) => a[1].uses.length - b[1].uses.length); break; // orphans (1 use = declared only) float to the top
+            case 'most-files': entries.sort((a, b) => filesOf(b) - filesOf(a)); break;
+        }
+
+        const summary = document.getElementById('idMapSummary');
+        if (summary) {
+            const orphanCount = Object.values(this._cache).filter(v => v.uses.length === 1).length;
+            summary.innerText = `${entries.length} id${entries.length === 1 ? '' : 's'} shown` +
+                (filter ? ` (filtered from ${Object.keys(this._cache).length})` : '') +
+                ` — ${orphanCount} declared but never referenced elsewhere`;
+        }
+
+        const list = document.getElementById('idMapList');
+        if (!list) return;
+        if (entries.length === 0) {
+            list.innerHTML = '<div style="text-align:center; opacity:0.6; padding:20px; font-size:12px;">No matching ids.</div>';
+            return;
+        }
+
+        list.innerHTML = entries.map(([id, info], i) => {
+            const isOrphan = info.uses.length === 1;
+            const fileCount = filesOf([, info]);
+            const rowsHtml = info.uses.map(u =>
+                `<div class="item-row" style="cursor:pointer; padding:8px 10px; font-size:11px;" onclick="Nexus.idMap.jumpTo('${u.file.replace(/'/g, "\\'")}', ${u.line})">
+                    <span style="opacity:0.7;">${u.kind}</span>
+                    <span style="margin-left:auto; font-family:monospace;">${u.file}:${u.line}</span>
+                </div>`
+            ).join('');
+
+            return `<details class="diag-section" id="idMapAcc${i}">
+                <summary style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-family:monospace; font-weight:bold; ${isOrphan ? 'color:var(--danger);' : ''}">#${id}</span>
+                    <span style="opacity:0.6; font-size:10px;">${info.uses.length} use${info.uses.length === 1 ? '' : 's'} · ${fileCount} file${fileCount === 1 ? '' : 's'}${isOrphan ? ' · unused' : ''}</span>
+                </summary>
+                <div class="diag-body" style="display:flex; flex-direction:column; gap:4px;">${rowsHtml}</div>
+            </details>`;
+        }).join('');
+    },
+
+    jumpTo(file, line) {
+        Nexus.UI.closeModal('id-map');
+        if (Nexus.state.activeFile !== file) Nexus.Vfs.switchFile(file);
+        Nexus.UI.jumpToLine(line);
+    }
+},
+
              
 graph: {
    analyze() {
