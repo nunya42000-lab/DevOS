@@ -12846,6 +12846,33 @@ const inj = "<scr" + "ipt>\n" +
                status.innerText = "FAULT"; 
            } 
        },
+   // TEMPORARY DIAGNOSTIC — remove once the drawer issue is resolved.
+   // The 🔍/✍️ buttons open nothing, with no flash and no console error,
+   // while the identical call for suggestionsDrawer/navDrawer works. The
+   // JS path has been verified correct by execution, so this reports the
+   // element's real computed state at tap time to show where it actually
+   // ends up. Called instead of toggleDrawer by those two buttons only.
+   toggleDrawerDebug(id) {
+       this.toggleDrawer(id);
+       const d = document.getElementById(id);
+       if (!d) { alert('DIAG: #' + id + ' does not exist in the DOM.'); return; }
+       const s = getComputedStyle(d);
+       const r = d.getBoundingClientRect();
+       alert(
+           'DIAG for #' + id + '\n\n' +
+           'has .open class: ' + d.classList.contains('open') + '\n' +
+           'transform: ' + s.transform + '\n' +
+           'display: ' + s.display + '\n' +
+           'visibility: ' + s.visibility + '\n' +
+           'opacity: ' + s.opacity + '\n' +
+           'z-index: ' + s.zIndex + '\n' +
+           'position: ' + s.position + '\n\n' +
+           'RECT left: ' + Math.round(r.left) + '  top: ' + Math.round(r.top) + '\n' +
+           'RECT width: ' + Math.round(r.width) + '  height: ' + Math.round(r.height) + '\n\n' +
+           'screen: ' + window.innerWidth + ' x ' + window.innerHeight
+       );
+   },
+
 toggleDrawer(id) {
     // Close other drawers automatically so they don't overlap.
     document.querySelectorAll('.transform-drawer').forEach(el => {

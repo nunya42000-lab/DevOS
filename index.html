@@ -253,7 +253,7 @@
     </div>
 
 
-<div id="searchDrawer" class="transform-drawer" style="width: 280px;">
+<div id="searchDrawer" class="transform-drawer" style="width: 280px; z-index: 8700;">
     <div style="display:flex; flex-direction:column; gap:6px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
             <span style="font-size:10px; color:var(--accent); font-weight:bold;">FIND & REPLACE</span>
@@ -279,7 +279,7 @@
     </div>
 </div>
 
-<div id="writerDrawer" class="transform-drawer" style="width: 260px;">
+<div id="writerDrawer" class="transform-drawer" style="width: 260px; z-index: 8700;">
      <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
          <span style="font-size:10px; color:var(--gold); font-weight:bold;">BOILERPLATE ARCHITECT</span>
          <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.UI.toggleDrawer('writerDrawer')">&times;</span>
@@ -1497,8 +1497,8 @@
      the group BEFORE this one instead (margin-right), which closes the
      same gap without moving this container's buttons under anything. -->
 <div id="ribbonDrawerControls" style="display: flex; gap: 6px; padding-right: 6px; align-items: center;">
-    <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('searchDrawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);" title="Find &amp; Replace" aria-label="Open find and replace">🔍</button>
-    <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('writerDrawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);" title="Boilerplate Architect" aria-label="Open boilerplate snippet writer">✍️</button>
+    <button class="sleek-btn" onclick="Nexus.UI.toggleDrawerDebug('searchDrawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);" title="Find &amp; Replace" aria-label="Open find and replace">🔍</button>
+    <button class="sleek-btn" onclick="Nexus.UI.toggleDrawerDebug('writerDrawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);" title="Boilerplate Architect" aria-label="Open boilerplate snippet writer">✍️</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleSlide('shell')" title="Command Shell" aria-label="Toggle command shell">⌨️</button>
     <button class="sleek-btn" onclick="Nexus.Terminal.toggle()" title="Terminal" aria-label="Toggle terminal">📟</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleWidget('utilityBar')" title="Utility Bar" aria-label="Toggle utility bar">🛠️</button>
