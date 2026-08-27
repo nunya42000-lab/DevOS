@@ -194,19 +194,19 @@
         <button onclick="Nexus.toggleEditor(); Nexus.UI.syncRibbonMenu()">🔄 Swap Editor Engine</button>
         <button onclick="Nexus.UI.toggleSun()">☀️ Light/Dark Mode</button>
         <div class="ribbon-dropdown-divider"></div>
-        <button id="ribbonMenuIndentGuides" onclick="Nexus.UI.toggleIndentGuides(); Nexus.UI.syncRibbonMenu()">📏 Indent Guides</button>
-        <button id="ribbonMenuWordWrap" onclick="Nexus.UI.toggleWordWrap(); Nexus.UI.syncRibbonMenu()">↩️ Word Wrap</button>
-        <button id="ribbonMenuWhitespace" onclick="Nexus.UI.toggleShowWhitespace(); Nexus.UI.syncRibbonMenu()">␣ Show Whitespace</button>
-        <button id="ribbonMenuBracketTracing" onclick="Nexus.UI.toggleBracketTracing(); Nexus.UI.syncRibbonMenu()" title="Highlights a bracket's matching pair whenever your cursor sits next to one — no visible effect elsewhere">{ } Bracket Match Highlight</button>
-        <button id="ribbonMenuChangeGutter" onclick="Nexus.UI.toggleChangeGutter(); Nexus.UI.syncRibbonMenu()">📊 Change Gutter</button>
-        <button id="ribbonMenuStickyScroll" onclick="Nexus.UI.toggleStickyScroll(); Nexus.UI.syncRibbonMenu()">📌 Sticky Scope Headers</button>
-        <button id="ribbonMenuMinimap" onclick="Nexus.UI.toggleMinimap(); Nexus.UI.syncRibbonMenu()">🗺️ Minimap</button>
-        <button id="ribbonMenuLint" onclick="Nexus.UI.toggleLint(); Nexus.UI.syncRibbonMenu()">🩺 Inline Lint</button>
-        <button id="ribbonMenuAutocomplete" onclick="Nexus.UI.toggleAutocomplete(); Nexus.UI.syncRibbonMenu()">💡 Autocomplete</button>
+        <button id="ribbonMenuIndentGuides" onclick="Nexus.UI.toggleIndentGuides(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">📏 Indent Guides</span><span class="rd-subtext">Faint vertical lines through each indent level, for tracking nested blocks.</span></button>
+        <button id="ribbonMenuWordWrap" onclick="Nexus.UI.toggleWordWrap(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">↩️ Word Wrap</span><span class="rd-subtext">Long lines wrap to fit the screen instead of scrolling sideways.</span></button>
+        <button id="ribbonMenuWhitespace" onclick="Nexus.UI.toggleShowWhitespace(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">␣ Show Whitespace</span><span class="rd-subtext">Shows dots for spaces and arrows for tabs — useful for spotting mixed indentation.</span></button>
+        <button id="ribbonMenuBracketTracing" onclick="Nexus.UI.toggleBracketTracing(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">{ } Bracket Match Highlight</span><span class="rd-subtext">Highlights a bracket's matching pair — but ONLY while your cursor is sitting directly next to a bracket. No effect anywhere else.</span></button>
+        <button id="ribbonMenuChangeGutter" onclick="Nexus.UI.toggleChangeGutter(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">📊 Change Gutter</span><span class="rd-subtext">A thin green/red bar in the left margin marking lines that differ from your last save — clears once you save.</span></button>
+        <button id="ribbonMenuStickyScroll" onclick="Nexus.UI.toggleStickyScroll(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">📌 Sticky Scope Headers</span><span class="rd-subtext">Pins the current function/block's opening line to the top while you scroll through its body.</span></button>
+        <button id="ribbonMenuMinimap" onclick="Nexus.UI.toggleMinimap(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">🗺️ Minimap</span><span class="rd-subtext">A zoomed-out map of the whole file on the right edge, for jumping around fast.</span></button>
+        <button id="ribbonMenuLint" onclick="Nexus.UI.toggleLint(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">🩺 Inline Lint</span><span class="rd-subtext">Underlines syntax problems directly in the editor as you type.</span></button>
+        <button id="ribbonMenuAutocomplete" onclick="Nexus.UI.toggleAutocomplete(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">💡 Autocomplete</span><span class="rd-subtext">Suggests completions while typing — changes typing behavior, off by default.</span></button>
         <div class="ribbon-dropdown-divider"></div>
         <button onclick="Nexus.UI.toggleSidebar('right')">🧰 Diagnostics Hub</button>
         <button id="ribbonMenuBookmark" onclick="Nexus.UI.toggleBookmarkHere(); Nexus.UI.syncRibbonMenu()">🔖 Bookmark Line</button>
-        <button id="ribbonMenuBookmarkingEnabled" onclick="Nexus.UI.toggleBookmarkingEnabled(); Nexus.UI.syncRibbonMenu()">🔖 Bookmarking Enabled</button>
+        <button id="ribbonMenuBookmarkingEnabled" onclick="Nexus.UI.toggleBookmarkingEnabled(); Nexus.UI.syncRibbonMenu()" class="has-subtext"><span class="rd-label-row">🔖 Bookmarking Enabled</span><span class="rd-subtext">Off = tapping Bookmark Line or the editor's gutter margin does nothing, on either engine.</span></button>
         <button onclick="Nexus.UI.openBookmarksPanel()">📑 All Bookmarks</button>
         <div class="ribbon-dropdown-divider"></div>
         <button onclick="Nexus.UI.openModal('manual'); Nexus.UI.toggleRibbonMenu()">❓ Help</button>

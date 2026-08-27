@@ -4365,7 +4365,26 @@ Sentinel : {
        sortLines() {
            if (!Nexus.state.activeFile) return this.log("[SORT LINES] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[SORT LINES] EDITOR LOCKED. Cannot modify.", "danger");
-           const { text, from, to } = this.getSelectionRange();
+           // FIX (real, destructive bug): getSelectionRange() falls back
+           // to the ENTIRE file when nothing is selected — which is the
+           // normal, default state most of the time. A plain alphabetical
+           // line sort has no awareness of code structure at all: braces
+           // get separated from their statements, if/else bodies scatter,
+           // closing brackets end up anywhere — sorting a whole source
+           // file this way is guaranteed to destroy it. That's not a
+           // narrow edge case, it's what happens on ordinary use with
+           // nothing selected, which is exactly "wrecks everything I try
+           // it on." Alphabetizing is only sound for genuinely line-based
+           // content the person has deliberately chosen (a CSS property
+           // block, an import list, a plain text list) — never assumed
+           // implicitly across a whole file. Requiring a real selection
+           // makes the destructive case something you have to opt into,
+           // not something that happens by default.
+           const sel = this.getSelectionRange();
+           if (!sel.hasSelection) {
+               return this.log("[SORT LINES] Select the specific lines to sort first — sorting an entire file alphabetically will scramble its structure. Highlight just the lines you want reordered (e.g. a CSS block or an import list), then run this again.", "warn");
+           }
+           const { text, from, to } = sel;
            if (!text) return;
            const hadTrailingNewline = text.endsWith('\n');
            let lines = text.split('\n');
@@ -5556,6 +5575,24 @@ try {
     });
 
     function toggleBookmarkAt(view, pos) {
+        // FIX (real bug — this is why the enable/disable toggle didn't
+        // actually stop bookmarking): the guard I added last turn was on
+        // toggleBookmarkHere() only, which is one of TWO ways to place a
+        // bookmark — the gutter itself has its own separate, direct
+        // mousedown handler (right below, in bookmarkGutter's
+        // domEventHandlers) that called toggleBookmarkAt() straight
+        // through, bypassing that check entirely. Tapping the gutter
+        // margin next to a line number placed a bookmark regardless of
+        // what the dropdown toggle said. Gating it HERE instead — the one
+        // real choke point every bookmark placement actually goes
+        // through, both existing call sites and any future one — instead
+        // of needing to remember to re-check the preference at every
+        // place that might eventually call this.
+        if (Nexus.state.prefs.bookmarkingEnabled === false) {
+            const st = document.getElementById('footStatus');
+            if (st) { st.innerText = "BOOKMARKING DISABLED"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
+            return;
+        }
         const line = view.state.doc.lineAt(pos);
         let hasBookmark = false;
         view.state.field(bookmarkState).between(line.from, line.from, () => { hasBookmark = true; });
@@ -9530,6 +9567,29 @@ UI: {
     // Inside Nexus.UI
     async boot() { 
     
+        // FIX (real, previously-undiscovered bug — every saved preference
+        // was silently destroyed on every boot, not just the engine
+        // choice): settings.boot() — the thing that actually loads the
+        // real saved Nexus.state.prefs from storage — used to run AFTER
+        // Vfs.boot(). But Vfs.boot() calls switchFile() internally, and
+        // switchFile() calls setEditMode(Nexus.state.prefs.editMode ||
+        // 'util') unconditionally — which in turn calls
+        // settings.update(), which persists the ENTIRE current prefs
+        // object back to storage. Since this ran before settings.boot()
+        // had loaded anything, prefs was still sitting at hardcoded
+        // defaults at that exact moment — so this write overwrote every
+        // real saved preference (activeEngine, editMode, everything) with
+        // defaults, moments before settings.boot() would have correctly
+        // restored them. By the time settings.boot() ran, the real save
+        // was already gone. Confirmed directly: seeded storage with
+        // activeEngine:'cm6', watched the actual write during Vfs.boot(),
+        // and captured it writing 'vanilla' back to storage before
+        // settings.boot() ever got a chance to read the real value.
+        // Moving settings.boot() first means Nexus.state.prefs is
+        // genuinely hydrated with real saved values before ANYTHING else
+        // in boot can read from or re-persist it.
+        if (Nexus.settings && typeof Nexus.settings.boot === 'function') await Nexus.settings.boot();
+
         // FIX: Manually ignite the UI engines for ribbon and swipes
         if (typeof this.initSubSystems === 'function') this.initSubSystems();
         if (typeof this.updateWidgets === 'function') this.updateWidgets();
@@ -9544,17 +9604,16 @@ UI: {
         // 2. Safe Guarded Module Cascade
         if (Nexus.vault && typeof Nexus.vault.boot === 'function') await Nexus.vault.boot(); 
         if (Nexus.snapshots && typeof Nexus.snapshots.boot === 'function') await Nexus.snapshots.boot(); 
-        if (Nexus.settings && typeof Nexus.settings.boot === 'function') await Nexus.settings.boot(); 
 
-        // FIX: the initial initSubSystems()/updateWidgets() calls above ran
-        // before settings.boot() had restored the real saved prefs (widget
-        // visibility, utility bar layout), so they rendered/applied only the
-        // hardcoded defaults every single time — the saved values were
-        // sitting correctly in storage the whole time, just never re-applied
-        // to the screen once loaded. Do it again now that they're in.
-        if (typeof this.updateWidgets === 'function') this.updateWidgets();
-        if (typeof this.renderUtilBar === 'function') this.renderUtilBar();
-        if (typeof this.renderUtilMirror === 'function') this.renderUtilMirror();
+        // The second updateWidgets()/renderUtilBar()/renderUtilMirror()
+        // call that used to sit here is no longer needed: it existed
+        // specifically because settings.boot() used to run AFTER Vfs.boot,
+        // so the first calls up top only ever saw hardcoded defaults and
+        // needed a repeat once the real prefs were in. Now that
+        // settings.boot() runs first (see this function's own opening
+        // comment for why), the very first initSubSystems()/
+        // updateWidgets() call already has the real saved values —
+        // calling them again here was harmless but redundant.
         
         // 3. Engine Initializations
         if (Nexus.DpadEngine && typeof Nexus.DpadEngine.init === 'function') Nexus.DpadEngine.init();
@@ -12902,17 +12961,12 @@ initInfiniteRibbon() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Bookmarks require the CM6 Engine — switch engines first (🔄 in the top bar).");
            }
-           // Real disable switch, not just "move the button somewhere less
-           // convenient" — Nexus.state.prefs.bookmarkingEnabled, toggled
-           // from the dropdown (toggleBookmarkingEnabled below). While
-           // off, this button is a genuine no-op instead of still placing
-           // a bookmark, which is what "stop accidental bookmarks" needs
-           // to actually mean.
-           if (Nexus.state.prefs.bookmarkingEnabled === false) {
-               const st = document.getElementById('footStatus');
-               if (st) { st.innerText = "BOOKMARKING DISABLED"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
-               return;
-           }
+           // The actual enable/disable check now lives inside
+           // toggleBookmarkAt() itself (editorCore's shared function,
+           // near the bookmarkGutter setup) — the one real choke point
+           // BOTH this button and the gutter's own direct tap handler go
+           // through. Keeping a second copy of the same check here would
+           // just be two messages that could quietly drift apart later.
            const view = Nexus.editorCore.view;
            const pos = view.state.selection.main.head;
            Nexus.editorCore.toggleBookmarkAt(view, pos);
