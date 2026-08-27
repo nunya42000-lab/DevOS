@@ -138,7 +138,18 @@ window.Nexus = {
            indentGuides: true
        },
        searchOpts: { case: false, regex: false, global: false },
-       widgets: { 'utilityBar': false, 'kb-monolith': false, 'search-bar': false, 'writer-bar': false, 'nexus-dpad': false }
+       // FIX: these four keys were stale kebab-case leftovers from before a
+       // camelCase rename pass — 'kb-monolith', 'search-bar', 'writer-bar'
+       // and 'nexus-dpad' match NO element in index.html (the real ones are
+       // searchDrawer / writerDrawer / nexusDpad, and the old kb-monolith
+       // element doesn't exist at all anymore; the footer is #nexusDock).
+       // Every widget-visibility lookup keyed off these silently found
+       // nothing and did nothing — saved visibility preferences for these
+       // widgets could never actually be applied or restored. Verified by
+       // running the real boot sequence against a DOM that returns null for
+       // IDs genuinely absent from index.html, which surfaced exactly these
+       // four as phantom lookups.
+       widgets: { 'utilityBar': false, 'searchDrawer': false, 'writerDrawer': false, 'nexusDpad': false }
    },
 compiler: {
     // Translates your mobile macros into executable code
@@ -9151,7 +9162,16 @@ toggleKeyboardRows() {
 
 
    toggleSnap(id) {
+       // FIX: `el.dataset` on the next line was completely unguarded — a
+       // missing element (a renamed/removed ID, a stale caller) made this
+       // throw "Cannot read properties of null", and since this runs from
+       // a tap handler it would surface as a dead-feeling UI rather than
+       // anything obviously diagnosable.
        const el = document.getElementById(id); 
+       if (!el) {
+           console.error(`toggleSnap: no element with id '${id}' — ignoring.`);
+           return;
+       }
        const isSnapped = el.dataset.snapped === 'true';
        
        el.style.transition = 'all 0.4s cubic-bezier(0.19, 1, 0.22, 1)';
@@ -9184,7 +9204,13 @@ toggleKeyboardRows() {
    },
 
    initDrag(e, id) {
+       // Same unguarded-null fix as toggleSnap above — el.dataset here had
+       // no null check either.
        const el = document.getElementById(id);
+       if (!el) {
+           console.error(`initDrag: no element with id '${id}' — ignoring.`);
+           return;
+       }
        if (el.dataset.snapped === 'true') return;
        
        const isTouch = e.type && e.type.indexOf('touch') === 0;
@@ -10021,8 +10047,15 @@ insertUUID() {
            }
        },
 
+       // NOTE: both of these are currently orphaned — nothing calls either
+       // one, and neither #widgetDropMenu nor #formatDropMenu exists in
+       // index.html anymore (leftovers from a removed dropdown UI). Kept
+       // rather than deleted since that's a call about intent, but guarded
+       // so they can't throw an unguarded null deref if something wires
+       // them back up before the markup is restored.
        toggleWidgetDrop(e) {
        const menu = document.getElementById('widgetDropMenu');
+       if (!menu) { console.error("toggleWidgetDrop: #widgetDropMenu does not exist."); return; }
        const rect = e.target.getBoundingClientRect();
        menu.style.left = rect.left + 'px';
        menu.classList.toggle('active');
@@ -10035,6 +10068,7 @@ insertUUID() {
    },
        toggleFormatDrop(e) {
        const menu = document.getElementById('formatDropMenu');
+       if (!menu) { console.error("toggleFormatDrop: #formatDropMenu does not exist."); return; }
        const rect = e.target.getBoundingClientRect();
        menu.style.left = rect.left + 'px';
        menu.classList.toggle('active');
