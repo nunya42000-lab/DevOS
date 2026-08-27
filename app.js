@@ -1410,7 +1410,16 @@ _detectMissingImports(srcCode) {
     // same detector) already lists dependencies via this broader pattern;
     // narrower matching here would silently disagree with what that log
     // view shows for anything that isn't a <script>/<link> tag.
-    const importRegex = /(?:import\s+.*?from\s+['"]([^'"]+)['"])|(?:require\(['"]([^'"]+)['"]\))|(?:\bsrc=['"]([^'"]+)['"])|(?:\bhref=['"]([^'"]+)['"])/g;
+    // AUDIT FIX: the import branch previously required `from` —
+    // /import\s+.*?from\s+['"]...['"]/ — so a bare side-effect import
+    // (`import './polyfill.js';`, with no binding and no `from`) never
+    // matched at all. That's an extremely common form (CSS imports,
+    // polyfills, modules imported purely to register themselves), and the
+    // tool silently reported "everything resolves" while never having
+    // looked at them — the worst failure mode for a diagnostic. Making
+    // the `<bindings> from` portion optional catches both, verified
+    // against all 8 real import/require/src/href forms.
+    const importRegex = /(?:import\s+(?:[^'"();]*?\sfrom\s+)?['"]([^'"]+)['"])|(?:require\(\s*['"]([^'"]+)['"]\s*\))|(?:\bsrc=['"]([^'"]+)['"])|(?:\bhref=['"]([^'"]+)['"])/g;
     const seen = new Set();
     const missing = [];
     let m;
@@ -12611,31 +12620,71 @@ jumpToLine(lineNumber, colNumber) {
        return;
    }
    
-   // 2. Map the entire Vfs to temporary Blob URLs
+   // 2. Map the entire Vfs to temporary Blob URLs.
+   // MIME types matter here: a blob served as text/plain won't execute as a
+   // module, won't apply as a stylesheet, and won't render as an image, so
+   // every type the sandbox might reference needs a correct one — not just
+   // the three code types. Images/fonts/JSON referenced from HTML (icons,
+   // manifests, assets) previously all fell through to text/plain and
+   // silently failed to load.
+   const MIME = {
+       js: 'application/javascript', mjs: 'application/javascript',
+       css: 'text/css', html: 'text/html', htm: 'text/html',
+       json: 'application/json', webmanifest: 'application/manifest+json',
+       svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg',
+       jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp',
+       ico: 'image/x-icon', woff: 'font/woff', woff2: 'font/woff2',
+       ttf: 'font/ttf', otf: 'font/otf', txt: 'text/plain', md: 'text/markdown'
+   };
    const VfsMap = {};
    Object.entries(Nexus.state.Vfs).forEach(([name, content]) => {
        const ext = name.split('.').pop().toLowerCase();
-       let type = 'text/plain';
-       if (ext === 'js') type = 'application/javascript';
-       else if (ext === 'css') type = 'text/css';
-       else if (ext === 'html') type = 'text/html';
-       
+       const type = MIME[ext] || 'text/plain';
        const blob = new Blob([content], { type });
        const url = URL.createObjectURL(blob);
        VfsMap[name] = url;
        this.sandboxBlobs.push(url);
    });
 
-   // 3. Virtualization Regex: Re-routes imports/links to the Blob Map
+   // Resolve a referenced path against the Vfs, tolerating the ways the
+   // same file gets written in real projects: "app.js", "./app.js",
+   // "/app.js", and "js/app.js" when only "app.js" exists (and vice
+   // versa). Returns the real Vfs key, or null.
+   const resolveRef = (ref) => {
+       if (!ref) return null;
+       const clean = ref.split('?')[0].split('#')[0].replace(/^\.\//, '').replace(/^\//, '');
+       if (Nexus.state.Vfs[clean] !== undefined) return clean;
+       const base = clean.split('/').pop();
+       return Object.keys(Nexus.state.Vfs).find(k => k === base || k.endsWith('/' + base)) || null;
+   };
+
+   // 3. Virtualization: re-route any local reference to its Blob URL.
+   // Now resolution-aware (via resolveRef) instead of only matching exact
+   // filenames, so "js/app.js" style paths resolve too.
    const virtualize = (code) => {
-       let processed = code;
-       Object.keys(VfsMap).forEach(filename => {
-           // Matches: "file.js", "./file.js", and "/file.js" within quotes
-           const escapedName = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-           const regex = new RegExp(`(['"])(?:\\.\\/|\\/)?${escapedName}(['"])`, 'g');
-           processed = processed.replace(regex, `$1${VfsMap[filename]}$2`);
+       return code.replace(/(['"])([^'"\n]+?)\1/g, (whole, q, ref) => {
+           if (/^(?:https?:|data:|blob:|#|mailto:|tel:)/i.test(ref)) return whole;
+           const hit = resolveRef(ref);
+           return hit ? `${q}${VfsMap[hit]}${q}` : whole;
        });
-       return processed;
+   };
+
+   // Inline a CSS file's contents, recursively resolving its own @import
+   // statements against the project. Without this, a stylesheet that
+   // itself @imports another project file left that nested import pointing
+   // at an unresolvable relative path — the imported rules silently never
+   // applied. Depth-capped and cycle-guarded so a self-referencing or
+   // mutually-importing pair can't spin forever.
+   const inlineCss = (cssName, seen = new Set()) => {
+       if (seen.has(cssName) || seen.size > 20) return '';
+       seen.add(cssName);
+       let css = Nexus.state.Vfs[cssName] || '';
+       css = css.replace(/@import\s+(?:url\(\s*)?['"]?([^'")\s;]+)['"]?\s*\)?\s*;/gi, (whole, ref) => {
+           if (/^(?:https?:|data:)/i.test(ref)) return whole; // leave real remote imports alone
+           const hit = resolveRef(ref);
+           return hit ? `\n/* inlined: ${hit} */\n` + inlineCss(hit, seen) : whole;
+       });
+       return css;
    };
 
    // 5. Entry-point resolution: "Play" means run the PROJECT. If the file
@@ -12666,6 +12715,22 @@ const inj = "<scr" + "ipt>\n" +
     "};\n" +
     "console.log = (...args) => send(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#3fb950');\n" +
     "console.error = (...args) => send('[ERR] ' + args.join(' '), '#f85149');\n" +
+    // Service workers cannot register from a srcdoc iframe — the document
+    // has an opaque origin, so the browser rejects it unconditionally. For
+    // a PWA that means every single preview run would throw a confusing
+    // SecurityError that looks like a bug in the user's own code. Shim it
+    // to report clearly what happened instead, so the rest of the app
+    // still previews normally rather than dying at the registration call.
+    "if (navigator.serviceWorker) {\n" +
+        "try {\n" +
+            "Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {\n" +
+                "register: () => { send('[sandbox] serviceWorker.register() skipped — service workers cannot run in a preview frame. Your real deployment is unaffected.', '#d29922'); return Promise.resolve({ scope: '(sandbox)', update(){}, unregister(){ return Promise.resolve(true); } }); },\n" +
+                "getRegistration: () => Promise.resolve(undefined),\n" +
+                "getRegistrations: () => Promise.resolve([]),\n" +
+                "addEventListener: () => {}, removeEventListener: () => {}, controller: null, ready: new Promise(() => {})\n" +
+            "} });\n" +
+        "} catch (swErr) {}\n" +
+    "}\n" +
     "window.onerror = (msg, url, ln, col, err) => {\n" +
         "send('Crash at line ' + ln + ': ' + msg, '#f85149');\n" +
         "try {\n" +
@@ -12683,27 +12748,57 @@ const inj = "<scr" + "ipt>\n" +
 
    // 6. Final Assembly & Injection
    if (activeExt === 'html') {
-       // Directly inline any locally-referenced <link rel="stylesheet"> and
-       // <script src="..."> that point at another file in this project,
-       // instead of rewriting them to blob: URLs. This guarantees the linked
-       // CSS/JS actually renders — no dependency on how a given browser
-       // handles blob: URL fetches from inside a srcdoc document, which
-       // isn't something worth staking "does my CSS load" on.
        let htmlCode = activeCode;
+
+       // Inline locally-referenced <link rel="stylesheet"> and <script src>
+       // rather than rewriting them to blob: URLs — this guarantees they
+       // actually apply, without depending on how a given browser handles
+       // blob: fetches from inside a srcdoc document.
+       //
+       // Three real multi-file bugs fixed here, all found by running an
+       // actual PWA project through this:
+       //   1. type="module" was DROPPED when inlining a script — the old
+       //      pattern only captured attributes around `src` and rebuilt the
+       //      tag without them in the right place, so any module script
+       //      became a classic script and every `import` inside it became
+       //      an instant syntax error.
+       //   2. An inlined script's OWN imports were never resolved, so a
+       //      dependency chain (index.html -> app.js -> helper.js) silently
+       //      lost everything past the first hop — helper.js never appeared
+       //      in the output at all.
+       //   3. Nested @import inside an inlined stylesheet was left pointing
+       //      at an unresolvable relative path.
        Object.keys(VfsMap).forEach(filename => {
            if (filename === entryFile) return; // don't inline the file into itself
            const ext = filename.split('.').pop().toLowerCase();
            const escapedName = filename.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+           const pathPat = `(?:\\.\\/|\\/)?${escapedName}`;
 
            if (ext === 'css') {
-               const linkRe = new RegExp(`<link\\b[^>]*href=(['"])(?:\\.\\/|\\/)?${escapedName}\\1[^>]*>`, 'gi');
-               htmlCode = htmlCode.replace(linkRe, `<style>\n${Nexus.state.Vfs[filename]}\n</style>`);
-           } else if (ext === 'js') {
-               const scriptRe = new RegExp(`<script\\b([^>]*)src=(['"])(?:\\.\\/|\\/)?${escapedName}\\2([^>]*)><\\/script>`, 'gi');
-               const safeJs = Nexus.state.Vfs[filename].replace(/<\/script>/gi, '<\\/script>');
-               htmlCode = htmlCode.replace(scriptRe, (m, before, q, after) => `<script${before}${after}>\n${safeJs}\n<\/script>`);
+               const linkRe = new RegExp(`<link\\b[^>]*href=(['"])${pathPat}\\1[^>]*>`, 'gi');
+               htmlCode = htmlCode.replace(linkRe, () => `<style>\n${inlineCss(filename)}\n</style>`);
+           } else if (ext === 'js' || ext === 'mjs') {
+               // Capture the whole tag so every attribute (type="module",
+               // defer, async) survives; only `src` is stripped out.
+               const scriptRe = new RegExp(`<script\\b([^>]*?)\\ssrc=(['"])${pathPat}\\2([^>]*)>\\s*<\\/script>`, 'gi');
+               htmlCode = htmlCode.replace(scriptRe, (m, before, q, after) => {
+                   const attrs = `${before || ''}${after || ''}`.replace(/\s+/g, ' ').trim();
+                   // Resolve this script's own imports to blob URLs so its
+                   // dependencies load instead of dying on a bare path.
+                   const body = virtualize(Nexus.state.Vfs[filename] || '')
+                       .replace(/<\/script>/gi, '<\\/script>');
+                   return `<script${attrs ? ' ' + attrs : ''}>\n${body}\n<\/script>`;
+               });
            }
        });
+
+       // Any remaining local references (images, icons, manifest, fonts,
+       // fetch() targets, and scripts/styles whose tags didn't match the
+       // inline patterns above) get rewritten to their blob URLs, so they
+       // resolve instead of 404ing against a srcdoc document that has no
+       // real base URL at all.
+       htmlCode = virtualize(htmlCode);
+
        // Inject the console interceptor without disturbing doctype-first
        // ordering: prepending it before <!DOCTYPE html> makes the browser
        // ignore the doctype entirely and render the preview in quirks mode.
