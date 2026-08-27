@@ -1293,23 +1293,21 @@
                     </select>
                 </div>
                 <div id="idMapSummary" style="font-size:11px; opacity:0.7; margin-bottom:10px; flex-shrink:0;"></div>
-                <!-- FIX #2 (the first min-height:0 fix on THIS container
-                     wasn't the whole story): every .diag-section child here
-                     is a flex item by virtue of this container's own
-                     display:flex — and flex items default to
-                     flex-shrink:1, meaning the browser is legally allowed
-                     to compress each one below its natural content height
-                     when space is tight. With 243 of them stacked here,
-                     that's exactly what was happening: every single
-                     accordion got compressed toward zero height uniformly,
-                     which is precisely the "243 identical hairline rows,
-                     no visible text" symptom — not a sizing issue on THIS
-                     container (already fixed), but on each ITEM inside it.
-                     flex-shrink:0 on the accordions themselves (below,
-                     inline on the generated markup) is the actual fix —
-                     each one is now guaranteed to render at its real
-                     content height no matter how many siblings exist. -->
-                <div id="idMapList" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
+                <!-- Deliberately a BLOCK scroller, not a flex column.
+                     Two previous attempts to fix the "hundreds of identical
+                     hairline rows, no visible text" bug by patching flex
+                     behaviour (min-height:0 on this box, then flex-shrink:0
+                     on each child) both failed. Flex was never needed here
+                     — this is a plain vertical list — and every flex fix is
+                     a negotiation the browser can still resolve against
+                     you at scale. As a block container, each child simply
+                     takes its own content height; there is no shrink step
+                     that can compress them at all. Spacing comes from each
+                     item's own margin-bottom rather than flex `gap`, which
+                     block layout doesn't apply. min-height:0 stays because
+                     THIS element is still a flex ITEM of .modal-body, which
+                     is what lets flex:1 cap it so overflow-y can scroll. -->
+                <div id="idMapList" style="flex:1; min-height:0; overflow-y:auto; display:block;"></div>
             </div>
         </div>
     </div>

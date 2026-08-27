@@ -4,26 +4,14 @@
 // be a real sibling file rather than inlined (blob:/data: registration is
 // rejected by spec: "Script URL's scheme is not 'http' or 'https'").
 
-// Bumped from v1: index.html was split into three real sibling files
-// (index.html/app.js/styles.css) instead of one monolithic HTML file with
-// inline <style>/<script>. The cache key itself has to change too, not
-// just APP_SHELL's contents — reusing the old CACHE name would mean an
-// already-installed client's existing cache (keyed under 'divide-shell-v1',
-// holding only the old single-file shell) just silently sits there
-// unused/stale rather than being replaced, since caches.open() with an
-// existing name reopens the same store rather than resetting it. The
-// activate handler below already deletes any cache key that isn't the
-// current CACHE constant, so bumping this version string is what actually
-// triggers that cleanup and forces a real re-fetch of the new 3-file shell.
-const CACHE = 'divide-shell-v2';
+// Bumped from v2 -> v3: adding the version-pinned CDN precache list below
+// (see PRECACHE_EXTERNALS) means the cache's actual contents genuinely
+// change on this deploy, not just APP_SHELL's own file list — same
+// reasoning as the v1->v2 bump: reusing an existing cache name reopens the
+// same store rather than resetting it, so a version bump is what actually
+// triggers the activate handler's cleanup and a real re-fetch.
+const CACHE = 'divide-shell-v3';
 
-// Everything needed to boot divIDE with no network. The CDN scripts
-// (CodeMirror deps, localforage, acorn, prettier, etc.) are cached
-// opportunistically on first fetch below rather than listed here up
-// front — pinning ~20 cross-origin esm.sh/jsdelivr/unpkg URLs by hand
-// would silently rot the moment any of those packages ship a new
-// version, so the fetch handler's cache-as-you-go strategy is the
-// version that actually stays correct over time.
 const APP_SHELL = [
   './',
   './index.html',
@@ -36,14 +24,88 @@ const APP_SHELL = [
   './icon-512-maskable.png'
 ];
 
+// Every version-pinned, plain <script src>/<link> CDN dependency this app
+// actually loads — genuinely safe to precache aggressively since a
+// version number baked into the URL itself (e.g. .../3.10.1/jszip.min.js)
+// can never resolve to different content later; there's no staleness risk
+// the way there would be for an unpinned URL. This is the direct answer
+// to "cache all the externals": these 20 requests used to only get cached
+// opportunistically, AFTER first being fetched live over the network —
+// meaning the very first time any given feature was used (Compress,
+// GitHub sync, Terminal, PeerJS sync, etc.), it still had to hit the
+// network cold, with no offline fallback and no protection against a
+// slow/stalling connection on that first use. Precaching them here means
+// they're already local from the moment this service worker's install
+// step finishes, before any of those features are ever touched.
+//
+// Deliberately excludes the CM6/esm.sh imports (codemirror and everything
+// under @codemirror/, @lezer/, @replit/, @fazelstudio/): those resolve
+// through esm.sh's own dynamic dependency-graph resolution at import()
+// time, not a single fixed URL each — esm.sh may redirect, append query
+// params, or serve versioned sub-paths that aren't predictable without
+// live network access to actually observe (confirmed unavailable in the
+// sandbox this was written in). Hardcoding a guessed set of exact URLs
+// for those risks caching the WRONG thing silently, which is worse than
+// the existing cache-on-first-successful-fetch fallback these still rely
+// on instead — an approach that already correctly adapts to however
+// esm.sh actually resolves things, rather than assuming.
+const PRECACHE_EXTERNALS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js',
+  'https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jsdiff/5.1.0/diff.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/acorn/8.11.3/acorn.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/acorn-walk/8.3.2/walk.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-html.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/js-beautify/1.14.7/beautify-css.min.js',
+  'https://unpkg.com/prettier@3.2.5/standalone.js',
+  'https://unpkg.com/prettier@3.2.5/plugins/estree.js',
+  'https://unpkg.com/prettier@3.2.5/plugins/babel.js',
+  'https://unpkg.com/prettier@3.2.5/plugins/html.js',
+  'https://unpkg.com/prettier@3.2.5/plugins/postcss.js',
+  'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js',
+  'https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css',
+  'https://cdn.jsdelivr.net/npm/astring@1.8.1/dist/astring.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/terser/5.31.0/bundle.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js',
+  'https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js'
+];
+
 self.addEventListener('install', (e) => {
   self.skipWaiting();
   e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(APP_SHELL).catch(() => {
-      // A single missing shell file (e.g. this SW served from a path
-      // where index.html has a different name) shouldn't hard-fail
-      // install and leave the app entirely uninstallable offline.
-    }))
+    caches.open(CACHE).then((c) =>
+      // Same-origin shell first, external CDN deps second — both via
+      // individual put() calls rather than one big addAll() across both
+      // lists: addAll() fails ALL-OR-NOTHING (one 404/CORS-blocked
+      // request anywhere in the list aborts the entire install), which
+      // would mean a single unreachable CDN at install time could leave
+      // even the app's own first-party files uncached. Fetching each
+      // external with { mode: 'cors' } explicitly and catching failures
+      // per-request means one blocked/offline CDN just doesn't get
+      // precached (falls back to the existing on-first-use caching) 
+      // instead of taking down the whole install.
+      c.addAll(APP_SHELL)
+        .catch(() => {
+          // A single missing shell file (e.g. this SW served from a path
+          // where index.html has a different name) shouldn't hard-fail
+          // install and leave the app entirely uninstallable offline.
+        })
+        .then(() => Promise.all(
+          PRECACHE_EXTERNALS.map((url) =>
+            fetch(url, { mode: 'cors' })
+              .then((res) => { if (res && res.ok) return c.put(url, res); })
+              .catch(() => {
+                // One CDN being unreachable at install time (offline
+                // first install, a blocked domain, a transient outage)
+                // shouldn't fail the whole precache — that dependency
+                // simply falls back to the fetch handler's existing
+                // cache-on-first-successful-fetch behavior instead.
+              })
+          )
+        ))
+    )
   );
 });
 

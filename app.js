@@ -8400,14 +8400,13 @@ idMap: {
                 </div>`
             ).join('');
 
-            // flex-shrink:0 is the real fix here — see the long comment on
-            // #idMapList's own container in index.html for why every
-            // accordion was rendering as an identical compressed hairline
-            // with no visible text: as a flex item with the default
-            // flex-shrink:1, the browser was legally compressing each one
-            // below its real content height once there were 243 of them
-            // competing for space in the scroll container.
-            return `<details class="diag-section" id="idMapAcc${i}" style="flex-shrink:0;">
+            // margin-bottom (not flex `gap`) because #idMapList is a plain
+            // BLOCK scroller — see its comment in index.html for why flex
+            // was removed here entirely. Block children take their natural
+            // content height with no shrink step, which is what actually
+            // fixed the collapsed-hairline rendering; `gap` simply doesn't
+            // apply in block layout, so spacing has to come from the item.
+            return `<details class="diag-section" id="idMapAcc${i}" style="margin-bottom:6px;">
                 <summary style="display:flex; align-items:center; gap:8px;">
                     <span style="font-family:monospace; font-weight:bold; ${isOrphan ? 'color:var(--danger);' : ''}">#${id}</span>
                     <span style="opacity:0.6; font-size:10px;">${info.uses.length} use${info.uses.length === 1 ? '' : 's'} · ${fileCount} file${fileCount === 1 ? '' : 's'}${isOrphan ? ' · unused' : ''}</span>

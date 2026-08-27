@@ -384,6 +384,15 @@
         text-transform: uppercase;
         letter-spacing: 0.5px;
         user-select: none;
+        /* Hard floor, independent of whatever lays this out. Padding alone
+           defines height only as long as nothing compresses the element —
+           which is exactly what kept going wrong in the ID Usage Map, where
+           hundreds of these collapsed to ~2px hairlines (just their own top
+           and bottom borders touching) with the text squeezed out entirely.
+           A real min-height means the row can't disappear even if some
+           future container reintroduces a shrink step. */
+        min-height: 40px;
+        box-sizing: border-box;
     }
     .diag-section > summary::-webkit-details-marker { display: none; }
     .diag-section > summary::after {
