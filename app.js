@@ -2018,11 +2018,31 @@ setEmptyState() {
         }
 
         // Footer Status Sync. switchFile() only ever runs for a real,
-        // existing file (guarded at the top of this function), and
-        // 'readonly' is now ONLY ever set by setEmptyState() — the
-        // no-file-open display — since the Task 2 edit-mode refactor
-        // removed the old 3-state 'readonly' mode entirely. So this can no
-        // longer actually be "LOCKED" here; it's always Util or Full.
+        // existing file (guarded at the top of this function).
+        //
+        // FIX (real bug — "file opens, editor won't accept input"):
+        // 'readonly' is only ever SET by setEmptyState(), but nothing ever
+        // guaranteed it gets CLEARED again once a real file opens —
+        // switchFile() never called setEditMode() at all before this fix.
+        // Edit-mode restoration only happened once, at boot, via a
+        // one-time setTimeout gated on activeFile — it does not re-run on
+        // every subsequent file switch. So if the app passed through the
+        // empty state even once in a session (deleting the last open
+        // file, closing every tab, or simply the very first boot before
+        // anything loaded) and 'readonly' got set then, it would still be
+        // sitting on #rawTerminal indefinitely — inherited by CM6 on its
+        // own engine-swap sync (which explicitly checks rawEd's readonly
+        // attribute) — for every file opened afterward, no matter how
+        // unrelated. The file would render completely (scrollable,
+        // visible, gutter/status bar all correct) while accepting zero
+        // input, matching exactly "opens but won't accept anything, can
+        // still scroll/move it around." Calling setEditMode() explicitly
+        // here — the same call boot already makes once — guarantees every
+        // single file open resolves the real edit-mode state itself,
+        // instead of trusting that it was already correct from whatever
+        // happened earlier in the session.
+        Nexus.UI.setEditMode(Nexus.state.prefs.editMode || 'util');
+
         const st = document.getElementById('footStatus');
         if (st && (!Nexus.editorCore || !Nexus.editorCore.isCM6)) {
             const ed = document.getElementById('rawTerminal');
