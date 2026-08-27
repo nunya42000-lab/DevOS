@@ -336,9 +336,9 @@
             <span style="font-size:10px; color:var(--accent); font-weight:bold; letter-spacing:1px;">🎮 NAVIGATION</span>
             <span style="color:var(--danger); cursor:pointer; font-size:20px; line-height:1;" onclick="Nexus.UI.toggleDrawer('navDrawer')">&times;</span>
         </div>
-        <div style="display:flex; gap:20px; align-items:center; justify-content:center;">
-            <!-- Diamond: 3x3 grid, arrows on the 4 edge cells, corners empty -->
-            <div style="display:grid; grid-template-columns: repeat(3, 56px); grid-template-rows: repeat(3, 56px); gap:4px;">
+        <div style="display:flex; gap:0; align-items:center; justify-content:center;">
+            <!-- Left 3x3: arrows on the cross positions (2,4,6,8), corners empty -->
+            <div style="display:grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); gap:4px;">
                 <div></div>
                 <button class="sleek-btn dpad-arrow nav-drawer-btn" data-dir="Up" title="Move Up" aria-label="Move cursor up">↑</button>
                 <div></div>
@@ -349,17 +349,32 @@
                 <button class="sleek-btn dpad-arrow nav-drawer-btn" data-dir="Down" title="Move Down" aria-label="Move cursor down">↓</button>
                 <div></div>
             </div>
-            <!-- Square: 2x2 grid, 4 genuinely customizable action slots
-                 (Settings -> Navigation Drawer). Populated by
-                 Nexus.UI.renderNavDrawerButtons() from
-                 Nexus.state.prefs.navDrawerLayout — starts empty/inert in
-                 markup on purpose so there's exactly one place (that
-                 function) deciding each slot's icon/onclick, rather than
-                 static HTML that render() has to overwrite/fight with. -->
-            <div style="display:grid; grid-template-columns: repeat(2, 56px); grid-template-rows: repeat(2, 56px); gap:4px;">
+
+            <!-- Invisible 1x3 divider: one column wide, three rows tall,
+                 matching the grids' own 56px cell size and 4px gap so the
+                 two 3x3 grids stay on a single continuous rhythm rather
+                 than being pushed apart by an arbitrary flex gap. -->
+            <div style="display:grid; grid-template-columns: 24px; grid-template-rows: repeat(3, 46px); gap:4px; margin:0 4px;">
+                <div></div><div></div><div></div>
+            </div>
+
+            <!-- Right 3x3: action slots on the CORNERS (1,3,7,9), cross
+                 positions empty — mirrors the left grid's geometry inverted.
+                 Populated by Nexus.UI.renderNavDrawerButtons() from
+                 Nexus.state.prefs.navDrawerLayout; markup stays inert on
+                 purpose so that function is the single place deciding each
+                 slot's icon/onclick. Slot order follows reading order:
+                 0=top-left(1), 1=top-right(3), 2=bottom-left(7),
+                 3=bottom-right(9). -->
+            <div style="display:grid; grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(3, 46px); gap:4px;">
                 <button id="navDrawerSlot0" class="sleek-btn nav-drawer-btn"></button>
+                <div></div>
                 <button id="navDrawerSlot1" class="sleek-btn nav-drawer-btn"></button>
+                <div></div>
+                <div></div>
+                <div></div>
                 <button id="navDrawerSlot2" class="sleek-btn nav-drawer-btn"></button>
+                <div></div>
                 <button id="navDrawerSlot3" class="sleek-btn nav-drawer-btn"></button>
             </div>
         </div>
@@ -1470,9 +1485,14 @@
             <button id="rowToggleBtn" class="sleek-btn" onclick="Nexus.UI.toggleKeyboardRows()" title="Toggle Keyboard Rows" aria-label="Toggle extra keyboard rows">↕️</button>
         </div>
         
-        <div class="dock-divider"></div>
-        
-<div id="ribbonDrawerControls" style="display: flex; gap: 6px; padding-left: 4px; padding-right: 6px; align-items: center;">
+<!-- The .dock-divider that used to sit here (1px rule + 4px margin each
+     side) plus this container's own padding-left were what put a visible
+     gap between ↕️ and 🔍. Both removed. The remaining separation was
+     .dock-toolbar's own `gap: 8px` between its direct children — cancelled
+     with an equal negative left margin here rather than by changing that
+     gap, since it's shared by every other group in the toolbar and
+     reducing it globally would tighten spacing everywhere else too. -->
+<div id="ribbonDrawerControls" style="display: flex; gap: 6px; margin-left: -8px; padding-right: 6px; align-items: center;">
     <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('searchDrawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);" title="Find &amp; Replace" aria-label="Open find and replace">🔍</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('writerDrawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);" title="Boilerplate Architect" aria-label="Open boilerplate snippet writer">✍️</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleSlide('shell')" title="Command Shell" aria-label="Toggle command shell">⌨️</button>

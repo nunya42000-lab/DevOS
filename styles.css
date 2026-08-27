@@ -789,12 +789,22 @@
        here specifically), since this drawer's whole purpose is easy
        big-target tapping, unlike the dense inline footer dock it's grown
        out of. */
+    /* Sized to match the drawer's grid tracks exactly. Was 56px, which fit
+       the old 3x3 + 2x2 arrangement, but the current 3x3 + divider + 3x3
+       needs 46px to fit a phone: at 56px the drawer measured 448px wide
+       and overflowed every common screen (360/390/412/430). 46px keeps it
+       at ~356px — fits even a 360px screen — while staying above the 44px
+       minimum comfortable touch target. min-width/min-height matter here
+       specifically: leaving them at 56 would force each cell wider than
+       its grid track and blow the layout back out regardless of the
+       track size. */
     .nav-drawer-btn {
-        width: 56px; height: 56px; min-width: 56px; min-height: 56px;
-        font-size: 20px; background: var(--bg); border: 1px solid var(--border);
-        border-radius: 12px;
+        width: 46px; height: 46px; min-width: 46px; min-height: 46px;
+        font-size: 18px; background: var(--bg); border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 0;
     }
-    .nav-drawer-btn#navDrawerSelectLockBtn { font-size: 13px; }
+    .nav-drawer-btn#navDrawerSelectLockBtn { font-size: 11px; }
         
     .sleek-input {
         background: #1e2227; border: 1px solid #3e4451; border-radius: 8px; color: #fff;
