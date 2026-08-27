@@ -28,6 +28,58 @@ try {
     db = { files: inertTable(), contents: inertTable(), vault: inertTable(), history: inertTable() };
 }
 
+// FIX (real freeze source, and this one hits BEFORE any file-open check
+// even runs): every localforage.getItem/setItem call across this whole
+// file (18 of them) had zero timeout — unlike a network fetch, IndexedDB
+// access is normally near-instant, but it CAN genuinely stall under real,
+// documented browser conditions (a stuck transaction, a corrupted
+// database, certain private-browsing/storage-partitioning edge cases
+// where the browser silently never resolves the request rather than
+// rejecting it). Vfs.boot() — the very first thing awaited in the entire
+// app boot sequence, running unconditionally regardless of whether any
+// file is open — does FOUR sequential localforage.getItem() calls before
+// it even reaches the "is there a file to open" check that leads to
+// setEmptyState(). A stall on any one of those four hangs boot itself,
+// before file state is ever determined — which is exactly why this
+// freeze happens with no files open at all, unlike the CM6-import and
+// Night-Cycle freezes fixed earlier (both gated on having a file/JS
+// content to act on).
+//
+// Wraps every localforage call through a single shared, always-timeout-
+// protected function instead of patching all 18 call sites individually
+// by hand (real risk of missing one) — same withTimeout race-against-a-
+// deadline technique already used for the CM6 import chain and GitHub
+// fetches, applied here as one central choke point so nothing new added
+// later can accidentally skip this protection either.
+const STORAGE_TIMEOUT_MS = 8000;
+const safeStorage = {
+    async getItem(key) {
+        try {
+            return await Promise.race([
+                localforage.getItem(key),
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`localforage.getItem('${key}') timed out`)), STORAGE_TIMEOUT_MS))
+            ]);
+        } catch (e) {
+            console.error(`VORTEX STORAGE: getItem('${key}') failed or timed out — continuing with no saved value.`, e);
+            return null; // same shape a genuinely-empty key returns, so every existing "if (saved) ..." check downstream keeps working unchanged
+        }
+    },
+    async setItem(key, value) {
+        try {
+            return await Promise.race([
+                localforage.setItem(key, value),
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`localforage.setItem('${key}') timed out`)), STORAGE_TIMEOUT_MS))
+            ]);
+        } catch (e) {
+            console.error(`VORTEX STORAGE: setItem('${key}') failed or timed out — this save was not persisted.`, e);
+            if (typeof Nexus !== 'undefined' && Nexus.shell && typeof Nexus.shell.out === 'function') {
+                Nexus.shell.out(`⚠️ Save to storage failed for '${key}' — your change may not persist across a reload.`, 'error');
+            }
+            return null;
+        }
+    }
+};
+
 window.Nexus = {
    // MERGED STATE OBJECT
    state: {
@@ -109,6 +161,32 @@ compiler: {
        isLoaded: false,
        view: null,
        modules: {},
+
+       // FIX (the actual "locks up" mechanism): the CM6 boot's 13 dynamic
+       // import() calls (all live esm.sh fetches, no local caching beyond
+       // whatever the service worker/browser HTTP cache happens to hold)
+       // had no timeout at all. A slow or STALLING connection — as
+       // distinct from an outright failed one — never rejects on its own;
+       // fetch() has no built-in timeout, so a connection that opens but
+       // never completes just sits there indefinitely. Promise.all
+       // inherits that same non-resolution: it doesn't reject just
+       // because one of its inputs is slow, it waits for every one of
+       // them to settle, forever if even one never does. This is why the
+       // existing try/catch around this whole boot sequence never caught
+       // anything in that case — a stall was never actually an error to
+       // catch, just a Promise that never finished. Wraps any promise in
+       // a race against a hard deadline, converting "never resolves" into
+       // a real, catchable rejection after a reasonable wait — restoring
+       // the actual point of a try/catch that was already there but had
+       // nothing to catch.
+       withTimeout(promise, ms, label) {
+           let timer;
+           const timeout = new Promise((_, reject) => {
+               timer = setTimeout(() => reject(new Error(`${label || 'Operation'} timed out after ${ms}ms — check your network connection.`)), ms);
+           });
+           return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+       },
+
        // Adds real padding-bottom to .cm-content sized to ~15 rendered
        // lines, so the editor can scroll past the last line of code
        // instead of pinning it to the bottom edge. Reads the ACTUAL
@@ -1589,8 +1667,8 @@ Vfs: {
     async boot() {
         try {
             // Migration-aware boot: Checks v42 primary, falls back to v41
-            let Vfs = await localforage.getItem('Nexus.state.Vfs_v42') || await localforage.getItem('Nexus.state.Vfs_v41');
-            let orig = await localforage.getItem('nexus_originals_v42') || await localforage.getItem('nexus_originals_v41');
+            let Vfs = await safeStorage.getItem('Nexus.state.Vfs_v42') || await safeStorage.getItem('Nexus.state.Vfs_v41');
+            let orig = await safeStorage.getItem('nexus_originals_v42') || await safeStorage.getItem('nexus_originals_v41');
             
             if (Vfs && Object.keys(Vfs).length > 0) {
                 Nexus.state.Vfs = Vfs;
@@ -1617,7 +1695,7 @@ Vfs: {
             // sync feature) between sessions. Falls back to an empty tab
             // bar — not "every file" — if nothing was saved, matching the
             // new default of files sitting unopened in the explorer.
-            const savedTabs = await localforage.getItem('nexus_open_tabs_v1');
+            const savedTabs = await safeStorage.getItem('nexus_open_tabs_v1');
             Nexus.state.openTabs = Array.isArray(savedTabs)
                 ? savedTabs.filter(fn => Nexus.state.Vfs[fn] !== undefined)
                 : [];
@@ -1626,7 +1704,7 @@ Vfs: {
             // Prefer the file the user was actually working in last session
             // (persisted by switchFile on every switch) — falling back to the
             // first file only if that one no longer exists.
-            const lastActive = await localforage.getItem('nexus_last_active_file');
+            const lastActive = await safeStorage.getItem('nexus_last_active_file');
             if (lastActive && files.includes(lastActive)) {
                 Nexus.state.activeFile = lastActive;
             } else if (!Nexus.state.activeFile || !files.includes(Nexus.state.activeFile)) {
@@ -1647,14 +1725,14 @@ Vfs: {
     // needs to survive independently of whether the user has unsaved file
     // content sitting around.
     saveOpenTabs() {
-        localforage.setItem('nexus_open_tabs_v1', Nexus.state.openTabs);
+        safeStorage.setItem('nexus_open_tabs_v1', Nexus.state.openTabs);
     },
 
     async save() {
         // Persist using v42 keys to maintain migration integrity
         try {
-            await localforage.setItem('Nexus.state.Vfs_v42', Nexus.state.Vfs);
-            await localforage.setItem('nexus_originals_v42', Nexus.state.originals);
+            await safeStorage.setItem('Nexus.state.Vfs_v42', Nexus.state.Vfs);
+            await safeStorage.setItem('nexus_originals_v42', Nexus.state.originals);
             return true;
         } catch (e) {
             // This used to fail silently — a rejected IndexedDB write (quota
@@ -1833,7 +1911,7 @@ setEmptyState() {
         // Remember which file is open — a tiny string write — so a reload
         // puts the user back where they were, instead of always dumping them
         // into whichever file happens to be first in the project.
-        localforage.setItem('nexus_last_active_file', fn);
+        safeStorage.setItem('nexus_last_active_file', fn);
         const code = Nexus.state.Vfs[fn];
         const footFile = document.getElementById('footFile');
         if (footFile) footFile.innerText = "FILE: " + fn.toUpperCase();
@@ -4916,7 +4994,7 @@ try {
         // a risk for too uncertain a payoff and intentionally left as-is.
         // If this is revisited later, do it as its OWN isolated, on-device-
         // tested change — not bundled in alongside unrelated feature work.
-        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands, cmSticky, cmMinimap, cmLint, cmAutocomplete] = await Promise.all([
+        const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands, cmSticky, cmMinimap, cmLint, cmAutocomplete] = await Nexus.editorCore.withTimeout(Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
             import("@codemirror/view"),
@@ -4930,7 +5008,7 @@ try {
             import("@replit/codemirror-minimap"),
             import("@codemirror/lint"),
             import("@codemirror/autocomplete")
-        ]);
+        ]), 15000, "Loading the CM6 editor engine");
         
         Nexus.editorCore.modules = {
             basicSetup: cm6.basicSetup,
@@ -5759,7 +5837,23 @@ try {
        }
    },
                       spotlight: {
+           // FIX: this used to run the full scan (every file, every line,
+           // a substring check per line) directly on EVERY keystroke via
+           // oninput with no debounce at all — typing a multi-character
+           // query re-scanned the whole project once per character,
+           // synchronously, each one blocking. For a project with many or
+           // large files, that's real, repeated main-thread work that
+           // could make typing in search itself feel like the app was
+           // freezing, distinct from (but same general class of bug as)
+           // the Night Cycle fix elsewhere in this file. Debounced to
+           // actually scan only after typing pauses briefly, same
+           // standard technique used for autosave elsewhere in this app.
+           _debounceTimer: null,
            search(query) {
+               clearTimeout(this._debounceTimer);
+               this._debounceTimer = setTimeout(() => this._runSearch(query), 200);
+           },
+           _runSearch(query) {
                const res = document.getElementById('spotlightResults');
                if (!query) { 
                    res.innerHTML = ''; 
@@ -5991,7 +6085,24 @@ inject() {
        async startNightCycle() {
            Nexus.Sentinel.log("[DREAMER] Initiating Background Stress Test...", "accent");
            const testPromises = [];
-           
+
+           // FIX (real freeze source, distinct from the worker-timeout fix
+           // in Nexus.chronos): this loop used to run fully synchronously
+           // across EVERY .js file in the project — acorn.parse() plus a
+           // full AST walk per file, back to back, with no yield point
+           // anywhere in between. For a project with many or large JS
+           // files, that's real, uninterrupted main-thread work long
+           // enough to make the whole app feel frozen (no tap response,
+           // no visual feedback) until every file finishes parsing — not
+           // an infinite loop, just enough synchronous work in one go to
+           // present the same way to whoever's using it. This explains
+           // "random diagnostics freeze it, not every time" specifically:
+           // whether it's noticeable scales directly with how much JS the
+           // current project actually has, which varies project to
+           // project. Yields back to the browser after each file (a
+           // microtask-queue tick via setTimeout 0) so the UI stays
+           // responsive throughout a run instead of locking up until the
+           // entire scan completes.
            for (const [filename, code] of Object.entries(Nexus.state.Vfs)) {
                if (!filename.endsWith('.js')) continue;
                try {
@@ -6005,6 +6116,11 @@ inject() {
                } catch(e) {
                    Nexus.Sentinel.log(`[DREAMER] Skipped ${filename} — syntax error, could not be parsed for testing.`, "warn");
                }
+               // Yield to the event loop before parsing the next file —
+               // lets any pending UI updates (taps, renders, the log
+               // messages this function itself just wrote) actually paint
+               // instead of queuing up behind a wall of synchronous work.
+               await new Promise((resolve) => setTimeout(resolve, 0));
            }
            
            Nexus.Sentinel.log(`[DREAMER] Queued ${testPromises.length} logic branches for Chronos.`, "warn");
@@ -6618,6 +6734,17 @@ self.addEventListener('fetch', (e) => {
        // divIDE's own PeerJS "id" IS the room code (prefixed so it can't
        // collide with someone else's completely unrelated PeerJS app
        // using the same public broker).
+       // Real connection timeout — unlike the CM6/GitHub fixes elsewhere
+       // in this app, PeerJS's own setup here is fully event-driven
+       // (.on('open'), .on('error')) with nothing ever awaited, so a
+       // stalled signaling-server connection can't actually freeze the
+       // app's execution the way an un-timed-out await could. But it CAN
+       // leave the status silently stuck on "Starting…"/"Connecting…"
+       // forever with no feedback and no way to tell "still trying" from
+       // "will never succeed" — this gives that a real, bounded end
+       // instead of indefinite silent waiting.
+       CONNECT_TIMEOUT_MS: 15000,
+
        host() {
            if (typeof Peer === 'undefined') return alert("PeerJS failed to load — check network/CDN access.");
            this.disconnect(); // clean up any previous session first
@@ -6627,7 +6754,16 @@ self.addEventListener('fetch', (e) => {
            this.role = 'host';
            this.peer = new Peer('divide-' + code);
 
+           let opened = false;
+           const timeoutTimer = setTimeout(() => {
+               if (opened) return;
+               this._setStatus('Could not reach the signaling server — check your connection and try again.', 'var(--danger)');
+               this.disconnect();
+           }, this.CONNECT_TIMEOUT_MS);
+
            this.peer.on('open', () => {
+               opened = true;
+               clearTimeout(timeoutTimer);
                const codeEl = document.getElementById('peerSyncCode');
                if (codeEl) codeEl.innerText = code;
                this._setStatus('Waiting for a device to join…', 'var(--gold)');
@@ -6644,6 +6780,7 @@ self.addEventListener('fetch', (e) => {
            });
 
            this.peer.on('error', (err) => {
+               clearTimeout(timeoutTimer);
                console.error('PeerSync host error:', err);
                this._setStatus('Error: ' + err.type, 'var(--danger)');
            });
@@ -6659,12 +6796,22 @@ self.addEventListener('fetch', (e) => {
            this._setStatus('Connecting…', 'var(--gold)');
            this.peer = new Peer();
 
+           let opened = false;
+           const timeoutTimer = setTimeout(() => {
+               if (opened) return;
+               this._setStatus('Could not reach the signaling server — check your connection and try again.', 'var(--danger)');
+               this.disconnect();
+           }, this.CONNECT_TIMEOUT_MS);
+
            this.peer.on('open', () => {
+               opened = true;
+               clearTimeout(timeoutTimer);
                this.conn = this.peer.connect('divide-' + code.trim().toUpperCase(), { reliable: true });
                this._wireConnection();
            });
 
            this.peer.on('error', (err) => {
+               clearTimeout(timeoutTimer);
                console.error('PeerSync guest error:', err);
                this._setStatus(err.type === 'peer-unavailable' ? 'No device found with that code.' : 'Error: ' + err.type, 'var(--danger)');
            });
@@ -6799,7 +6946,7 @@ self.addEventListener('fetch', (e) => {
                    Nexus.state.vault = records.map(r => ({ name: r.title, code: r.content, id: r.id }));
                } else {
                    // 2. Fallback & Migrate legacy LocalForage snippets
-                   const saved = await localforage.getItem('nexus_vault_v40'); 
+                   const saved = await safeStorage.getItem('nexus_vault_v40'); 
                    if (saved && saved.length > 0) { 
                        Nexus.state.vault = saved; 
                        // Push them into the new Dexie table
@@ -6821,7 +6968,7 @@ self.addEventListener('fetch', (e) => {
                await db.vault.bulkAdd(bulk);
                
                // Keep localforage updated as a temporary failsafe backup
-               localforage.setItem('nexus_vault_v40', Nexus.state.vault); 
+               safeStorage.setItem('nexus_vault_v40', Nexus.state.vault); 
            } catch (e) {
                console.error("Vault Sync Failure:", e);
            }
@@ -6886,11 +7033,11 @@ grab() {
 
    snapshots: {
        async boot() { 
-           const saved = await localforage.getItem('nexus_snapshots_v40'); 
+           const saved = await safeStorage.getItem('nexus_snapshots_v40'); 
            if (saved) Nexus.state.snapshots = saved; 
            this.render(); 
        },
-       save() { localforage.setItem('nexus_snapshots_v40', Nexus.state.snapshots); },
+       save() { safeStorage.setItem('nexus_snapshots_v40', Nexus.state.snapshots); },
        create() { 
            Nexus.state.snapshots.push({ 
                time: new Date().toLocaleTimeString(), 
@@ -7736,7 +7883,7 @@ graph: {
 },
 settings: {
     async boot() { 
-        const saved = await localforage.getItem('nexus_prefs_v42'); 
+        const saved = await safeStorage.getItem('nexus_prefs_v42'); 
         if (saved) Nexus.state.prefs = saved; 
 
         // One-time migration: bookmarkHere/bookmarksList/select used to be
@@ -7756,7 +7903,7 @@ settings: {
             const cleanedStr = cleaned.join(', ');
             if (cleanedStr !== Nexus.state.prefs.utilLayout) {
                 Nexus.state.prefs.utilLayout = cleanedStr;
-                localforage.setItem('nexus_prefs_v42', Nexus.state.prefs);
+                safeStorage.setItem('nexus_prefs_v42', Nexus.state.prefs);
             }
         }
 
@@ -7764,7 +7911,7 @@ settings: {
         // the same "own dedicated key" pattern already used for vault/
         // snapshots elsewhere in this file, since bookmarks are user
         // content tied to specific files rather than an app preference.
-        const savedBookmarks = await localforage.getItem('nexus_bookmarks_v1');
+        const savedBookmarks = await safeStorage.getItem('nexus_bookmarks_v1');
         if (savedBookmarks) Nexus.state.bookmarks = savedBookmarks;
 
         // Restore widget visibility (utility bar, D-pad, etc.) from the
@@ -7928,7 +8075,7 @@ settings: {
     update(k, v) { 
         if (['kbRows', 'fontSize', 'tabWidth'].includes(k)) v = parseInt(v);
         Nexus.state.prefs[k] = v; 
-        localforage.setItem('nexus_prefs_v42', Nexus.state.prefs); 
+        safeStorage.setItem('nexus_prefs_v42', Nexus.state.prefs); 
         this.apply(); 
     },
 
@@ -8428,6 +8575,28 @@ github: {
         }
         return true;
     },
+
+    // FIX: every GitHub fetch() here previously had no timeout at all —
+    // unlike the CM6 import chain (a Promise.race against a deadline,
+    // since import() itself can't be cancelled), a real fetch() CAN be
+    // aborted directly via AbortController, which is the more correct
+    // mechanism when it's actually available. A stalled request against
+    // api.github.com (slow connection, network hiccup, a captive portal
+    // intercepting the request) would otherwise hang the awaiting
+    // function forever with no error and no way to recover except
+    // reloading the whole app — pull-all() in particular loops through
+    // fetches SEQUENTIALLY, so one stalled file mid-loop would block
+    // every file after it too.
+    async fetchWithTimeout(url, options = {}, ms = 15000) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ms);
+        try {
+            return await fetch(url, { ...options, signal: controller.signal });
+        } finally {
+            clearTimeout(timer);
+        }
+    },
+
     async pushCurrentFile() {
         if (!Nexus.state.activeFile) return this.setStatus('No active file.', 'var(--danger)');
         if (!this.checkConfig()) return;
@@ -8595,7 +8764,7 @@ shell: {
            const repo = Nexus.state.prefs.ghRepo;
            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
            try {
-               const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+               const res = await Nexus.github.fetchWithTimeout(url, { headers: { "Authorization": `token ${token}` } });
                if (!res.ok) throw new Error("File not found.");
                const data = await res.json();
                const pulled = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
@@ -8619,12 +8788,12 @@ shell: {
            const repo = Nexus.state.prefs.ghRepo;
            const url = `https://api.github.com/repos/${repo}/contents/`;
            try {
-               const res = await fetch(url, { headers: { "Authorization": `token ${token}` } });
+               const res = await Nexus.github.fetchWithTimeout(url, { headers: { "Authorization": `token ${token}` } });
                const items = await res.json();
                let count = 0;
                for (const item of items) {
                    if (item.type === "file") {
-                       const fRes = await fetch(item.url, { headers: { "Authorization": `token ${token}` } });
+                       const fRes = await Nexus.github.fetchWithTimeout(item.url, { headers: { "Authorization": `token ${token}` } });
                        const fData = await fRes.json();
                        const pulled = decodeURIComponent(escape(atob(fData.content.replace(/\s/g, ''))));
                        Nexus.state.Vfs[item.path] = pulled;
@@ -8650,7 +8819,7 @@ shell: {
            if (content === undefined) return `Error: '${path}' not found in Vortex.`;
 
            try {
-               const getRes = await fetch(url, {
+               const getRes = await Nexus.github.fetchWithTimeout(url, {
                    headers: { "Authorization": `token ${token}` }
                });
                
@@ -8666,7 +8835,7 @@ shell: {
                    sha: sha 
                };
 
-               const putRes = await fetch(url, {
+               const putRes = await Nexus.github.fetchWithTimeout(url, {
                    method: "PUT",
                    headers: {
                        "Authorization": `token ${token}`,
@@ -11976,7 +12145,7 @@ initInfiniteRibbon() {
            lines.sort((a, b) => a.line - b.line);
 
            Nexus.state.bookmarks[Nexus.state.activeFile] = lines;
-           localforage.setItem('nexus_bookmarks_v1', Nexus.state.bookmarks);
+           safeStorage.setItem('nexus_bookmarks_v1', Nexus.state.bookmarks);
 
            if (document.getElementById('modalBookmarks')?.classList.contains('active')) {
                Nexus.UI.renderBookmarksList();
@@ -12047,7 +12216,7 @@ initInfiniteRibbon() {
            const marks = Nexus.state.bookmarks[filename];
            if (!marks) return;
            Nexus.state.bookmarks[filename] = marks.filter(b => b.line !== line);
-           localforage.setItem('nexus_bookmarks_v1', Nexus.state.bookmarks);
+           safeStorage.setItem('nexus_bookmarks_v1', Nexus.state.bookmarks);
 
            // If this is the currently open file in CM6, also remove the
            // live gutter marker so the two stay in sync immediately rather
