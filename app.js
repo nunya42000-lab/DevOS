@@ -168,18 +168,25 @@ window.Nexus = {
            widgetVisibility: null     // null => use the state.widgets defaults below
        },
        searchOpts: { case: false, regex: false, global: false },
-       // FIX: these four keys were stale kebab-case leftovers from before a
-       // camelCase rename pass — 'kb-monolith', 'search-bar', 'writer-bar'
-       // and 'nexus-dpad' match NO element in index.html (the real ones are
-       // searchDrawer / writerDrawer / nexusDpad, and the old kb-monolith
-       // element doesn't exist at all anymore; the footer is #nexusDock).
-       // Every widget-visibility lookup keyed off these silently found
-       // nothing and did nothing — saved visibility preferences for these
-       // widgets could never actually be applied or restored. Verified by
-       // running the real boot sequence against a DOM that returns null for
-       // IDs genuinely absent from index.html, which surfaced exactly these
-       // four as phantom lookups.
-       widgets: { 'utilityBar': false, 'searchDrawer': false, 'writerDrawer': false, 'nexusDpad': false }
+       // FIX (real regression, found via on-device diagnosis): searchDrawer
+       // and writerDrawer used to be dead keys here (stale kebab-case IDs
+       // matching nothing in the HTML), so this whole mechanism had no
+       // effect on them at all. Correcting the IDs in an earlier pass made
+       // updateWidgets() start ACTUALLY applying to them — but nothing
+       // reconciled that against the separate, newer .transform-drawer /
+       // toggleDrawer() system these two are really driven by. Every boot
+       // and updateWidgets() call was stamping `style.display = 'none'`
+       // directly onto both elements (an INLINE style, which beats any
+       // stylesheet rule regardless of specificity or !important) since
+       // both defaulted to false here — permanently hiding them no matter
+       // what toggleDrawer()'s own .open class correctly did. Confirmed
+       // directly on-device: getComputedStyle showed .open applied,
+       // transform: none, and display: none simultaneously — display:none
+       // short-circuits transform computation entirely, which is exactly
+       // that signature. Removed both from this registry; they are not
+       // simple show/hide widgets, they're drawers, and toggleDrawer()
+       // already owns their visibility correctly on its own.
+       widgets: { 'utilityBar': false, 'nexusDpad': false }
    },
 compiler: {
     // Translates your mobile macros into executable code
@@ -12846,33 +12853,6 @@ const inj = "<scr" + "ipt>\n" +
                status.innerText = "FAULT"; 
            } 
        },
-   // TEMPORARY DIAGNOSTIC — remove once the drawer issue is resolved.
-   // The 🔍/✍️ buttons open nothing, with no flash and no console error,
-   // while the identical call for suggestionsDrawer/navDrawer works. The
-   // JS path has been verified correct by execution, so this reports the
-   // element's real computed state at tap time to show where it actually
-   // ends up. Called instead of toggleDrawer by those two buttons only.
-   toggleDrawerDebug(id) {
-       this.toggleDrawer(id);
-       const d = document.getElementById(id);
-       if (!d) { alert('DIAG: #' + id + ' does not exist in the DOM.'); return; }
-       const s = getComputedStyle(d);
-       const r = d.getBoundingClientRect();
-       alert(
-           'DIAG for #' + id + '\n\n' +
-           'has .open class: ' + d.classList.contains('open') + '\n' +
-           'transform: ' + s.transform + '\n' +
-           'display: ' + s.display + '\n' +
-           'visibility: ' + s.visibility + '\n' +
-           'opacity: ' + s.opacity + '\n' +
-           'z-index: ' + s.zIndex + '\n' +
-           'position: ' + s.position + '\n\n' +
-           'RECT left: ' + Math.round(r.left) + '  top: ' + Math.round(r.top) + '\n' +
-           'RECT width: ' + Math.round(r.width) + '  height: ' + Math.round(r.height) + '\n\n' +
-           'screen: ' + window.innerWidth + ' x ' + window.innerHeight
-       );
-   },
-
 toggleDrawer(id) {
     // Close other drawers automatically so they don't overlap.
     document.querySelectorAll('.transform-drawer').forEach(el => {
@@ -12880,7 +12860,19 @@ toggleDrawer(id) {
     });
     const target = document.getElementById(id);
     if (!target) return;
+    const opening = !target.classList.contains('open');
     target.classList.toggle('open');
+    // Defensive: an inline style.display set by some other code path (this
+    // exact bug happened once already — see the widgets registry comment
+    // in Nexus.state — where updateWidgets() stamped display:none directly
+    // onto searchDrawer/writerDrawer, which beat every .transform-drawer
+    // CSS rule regardless of specificity and left them permanently hidden
+    // even while .open was correctly applied) would silently defeat the
+    // class-based show/hide this function is supposed to own. Clearing any
+    // inline display on open guarantees the stylesheet rule is what
+    // decides visibility, not whatever inline style happened to be left
+    // over from elsewhere.
+    if (opening) target.style.display = '';
 },
 // (Removed: toggleRibbonDpad() — dead code nothing called. It was also the
 // only place setupFastHold() ever ran, which is why the dock's arrow buttons

@@ -1033,6 +1033,19 @@
 .transform-drawer.open {
     transform: translateX(0) !important;
 }
+/* Real fix for these two lives in Nexus.state.widgets (app.js) and
+   toggleDrawer() itself — see their comments for the actual root cause
+   (an inline style.display:none stamped by an unrelated widget-visibility
+   system, which beat every transform/class rule here regardless of
+   specificity). Kept only the height constraint from that investigation,
+   since long Find & Replace / Boilerplate results scrolling within the
+   drawer rather than growing it past the screen is worth keeping either
+   way. */
+#searchDrawer,
+#writerDrawer {
+    max-height: 70vh;
+    overflow-y: auto;
+}
 
 /* =======================================================
    UTILITY TOOLBAR DOCKING: RIGHT-EDGE VISUAL STYLING
