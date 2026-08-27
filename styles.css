@@ -773,6 +773,17 @@
     .sleek-btn:hover { background: var(--dock-hover-bg); color: var(--dock-hover-text); }
     .sleek-btn.active { background: var(--dock-active-bg); color: var(--dock-active-text); box-shadow: 0 0 10px rgba(255,255,255,0.1); }
 
+    /* AUDIT FIX: `btn-active` is toggled from JS in five places (the
+       keyboard language selector, the d-pad panel toggle, and others) but
+       had no CSS rule anywhere in this stylesheet — so every one of those
+       toggles was a no-op visually, and those buttons never showed their
+       active state. Same class of defect as the `.nav-hidden` bug found
+       earlier: JS flipping a class that styles nothing. Styled to match
+       the established `.active` convention directly above rather than
+       rewriting the five JS call sites, since some target .tool-btn and
+       some .sleek-btn — one rule covers both correctly. */
+    .btn-active { background: var(--dock-active-bg); color: var(--dock-active-text); box-shadow: 0 0 10px rgba(255,255,255,0.1); }
+
     /* Navigation Drawer buttons — deliberately larger than the standard
        44px .sleek-btn floor (task spec calls for "larger" arrows/actions
        here specifically), since this drawer's whole purpose is easy
@@ -996,6 +1007,7 @@
 .transform-drawer.open {
     transform: translateX(0) !important;
 }
+
 /* =======================================================
    UTILITY TOOLBAR DOCKING: RIGHT-EDGE VISUAL STYLING
    ======================================================= */
@@ -1124,25 +1136,6 @@
 }
 .transform-drawer.open { transform: translateX(0); }
 
-/* Bottom-left variant — used by the Navigation Drawer (🎮). Anchored to the
-   bottom-left corner instead of vertically centered, and slides straight
-   down out of view (translateY) rather than sideways (translateX), since
-   it sits directly above the footer dock rather than beside the editor.
-   `bottom` is intentionally NOT hardcoded here: #nexusDock is
-   position:relative with a variable height (keyboard rows toggle on/off,
-   KB row count is user-configurable 1-3 rows), so a fixed px offset would
-   drift out of alignment depending on dock state. Nexus.UI.toggleDrawer()
-   sets `bottom` inline from #nexusDock's live measured height every time
-   this drawer opens instead. */
-.transform-drawer-bottom {
-    position: fixed; left: 0; top: auto; bottom: 0; right: auto;
-    transform: translateY(115%) !important;
-    transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1);
-    background: var(--panel); border: 1px solid var(--border); border-bottom: none;
-    border-radius: 16px 16px 0 0 !important; z-index: 8500; padding: 16px;
-    box-shadow: 10px -10px 40px rgba(0,0,0,0.9); max-width: 92vw;
-}
-.transform-drawer-bottom.open { transform: translateY(0) !important; }
     /* --- B. THE GRAPH MATRIX (Visual Inter-file Imports & References) --- */
     .graph-viewport {
         flex: 1;

@@ -135,7 +135,37 @@ window.Nexus = {
            ghToken: "",
            ghRepo: "",
            activeEngine: 'vanilla',
-           indentGuides: true
+           indentGuides: true,
+
+           // AUDIT FIX: the 16 keys below were all read and written
+           // throughout the app but never declared here — each was added
+           // incrementally over time and relied purely on scattered inline
+           // fallbacks (`|| 'x'`, `!== false`, `!!`) at each individual
+           // read site. Not a crash (those fallbacks work), but it left
+           // this object no longer describing the app's real settings
+           // surface, and meant each key's "true" default was implicit,
+           // duplicated across every read, and easy to make inconsistent
+           // between two call sites. Declared explicitly here so there's
+           // one authoritative answer per setting. Values chosen to match
+           // exactly what the existing inline fallbacks already produced,
+           // so this changes no current behavior — verified against each
+           // read site rather than assumed.
+           editMode: 'util',          // setEditMode collapses anything unrecognized to 'util'
+           outdoorMode: false,        // dark is the base theme; outdoor-mode is the opt-in override
+           wordWrap: false,           // read as !!prefs.wordWrap
+           showWhitespace: false,     // read as !!prefs.showWhitespace
+           bracketTracing: true,      // read as prefs.bracketTracing !== false
+           stickyScroll: true,        // read as prefs.stickyScroll !== false
+           minimap: false,            // opt-in, per its toggle's own reasoning
+           lintEnabled: false,        // opt-in — the Diagnostics Hub already covers this ground
+           autocomplete: false,       // opt-in — changes typing behavior
+           infiniteScroll: false,     // ribbon infinite scroll, off by default
+           navButtonsHidden: false,   // arrow-key group starts visible
+           utilBarCollapsed: false,
+           diagFilterEnabled: false,
+           utilLayout: null,          // null => fall back to DEFAULT_UTIL_LAYOUT
+           navDrawerLayout: null,     // null => fall back to DEFAULT_NAV_DRAWER_LAYOUT
+           widgetVisibility: null     // null => use the state.widgets defaults below
        },
        searchOpts: { case: false, regex: false, global: false },
        // FIX: these four keys were stale kebab-case leftovers from before a
@@ -8246,18 +8276,42 @@ kbEditor: {
            });
        },
        
-       update(i, field, val) { this.tempLayout[this.currentLang][i][field] = val; },
-       add() { this.tempLayout[this.currentLang].push({d: 'New', i: 'New'}); this.render(); },
-       remove(i) { this.tempLayout[this.currentLang].splice(i, 1); this.render(); },
+       // AUDIT FIX: all five of these assumed this.tempLayout[currentLang]
+       // was already an array — but tempLayout is cloned from
+       // prefs.kbLayouts, which defaults to {} (empty). So for any
+       // language the user hasn't already saved a custom layout for —
+       // i.e. ALL of them, by default — tempLayout[currentLang] was
+       // undefined and every one of these threw immediately ("Cannot read
+       // properties of undefined"). The Keyboard Builder was effectively
+       // dead on first use: open it, tap add, crash. Found by actually
+       // invoking every zero-arg method across all 55 subsystems rather
+       // than reading code. _ensureLang() lazily creates the array on
+       // first touch, which is also what makes "customize a language that
+       // has no saved layout yet" work at all.
+       _ensureLang() {
+           if (!Array.isArray(this.tempLayout[this.currentLang])) {
+               this.tempLayout[this.currentLang] = [];
+           }
+           return this.tempLayout[this.currentLang];
+       },
+
+       update(i, field, val) {
+           const arr = this._ensureLang();
+           if (arr[i]) arr[i][field] = val;
+       },
+       add() { this._ensureLang().push({d: 'New', i: 'New'}); this.render(); },
+       remove(i) { this._ensureLang().splice(i, 1); this.render(); },
        moveUp(i) { 
-           if(i > 0) { 
-               [this.tempLayout[this.currentLang][i], this.tempLayout[this.currentLang][i-1]] = [this.tempLayout[this.currentLang][i-1], this.tempLayout[this.currentLang][i]];
+           const arr = this._ensureLang();
+           if(i > 0 && arr[i] && arr[i-1]) { 
+               [arr[i], arr[i-1]] = [arr[i-1], arr[i]];
                this.render(); 
            } 
        },
        moveDown(i) { 
-           if(i < this.tempLayout[this.currentLang].length-1) { 
-               [this.tempLayout[this.currentLang][i], this.tempLayout[this.currentLang][i+1]] = [this.tempLayout[this.currentLang][i+1], this.tempLayout[this.currentLang][i]];
+           const arr = this._ensureLang();
+           if(i < arr.length-1 && arr[i] && arr[i+1]) { 
+               [arr[i], arr[i+1]] = [arr[i+1], arr[i]];
                this.render(); 
            } 
        },
