@@ -197,7 +197,8 @@
         <button id="ribbonMenuIndentGuides" onclick="Nexus.UI.toggleIndentGuides(); Nexus.UI.syncRibbonMenu()">📏 Indent Guides</button>
         <button id="ribbonMenuWordWrap" onclick="Nexus.UI.toggleWordWrap(); Nexus.UI.syncRibbonMenu()">↩️ Word Wrap</button>
         <button id="ribbonMenuWhitespace" onclick="Nexus.UI.toggleShowWhitespace(); Nexus.UI.syncRibbonMenu()">␣ Show Whitespace</button>
-        <button id="ribbonMenuBracketTracing" onclick="Nexus.UI.toggleBracketTracing(); Nexus.UI.syncRibbonMenu()">{ } Bracket Tracing</button>
+        <button id="ribbonMenuBracketTracing" onclick="Nexus.UI.toggleBracketTracing(); Nexus.UI.syncRibbonMenu()" title="Highlights a bracket's matching pair whenever your cursor sits next to one — no visible effect elsewhere">{ } Bracket Match Highlight</button>
+        <button id="ribbonMenuChangeGutter" onclick="Nexus.UI.toggleChangeGutter(); Nexus.UI.syncRibbonMenu()">📊 Change Gutter</button>
         <button id="ribbonMenuStickyScroll" onclick="Nexus.UI.toggleStickyScroll(); Nexus.UI.syncRibbonMenu()">📌 Sticky Scope Headers</button>
         <button id="ribbonMenuMinimap" onclick="Nexus.UI.toggleMinimap(); Nexus.UI.syncRibbonMenu()">🗺️ Minimap</button>
         <button id="ribbonMenuLint" onclick="Nexus.UI.toggleLint(); Nexus.UI.syncRibbonMenu()">🩺 Inline Lint</button>
@@ -205,6 +206,7 @@
         <div class="ribbon-dropdown-divider"></div>
         <button onclick="Nexus.UI.toggleSidebar('right')">🧰 Diagnostics Hub</button>
         <button id="ribbonMenuBookmark" onclick="Nexus.UI.toggleBookmarkHere(); Nexus.UI.syncRibbonMenu()">🔖 Bookmark Line</button>
+        <button id="ribbonMenuBookmarkingEnabled" onclick="Nexus.UI.toggleBookmarkingEnabled(); Nexus.UI.syncRibbonMenu()">🔖 Bookmarking Enabled</button>
         <button onclick="Nexus.UI.openBookmarksPanel()">📑 All Bookmarks</button>
         <div class="ribbon-dropdown-divider"></div>
         <button onclick="Nexus.UI.openModal('manual'); Nexus.UI.toggleRibbonMenu()">❓ Help</button>
@@ -482,6 +484,10 @@
                         <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--danger); font-weight: 700;">IMPORTS ➔</span>
                         <span id="auditCountMissingImports" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
                     </div>
+                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runMobileAudit()" title="Mobile-specific web pitfalls: fixed 100vh, hover-only interactions, missing viewport/input hints" aria-label="Run mobile pitfalls audit">
+                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">MOBILE ➔</span>
+                        <span id="auditCountMobile" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
+                    </div>
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
@@ -690,6 +696,8 @@
                 <button class="tool-btn btn-accent" onclick="Nexus.UI.runSandbox();" title="Run" aria-label="Run sandbox">▶️</button>
                 <button class="seg-btn active" onclick="Nexus.UI.segSandbox('test')">VIEW</button>
                 <button class="seg-btn" onclick="Nexus.UI.segSandbox('opts')">OPTS</button>
+                <button class="seg-btn" onclick="Nexus.UI.segSandbox('network')">NET</button>
+                <button class="seg-btn" onclick="Nexus.UI.segSandbox('element')">PICK</button>
                 <button class="seg-btn" onclick="Nexus.UI.segSandbox('logs')">LOGS</button>
                 <button class="close-x" title="Close" aria-label="Close" style="margin-left: auto;" onclick="Nexus.UI.closeModal('sandbox')">&times;</button>
             </div>
@@ -705,7 +713,30 @@
                 <button class="tool-btn btn-accent" style="width:100%; margin-top:20px;" onclick="Nexus.UI.runSandbox()">REBOOT PROCESS</button>
             </div>
 
-            <div id="sbLogs" class="sb-page" style="background:#000; padding:10px;">
+            <!-- Network monitor (Feature 1): fetch/XHR calls made by the
+                 running preview, reported live by the injected sandbox
+                 script (see runSandbox()'s `inj` string). -->
+            <div id="sbNetwork" class="sb-page" style="background:#000; padding:0; display:flex; flex-direction:column;">
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:10px; border-bottom:1px solid var(--border); flex-shrink:0;">
+                    <span id="networkCount" style="font-size:11px; opacity:0.7;"></span>
+                    <button class="tool-btn" style="padding:4px 10px; font-size:10px;" onclick="Nexus.networkMonitor.clear()">CLEAR</button>
+                </div>
+                <div id="networkList" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding:10px;"></div>
+            </div>
+
+            <!-- Tap-to-inspect element picker (Feature 2). -->
+            <div id="sbElement" class="sb-page" style="background:#000; padding:10px; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px; flex-shrink:0;">
+                    <button id="elementInspectorToggle" class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.elementInspector.toggle()">🎯 TOGGLE PICKER</button>
+                </div>
+                <div id="elementInspectorHint" style="display:none; font-size:10px; color:var(--gold); margin-bottom:10px; flex-shrink:0;">Picker is ON — tap anything in the VIEW tab.</div>
+                <div id="elementInspectorResult" style="flex:1; overflow-y:auto; background:var(--surface); border-radius:8px; padding:12px;"></div>
+            </div>
+
+            <div id="sbLogs" class="sb-page" style="background:#000; padding:0;">
+                <div style="display:flex; justify-content:flex-end; padding:8px 10px; border-bottom:1px solid var(--border); flex-shrink:0;">
+                    <button class="tool-btn" style="padding:4px 10px; font-size:10px;" onclick="Nexus.UI.copyLogsToClipboard()">📋 COPY ALL LOGS</button>
+                </div>
                 <div id="ghostConsole"></div>
             </div>
         </div>
@@ -1249,7 +1280,20 @@
                     </select>
                 </div>
                 <div id="idMapSummary" style="font-size:11px; opacity:0.7; margin-bottom:10px; flex-shrink:0;"></div>
-                <div id="idMapList" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
+                <!-- FIX: flex:1 alone doesn't set min-height, and a flex
+                     item's default min-height is 'auto' — i.e. tall enough
+                     to fit all its content. Combined with overflow-y:auto,
+                     that's a well-known flexbox trap: the browser ends up
+                     fighting between "grow to fit 227 accordions" and
+                     "clip and scroll at the flex-allocated height," and
+                     the actual rendering symptom is exactly what showed up
+                     — a scrollbar confirming a scrollable box exists, but
+                     every row squashed to a hairline instead of its real
+                     height. min-height:0 is the standard, documented fix:
+                     it lets flex:1 actually cap the box at the space
+                     available, which is what makes overflow-y:auto kick in
+                     correctly instead of the box just growing forever. -->
+                <div id="idMapList" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
             </div>
         </div>
     </div>

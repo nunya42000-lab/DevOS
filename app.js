@@ -155,6 +155,8 @@ window.Nexus = {
            wordWrap: false,           // read as !!prefs.wordWrap
            showWhitespace: false,     // read as !!prefs.showWhitespace
            bracketTracing: true,      // read as prefs.bracketTracing !== false
+           showChangeGutter: true,    // diff-as-you-type gutter (Feature 4) — on by default, same reasoning as bracket tracing/sticky scroll: a passive visual aid, not a behavior change
+           bookmarkingEnabled: true,  // real on/off switch for placing bookmarks at all, not just where the button lives — see toggleBookmarkHere()'s own comment
            stickyScroll: true,        // read as prefs.stickyScroll !== false
            minimap: false,            // opt-in, per its toggle's own reasoning
            lintEnabled: false,        // opt-in — the Diagnostics Hub already covers this ground
@@ -741,6 +743,7 @@ auditor: {
         document.getElementById('auditCountBrackets').innerText = '0';
         document.getElementById('auditCountTodo').innerText = '0';
         document.getElementById('auditCountMissingImports').innerText = '0';
+        document.getElementById('auditCountMobile').innerText = '0';
         const badge = document.getElementById('diagBadgeCore');
         if (badge) badge.classList.remove('show');
     },
@@ -836,6 +839,10 @@ auditor: {
         const missingImports = this._detectMissingImports(srcCode).map(i => ({ text: `Unresolved: '${i.path}'`, line: i.line }));
         sections.push({ label: 'MISSING IMPORTS', count: missingImports.length, items: missingImports });
 
+        // --- Mobile-web footguns (Feature 5) ---
+        const mobileIssues = this._detectMobileIssues(srcCode, ext).map(i => ({ text: i.text, line: i.line }));
+        sections.push({ label: 'MOBILE PITFALLS', count: mobileIssues.length, items: mobileIssues });
+
         // --- TODOs (informational — reminders, not defects) ---
         const todos = this._detectTodos(srcCode);
 
@@ -859,6 +866,7 @@ auditor: {
         setCount('auditCountBrackets', bracketIssues.length);
         setCount('auditCountTodo', todos.length);
         setCount('auditCountMissingImports', missingImports.length);
+        setCount('auditCountMobile', mobileIssues.length);
 
         // --- Render one consolidated report ---
         const totalIssues = sections.reduce((sum, s) => sum + s.count, 0);
@@ -1095,6 +1103,38 @@ auditor: {
             html += `<div ${clickable ? `onclick="Nexus.UI.jumpToLine(${i.line})" style="cursor:pointer;"` : ''} style="background:var(--surface); padding:8px 10px; margin-bottom:6px; border-left:3px solid var(--danger); border-radius:4px; display:flex; justify-content:space-between; align-items:center;">`
                 + `<span style="font-size:11px;">'${i.path}'</span>`
                 + (clickable ? `<span style="font-size:9px; opacity:0.6; white-space:nowrap; padding-left:6px;">LN ${i.line} →</span>` : '')
+                + `</div>`;
+        });
+        reportBox.innerHTML = html;
+    },
+
+    // Standalone card for the mobile-web footgun checks — same pattern as
+    // runMissingImportsAudit() just above, reusing _detectMobileIssues so
+    // this and Full Sweep can never disagree about what counts as a
+    // mobile pitfall.
+    runMobileAudit() {
+        if (!Nexus.state.activeFile) {
+            document.getElementById('auditorModeTitle').innerText = "ACTIVE: MOBILE PITFALLS";
+            const box = document.getElementById('auditorReportBox');
+            if (box) box.innerHTML = `<div style="color: var(--gold); font-weight: bold;">No file open — open or create a file first.</div>`;
+            return;
+        }
+        document.getElementById('auditorModeTitle').innerText = "ACTIVE: MOBILE PITFALLS";
+        const srcCode = this.getEditorContent();
+        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
+        const issues = this._detectMobileIssues(srcCode, ext);
+        const counter = document.getElementById('auditCountMobile');
+        if (counter) counter.innerText = issues.length;
+        const reportBox = document.getElementById('auditorReportBox');
+        if (issues.length === 0) {
+            reportBox.innerHTML = `<div style="color: var(--success); font-weight: bold;">✔ No mobile-specific pitfalls found in this file.</div>`;
+            return;
+        }
+        let html = `<div style="color:var(--danger); font-weight:bold; margin-bottom:6px;">${issues.length} MOBILE PITFALL${issues.length === 1 ? '' : 'S'}</div>`;
+        issues.forEach(i => {
+            html += `<div onclick="Nexus.UI.jumpToLine(${i.line})" style="cursor:pointer; background:var(--surface); padding:8px 10px; margin-bottom:6px; border-left:3px solid var(--gold); border-radius:4px; display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">`
+                + `<span style="font-size:11px;">${i.text}</span>`
+                + `<span style="font-size:9px; opacity:0.6; white-space:nowrap; flex-shrink:0;">LN ${i.line} →</span>`
                 + `</div>`;
         });
         reportBox.innerHTML = html;
@@ -1394,6 +1434,90 @@ _resolveVfsPath(refPath) {
     if (Nexus.state.Vfs[clean] !== undefined) return clean;
     const basename = clean.split('/').pop();
     return Object.keys(Nexus.state.Vfs).find(k => k === basename || k.endsWith('/' + basename)) || null;
+},
+
+// Ported from an earlier standalone version of this app that had a
+// dedicated "runDependencyCheck" — flags import/src/href paths that don't
+// resolve to any real file in the project. This is a genuinely different
+// check from Project Radar (Nexus.graph): Radar finds files that exist
+// but nothing reaches (dead code — the opposite failure), while this
+// finds references that point at files that DON'T exist at all (typos,
+// renamed/deleted files, wrong relative path). Neither one covers the
+// other. Reuses _resolveVfsPath — the same normalization (query/hash
+// stripping, ./ prefix, basename fallback) already trusted for the
+// orphan-ID checker's own cross-file resolution — rather than a separate,
+// simpler regex-based path match that could disagree with it on edge
+// cases. Skips anything that looks like a real URL (http/https/protocol-
+// relative //) since those are never meant to resolve against the local
+// Vfs at all.
+// Mobile-web footgun detector (Feature 5). A category of bug generic
+// linters don't cover at all: things that are perfectly valid CSS/HTML/JS
+// but specifically break or degrade on a touchscreen/mobile browser. Five
+// checks, each verified against real deliberate examples before being
+// wired in (both the "should flag" and "should NOT flag" cases for every
+// rule, to keep false-positive risk low — a linter that cries wolf gets
+// ignored):
+//   1. Fixed 100vh (ignores mobile browser chrome/address bar — this
+//      exact app's own boot code has a comment describing hitting this
+//      real bug with divIDE itself). Excludes dvh/svh/lvh, the modern fix.
+//   2. :hover with no :active/:focus fallback on the same selector — an
+//      interaction that's invisible on a touch-only device.
+//   3. Viewport meta tag missing entirely, or present without `width=` in
+//      its content (present-but-incomplete is the more common real
+//      mistake than missing outright).
+//   4. <input> with no type hint and no explicit inputmode — the OS picks
+//      a generic keyboard instead of the numeric/phone/email one that
+//      would actually help.
+//   5. mouseover/mouseenter listeners with no touch/pointer equivalent
+//      anywhere in the same file — dead on a touchscreen.
+_detectMobileIssues(srcCode, ext) {
+    const issues = []; // { line, text }
+    const lines = srcCode.split('\n');
+
+    if (ext === 'css') {
+        lines.forEach((line, i) => {
+            if (/\b100vh\b/.test(line) && !/\bdvh\b/.test(line)) {
+                issues.push({ line: i + 1, text: '100vh ignores mobile browser chrome (address bar) — use 100dvh, or account for it explicitly.' });
+            }
+            const hoverMatch = line.match(/([.#][\w-]+):hover/);
+            if (hoverMatch) {
+                const selector = hoverMatch[1];
+                if (!srcCode.includes(selector + ':active') && !srcCode.includes(selector + ':focus')) {
+                    issues.push({ line: i + 1, text: `${selector}:hover has no :active/:focus fallback — invisible on touch-only devices.` });
+                }
+            }
+        });
+    }
+
+    if (ext === 'html' || ext === 'htm') {
+        const viewportMatch = srcCode.match(/<meta[^>]+name=["']viewport["'][^>]*>/i);
+        if (!viewportMatch) {
+            issues.push({ line: 1, text: 'No <meta name="viewport"> tag — page will render tiny/zoomed-out on phones.' });
+        } else {
+            const contentMatch = viewportMatch[0].match(/content=["']([^"']*)["']/i);
+            if (!contentMatch || !/width\s*=/.test(contentMatch[1])) {
+                const line = srcCode.slice(0, viewportMatch.index).split('\n').length;
+                issues.push({ line, text: 'Viewport meta tag is missing width= in its content — likely won\'t fit the actual screen.' });
+            }
+        }
+        const inputRe = /<input\b(?![^>]*(?:type=["'](?:tel|email|number|url|search|checkbox|radio|hidden|submit|button)["']|inputmode=))[^>]*>/gi;
+        let m;
+        while ((m = inputRe.exec(srcCode))) {
+            const line = srcCode.slice(0, m.index).split('\n').length;
+            issues.push({ line, text: 'This <input> has no type hint or inputmode — the OS will show a generic keyboard instead of one matched to the expected content.' });
+        }
+    }
+
+    if (ext === 'js' || ext === 'mjs') {
+        const hasTouchEquivalent = /touchstart|pointerdown|pointerenter/.test(srcCode);
+        lines.forEach((line, i) => {
+            if (/addEventListener\(\s*['"](?:mouseover|mouseenter)['"]/.test(line) && !hasTouchEquivalent) {
+                issues.push({ line: i + 1, text: 'mouseover/mouseenter listener with no touch/pointer equivalent anywhere in this file — has no effect on a touchscreen.' });
+            }
+        });
+    }
+
+    return issues;
 },
 
 // Ported from an earlier standalone version of this app that had a
@@ -1872,6 +1996,11 @@ Vfs: {
         // every OTHER open tab as "saved" too when their content was never
         // touched by this action at all.
         if (ok) Nexus.state.lastSavedContent[Nexus.state.activeFile] = code;
+        // Baseline just moved to match current content, so every line
+        // should now read as unchanged — clears the change gutter
+        // immediately rather than leaving stale marks up until the next
+        // edit's own debounce fires.
+        if (ok && Nexus.editorCore.refreshChangeGutter) Nexus.editorCore.refreshChangeGutter();
 
         if (btn) {
             btn.classList.remove('saving');
@@ -2044,6 +2173,13 @@ setEmptyState() {
             if (typeof Nexus.UI._restoreBookmarksToCM6 === 'function') {
                 Nexus.UI._restoreBookmarksToCM6(view, fn);
             }
+            // Same reasoning as the bookmark restore just above: the
+            // change gutter's own StateField only tracks incremental edits
+            // within one file, so after swapping the entire document out
+            // for a different file's content it needs a fresh recompute
+            // against THIS file's own lastSavedContent baseline, not
+            // whatever marks were left over from the previous file.
+            if (Nexus.editorCore.refreshChangeGutter) Nexus.editorCore.refreshChangeGutter();
         } else {
             const ed = document.getElementById('rawTerminal');
             if (ed) {
@@ -5448,6 +5584,131 @@ try {
         })
     ];
 
+    // Diff-as-you-type gutter (Feature 4): a thin colored bar showing
+    // which lines differ from the file's own last-manually-saved content
+    // — not the live autosave copy, which changes on every keystroke and
+    // so would never actually show anything as "changed." Reuses
+    // Nexus.state.lastSavedContent, the exact same baseline this app's own
+    // tab-close/dirty-tracking already relies on (Vfs.isDirty()), so
+    // "this line looks different" and "this file needs saving" always
+    // agree — one source of truth, not two dirty-tracking concepts that
+    // could drift apart. Diffed with Diff.diffLines (already loaded
+    // globally as `Diff` for Merge/Compare) rather than a hand-rolled
+    // line comparison — verified directly that a changed line surfaces as
+    // an 'added' hunk at the right line number before wiring this in.
+    const changeMarkerAdded = new (class extends GutterMarker {
+        toDOM() {
+            const span = document.createElement('span');
+            span.style.cssText = 'display:block; width:3px; height:100%; background:#3fb950; margin-left:1px;';
+            return span;
+        }
+    })();
+    const changeMarkerRemoved = new (class extends GutterMarker {
+        toDOM() {
+            const span = document.createElement('span');
+            span.style.cssText = 'display:block; width:3px; height:40%; background:#f85149; margin-left:1px; margin-top:-2px;';
+            return span;
+        }
+    })();
+
+    const changeGutterEffect = StateEffect.define();
+    const changeGutterState = StateField.define({
+        create() { return RangeSet.empty; },
+        update(set, transaction) {
+            for (const e of transaction.effects) {
+                if (e.is(changeGutterEffect)) return e.value; // full replace — recomputed fresh each time, not incrementally mapped
+            }
+            if (transaction.docChanged) return set.map(transaction.changes);
+            return set;
+        }
+    });
+
+    // Debounced the same way autosave already is (400ms) — diffing the
+    // WHOLE file against its saved baseline on every single keystroke is
+    // exactly the class of unthrottled per-keystroke work that caused a
+    // real, previously-found freeze in this app's search feature; this
+    // avoids repeating that mistake for a much larger operation (a full
+    // diffLines pass, not a substring scan).
+    let changeGutterTimer = null;
+    function scheduleChangeGutterUpdate(view) {
+        clearTimeout(changeGutterTimer);
+        changeGutterTimer = setTimeout(() => recomputeChangeGutter(view), 400);
+    }
+    function recomputeChangeGutter(view) {
+        if (!Nexus.state.prefs.showChangeGutter) {
+            view.dispatch({ effects: changeGutterEffect.of(RangeSet.empty) });
+            return;
+        }
+        const fn = Nexus.state.activeFile;
+        const saved = Nexus.state.lastSavedContent[fn];
+        if (saved === undefined) { // brand new, never-saved file — nothing to diff against, not an error state
+            view.dispatch({ effects: changeGutterEffect.of(RangeSet.empty) });
+            return;
+        }
+        const current = view.state.doc.toString();
+        if (saved === current) {
+            view.dispatch({ effects: changeGutterEffect.of(RangeSet.empty) });
+            return;
+        }
+        const hunks = Diff.diffLines(saved, current);
+        const marks = [];
+        let curLine = 1;
+        for (let hi = 0; hi < hunks.length; hi++) {
+            const h = hunks[hi];
+            const lineCount = h.value.endsWith('\n') ? h.value.split('\n').length - 1 : h.value.split('\n').length;
+            if (h.removed) {
+                // A removed hunk immediately followed by an added one is a
+                // genuine "this line changed" pair (same adjacency this
+                // app's own Merge feature already relies on to detect
+                // replacements) — the upcoming added-branch iteration
+                // marks the real, current line for that case, so nothing
+                // needs marking here or the changed line would get BOTH a
+                // green (added) AND an incorrect red (removed) mark on the
+                // unrelated line before it. Only a genuinely unpaired
+                // removal — content deleted with nothing replacing it —
+                // has no line of its own left in the current doc, so the
+                // closest honest signal is flagging the line immediately
+                // before the gap instead.
+                const next = hunks[hi + 1];
+                const isReplacePair = next && next.added;
+                if (!isReplacePair && curLine > 1 && curLine - 1 <= view.state.doc.lines) {
+                    const line = view.state.doc.line(curLine - 1);
+                    marks.push(changeMarkerRemoved.range(line.from));
+                }
+            } else if (h.added) {
+                for (let i = 0; i < lineCount; i++) {
+                    const lineNum = curLine + i;
+                    if (lineNum <= view.state.doc.lines) {
+                        const line = view.state.doc.line(lineNum);
+                        marks.push(changeMarkerAdded.range(line.from));
+                    }
+                }
+                curLine += lineCount;
+            } else {
+                curLine += lineCount;
+            }
+        }
+        view.dispatch({ effects: changeGutterEffect.of(RangeSet.of(marks, true)) });
+    }
+
+    const changeGutter = [
+        changeGutterState,
+        gutter({
+            class: 'cm-change-gutter',
+            markers: v => v.state.field(changeGutterState)
+        })
+    ];
+
+    // Exposed so manualSave()/switchFile() (both defined elsewhere, outside
+    // this closure) can force an immediate recompute — on save, so the
+    // gutter clears right away instead of waiting out the 400ms debounce
+    // on an edit that never comes; on file switch, so reopening a tab that
+    // already has unsaved changes shows them immediately rather than only
+    // after the next keystroke in that file.
+    Nexus.editorCore.refreshChangeGutter = () => {
+        if (Nexus.editorCore.view) recomputeChangeGutter(Nexus.editorCore.view);
+    };
+
     // Whitespace visualization: same live-toggle-via-Compartment pattern
     // again. highlightWhitespace() renders spaces/tabs as visible dots/
     // arrows (confirmed against @codemirror/view's real source and
@@ -5541,6 +5802,7 @@ try {
        Nexus.editorCore.lintCompartment.of(Nexus.state.prefs.lintEnabled ? Nexus.UI._buildLintExtension() : []),
        Nexus.editorCore.autocompleteCompartment.of(Nexus.state.prefs.autocomplete ? Nexus.UI._buildAutocompleteExtension() : []),
        bookmarkGutter,
+       changeGutter,
        Nexus.editorCore.themeCompartment.of(wantsDark ? [oneDark] : []),
        fixedHeight,
        EditorView.updateListener.of((update) => {
@@ -5552,6 +5814,7 @@ try {
                Nexus.state.Vfs[Nexus.state.activeFile] = update.state.doc.toString();
                clearTimeout(Nexus.editorCore._autosaveTimer);
                Nexus.editorCore._autosaveTimer = setTimeout(() => Nexus.Vfs.save(), 400);
+               scheduleChangeGutterUpdate(update.view);
            }
            if (update.selectionSet) {
                const pos = update.state.selection.main.head;
@@ -7504,6 +7767,103 @@ mergeEngine: {
         document.getElementById('mergeModeQuickBtn').classList.add('btn-accent');
         document.getElementById('mergeModeManualBtn').classList.remove('btn-accent');
         Nexus.merge.render();
+    }
+},
+
+// Network monitor (Feature 1). Receives entries reported by the sandbox's
+// own injected fetch/XHR wrappers — see the `inj` string in runSandbox()
+// for the actual interception logic, verified independently against real
+// fetch/XHR calls before being wired to this receiver. Cleared on every
+// new sandbox run so entries never carry over from a previous preview.
+networkMonitor: {
+    entries: [],
+
+    _record(entry) {
+        this.entries.push({ ...entry, id: this.entries.length, time: new Date().toLocaleTimeString() });
+        this.render();
+    },
+
+    clear() {
+        this.entries = [];
+        this.render();
+    },
+
+    render() {
+        const list = document.getElementById('networkList');
+        if (!list) return;
+        const countEl = document.getElementById('networkCount');
+        if (countEl) countEl.innerText = this.entries.length ? `${this.entries.length} request${this.entries.length === 1 ? '' : 's'}` : '';
+
+        if (this.entries.length === 0) {
+            list.innerHTML = '<div style="text-align:center; opacity:0.6; padding:30px 20px; font-size:12px;">No requests yet. fetch() and XMLHttpRequest calls made by your project while it runs will appear here.</div>';
+            return;
+        }
+
+        list.innerHTML = this.entries.slice().reverse().map(e => {
+            const statusColor = e.error ? 'var(--danger)' : (e.ok ? 'var(--success)' : 'var(--danger)');
+            const statusText = e.error ? 'FAILED' : e.status;
+            const sizeText = e.size != null ? (e.size < 1024 ? e.size + ' B' : (e.size / 1024).toFixed(1) + ' KB') : '—';
+            return `<div class="item-row" style="flex-direction:column; align-items:stretch; gap:4px; padding:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:bold; color:var(--accent); font-size:10px;">${e.method}</span>
+                    <span style="color:${statusColor}; font-weight:bold; font-size:11px;">${statusText}</span>
+                </div>
+                <div style="font-family:monospace; font-size:11px; word-break:break-all;">${e.url}</div>
+                <div style="display:flex; justify-content:space-between; font-size:9px; opacity:0.6;">
+                    <span>${e.kind} · ${e.time}</span>
+                    <span>${Math.round(e.duration)}ms · ${sizeText}</span>
+                </div>
+                ${e.error ? `<div style="color:var(--danger); font-size:10px;">${e.error}</div>` : ''}
+            </div>`;
+        }).join('');
+    }
+},
+
+// Tap-to-inspect element picker (Feature 2). Toggled on/off; while active,
+// tapping anything inside the sandbox iframe reports its tag/id/classes/
+// text/box-model/key computed styles instead of triggering the tap's own
+// normal behavior (the injected listener calls preventDefault/
+// stopPropagation only while this.active is true, checked live at click
+// time via window.parent — so toggling off mid-preview immediately
+// restores normal interaction with no need to re-inject anything).
+elementInspector: {
+    active: false,
+    lastPicked: null,
+
+    toggle() {
+        this.active = !this.active;
+        const btn = document.getElementById('elementInspectorToggle');
+        if (btn) btn.classList.toggle('active', this.active);
+        const hint = document.getElementById('elementInspectorHint');
+        if (hint) hint.style.display = this.active ? 'block' : 'none';
+    },
+
+    _record(info) {
+        this.lastPicked = info;
+        this.render();
+    },
+
+    render() {
+        const box = document.getElementById('elementInspectorResult');
+        if (!box) return;
+        if (!this.lastPicked) {
+            box.innerHTML = '<div style="text-align:center; opacity:0.6; padding:30px 20px; font-size:12px;">Turn on the picker above, then tap anything in the preview.</div>';
+            return;
+        }
+        const p = this.lastPicked;
+        const row = (label, val) => `<div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px solid var(--border); font-size:11px;"><span style="opacity:0.6;">${label}</span><span style="font-family:monospace;">${val}</span></div>`;
+        box.innerHTML = `
+            <div style="font-family:monospace; font-size:14px; color:var(--accent); margin-bottom:4px;">
+                &lt;${p.tag}${p.id ? ' id="' + p.id + '"' : ''}${p.classes.length ? ' class="' + p.classes.join(' ') + '"' : ''}&gt;
+            </div>
+            ${p.text ? `<div style="font-size:11px; opacity:0.7; margin-bottom:10px; font-style:italic;">"${p.text}${p.text.length >= 60 ? '…' : ''}"</div>` : ''}
+            <div style="margin-bottom:10px;">
+                ${row('Position', `${p.rect.x}, ${p.rect.y}`)}
+                ${row('Size', `${p.rect.w} × ${p.rect.h}`)}
+            </div>
+            <div>
+                ${Object.entries(p.styles).map(([k, v]) => row(k, v)).join('')}
+            </div>`;
     }
 },
 
@@ -10157,7 +10517,7 @@ insertUUID() {
        // Settings -> Customize Utility Bar for anyone who specifically
        // wants them closer to their thumb — removed from the DEFAULT,
        // not deleted from the tool map entirely.
-       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
+       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, bookmarkHere, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
 
        // Populates #modalUtilLayout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -11958,6 +12318,18 @@ initInfiniteRibbon() {
        // bracketMatching() keeps working regardless; see the long comment
        // on the compartment's setup for why turning this off doesn't fully
        // disable matching, just this app's louder styling for it).
+       // FIX: no visible change on toggle isn't a bug in the matching or
+       // its styling (both are real and already work — see the
+       // .cm-matchingBracket CSS override, which deliberately makes
+       // matches more legible than CM6's own barely-visible default) — the
+       // actual problem is that bracketMatching() ONLY highlights when the
+       // cursor sits directly next to a bracket. Toggle it off/on with the
+       // cursor anywhere else and there is genuinely nothing to see either
+       // way, which reads exactly like "I can't tell what this does."
+       // Jumping the cursor to the nearest bracket on the page right when
+       // this turns ON gives an immediate, real demonstration instead of
+       // requiring you to already know to go place your cursor next to a
+       // bracket yourself first.
        toggleBracketTracing() {
            if (!Nexus.editorCore.isCM6) {
                return alert("Bracket tracing requires the CM6 Engine — switch engines first (🔄 in the top bar).");
@@ -11973,10 +12345,41 @@ initInfiniteRibbon() {
                Nexus.editorCore.view.dispatch({
                    effects: Nexus.editorCore.bracketTracingCompartment.reconfigure(newExtension)
                });
+
+               if (newValue) {
+                   const view = Nexus.editorCore.view;
+                   const doc = view.state.doc.toString();
+                   const near = doc.slice(0, 400).search(/[{}()\[\]]/); // nearest bracket from the top of the file — a real, visible demo, not a guess at the cursor's own position
+                   if (near !== -1) {
+                       view.dispatch({ selection: { anchor: near + 1 }, scrollIntoView: true });
+                       const st = document.getElementById('footStatus');
+                       if (st) { st.innerText = "BRACKET TRACING ON — try placing your cursor next to any { } [ ] ( )"; setTimeout(() => Nexus.UI.syncStatus(), 3000); }
+                   } else {
+                       const st = document.getElementById('footStatus');
+                       if (st) { st.innerText = "BRACKET TRACING ON — highlights a pair whenever your cursor sits next to one"; setTimeout(() => Nexus.UI.syncStatus(), 3000); }
+                   }
+               }
            }
 
            const btn2 = document.getElementById('bracketTracingBtn');
            if (btn2) btn2.classList.toggle('btn-accent', newValue);
+       },
+
+       // Diff-as-you-type gutter toggle (Feature 4). Simpler than the
+       // Compartment-reconfigure pattern above: the gutter extension is
+       // always present in currentExtensions, gated purely by this
+       // preference INSIDE recomputeChangeGutter() itself — flipping the
+       // pref and forcing one recompute is enough, no Compartment swap
+       // needed since "off" already means "recompute always yields an
+       // empty RangeSet" rather than "the extension isn't loaded at all."
+       toggleChangeGutter() {
+           if (!Nexus.editorCore.isCM6) {
+               return alert("The change gutter requires the CM6 Engine — switch engines first (🔄 in the top bar).");
+           }
+           const newValue = !(Nexus.state.prefs.showChangeGutter !== false);
+           Nexus.state.prefs.showChangeGutter = newValue;
+           Nexus.settings.update('showChangeGutter', newValue);
+           if (Nexus.editorCore.refreshChangeGutter) Nexus.editorCore.refreshChangeGutter();
        },
 
        // Sticky scope headers toggle. Defaults ON like bracket tracing —
@@ -12247,6 +12650,8 @@ initInfiniteRibbon() {
            setActive('ribbonMenuWordWrap', !!Nexus.state.prefs.wordWrap);
            setActive('ribbonMenuWhitespace', !!Nexus.state.prefs.showWhitespace);
            setActive('ribbonMenuBracketTracing', Nexus.state.prefs.bracketTracing !== false);
+           setActive('ribbonMenuChangeGutter', Nexus.state.prefs.showChangeGutter !== false);
+           setActive('ribbonMenuBookmarkingEnabled', Nexus.state.prefs.bookmarkingEnabled !== false);
            setActive('ribbonMenuStickyScroll', Nexus.state.prefs.stickyScroll !== false);
            setActive('ribbonMenuMinimap', !!Nexus.state.prefs.minimap);
            setActive('ribbonMenuLint', !!Nexus.state.prefs.lintEnabled);
@@ -12497,9 +12902,33 @@ initInfiniteRibbon() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Bookmarks require the CM6 Engine — switch engines first (🔄 in the top bar).");
            }
+           // Real disable switch, not just "move the button somewhere less
+           // convenient" — Nexus.state.prefs.bookmarkingEnabled, toggled
+           // from the dropdown (toggleBookmarkingEnabled below). While
+           // off, this button is a genuine no-op instead of still placing
+           // a bookmark, which is what "stop accidental bookmarks" needs
+           // to actually mean.
+           if (Nexus.state.prefs.bookmarkingEnabled === false) {
+               const st = document.getElementById('footStatus');
+               if (st) { st.innerText = "BOOKMARKING DISABLED"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
+               return;
+           }
            const view = Nexus.editorCore.view;
            const pos = view.state.selection.main.head;
            Nexus.editorCore.toggleBookmarkAt(view, pos);
+       },
+
+       // The actual enable/disable switch — a separate concept from the
+       // per-line toggleBookmarkHere() above. This one is a real
+       // preference, not per-line state: while off, tapping the bookmark
+       // button anywhere does nothing at all, which is what "stop
+       // cleaning up accidental bookmarks" needs — a button that's merely
+       // less reachable still gets tapped by accident; one that's
+       // genuinely inert does not.
+       toggleBookmarkingEnabled() {
+           const newValue = !(Nexus.state.prefs.bookmarkingEnabled !== false);
+           Nexus.state.prefs.bookmarkingEnabled = newValue;
+           Nexus.settings.update('bookmarkingEnabled', newValue);
        },
 
        // Reads the CM6 bookmark StateField's current RangeSet and mirrors
@@ -12756,8 +13185,38 @@ jumpToLine(lineNumber, colNumber) {
     // target line in the visible area.
     ed.scrollTop = Math.max(0, (clampedLine - 1) * 22 - ed.clientHeight / 2);
 },
+
+// Copies every log line and tutor "explain" card currently in the sandbox
+// LOGS tab as plain text, in the order they appear (oldest first, since
+// that's the natural reading order top-to-bottom — matches what's on
+// screen, not reversed). Uses each entry's own .innerText rather than
+// .textContent (which would squash the tutor cards' headers/paragraphs
+// together with no line breaks) or raw .innerHTML (unreadable — full of
+// tags), so a card like "Why it matters: ... How to think about fixing
+// it: ..." copies out exactly as readable as it looks on screen.
+copyLogsToClipboard() {
+    const console = document.getElementById('ghostConsole');
+    if (!console || console.children.length === 0) {
+        return alert("No logs to copy yet — run the sandbox first.");
+    }
+    const text = Array.from(console.children)
+        .map(el => (el.innerText || '').trim())
+        .filter(Boolean)
+        .join('\n\n');
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            Nexus.shell.out('📋 Logs copied to clipboard.', 'success');
+        }).catch(() => {
+            alert("Clipboard access was denied — long-press the logs to copy manually.");
+        });
+    } else {
+        alert("Clipboard API isn't available here — long-press the logs to copy manually.");
+    }
+},
+
     segSandbox(name) {
-        const order = ['test', 'opts', 'logs'];
+        const order = ['test', 'opts', 'network', 'element', 'logs'];
         document.querySelectorAll('.sandbox-nav .seg-btn').forEach((b, i) => b.classList.toggle('active', order[i] === name));
         const targetId = 'sb' + name.charAt(0).toUpperCase() + name.slice(1);
         document.querySelectorAll('.sb-page').forEach(p => p.classList.toggle('active', p.id === targetId));
@@ -12768,6 +13227,12 @@ jumpToLine(lineNumber, colNumber) {
    if(!f || !c) return; 
    
    c.innerHTML = ""; 
+   // Fresh preview run = fresh network log and element pick — entries from
+   // a previous run of a different (or even the same) file would be
+   // actively misleading sitting next to a new run's results.
+   Nexus.networkMonitor.clear();
+   Nexus.elementInspector.lastPicked = null;
+   Nexus.elementInspector.render();
 
    // 1. Memory Management: Revoke old Blob URLs to prevent Pixel 7 memory leaks
    if (this.sandboxBlobs) {
@@ -12875,6 +13340,84 @@ const inj = "<scr" + "ipt>\n" +
     "};\n" +
     "console.log = (...args) => send(args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' '), '#3fb950');\n" +
     "console.error = (...args) => send('[ERR] ' + args.join(' '), '#f85149');\n" +
+    // Network monitor (Feature 1): intercepts BOTH fetch() and
+    // XMLHttpRequest — real projects use either or both — and reports
+    // method/url/status/duration/size back to the parent via the same
+    // window.parent bridge everything else here already uses. Wrapping
+    // fetch() has to preserve its exact Promise-returning contract (the
+    // user's own .then()/await on the ORIGINAL call must still work
+    // exactly as if this wrapper wasn't here) — timing and reporting
+    // happen as side effects around the real call, never by replacing
+    // what it resolves/rejects with.
+    "(function(){\n" +
+        "const send2 = (entry) => { try { window.parent.Nexus.networkMonitor._record(entry); } catch(e) {} };\n" +
+        "const realFetch = window.fetch ? window.fetch.bind(window) : null;\n" +
+        "if (realFetch) {\n" +
+            "window.fetch = function(input, init) {\n" +
+                "const start = performance.now();\n" +
+                "const url = typeof input === 'string' ? input : (input && input.url) || String(input);\n" +
+                "const method = (init && init.method) || (input && input.method) || 'GET';\n" +
+                "return realFetch(input, init).then((res) => {\n" +
+                    "const dur = performance.now() - start;\n" +
+                    "res.clone().text().then((body) => {\n" +
+                        "send2({ kind: 'fetch', method, url, status: res.status, ok: res.ok, duration: dur, size: body.length });\n" +
+                    "}).catch(() => send2({ kind: 'fetch', method, url, status: res.status, ok: res.ok, duration: dur, size: null }));\n" +
+                    "return res;\n" +
+                "}).catch((err) => {\n" +
+                    "send2({ kind: 'fetch', method, url, status: 0, ok: false, duration: performance.now() - start, error: String(err && err.message || err) });\n" +
+                    "throw err;\n" +
+                "});\n" +
+            "};\n" +
+        "}\n" +
+        "const RealXHR = window.XMLHttpRequest;\n" +
+        "if (RealXHR) {\n" +
+            "window.XMLHttpRequest = function() {\n" +
+                "const xhr = new RealXHR();\n" +
+                "let _method = 'GET', _url = '', _start = 0;\n" +
+                "const realOpen = xhr.open.bind(xhr);\n" +
+                "xhr.open = function(method, url, ...rest) { _method = method; _url = url; return realOpen(method, url, ...rest); };\n" +
+                "const realSend = xhr.send.bind(xhr);\n" +
+                "xhr.send = function(...args) {\n" +
+                    "_start = performance.now();\n" +
+                    "xhr.addEventListener('loadend', () => {\n" +
+                        "send2({ kind: 'xhr', method: _method, url: _url, status: xhr.status, ok: xhr.status >= 200 && xhr.status < 400, duration: performance.now() - _start, size: (xhr.responseText || '').length });\n" +
+                    "});\n" +
+                    "return realSend(...args);\n" +
+                "};\n" +
+                "return xhr;\n" +
+            "};\n" +
+        "}\n" +
+    "})();\n" +
+    // Element inspector (Feature 2): a single delegated click listener,
+    // only active while Nexus.elementInspector.active is true (toggled
+    // from the parent app) — checked at click time via the same
+    // window.parent bridge, so the listener can stay attached for the
+    // life of the preview without doing anything when the tool is off.
+    // Walks up from event.target to the nearest element with an id or
+    // class if the exact tapped node has neither, since "what did I tap"
+    // on a deeply nested layout is usually more useful one level up than
+    // the literal leaf text node's parent span.
+    "document.addEventListener('click', function(e) {\n" +
+        "let active = false;\n" +
+        "try { active = window.parent.Nexus.elementInspector.active; } catch(err) {}\n" +
+        "if (!active) return;\n" +
+        "e.preventDefault(); e.stopPropagation();\n" +
+        "let el = e.target;\n" +
+        "const cs = getComputedStyle(el);\n" +
+        "const r = el.getBoundingClientRect();\n" +
+        "const info = {\n" +
+            "tag: el.tagName.toLowerCase(), id: el.id || null,\n" +
+            "classes: el.className && typeof el.className === 'string' ? el.className.split(/\\s+/).filter(Boolean) : [],\n" +
+            "text: (el.textContent || '').trim().slice(0, 60),\n" +
+            "rect: { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) },\n" +
+            "styles: {\n" +
+                "fontSize: cs.fontSize, color: cs.color, background: cs.backgroundColor,\n" +
+                "padding: cs.padding, margin: cs.margin, display: cs.display,\n" +
+                "position: cs.position, flexDirection: cs.flexDirection, overflow: cs.overflow\n" +
+            "}\n" +
+        "};\n" +
+        "try { window.parent.Nexus.elementInspector._record(info); } catch(err) {}\n" +
+    "}, true);\n" +
     // Service workers cannot register from a srcdoc iframe — the document
     // has an opaque origin, so the browser rejects it unconditionally. For
     // a PWA that means every single preview run would throw a confusing

@@ -425,6 +425,14 @@
     .cm-bookmark-gutter:hover {
         background: rgba(255, 255, 255, 0.05);
     }
+    /* Diff-as-you-type gutter (Feature 4) — narrow and non-interactive on
+       purpose, unlike the bookmark gutter right above it: this is a
+       passive at-a-glance signal (which lines differ from what's saved),
+       not something meant to be clicked. */
+    .cm-change-gutter {
+        width: 6px;
+        padding: 0;
+    }
     /* Sticky scope headers (@fazelstudio/codemirror-stickyscroll). The
        package documents these exact custom properties for restyling —
        mapped here to this app's own theme variables instead of its
@@ -698,7 +706,23 @@
     #sandboxWrap { flex: 1; display: flex; flex-direction: column; background: #fff; }
     #sandboxFrame { flex: 1; border: none; }
     #ghostConsole { 
-        height: 35vh; 
+        /* FIX: this was a fixed height:35vh — a leftover from an earlier
+           layout where the console shared the LOGS page with something
+           else. .sb-page is already correctly set up as a proper flex
+           column that fills the modal and clips overflow (flex:1;
+           overflow:hidden on the page itself) — #ghostConsole just never
+           participated in that, so its own fixed 35vh box scrolled fine
+           on its own, but anything past that height (the tutor "explain"
+           cards especially, which can be tall) rendered BELOW it and got
+           clipped by the page's own overflow:hidden with no way to reach
+           it — exactly "cuts off halfway down the page." flex:1 lets it
+           fill whatever space .sb-page actually has instead of a
+           fixed guess; min-height:0 is needed for the same flexbox reason
+           the ID Usage Map list needed it (a flex item's default
+           min-height is "tall enough for all its content," which defeats
+           overflow-y:auto without this). */
+        flex: 1;
+        min-height: 0;
         background: #000; 
         color: #3fb950; 
         padding: 15px; 
