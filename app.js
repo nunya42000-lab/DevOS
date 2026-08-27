@@ -9223,6 +9223,13 @@ toggleKeyboardRows() {
        }
    },
 
+   // Tracks the currently-active drag's own move/end closures (module-
+   // level state, one drag at a time across the whole app — this app only
+   // ever has 2 draggable floating widgets and dragging is inherently a
+   // single-pointer gesture, so one shared slot is correct, not a
+   // per-widget map).
+   _activeDrag: null,
+
    initDrag(e, id) {
        // Same unguarded-null fix as toggleSnap above — el.dataset here had
        // no null check either.
@@ -9232,6 +9239,32 @@ toggleKeyboardRows() {
            return;
        }
        if (el.dataset.snapped === 'true') return;
+
+       // FIX (real, plausible "random freezes" source — same bug class as
+       // the utility-bar scrub fix above, actually worse here): move/end
+       // used to be freshly-created ANONYMOUS closures on every single
+       // call, with zero guard against re-entry. If the matching
+       // touchend/mouseup was ever swallowed before reaching this listener
+       // (an interrupting call/notification, the OS intercepting a
+       // gesture, the app backgrounding mid-drag — all real, common
+       // touchscreen conditions, not edge cases), that closure pair was
+       // permanently orphaned: since they were anonymous, nothing kept a
+       // reference to remove them later even if you wanted to — they'd
+       // just sit there forever as 2 more live document-level
+       // mousemove/touchmove listeners, doing real DOM writes (style.left/
+       // top) on every pixel of movement anywhere on the page. Every
+       // SUBSEQUENT drag of either floating widget in this app added yet
+       // another pair on top, with no cap. Fixed by tracking the current
+       // drag's handlers in one shared slot (_activeDrag) so a new drag
+       // can always force-clean whatever the previous one left behind
+       // before attaching its own — removeEventListener on a handler
+       // that's already gone is a harmless no-op, so this is safe to run
+       // unconditionally.
+       if (this._activeDrag) {
+           document.removeEventListener(this._activeDrag.moveEvent, this._activeDrag.move);
+           document.removeEventListener(this._activeDrag.endEvent, this._activeDrag.end);
+           this._activeDrag = null;
+       }
        
        const isTouch = e.type && e.type.indexOf('touch') === 0;
        const clientX = isTouch ? e.touches[0].clientX : e.clientX;
@@ -9250,13 +9283,20 @@ toggleKeyboardRows() {
            el.style.bottom = 'auto';
        };
 
+       const moveEvent = isTouch ? 'touchmove' : 'mousemove';
+       const endEvent = isTouch ? 'touchend' : 'mouseup';
+
        const end = () => {
-           document.removeEventListener(isTouch ? 'touchmove' : 'mousemove', move);
-           document.removeEventListener(isTouch ? 'touchend' : 'mouseup', end);
+           document.removeEventListener(moveEvent, move);
+           document.removeEventListener(endEvent, end);
+           if (Nexus.UI._activeDrag && Nexus.UI._activeDrag.end === end) {
+               Nexus.UI._activeDrag = null;
+           }
        };
 
-       document.addEventListener(isTouch ? 'touchmove' : 'mousemove', move, { passive: false });
-       document.addEventListener(isTouch ? 'touchend' : 'mouseup', end);
+       this._activeDrag = { move, end, moveEvent, endEvent };
+       document.addEventListener(moveEvent, move, { passive: false });
+       document.addEventListener(endEvent, end);
    },
    toggleWidget(id) {
            const el = document.getElementById(id);
@@ -9305,6 +9345,42 @@ toggleKeyboardRows() {
        _scrub: { active: false, startY: 0, startX: 0, moved: false, indicatorEl: null },
 
        scrubStart(event) {
+           // FIX (real, plausible "random freezes, gets worse over time"
+           // source): this added 4 document-level listeners on every
+           // single call with NO guard against re-entry and no
+           // corresponding cleanup if the matching scrubEnd never fires.
+           // scrubEnd normally removes them correctly (it uses named
+           // function references, the right way to make removeEventListener
+           // actually work) — but on a touchscreen, a touchend/mouseup can
+           // genuinely get swallowed before it ever reaches this listener:
+           // an interrupting call/notification overlay, the OS intercepting
+           // a gesture, the app backgrounding mid-touch, a finger sliding
+           // off-screen. Any of those leaves _scrub.active stuck true
+           // forever with 4 real listeners still attached — and the NEXT
+           // press of this same grip would have added 4 MORE on top,
+           // since there was no guard here at all. Repeat that a handful
+           // of times across a session and you get a pile of duplicate
+           // global mousemove/touchmove handlers — each doing real work
+           // (line-offset math, preventDefault, DOM reads) on every pixel
+           // of movement ANYWHERE on the page, not just on the grip —
+           // which matches "random freezes that aren't consistent" far
+           // better than a deterministic bug would: it depends entirely
+           // on how many times a scrub gesture got interrupted, which
+           // varies session to session.
+           //
+           // Two-part fix: force-clean any stale listeners from a
+           // previous, never-completed drag before starting a new one
+           // (idempotent — removing a listener that isn't there is a
+           // harmless no-op), and reset _scrub.active first so a
+           // currently-active real drag can't have its own state wiped
+           // out from under it by this call.
+           if (this._scrub.active) {
+               document.removeEventListener('mousemove', Nexus.UI.scrubMove);
+               document.removeEventListener('touchmove', Nexus.UI.scrubMove);
+               document.removeEventListener('mouseup', Nexus.UI.scrubEnd);
+               document.removeEventListener('touchend', Nexus.UI.scrubEnd);
+           }
+
            const point = event.touches ? event.touches[0] : event;
            this._scrub.active = true;
            this._scrub.startY = point.clientY;
