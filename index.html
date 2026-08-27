@@ -1293,19 +1293,22 @@
                     </select>
                 </div>
                 <div id="idMapSummary" style="font-size:11px; opacity:0.7; margin-bottom:10px; flex-shrink:0;"></div>
-                <!-- FIX: flex:1 alone doesn't set min-height, and a flex
-                     item's default min-height is 'auto' — i.e. tall enough
-                     to fit all its content. Combined with overflow-y:auto,
-                     that's a well-known flexbox trap: the browser ends up
-                     fighting between "grow to fit 227 accordions" and
-                     "clip and scroll at the flex-allocated height," and
-                     the actual rendering symptom is exactly what showed up
-                     — a scrollbar confirming a scrollable box exists, but
-                     every row squashed to a hairline instead of its real
-                     height. min-height:0 is the standard, documented fix:
-                     it lets flex:1 actually cap the box at the space
-                     available, which is what makes overflow-y:auto kick in
-                     correctly instead of the box just growing forever. -->
+                <!-- FIX #2 (the first min-height:0 fix on THIS container
+                     wasn't the whole story): every .diag-section child here
+                     is a flex item by virtue of this container's own
+                     display:flex — and flex items default to
+                     flex-shrink:1, meaning the browser is legally allowed
+                     to compress each one below its natural content height
+                     when space is tight. With 243 of them stacked here,
+                     that's exactly what was happening: every single
+                     accordion got compressed toward zero height uniformly,
+                     which is precisely the "243 identical hairline rows,
+                     no visible text" symptom — not a sizing issue on THIS
+                     container (already fixed), but on each ITEM inside it.
+                     flex-shrink:0 on the accordions themselves (below,
+                     inline on the generated markup) is the actual fix —
+                     each one is now guaranteed to render at its real
+                     content height no matter how many siblings exist. -->
                 <div id="idMapList" style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; gap:6px;"></div>
             </div>
         </div>

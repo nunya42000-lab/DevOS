@@ -8400,7 +8400,14 @@ idMap: {
                 </div>`
             ).join('');
 
-            return `<details class="diag-section" id="idMapAcc${i}">
+            // flex-shrink:0 is the real fix here — see the long comment on
+            // #idMapList's own container in index.html for why every
+            // accordion was rendering as an identical compressed hairline
+            // with no visible text: as a flex item with the default
+            // flex-shrink:1, the browser was legally compressing each one
+            // below its real content height once there were 243 of them
+            // competing for space in the scroll container.
+            return `<details class="diag-section" id="idMapAcc${i}" style="flex-shrink:0;">
                 <summary style="display:flex; align-items:center; gap:8px;">
                     <span style="font-family:monospace; font-weight:bold; ${isOrphan ? 'color:var(--danger);' : ''}">#${id}</span>
                     <span style="opacity:0.6; font-size:10px;">${info.uses.length} use${info.uses.length === 1 ? '' : 's'} · ${fileCount} file${fileCount === 1 ? '' : 's'}${isOrphan ? ' · unused' : ''}</span>
