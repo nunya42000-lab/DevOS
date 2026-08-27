@@ -1574,6 +1574,32 @@ runCssAudit() {
    
    init() {
    if (this.instance) return;
+
+   // FIX (real, previously-unguarded boot-time crash): this used to call
+   // `new Terminal(...)` and `new FitAddon.FitAddon()` completely
+   // unguarded — both are GLOBALS that only exist once their respective
+   // CDN scripts (xterm.js, xterm-addon-fit) have actually finished
+   // loading and executing. Nexus.UI.boot() only ever checked
+   // `typeof Nexus.Terminal.init === 'function'` before calling this —
+   // that confirms the FUNCTION exists, not that ITS dependencies do. If
+   // either CDN script hadn't finished loading yet by the time boot
+   // reached this line (slow connection, first-ever load before the
+   // service worker's precache existed, a blocked/failed request), this
+   // threw a genuine, completely uncaught ReferenceError — and since
+   // there was no try/catch anywhere around it, that uncaught throw
+   // HALTED THE REST OF BOOT MID-SEQUENCE: everything scheduled after
+   // this line in Nexus.UI.boot() (CM6/edit-mode restoration, keyboard-
+   // viewport tracking) would simply never run. That's exactly the
+   // "random undefined" symptom pattern from earlier — a boot-time
+   // exception silently skipping later initialization, not a single
+   // broken feature.
+   if (typeof Terminal === 'undefined' || typeof FitAddon === 'undefined') {
+       console.error("VORTEX: xterm.js or its fit addon failed to load — the in-app Terminal will be unavailable this session, but nothing else is affected.");
+       if (Nexus.shell && typeof Nexus.shell.out === 'function') {
+           Nexus.shell.out("Terminal unavailable — xterm.js didn't load (check your connection).", 'warn');
+       }
+       return;
+   }
    
    // 1. Initialize xterm
    this.instance = new Terminal({
@@ -8888,79 +8914,78 @@ async exec(cmdStr) {
 UI: {
     // Update your boot function to be completely non-blocking and guarded
     // Inside Nexus.UI
-        async boot() { 
-        console.log("VORTEX BOOT: Sequence Initiated");
-        try {
-            // FIX: Manually ignite the UI engines for ribbon and swipes
-            if (typeof this.initSubSystems === 'function') this.initSubSystems();
-            if (typeof this.updateWidgets === 'function') this.updateWidgets();
-        
-            // 1. Core Vfs Initialization
-            if (Nexus.Vfs && typeof Nexus.Vfs.boot === 'function') {
-                console.log("VORTEX BOOT: Awaiting Vfs.boot()...");
-                await Nexus.Vfs.boot(); 
-                console.log("VORTEX BOOT: Vfs.boot() complete.");
-            } else {
-                console.warn("VORTEX BOOT WARN: Nexus.Vfs core module missing or unparsed.");
-            }
-        
-            // 2. Safe Guarded Module Cascade
-            if (Nexus.vault && typeof Nexus.vault.boot === 'function') {
-                console.log("VORTEX BOOT: Awaiting vault.boot()...");
-                await Nexus.vault.boot();
-            }
-            if (Nexus.snapshots && typeof Nexus.snapshots.boot === 'function') {
-                console.log("VORTEX BOOT: Awaiting snapshots.boot()...");
-                await Nexus.snapshots.boot();
-            }
-            if (Nexus.settings && typeof Nexus.settings.boot === 'function') {
-                console.log("VORTEX BOOT: Awaiting settings.boot()...");
-                await Nexus.settings.boot();
-            }
-
-            console.log("VORTEX BOOT: Async modules loaded. Restoring UI state...");
-
-            // FIX: Re-apply saved values to the screen now that settings are loaded.
-            if (typeof this.updateWidgets === 'function') this.updateWidgets();
-            if (typeof this.renderUtilBar === 'function') this.renderUtilBar();
-            if (typeof this.renderUtilMirror === 'function') this.renderUtilMirror();
-            
-            // 3. Engine Initializations
-            if (Nexus.DpadEngine && typeof Nexus.DpadEngine.init === 'function') Nexus.DpadEngine.init();
-            if (Nexus.DpadEngine && typeof Nexus.DpadEngine.setupFastHold === 'function') Nexus.DpadEngine.setupFastHold();
-            if (Nexus.omni && typeof Nexus.omni.init === 'function') Nexus.omni.init();
-            if (Nexus.CR && typeof Nexus.CR.init === 'function') Nexus.CR.init();
-            if (Nexus.Terminal && typeof Nexus.Terminal.init === 'function') Nexus.Terminal.init();
-            
-            // RESTORE saved engine preference
-            if (Nexus.state.prefs.activeEngine === 'cm6' && Nexus.state.activeFile) {
-                setTimeout(() => Nexus.toggleEditor(), 300);
-            }
-
-            // RESTORE saved edit-mode (util/full)
-            if (Nexus.state.activeFile) {
-                setTimeout(() => {
-                    Nexus.UI.setEditMode(Nexus.state.prefs.editMode || 'util');
-                }, 500);
-            }
-            
-            // 4. Element DOM Check
-            if (document.getElementById('dreamerType') && Nexus.dreamer && typeof Nexus.dreamer.updatePreview === 'function') {
-                Nexus.dreamer.updatePreview(); 
-            }
-
-            // 5. Keyboard-aware viewport
-            if (typeof this.trackKeyboardViewport === 'function') this.trackKeyboardViewport();
-            
-            console.log("VORTEX BOOT: Sequence Complete!");
-
-        } catch (error) {
-            console.error("VORTEX BOOT FATAL ERROR: The sequence was aborted.", error);
-            // This is where you can trigger a "Safe Mode" UI or a manual retry button
-            // so the user isn't stuck staring at a frozen screen.
+    async boot() { 
+    
+        // FIX: Manually ignite the UI engines for ribbon and swipes
+        if (typeof this.initSubSystems === 'function') this.initSubSystems();
+        if (typeof this.updateWidgets === 'function') this.updateWidgets();
+    
+        // 1. Core Vfs Initialization
+        if (Nexus.Vfs && typeof Nexus.Vfs.boot === 'function') {
+            await Nexus.Vfs.boot(); 
+        } else {
+            console.warn("VORTEX BOOT WARN: Nexus.Vfs core module missing or unparsed.");
         }
-    }
+    
+        // 2. Safe Guarded Module Cascade
+        if (Nexus.vault && typeof Nexus.vault.boot === 'function') await Nexus.vault.boot(); 
+        if (Nexus.snapshots && typeof Nexus.snapshots.boot === 'function') await Nexus.snapshots.boot(); 
+        if (Nexus.settings && typeof Nexus.settings.boot === 'function') await Nexus.settings.boot(); 
 
+        // FIX: the initial initSubSystems()/updateWidgets() calls above ran
+        // before settings.boot() had restored the real saved prefs (widget
+        // visibility, utility bar layout), so they rendered/applied only the
+        // hardcoded defaults every single time — the saved values were
+        // sitting correctly in storage the whole time, just never re-applied
+        // to the screen once loaded. Do it again now that they're in.
+        if (typeof this.updateWidgets === 'function') this.updateWidgets();
+        if (typeof this.renderUtilBar === 'function') this.renderUtilBar();
+        if (typeof this.renderUtilMirror === 'function') this.renderUtilMirror();
+        
+        // 3. Engine Initializations
+        if (Nexus.DpadEngine && typeof Nexus.DpadEngine.init === 'function') Nexus.DpadEngine.init();
+        // The dock's arrow buttons (and their hold-to-repeat) get their
+        // listeners from setupFastHold(). This used to live only inside a
+        // dead function nothing called, so the bottom-toolbar arrows never
+        // worked at all. It must run at boot, unconditionally.
+        if (Nexus.DpadEngine && typeof Nexus.DpadEngine.setupFastHold === 'function') Nexus.DpadEngine.setupFastHold();
+        if (Nexus.omni && typeof Nexus.omni.init === 'function') Nexus.omni.init();
+        if (Nexus.CR && typeof Nexus.CR.init === 'function') Nexus.CR.init();
+        if (Nexus.Terminal && typeof Nexus.Terminal.init === 'function') Nexus.Terminal.init();
+        
+        // RESTORE saved engine preference
+        if (Nexus.state.prefs.activeEngine === 'cm6' && Nexus.state.activeFile) {
+            setTimeout(() => Nexus.toggleEditor(), 300);
+        }
+
+        // RESTORE saved edit-mode (util/full — 'readonly' no longer exists
+        // as a mode) — chained after a longer delay than the engine
+        // restoration above so it applies once CM6 (if being restored) has
+        // actually finished swapping in; applying inputmode/contentEditable
+        // state before that would touch Nexus.editorCore.view.contentDOM
+        // before that view exists.
+        // Defaults to 'util' (the safer of the two remaining states — still
+        // fully interactive, just keyboard-suppressed) if nothing was ever
+        // saved, or if a pre-refactor save still has the old 'readonly'
+        // value sitting in storage — setEditMode() itself also collapses
+        // any unrecognized value to 'util' as a second layer of the same
+        // guard.
+        if (Nexus.state.activeFile) {
+            setTimeout(() => {
+                Nexus.UI.setEditMode(Nexus.state.prefs.editMode || 'util');
+            }, 500);
+        }
+        
+        // 4. Element DOM Check
+        if (document.getElementById('dreamerType') && Nexus.dreamer && typeof Nexus.dreamer.updatePreview === 'function') {
+            Nexus.dreamer.updatePreview(); 
+        }
+
+        // 5. Keyboard-aware viewport (see trackKeyboardViewport below). Runs
+        // once for the app's lifetime, not per-file/per-engine-switch.
+        if (typeof this.trackKeyboardViewport === 'function') this.trackKeyboardViewport();
+        
+    },
     
   // Fixed initialization block structure with explicit method wrapping and closing brace
   initSubSystems() {  
