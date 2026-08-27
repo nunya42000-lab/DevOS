@@ -2920,6 +2920,29 @@ navigate(dir) {
     }
 }, // Closes navigate() cleanly
 
+// Nav Drawer's "beginning of line" / "⏭️ end of line" buttons — thin
+// wrappers around navigate() itself rather than a third reimplementation
+// of line-boundary logic: navigate() already computes exactly this for
+// both engines (CM6's cursorLineStart/cursorLineEnd commands via
+// lineLock+Left/Right, and the vanilla engine's own equivalent character
+// math), just gated behind lineLock being on. Temporarily forces it on
+// for one synchronous call then restores whatever it actually was —
+// safe to do synchronously with no risk of a concurrent hold-to-repeat
+// tick reading the flag mid-flip, since JS has nothing that can interleave
+// between the set/call/restore in the same synchronous pass.
+goToLineStart() {
+    const original = this.lineLock;
+    this.lineLock = true;
+    this.navigate('Left');
+    this.lineLock = original;
+},
+goToLineEnd() {
+    const original = this.lineLock;
+    this.lineLock = true;
+    this.navigate('Right');
+    this.lineLock = original;
+},
+
 }, // Closes the parent DpadEngine object block cleanly
 
 clones: {
@@ -9436,6 +9459,8 @@ insertUUID() {
            { group: 'Fix & Format', key: 'blanklines', label: 'Remove Blank Lines' },
            { group: 'Fix & Format', key: 'alignleft', label: 'Align Left' },
            { group: 'Fix & Format', key: 'reindent', label: 'Re-indent by Depth' },
+           { group: 'Selection & Lines', key: 'lineStart', label: 'Move Cursor to Beginning of Line' },
+           { group: 'Selection & Lines', key: 'lineEnd', label: 'Move Cursor to End of Line' },
            // Ribbon-mirrored tools — the ribbon's own fixed set (Save,
            // Refresh, Undo, Redo, Insert Tab, Outdent, Cut, Copy, Paste,
            // Run) mirrored here so they're also available as optional
@@ -9496,8 +9521,10 @@ insertUUID() {
            blanklines: { icon: '🧽', onclick: 'Nexus.Sentinel.removeBlankLines()' },
            alignleft: { icon: '⬅️', onclick: 'Nexus.Sentinel.alignLeft()' },
            reindent: { icon: '📐', onclick: 'Nexus.Sentinel.reindentByDepth()' },
+           lineStart: { icon: '⏮️', onclick: 'Nexus.DpadEngine.goToLineStart()' },
+           lineEnd: { icon: '⏭️', onclick: 'Nexus.DpadEngine.goToLineEnd()' },
        },
-       DEFAULT_NAV_DRAWER_LAYOUT: 'jumpBracket, oneLine, select, editChunk',
+       DEFAULT_NAV_DRAWER_LAYOUT: 'jumpBracket, oneLine, lineStart, lineEnd',
 
        renderNavDrawerButtons() {
            const layout = (Nexus.state.prefs.navDrawerLayout || Nexus.UI.DEFAULT_NAV_DRAWER_LAYOUT)
@@ -10229,26 +10256,63 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        // own single-line mode still inserts the line breaks it considers
        // mandatory (e.g. after every statement in a block), which defeats
        // the point of an actual one-liner.
+       // FIX: this always used the cursor-position node lookup
+       // (_getEnclosingDeclaration), completely ignoring an active
+       // selection — so highlighting a specific block of code and tapping
+       // "To 1-Line" would silently collapse whatever function/class the
+       // CURSOR happened to be inside instead of the actual highlighted
+       // text. Same fix as chunkEditor.openForCursor() already has: check
+       // for a real selection first and use its exact bounds verbatim,
+       // falling back to the cursor-position lookup only when nothing's
+       // selected — preserving the original "just place your cursor
+       // inside a function" behavior for that case, unchanged.
        collapseSelectionToOneLine() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("This tool requires the CM6 Engine.");
            }
            const view = Nexus.editorCore.view;
-           const target = this._getEnclosingDeclaration(view);
-           if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
+           const sel = view.state.selection.main;
+           let target;
+
+           if (!sel.empty) {
+               // A manual selection has no syntax node to read a type
+               // from the way the cursor-position fallback does — but
+               // blindly defaulting every manual selection to the
+               // JS-shaped collapse logic risks exactly the corruption
+               // _toOneLineHTML was built to avoid (mangled URLs in
+               // attributes, destroyed whitespace in quoted values) if
+               // someone highlights actual markup. Infer from the active
+               // file's extension plus a quick shape-check on the
+               // selected text itself (starts with '<' after trimming) —
+               // both signals have to agree before treating it as HTML,
+               // so a JS/CSS selection inside an .html file (e.g. code
+               // inside a <script> block) still correctly gets the
+               // JS-shaped path rather than being misdetected just for
+               // living inside an .html file.
+               const selectedText = view.state.doc.sliceString(sel.from, sel.to);
+               const activeExt = (Nexus.state.activeFile || '').split('.').pop().toLowerCase();
+               const looksLikeMarkup = /^\s*</.test(selectedText) && (activeExt === 'html' || activeExt === 'htm');
+               target = { declFrom: sel.from, declTo: sel.to, nodeName: looksLikeMarkup ? 'Element' : 'selection' };
+           } else {
+               target = this._getEnclosingDeclaration(view);
+               if (!target) return alert("Place the cursor inside a function, class, const, or object first — or select a range of text.");
+           }
 
            const original = view.state.doc.sliceString(target.declFrom, target.declTo);
            const oneLined = this._toOneLine(original, target.nodeName);
 
            if (oneLined === original) return; // already minimal, nothing to do
 
-           // Stash the pre-collapse text keyed by position so
-           // expandSelectionFromOneLine can restore exact original
-           // formatting rather than just re-running a generic formatter
-           // (which could produce different style choices than the user
-           // originally had — e.g. their own comment placement).
+           // Stash the pre-collapse text (plus the collapsed line's own
+           // length) keyed by position so expandSelectionFromOneLine can
+           // restore exact original formatting rather than just re-
+           // running a generic formatter (which could produce different
+           // style choices than the user originally had — e.g. their own
+           // comment placement), AND so it knows exactly how much text to
+           // replace on the way back without needing to guess a range
+           // from line boundaries or re-derive a syntax node.
            Nexus.state._foldSnapshots = Nexus.state._foldSnapshots || {};
-           Nexus.state._foldSnapshots[target.declFrom] = original;
+           Nexus.state._foldSnapshots[target.declFrom] = { original, collapsedLength: oneLined.length };
 
            view.dispatch({
                changes: { from: target.declFrom, to: target.declTo, insert: oneLined },
@@ -10271,25 +10335,47 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
                return alert("This tool requires the CM6 Engine.");
            }
            const view = Nexus.editorCore.view;
-           const target = this._getEnclosingDeclaration(view);
-           if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
-
-           const current = view.state.doc.sliceString(target.declFrom, target.declTo);
+           const cursorPos = view.state.selection.main.head;
            const snapshots = Nexus.state._foldSnapshots || {};
-           const snapshot = snapshots[target.declFrom];
 
-           if (snapshot) {
+           // FIX: this used to always re-derive "target" via
+           // _getEnclosingDeclaration (a fresh syntax-tree lookup from the
+           // cursor's current position) before ever checking for a
+           // snapshot — but collapseSelectionToOneLine() now also handles
+           // manual selections, which have no syntax node to rediscover
+           // the same way a moment later. The snapshot map is already
+           // keyed by the exact position the collapse happened at
+           // (collapseSelectionToOneLine leaves the cursor sitting
+           // exactly there afterward), so checking that position directly
+           // first — before doing any syntax-tree work at all — is both
+           // more correct and more direct: it can't accidentally resolve
+           // to the WRONG node on the newly-collapsed single line (whose
+           // own enclosing-declaration boundaries may no longer match
+           // where the original multi-line block started/ended) and fail
+           // to find a snapshot that's actually sitting right there.
+           if (snapshots[cursorPos] !== undefined) {
+               const { original: snapshotText, collapsedLength } = snapshots[cursorPos];
+               // Exact replacement range from the stashed collapsed
+               // length — no guessing from line boundaries, which could
+               // be wrong if anything else legitimately shares that same
+               // line, and no re-deriving a syntax node, which the
+               // now-collapsed single line might resolve differently than
+               // the original multi-line block did.
+               const declTo = cursorPos + collapsedLength;
                view.dispatch({
-                   changes: { from: target.declFrom, to: target.declTo, insert: snapshot },
-                   selection: { anchor: target.declFrom }
+                   changes: { from: cursorPos, to: declTo, insert: snapshotText },
+                   selection: { anchor: cursorPos }
                });
-               delete snapshots[target.declFrom];
+               delete snapshots[cursorPos];
                const st = document.getElementById('footStatus');
                if (st) { st.innerText = "RESTORED"; st.style.color = "var(--success)"; setTimeout(() => Nexus.UI.syncStatus(), 2000); }
                return;
            }
 
-           // No snapshot (e.g. the file was reloaded, or this one-liner
+           const target = this._getEnclosingDeclaration(view);
+           if (!target) return alert("Place the cursor inside a function, class, const, or object first.");
+
+           const current = view.state.doc.sliceString(target.declFrom, target.declTo);
            // was hand-written, not tool-collapsed) — reformat with
            // Prettier instead of just failing silently. Wrapping keeps
            // babel's parser happy for fragments that aren't valid as a
@@ -11182,6 +11268,26 @@ initInfiniteRibbon() {
                    </label>
                `).join('');
            }
+
+           // FIX (Device Sync opening underneath Settings): every
+           // .modal-overlay shares the same z-index (10000, in the
+           // stylesheet) — with two active at once, the browser falls
+           // back to DOM source order to decide which renders on top,
+           // not "which was opened more recently." Since this app's
+           // entire modal design is one full-screen dimmed overlay at a
+           // time, never two intentionally stacked, the real fix is
+           // making that actually true: close any other currently-open
+           // modal before opening this one. This wasn't unique to
+           // Settings/Device Sync — the same latent bug exists for every
+           // modal that opens another modal from inside itself (Compare,
+           // Vault, Templates, Compress, Sprite Sheet, Customize Utility
+           // Bar, the LocalStorage Inspector all do this too) — Settings
+           // was just the one case where it happened to be visible, since
+           // its own launch points (Files panel, Diagnostics Hub) are
+           // side panels, not .modal-overlay elements themselves.
+           document.querySelectorAll('.modal-overlay.active').forEach(el => {
+               if (el.id !== this.toModalId(id)) el.classList.remove('active');
+           });
            document.getElementById(this.toModalId(id)).classList.add('active'); 
        },
 
@@ -11740,6 +11846,30 @@ initInfiniteRibbon() {
        // everything else uses matchBrackets()'s own real bracket-position
        // data to build a selection from the first bracket's start through
        // the second bracket's end, brackets included.
+       // FIX: the previous version checked for an enclosing HTML Element
+       // node FIRST, before ever trying matchBrackets — which is backwards
+       // and caused a real regression: since an ancestor-walk looking for
+       // an Element node will always eventually find one for ANY position
+       // inside an HTML file (including a JS bracket sitting inside an
+       // embedded <script> tag, since that tag's own Element node is a
+       // genuine ancestor of everything inside it), tapping Match Bracket
+       // on a { or } inside a <script> block would incorrectly select the
+       // ENTIRE surrounding <script>...</script> tag instead of matching
+       // the specific bracket that was actually tapped.
+       //
+       // matchBrackets() already handles HTML correctly on its own —
+       // lang-html registers bracketMatchingHandle specifically so tag
+       // names route through the same matcher as {}/[]/() (see the
+       // matchBrackets module-loading comment above for the exact
+       // mechanism) — so there was never a need for a separate Element-
+       // node code path at all. This tries matchBrackets FIRST, at the
+       // exact cursor position and a couple of small position nudges (the
+       // matcher needs the position to land ON the bracket/tag-name text,
+       // not merely nearby, and the cursor is often sitting just before
+       // or after it rather than exactly on it) — only if every nearby
+       // position genuinely finds nothing does it fall back to selecting
+       // the enclosing element, which is now the FALLBACK, not the first
+       // thing tried.
        jumpToMatchingBracket() {
            if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
                return alert("Jump to matching bracket requires the CM6 Engine — switch engines first (🔄 in the top bar).");
@@ -11747,13 +11877,47 @@ initInfiniteRibbon() {
            const view = Nexus.editorCore.view;
            const useSelect = !!(Nexus.DpadEngine && Nexus.DpadEngine.selectLock);
            const pos = view.state.selection.main.head;
+           const { matchBrackets, cursorMatchingBracket, syntaxTree } = Nexus.editorCore.modules;
 
-           // HTML: resolve the nearest enclosing Element node and use its
-           // exact span — this is the syntax tree's own record of exactly
-           // where the opening tag starts and the closing tag ends, so it
-           // is inherently "whole tags, inclusive" with no bracket-
-           // counting involved at all.
-           const { syntaxTree } = Nexus.editorCore.modules;
+           if (typeof matchBrackets !== 'function') {
+               return alert("Bracket jump isn't available (module failed to load).");
+           }
+
+           // Try the exact position first (both directions, since the
+           // cursor could be just before an opening bracket/tag-name or
+           // just after a closing one), then a couple of small nudges —
+           // handles the common case of the cursor sitting adjacent to,
+           // rather than exactly on, a tag's name text.
+           let match = null;
+           for (const tryPos of [pos, pos - 1, pos + 1]) {
+               if (tryPos < 0 || tryPos > view.state.doc.length) continue;
+               match = matchBrackets(view.state, tryPos, 1) || matchBrackets(view.state, tryPos, -1);
+               if (match && match.end) break;
+           }
+
+           if (match && match.end) {
+               if (useSelect) {
+                   // Inclusive of both bracket characters/tag-name tokens —
+                   // from the earlier one's own start to the later one's
+                   // own end, regardless of which direction was searched.
+                   const from = Math.min(match.start.from, match.end.from);
+                   const to = Math.max(match.start.to, match.end.to);
+                   view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
+               } else if (typeof cursorMatchingBracket === 'function') {
+                   cursorMatchingBracket(view);
+               } else {
+                   view.dispatch({ selection: { anchor: match.end.to }, scrollIntoView: true });
+               }
+               view.focus();
+               return;
+           }
+
+           // Fallback: no bracket/tag-name match found at or near the
+           // cursor at all (e.g. cursor is inside plain text content
+           // between tags, not on any tag itself) — select the nearest
+           // enclosing Element as a reasonable "whole tag" result rather
+           // than just reporting failure, but only reached now as a last
+           // resort, not tried before the precise match above.
            if (syntaxTree) {
                const tree = syntaxTree(view.state);
                let node = tree.resolveInner(pos, 1);
@@ -11770,43 +11934,10 @@ initInfiniteRibbon() {
                    if (!node.parent) break;
                    node = node.parent;
                }
-               // No enclosing Element found (not HTML, or cursor is
-               // outside any tag, e.g. in a <script> block's own JS) —
-               // fall through to the bracket-based path below.
            }
 
-           const { matchBrackets, cursorMatchingBracket } = Nexus.editorCore.modules;
-           if (typeof matchBrackets !== 'function') {
-               return alert("Bracket jump isn't available (module failed to load).");
-           }
-
-           // Check both directions (dir 1 and -1) since the cursor could
-           // be sitting just before an opening bracket or just after a
-           // closing one — matchBrackets only looks one direction at a
-           // time from a given position.
-           let match = matchBrackets(view.state, pos, 1) || matchBrackets(view.state, pos, -1);
-           if (!match || !match.end) {
-               const st = document.getElementById('footStatus');
-               if (st) { st.innerText = "NO BRACKET HERE"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
-               return;
-           }
-
-           if (useSelect) {
-               // Inclusive of both bracket characters — from the earlier
-               // bracket's own start to the later bracket's own end,
-               // regardless of which direction was actually searched.
-               const from = Math.min(match.start.from, match.end.from);
-               const to = Math.max(match.start.to, match.end.to);
-               view.dispatch({ selection: { anchor: from, head: to }, scrollIntoView: true });
-           } else if (typeof cursorMatchingBracket === 'function') {
-               cursorMatchingBracket(view);
-           } else {
-               // Fallback if the cursor-only command failed to load for
-               // some reason: still move the cursor using matchBrackets'
-               // own data rather than leaving the tap with zero effect.
-               view.dispatch({ selection: { anchor: match.end.to }, scrollIntoView: true });
-           }
-           view.focus();
+           const st = document.getElementById('footStatus');
+           if (st) { st.innerText = "NO BRACKET HERE"; setTimeout(() => Nexus.UI.syncStatus(), 1500); }
        },
 
        // Toggles a bookmark on the line the cursor is currently on —
