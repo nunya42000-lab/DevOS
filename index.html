@@ -1466,7 +1466,7 @@
 
     <!-- 2. Main Active Toolbar Row -->
     <div class="dock-toolbar">
-        <div class="dock-group dpad-group">
+        <div class="dock-group dpad-group" style="margin-right: -8px;">
             <button class="sleek-btn" onclick="Nexus.UI.openSuggestions()" title="Code Suggestions" aria-label="Open code suggestions">💡</button>
             <button id="navToggleBtn" class="sleek-btn" onclick="Nexus.UI.toggleNavButtons()" title="Toggle Arrow Keys" aria-label="Toggle arrow key controls">◀▶</button>
             
@@ -1485,14 +1485,18 @@
             <button id="rowToggleBtn" class="sleek-btn" onclick="Nexus.UI.toggleKeyboardRows()" title="Toggle Keyboard Rows" aria-label="Toggle extra keyboard rows">↕️</button>
         </div>
         
-<!-- The .dock-divider that used to sit here (1px rule + 4px margin each
-     side) plus this container's own padding-left were what put a visible
-     gap between ↕️ and 🔍. Both removed. The remaining separation was
-     .dock-toolbar's own `gap: 8px` between its direct children — cancelled
-     with an equal negative left margin here rather than by changing that
-     gap, since it's shared by every other group in the toolbar and
-     reducing it globally would tighten spacing everywhere else too. -->
-<div id="ribbonDrawerControls" style="display: flex; gap: 6px; margin-left: -8px; padding-right: 6px; align-items: center;">
+<!-- The .dock-divider that used to sit here (1px rule + 4px margins) and
+     this container's padding-left were what put a visible gap between ↕️
+     and 🔍. Both removed.
+     NOT removed with a negative margin-left: that pulled this whole
+     container 8px leftward, sliding its FIRST buttons (🔍 and ✍️)
+     underneath the preceding .dock-group, which then swallowed their
+     taps — no flash, no console error, just dead buttons, because the
+     tap never reached them at all. The remaining separation is
+     .dock-toolbar's own `gap: 8px` between children; it's cancelled on
+     the group BEFORE this one instead (margin-right), which closes the
+     same gap without moving this container's buttons under anything. -->
+<div id="ribbonDrawerControls" style="display: flex; gap: 6px; padding-right: 6px; align-items: center;">
     <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('searchDrawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);" title="Find &amp; Replace" aria-label="Open find and replace">🔍</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('writerDrawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);" title="Boilerplate Architect" aria-label="Open boilerplate snippet writer">✍️</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleSlide('shell')" title="Command Shell" aria-label="Toggle command shell">⌨️</button>
