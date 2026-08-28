@@ -7788,6 +7788,405 @@ merge: {
     }
 },
 
+// N-WAY VARIANT MERGE ("Chronos Swipes").
+// Pick one file as MASTER, load any number of variant files, and walk down
+// master stopping at every spot where at least one variant disagrees. Each
+// stop offers every distinct version of that spot (master's own included),
+// cycled with swipe-left/right or buttons, and Build assembles a new file
+// from the choices.
+//
+// The alignment algorithm was prototyped and tested against real jsdiff
+// before any of this UI existed — including the cases that break naive
+// implementations: pure deletions, insertions at start-of-file, appends at
+// end-of-file (zero-width regions, which a plain range-overlap test drops
+// entirely), variants that happen to agree with master, and three-way
+// conflicts at the same spot. Assembly with all-master choices was verified
+// to reproduce the original file byte-for-byte.
+variantMerge: {
+    master: null,        // filename
+    variants: [],        // [{ name, text }]
+    regions: [],         // [{ masterStart, masterEnd, options:[{label,lines,sources}] }]
+    choices: [],         // index into each region's options
+    current: 0,          // which region is on screen
+
+    // One master-vs-variant diff -> { masterStart, masterEnd, replacement }
+    // changes, master line indices 0-based, masterEnd exclusive. A pure
+    // insertion is zero-width (masterStart === masterEnd).
+    _changesFor(masterText, variantText) {
+        const hunks = Diff.diffLines(masterText, variantText);
+        const changes = [];
+        let mLine = 0;
+        for (let i = 0; i < hunks.length; i++) {
+            const h = hunks[i];
+            const lines = h.value.endsWith('\n') ? h.value.split('\n').slice(0, -1) : h.value.split('\n');
+            const count = lines.length;
+            if (h.removed) {
+                const next = hunks[i + 1];
+                if (next && next.added) {
+                    // removed-immediately-followed-by-added is jsdiff's
+                    // representation of "this changed" (same adjacency the
+                    // 2-file Merge already relies on), not a delete plus an
+                    // unrelated insert.
+                    const nextLines = next.value.endsWith('\n') ? next.value.split('\n').slice(0, -1) : next.value.split('\n');
+                    changes.push({ masterStart: mLine, masterEnd: mLine + count, replacement: nextLines });
+                    i++;
+                } else {
+                    changes.push({ masterStart: mLine, masterEnd: mLine + count, replacement: [] });
+                }
+                mLine += count;
+            } else if (h.added) {
+                changes.push({ masterStart: mLine, masterEnd: mLine, replacement: lines });
+            } else {
+                mLine += count;
+            }
+        }
+        return changes;
+    },
+
+    _masterLines() {
+        const t = Nexus.state.Vfs[this.master] || '';
+        return t.endsWith('\n') ? t.split('\n').slice(0, -1) : t.split('\n');
+    },
+
+    computeRegions() {
+        const masterText = Nexus.state.Vfs[this.master] || '';
+        const masterLines = this._masterLines();
+        const perVariant = this.variants.map(v => ({ name: v.name, changes: this._changesFor(masterText, v.text) }));
+
+        // Every variant's change ranges, merged into shared decision regions.
+        let ranges = [];
+        perVariant.forEach(v => v.changes.forEach(c => ranges.push([c.masterStart, c.masterEnd])));
+        ranges.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        const merged = [];
+        for (const r of ranges) {
+            const last = merged[merged.length - 1];
+            if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+            else merged.push([r[0], r[1]]);
+        }
+
+        this.regions = merged.map(([s, e]) => {
+            const options = [{ label: 'MASTER', lines: masterLines.slice(s, e), sources: [this.master] }];
+            perVariant.forEach(v => {
+                // Relevance filter handles zero-width insertions explicitly:
+                // a plain overlap test misses them, and when the REGION is
+                // itself zero-width (an end-of-file append) a naive
+                // "start >= end -> stop" check drops it before it's read.
+                const relevant = v.changes.filter(ch =>
+                    ch.masterStart === ch.masterEnd
+                        ? (ch.masterStart >= s && ch.masterStart <= e)
+                        : (ch.masterStart < e && ch.masterEnd > s)
+                ).sort((a, b) => a.masterStart - b.masterStart);
+
+                const out = [];
+                let pos = s;
+                for (const ch of relevant) {
+                    if (ch.masterStart > pos) out.push(...masterLines.slice(pos, ch.masterStart));
+                    out.push(...ch.replacement);
+                    pos = Math.max(pos, ch.masterEnd);
+                }
+                if (pos < e) out.push(...masterLines.slice(pos, e));
+
+                // Collapse variants that produce identical text for this
+                // region into one option listing all of them, so you're
+                // choosing between genuinely distinct versions rather than
+                // paging through duplicates.
+                const key = out.join('\n');
+                const existing = options.find(o => o.lines.join('\n') === key);
+                if (existing) existing.sources.push(v.name);
+                else options.push({ label: v.name, lines: out, sources: [v.name] });
+            });
+            return { masterStart: s, masterEnd: e, options };
+        });
+
+        this.choices = this.regions.map(() => 0);
+        this.current = 0;
+    },
+
+    open() {
+        const files = Object.keys(Nexus.state.Vfs);
+        const mSel = document.getElementById('vmMasterSel');
+        if (mSel) {
+            mSel.innerHTML = files.map(f => `<option value="${f}">${f}</option>`).join('');
+            if (Nexus.state.activeFile) mSel.value = Nexus.state.activeFile;
+        }
+        this.master = mSel ? mSel.value : files[0];
+        this.variants = [];
+        this.regions = [];
+        this.renderVariantPicker();
+        this.render();
+        Nexus.UI.openModal('variant-merge');
+    },
+
+    renderVariantPicker() {
+        const box = document.getElementById('vmVariantList');
+        if (!box) return;
+        const files = Object.keys(Nexus.state.Vfs).filter(f => f !== this.master);
+        // Variants pulled from GitHub history don't exist in the Vfs at
+        // all, so listing only Vfs files would silently hide them even
+        // though they're loaded and will be compared. Shown separately,
+        // with a remove control, so what's actually in play is visible.
+        const external = this.variants.filter(v => Nexus.state.Vfs[v.name] === undefined);
+
+        let html = '';
+        if (files.length === 0 && external.length === 0) {
+            box.innerHTML = '<div style="opacity:0.6; font-size:11px; padding:8px;">No other files loaded to compare against. Load more files, or pull past versions from GitHub below.</div>';
+            return;
+        }
+        html += files.map(f => {
+            const on = this.variants.some(v => v.name === f);
+            return `<label style="display:flex; align-items:center; gap:8px; padding:6px 8px; font-size:11px; font-family:monospace;">
+                <input type="checkbox" ${on ? 'checked' : ''} onchange="Nexus.variantMerge.toggleVariant('${f.replace(/'/g, "\\'")}', this.checked)" style="width:16px; height:16px;">
+                <span>${f}</span>
+            </label>`;
+        }).join('');
+        if (external.length) {
+            // Split by prefix so the list says where each version actually
+            // came from — a flat "external" group would lump snapshot and
+            // GitHub versions together and make them indistinguishable.
+            const snaps = external.filter(v => v.name.startsWith('snap:'));
+            const gits  = external.filter(v => v.name.startsWith('git:'));
+            const other = external.filter(v => !v.name.startsWith('snap:') && !v.name.startsWith('git:'));
+            const group = (title, list) => list.length ? (
+                `<div style="font-size:9px; opacity:0.5; padding:6px 8px 2px;">${title}</div>` +
+                list.map(v => `<div style="display:flex; align-items:center; gap:8px; padding:6px 8px; font-size:11px; font-family:monospace;">
+                    <span style="color:var(--gold);">✓</span>
+                    <span style="flex:1;">${v.name}</span>
+                    <span style="color:var(--danger); cursor:pointer; padding:0 6px;" onclick="Nexus.variantMerge.toggleVariant('${v.name.replace(/'/g, "\\'")}', false); Nexus.variantMerge.renderVariantPicker();">&times;</span>
+                </div>`).join('')
+            ) : '';
+            html += group('FROM SNAPSHOTS', snaps);
+            html += group('FROM GITHUB HISTORY', gits);
+            html += group('LOADED VERSIONS', other);
+        }
+        box.innerHTML = html;
+    },
+
+    toggleVariant(name, on) {
+        if (on) {
+            if (!this.variants.some(v => v.name === name)) {
+                this.variants.push({ name, text: Nexus.state.Vfs[name] || '' });
+            }
+        } else {
+            this.variants = this.variants.filter(v => v.name !== name);
+        }
+    },
+
+    setMaster(name) {
+        this.master = name;
+        // Master can't also be a variant of itself.
+        this.variants = this.variants.filter(v => v.name !== name);
+        this.regions = [];
+        this.renderVariantPicker();
+        this.render();
+    },
+
+    analyze() {
+        if (!this.master) return alert("Pick a master file first.");
+        if (this.variants.length === 0) return alert("Tick at least one variant to compare against.");
+        this.computeRegions();
+        this.render();
+    },
+
+    cycleOption(dir) {
+        const r = this.regions[this.current];
+        if (!r) return;
+        const n = r.options.length;
+        this.choices[this.current] = (this.choices[this.current] + dir + n) % n;
+        this.render();
+    },
+
+    gotoRegion(dir) {
+        if (this.regions.length === 0) return;
+        this.current = Math.max(0, Math.min(this.regions.length - 1, this.current + dir));
+        this.render();
+    },
+
+    render() {
+        const view = document.getElementById('vmView');
+        const status = document.getElementById('vmStatus');
+        if (!view) return;
+
+        if (this.regions.length === 0) {
+            view.innerHTML = '<div style="text-align:center; opacity:0.6; padding:30px 15px; font-size:12px;">Pick a master file and tick some variants, then tap COMPARE.</div>';
+            if (status) status.innerText = '';
+            return;
+        }
+
+        const r = this.regions[this.current];
+        const chosen = this.choices[this.current];
+        const opt = r.options[chosen];
+        const lineLabel = r.masterStart === r.masterEnd
+            ? `insertion at master line ${r.masterStart + 1}`
+            : `master lines ${r.masterStart + 1}–${r.masterEnd}`;
+
+        if (status) status.innerText = `Difference ${this.current + 1} of ${this.regions.length} — ${lineLabel}`;
+
+        const body = opt.lines.length
+            ? opt.lines.map(l => `<div style="white-space:pre-wrap;">${l.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div>`).join('')
+            : '<div style="opacity:0.5; font-style:italic;">(nothing — this version omits these lines)</div>';
+
+        view.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px;">
+                <button class="tool-btn" style="padding:6px 12px;" onclick="Nexus.variantMerge.cycleOption(-1)">◀</button>
+                <div style="flex:1; text-align:center; font-size:11px; font-weight:bold; color:var(--accent); font-family:monospace; overflow:hidden; text-overflow:ellipsis;">
+                    ${opt.sources.join(' + ')}
+                    <span style="opacity:0.5; font-weight:400;"> (${chosen + 1}/${r.options.length})</span>
+                </div>
+                <button class="tool-btn" style="padding:6px 12px;" onclick="Nexus.variantMerge.cycleOption(1)">▶</button>
+            </div>
+            <div id="vmCard" style="background:#000; border:1px solid var(--accent); border-radius:8px; padding:10px; font-family:monospace; font-size:11px; max-height:38vh; overflow:auto;">${body}</div>
+        `;
+        this._wireSwipe();
+    },
+
+    // Swipe left/right on the card cycles versions — the "swipe through
+    // variations" part of the idea. Horizontal-only, with a movement
+    // threshold, so it can't fire while you're scrolling the card
+    // vertically to read a long block.
+    _wireSwipe() {
+        const card = document.getElementById('vmCard');
+        if (!card || card._vmSwipeWired) return;
+        card._vmSwipeWired = true;
+        let x0 = 0, y0 = 0;
+        card.addEventListener('touchstart', (e) => {
+            if (e.touches.length !== 1) return;
+            x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+        }, { passive: true });
+        card.addEventListener('touchend', (e) => {
+            const t = e.changedTouches && e.changedTouches[0];
+            if (!t) return;
+            const dx = t.clientX - x0, dy = t.clientY - y0;
+            if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+                Nexus.variantMerge.cycleOption(dx < 0 ? 1 : -1);
+            }
+        }, { passive: true });
+    },
+
+    build() {
+        if (this.regions.length === 0) return alert("Nothing compared yet.");
+        const masterLines = this._masterLines();
+        const out = [];
+        let pos = 0;
+        this.regions.forEach((r, i) => {
+            if (r.masterStart > pos) out.push(...masterLines.slice(pos, r.masterStart));
+            out.push(...r.options[this.choices[i]].lines);
+            pos = r.masterEnd;
+        });
+        if (pos < masterLines.length) out.push(...masterLines.slice(pos));
+        const result = out.join('\n') + '\n';
+
+        const dot = this.master.lastIndexOf('.');
+        const suggested = dot === -1 ? this.master + '.merged' : this.master.slice(0, dot) + '.merged' + this.master.slice(dot);
+        const name = prompt("Save the assembled file as:", suggested);
+        if (!name) return;
+
+        const isNew = Nexus.state.Vfs[name] === undefined;
+        Nexus.state.Vfs[name] = result;
+        if (isNew) {
+            Nexus.state.originals[name] = result;
+            Nexus.state.lastSavedContent[name] = result;
+        }
+        Nexus.Vfs.save();
+        Nexus.Vfs.renderAccordion();
+        Nexus.UI.closeModal('variant-merge');
+        Nexus.Vfs.switchFile(name);
+        alert(`Assembled ${this.regions.length} difference(s) into "${name}".`);
+    },
+
+    // Load past versions of the master file straight out of the local
+    // snapshot archive. Each snapshot is a whole-project copy
+    // ({ time, data: { filename: content } }), so any snapshot that
+    // contains the master file already holds a complete past version of
+    // it — no network, no GitHub setup, and it works for files that were
+    // never committed anywhere. Skips snapshots whose copy is byte-
+    // identical to the current file, since an option identical to master
+    // adds nothing to cycle through.
+    loadFromSnapshots() {
+        if (!this.master) return alert("Pick a master file first.");
+        const snaps = Nexus.state.snapshots || [];
+        const status = document.getElementById('vmStatus');
+
+        if (snaps.length === 0) {
+            if (status) status.innerText = 'No snapshots saved yet — use the 📸 button by the file explorer to take one.';
+            return;
+        }
+
+        const currentText = Nexus.state.Vfs[this.master] || '';
+        let loaded = 0, skippedIdentical = 0, skippedMissing = 0;
+
+        // Newest first, so the most recent past versions are the ones you
+        // cycle into first.
+        snaps.slice().reverse().forEach((s, idx) => {
+            const text = s.data ? s.data[this.master] : undefined;
+            if (text === undefined) { skippedMissing++; return; }
+            if (text === currentText) { skippedIdentical++; return; }
+            const label = `snap:${s.time}`;
+            // Two snapshots taken at the same displayed time would collide
+            // on label alone, so disambiguate by index when needed.
+            const name = this.variants.some(v => v.name === label) ? `${label} #${idx + 1}` : label;
+            if (!this.variants.some(v => v.name === name)) {
+                this.variants.push({ name, text });
+                loaded++;
+            }
+        });
+
+        const notes = [];
+        if (skippedIdentical) notes.push(`${skippedIdentical} identical to current`);
+        if (skippedMissing) notes.push(`${skippedMissing} without this file`);
+        if (status) {
+            status.innerText = loaded
+                ? `Loaded ${loaded} snapshot version(s)${notes.length ? ' (skipped ' + notes.join(', ') + ')' : ''}. Tap COMPARE.`
+                : `No usable snapshot versions${notes.length ? ' — skipped ' + notes.join(', ') : ''}.`;
+        }
+        this.renderVariantPicker();
+    },
+
+    // Pull previous versions of the master file straight from GitHub's
+    // commit history and load them as variants. Uses the repo/token
+    // already configured in Settings, and the same timeout-wrapped fetch
+    // as the rest of the GitHub integration.
+    async loadFromGitHub() {
+        if (!this.master) return alert("Pick a master file first.");
+        const token = Nexus.state.prefs.ghToken, repo = Nexus.state.prefs.ghRepo;
+        if (!token || !repo) return alert("Set your GitHub repo and token in Settings first.");
+
+        const status = document.getElementById('vmStatus');
+        if (status) status.innerText = 'Fetching history from GitHub…';
+        try {
+            const listUrl = `https://api.github.com/repos/${repo}/commits?path=${encodeURIComponent(this.master)}&per_page=8`;
+            const res = await Nexus.github.fetchWithTimeout(listUrl, { headers: { Authorization: `token ${token}` } });
+            if (!res.ok) throw new Error(`GitHub returned ${res.status}`);
+            const commits = await res.json();
+            if (!Array.isArray(commits) || commits.length === 0) {
+                if (status) status.innerText = 'No commit history found for this file.';
+                return;
+            }
+
+            let loaded = 0;
+            for (const c of commits) {
+                const contentUrl = `https://api.github.com/repos/${repo}/contents/${encodeURIComponent(this.master)}?ref=${c.sha}`;
+                const cRes = await Nexus.github.fetchWithTimeout(contentUrl, { headers: { Authorization: `token ${token}` } });
+                if (!cRes.ok) continue;
+                const data = await cRes.json();
+                if (!data.content) continue;
+                const text = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
+                const short = c.sha.slice(0, 7);
+                const when = (c.commit && c.commit.author && c.commit.author.date || '').slice(0, 10);
+                const label = `git:${short} ${when}`;
+                if (!this.variants.some(v => v.name === label)) {
+                    this.variants.push({ name: label, text });
+                    loaded++;
+                }
+            }
+            if (status) status.innerText = `Loaded ${loaded} past version(s) from GitHub. Tap COMPARE.`;
+            this.renderVariantPicker();
+        } catch (e) {
+            console.error('variantMerge.loadFromGitHub failed:', e);
+            if (status) status.innerText = 'GitHub fetch failed: ' + e.message;
+        }
+    }
+},
+
 mergeEngine: {
     // Kicks off a diff between a saved snapshot's version of the active file
     // and its current contents, reusing the same merge engine — snapshot

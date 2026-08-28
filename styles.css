@@ -842,7 +842,7 @@
         padding: 10px 12px; font-size: 13px; outline: none; width: 100%;
         font-family: 'Courier New', monospace;
     }
-    .sleek-input:focus { border-color: var(--accent); background: #000; }
+    .sleek-input:focus { border-color: var(--accent); background: var(--bg); }
 
     /* Toggle switch — a native checkbox underneath for accessibility, styled
        as a track + thumb. Used by the utility-bar tools modal. */
@@ -873,10 +873,10 @@
         display: inline-flex; align-items: center; justify-content: center;
         touch-action: manipulation;
     }
-    .kb-tab.active { background: #e5e9f0; color: #282c34; }
+    .kb-tab.active { background: var(--dock-active-bg); color: var(--dock-active-text); }
     .kb-tab.active::after { content: ' •'; color: var(--danger); } 
 
-    .kb-row-container { padding: 10px; display: flex; flex-direction: column; gap: 8px; background: #282c34; }
+    .kb-row-container { padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--dock-bg); }
 
     .kb-key {
         background: #d0d3d8; color: #282c34; border: none; border-radius: 6px;
@@ -1326,7 +1326,12 @@
     align-items: center;
     padding: 6px 8px;
     gap: 8px;
-    background-color: #21252b;
+    /* FIX: was a hardcoded #21252b, which sits ON TOP of #nexusDock and so
+       painted the whole footer dark even in light mode — #nexusDock itself
+       was correctly using var(--dock-bg) all along, it just never showed
+       through this layer. Both themes define the full --dock-* set, so
+       using the variable makes this follow the theme like everything else. */
+    background-color: var(--dock-bg);
     overflow-x: auto;
     white-space: nowrap;
     -webkit-overflow-scrolling: touch;
@@ -1443,9 +1448,12 @@
     padding: 4px 12px;
     font-family: monospace;
     font-size: 11px;
-    color: #5c6370;
-    background-color: #1e2227;
-    border-top: 1px solid #21252b;
+    /* Same hardcoded-color fix as .dock-toolbar above — this strip also
+       sits on top of #nexusDock, so its own fixed dark colours overrode
+       the themed background underneath it. */
+    color: var(--dock-label);
+    background-color: var(--dock-bg);
+    border-top: 1px solid var(--dock-border);
     }
     /* --- NEXUS REGEX PLAYGROUND & MACRO STYLES --- */
     #regexSlide { 

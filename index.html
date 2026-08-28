@@ -547,6 +547,7 @@
                     <button class="tool-btn btn-gold" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
                     <button class="tool-btn btn-accent" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
                 </div>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.variantMerge.open()" title="Set a master file, then cycle through every variant's version of each difference" aria-label="Open variant merge">🔀 VARIANT MERGE (N-WAY)</button>
             </div>
         </details>
 
@@ -1137,6 +1138,45 @@
         </div>
     </div>
     
+<!-- N-way variant merge: master + any number of variants, walked
+     difference by difference. See Nexus.variantMerge in app.js. -->
+<div id="modalVariantMerge" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head">
+            <span>🔀 VARIANT MERGE</span>
+            <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('variant-merge')">&times;</button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; overflow:hidden;">
+
+            <div style="flex-shrink:0;">
+                <div style="font-size:9px; opacity:0.6; margin-bottom:4px;">MASTER (the file you walk down)</div>
+                <select id="vmMasterSel" class="sleek-input" style="width:100%; margin-bottom:10px;" onchange="Nexus.variantMerge.setMaster(this.value)"></select>
+
+                <div style="font-size:9px; opacity:0.6; margin-bottom:4px;">COMPARE AGAINST</div>
+                <div id="vmVariantList" style="max-height:22vh; overflow-y:auto; background:var(--surface); border-radius:8px; margin-bottom:8px;"></div>
+
+                <div style="display:flex; gap:6px; margin-bottom:6px;">
+                    <button class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.variantMerge.analyze()">COMPARE</button>
+                </div>
+                <div style="display:flex; gap:6px; margin-bottom:10px;">
+                    <button class="tool-btn" style="flex:1;" onclick="Nexus.variantMerge.loadFromSnapshots()" title="Load past versions of the master file from your local snapshot archive">📸 SNAPSHOTS</button>
+                    <button class="tool-btn" style="flex:1;" onclick="Nexus.variantMerge.loadFromGitHub()" title="Pull previous versions of the master file from your GitHub commit history">⏳ GIT HISTORY</button>
+                </div>
+
+                <div id="vmStatus" style="font-size:11px; opacity:0.75; margin-bottom:8px; min-height:15px;"></div>
+            </div>
+
+            <div id="vmView" style="flex:1; min-height:0; overflow-y:auto;"></div>
+
+            <div style="display:flex; gap:6px; margin-top:10px; flex-shrink:0;">
+                <button class="tool-btn" style="flex:1;" onclick="Nexus.variantMerge.gotoRegion(-1)">↑ PREV DIFF</button>
+                <button class="tool-btn" style="flex:1;" onclick="Nexus.variantMerge.gotoRegion(1)">↓ NEXT DIFF</button>
+                <button class="tool-btn btn-success" style="flex:1;" onclick="Nexus.variantMerge.build()">✔ BUILD</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="modalMerge" class="modal-overlay">
     <div class="modal-content" style="width:92%; height:85%;">
         <div class="p-head">
