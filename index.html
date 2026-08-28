@@ -420,7 +420,12 @@
                     <button class="tool-btn btn-accent" style="padding:5px 10px; font-size:9px;" onclick="Nexus.snapshots.create()">📸 SNAPSHOT</button>
                 </div>
             </div>
-            
+
+            <div style="display:flex; gap:6px; margin-bottom:10px;">
+                <button id="explorerSortType" class="tool-btn btn-accent" style="flex:1; font-size:10px;" onclick="Nexus.Vfs.setExplorerSort('type')" title="Group files by extension (.js, .css, etc.)" aria-label="Sort by file type">🏷️ BY TYPE</button>
+                <button id="explorerSortTree" class="tool-btn" style="flex:1; font-size:10px;" onclick="Nexus.Vfs.setExplorerSort('tree')" title="Show real nested folders, like a normal file explorer" aria-label="Show folder tree">🌳 TREE</button>
+            </div>
+
             <div id="accordionRoot"></div>
 
             <div class="section-label" style="margin-top:25px;">Export</div>
@@ -1412,10 +1417,13 @@
                     <input type="password" id="prefGhToken" placeholder="ghp_..." onchange="Nexus.settings.update('ghToken', this.value.trim())" class="sleek-input" autocomplete="off">
                     <span style="font-size:9px; opacity:0.6;">Needs a token with "repo" scope — GitHub → Settings → Developer settings → Personal access tokens. Stored locally on this device only, never sent anywhere but api.github.com.</span>
                     <div class="grid-2" style="margin-top: 8px;">
-                        <button class="tool-btn btn-accent" onclick="Nexus.github.pushCurrentFile()" title="Push the active file to GitHub" aria-label="Push current file">⬆️ PUSH FILE</button>
-                        <button class="tool-btn btn-gold" onclick="Nexus.github.pullCurrentFile()" title="Pull the active file from GitHub" aria-label="Pull current file">⬇️ PULL FILE</button>
+                        <button class="tool-btn btn-accent" onclick="Nexus.github.pushAll()" title="Push every file in the project to GitHub, creating or updating each one" aria-label="Push all files">⬆️ PUSH ALL</button>
+                        <button class="tool-btn btn-gold" onclick="Nexus.github.pullAll()" title="Pull the entire project from GitHub, including subfolders" aria-label="Pull all files">⬇️ PULL ALL</button>
                     </div>
-                    <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.github.pullAll()" title="Sync the entire project from GitHub" aria-label="Sync entire project from GitHub">🔄 SYNC ENTIRE PROJECT</button>
+                    <div class="grid-2" style="margin-top:6px;">
+                        <button class="tool-btn" style="font-size:10px;" onclick="Nexus.github.pushCurrentFile()" title="Push only the active file" aria-label="Push current file only">Push current file only</button>
+                        <button class="tool-btn" style="font-size:10px;" onclick="Nexus.github.pullCurrentFile()" title="Pull only the active file" aria-label="Pull current file only">Pull current file only</button>
+                    </div>
                     <div id="githubStatus" role="status" aria-live="polite" style="font-size:11px; margin-top:6px; min-height: 16px;"></div>
                 </div>
             </div>

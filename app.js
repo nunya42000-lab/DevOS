@@ -157,6 +157,7 @@ window.Nexus = {
            bracketTracing: true,      // read as prefs.bracketTracing !== false
            showChangeGutter: true,    // diff-as-you-type gutter (Feature 4) — on by default, same reasoning as bracket tracing/sticky scroll: a passive visual aid, not a behavior change
            bookmarkingEnabled: true,  // real on/off switch for placing bookmarks at all, not just where the button lives — see toggleBookmarkHere()'s own comment
+           explorerSort: 'type',      // 'type' (existing behaviour — group by extension, flat list) or 'tree' (real nested folder view, built from the folder/file.ext paths already used for storage)
            stickyScroll: true,        // read as prefs.stickyScroll !== false
            minimap: false,            // opt-in, per its toggle's own reasoning
            lintEnabled: false,        // opt-in — the Diagnostics Hub already covers this ground
@@ -2030,6 +2031,17 @@ setEmptyState() {
         ed.setAttribute('inputmode', 'none');
     }
     if (Nexus.editorCore && Nexus.editorCore.view && Nexus.editorCore.view.contentDOM) {
+        // FIX: this used to only lock the CM6 view (contentEditable/
+        // inputmode) without ever clearing its actual document — so
+        // closing the last tab while CM6 was the active engine correctly
+        // disabled typing, but left whatever the last-open file's content
+        // WAS still fully visible on screen. #rawTerminal (a few lines up)
+        // was already being cleared correctly; CM6's own doc just never
+        // was. Same full-document-replace dispatch already used elsewhere
+        // in this file (e.g. loading a new file's content into CM6).
+        if (Nexus.editorCore.view.state.doc.length > 0) {
+            Nexus.editorCore.view.dispatch({ changes: { from: 0, to: Nexus.editorCore.view.state.doc.length, insert: '' } });
+        }
         Nexus.editorCore.view.contentDOM.contentEditable = "false";
         Nexus.editorCore.view.contentDOM.setAttribute('inputmode', 'none');
     }
@@ -2070,7 +2082,7 @@ setEmptyState() {
 
     // --- 2. CORE FILE OPERATIONS ---
     newFile() {
-        const name = prompt("Enter filename (e.g., index.html or script.js):");
+        const name = prompt("Enter filename (e.g., index.html, or src/app.js to place it in a folder):");
         if (!name) return;
         if (Nexus.state.Vfs[name] !== undefined) return alert("CONFLICT: File already exists.");
 
@@ -2413,50 +2425,162 @@ setEmptyState() {
         }
     },
 
+// Builds a nested folder tree from the flat "folder/subfolder/file.ext"
+// keys this app already uses for storage — GitHub's own contents API
+// (see pull-all's real recursive walk) already returns paths in exactly
+// this shape, so no translation is needed between what gets pulled and
+// what the tree displays. Folders sort before files; both alphabetical
+// within their own kind. Verified against real edge cases before this was
+// wired into any rendering: malformed paths (leading/trailing/double
+// slashes), a bare file whose name collides with an unrelated folder, and
+// deep single-chain nesting all degrade sensibly rather than crashing.
+_buildFileTree(filenames) {
+    const root = { type: 'folder', name: '', path: '', children: [] };
+    const folderIndex = new Map();
+
+    filenames.forEach(full => {
+        const parts = full.split('/').filter(Boolean);
+        let cursor = root;
+        let pathSoFar = '';
+        for (let i = 0; i < parts.length; i++) {
+            const isLast = i === parts.length - 1;
+            pathSoFar = pathSoFar ? pathSoFar + '/' + parts[i] : parts[i];
+            if (isLast) {
+                cursor.children.push({ type: 'file', name: parts[i], path: full });
+            } else {
+                let existing = folderIndex.get(pathSoFar);
+                if (!existing) {
+                    existing = { type: 'folder', name: parts[i], path: pathSoFar, children: [] };
+                    folderIndex.set(pathSoFar, existing);
+                    cursor.children.push(existing);
+                }
+                cursor = existing;
+            }
+        }
+    });
+
+    const sortNode = (node) => {
+        node.children.sort((a, b) => {
+            if (a.type !== b.type) return a.type === 'folder' ? -1 : 1;
+            return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+        });
+        node.children.forEach(c => { if (c.type === 'folder') sortNode(c); });
+    };
+    sortNode(root);
+    return root;
+},
+
+// Which tree folders are currently expanded, keyed by folder path.
+// Deliberately module-level state (not rebuilt from scratch on every
+// render) so switching files, saving, or any other renderAccordion()
+// call doesn't collapse folders the user had open — same reasoning the
+// existing type-sort accordions already rely on implicitly via their own
+// 'open' class persisting on the actual DOM nodes, except tree mode
+// regenerates its DOM on every render (paths can appear/disappear as
+// files are added/removed) so the open/closed state has to be tracked
+// separately rather than read back off elements that may not exist yet.
+_treeExpanded: new Set(),
+
+_renderTreeNode(node, depth) {
+    let html = '';
+    node.children.forEach(child => {
+        const indent = 14 + depth * 18;
+        if (child.type === 'folder') {
+            const isOpen = Nexus.Vfs._treeExpanded.has(child.path);
+            html += `<div class="tree-folder-row" style="display:flex; align-items:center; gap:6px; padding:10px ${indent}px 10px 12px; cursor:pointer; border-bottom:1px solid var(--border);" onclick="Nexus.Vfs.toggleTreeFolder('${child.path.replace(/'/g, "\\'")}')">
+                <span style="font-size:10px; opacity:0.6; transform:rotate(${isOpen ? '90' : '0'}deg); transition:transform 0.15s; display:inline-block;">▶</span>
+                <span>📁</span>
+                <span style="font-weight:bold;">${child.name}</span>
+                <span style="margin-left:auto; font-size:9px; opacity:0.5;">${child.children.length}</span>
+            </div>`;
+            if (isOpen) {
+                html += `<div>${this._renderTreeNode(child, depth + 1)}</div>`;
+            }
+        } else {
+            const activeClass = (child.path === Nexus.state.activeFile) ? 'active-file' : '';
+            html += `<div class="item-row ${activeClass}" style="padding-left:${indent + 18}px;" onclick="Nexus.Vfs.switchFile('${child.path.replace(/'/g, "\\'")}')">
+                <span>📄 ${child.name}</span>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="color:var(--gold); font-size:14px;" onclick="event.stopPropagation(); Nexus.Vfs.renameFile('${child.path.replace(/'/g, "\\'")}')">✏️</span>
+                    <span style="color:var(--danger); font-size:18px; line-height:0.8;" onclick="event.stopPropagation(); Nexus.Vfs.deleteFile('${child.path.replace(/'/g, "\\'")}')">&times;</span>
+                </div>
+            </div>`;
+        }
+    });
+    return html;
+},
+
+toggleTreeFolder(path) {
+    if (this._treeExpanded.has(path)) this._treeExpanded.delete(path);
+    else this._treeExpanded.add(path);
+    this.renderAccordion();
+},
+
+setExplorerSort(mode) {
+    Nexus.settings.update('explorerSort', mode);
+    // renderAccordion() itself keeps the button active-states in sync on
+    // every call, so no separate DOM update is needed here.
+    this.renderAccordion();
+},
+
 // --- 3. RENDERING ACCORDION ---
 renderAccordion() {
     // 1. Target the correct accordion container element safely
     const root = document.getElementById('accordionRoot');
     if (!root) return; // Exit gracefully if the DOM frame isn't painted yet
 
-    // 2. build the groups dictionary dynamically from Nexus.state.Vfs
-    const groups = {};
-    if (Nexus.state && Nexus.state.Vfs) {
-        Object.keys(Nexus.state.Vfs).forEach(fn => {
-            // Extract the extension (e.g., 'script.js' -> 'js', default to 'raw' if no extension)
+    const filenames = (Nexus.state && Nexus.state.Vfs) ? Object.keys(Nexus.state.Vfs) : [];
+    const mode = Nexus.state.prefs.explorerSort === 'tree' ? 'tree' : 'type';
+
+    let htmlOut = '';
+
+    if (mode === 'tree') {
+        // Real nested folder tree — see _buildFileTree/_renderTreeNode
+        // above. Root-level files (no '/' in their path) render as plain
+        // rows with no folder wrapper, matching how a real file explorer
+        // shows loose files sitting alongside top-level folders.
+        const tree = this._buildFileTree(filenames);
+        htmlOut = this._renderTreeNode(tree, 0);
+    } else {
+        // Original sort-by-extension behaviour, unchanged — this is now
+        // one of two explicit modes rather than the only option, per
+        // request: "sort by file type like it is now should be an
+        // option," not replaced.
+        const groups = {};
+        filenames.forEach(fn => {
             const parts = fn.split('.');
             const ext = parts.length > 1 ? parts.pop().toLowerCase() : 'raw';
-            
             if (!groups[ext]) groups[ext] = [];
             groups[ext].push(fn);
         });
-    }
 
-    let htmlOut = "";
+        Object.entries(groups).forEach(([ext, files]) => {
+            htmlOut += '<div class="acc-section">';
+            htmlOut += '    <div class="acc-head" onclick="this.nextElementSibling.classList.toggle(\'open\')">';
+            htmlOut += '        <span>.' + ext.toUpperCase() + '</span> <span>' + files.length + '</span>';
+            htmlOut += '    </div>';
+            htmlOut += '    <div class="acc-content open">';
 
-    // 3. Loop safely through our dynamically calculated groups dictionary
-    Object.entries(groups).forEach(([ext, files]) => {
-        htmlOut += '<div class="acc-section">';
-        htmlOut += '    <div class="acc-head" onclick="this.nextElementSibling.classList.toggle(\'open\')">';
-        htmlOut += '        <span>.' + ext.toUpperCase() + '</span> <span>' + files.length + '</span>';
-        htmlOut += '    </div>';
-        htmlOut += '    <div class="acc-content open">';
+            files.forEach(fn => {
+                const activeClass = (fn === Nexus.state.activeFile) ? 'active-file' : '';
+                // A file living in a subfolder still displays as the flat
+                // "folder/file.ext" string here on purpose — this is the
+                // sort-BY-TYPE view, not the tree, so it deliberately
+                // doesn't build any folder structure; tree mode is the
+                // real explorer-style option for that.
+                htmlOut += '        <div class="item-row ' + activeClass + '" onclick="Nexus.Vfs.switchFile(\'' + fn + '\')">';
+                htmlOut += '            <span>' + fn + '</span>';
+                htmlOut += '            <div style="display:flex; align-items:center; gap:12px;">';
+                htmlOut += '                <span style="color:var(--gold); font-size:14px;" onclick="event.stopPropagation(); Nexus.Vfs.renameFile(\'' + fn + '\')">✏️</span>';
+                htmlOut += '                <span style="color:var(--danger); font-size:18px; line-height:0.8;" onclick="event.stopPropagation(); Nexus.Vfs.deleteFile(\'' + fn + '\')">&times;</span>';
+                htmlOut += '            </div>';
+                htmlOut += '        </div>';
+            });
 
-        files.forEach(fn => {
-            const activeClass = (fn === Nexus.state.activeFile) ? 'active-file' : '';
-            // Fixed lowercase 'Vfs' references to uppercase 'Vfs' to match core architecture
-            htmlOut += '        <div class="item-row ' + activeClass + '" onclick="Nexus.Vfs.switchFile(\'' + fn + '\')">';
-            htmlOut += '            <span>' + fn + '</span>';
-            htmlOut += '            <div style="display:flex; align-items:center; gap:12px;">';
-            htmlOut += '                <span style="color:var(--gold); font-size:14px;" onclick="event.stopPropagation(); Nexus.Vfs.renameFile(\'' + fn + '\')">✏️</span>';
-            htmlOut += '                <span style="color:var(--danger); font-size:18px; line-height:0.8;" onclick="event.stopPropagation(); Nexus.Vfs.deleteFile(\'' + fn + '\')">&times;</span>';
-            htmlOut += '            </div>';
-            htmlOut += '        </div>';
+            htmlOut += '    </div>';
+            htmlOut += '</div>';
         });
-
-        htmlOut += '    </div>';
-        htmlOut += '</div>';
-    });
+    }
 
     // Fallback display if the Vfs is perfectly fresh and empty
     if (htmlOut === "") {
@@ -2464,6 +2588,16 @@ renderAccordion() {
     }
 
     root.innerHTML = htmlOut;
+
+    // Keep the two sort-mode buttons' active styling in sync with the
+    // real saved preference on every render, not just when
+    // setExplorerSort() itself is the trigger — this function also runs
+    // on plain boot restoration, file add/remove, etc., where the button
+    // DOM could otherwise silently drift from Nexus.state.prefs.explorerSort.
+    const typeBtn = document.getElementById('explorerSortType');
+    const treeBtn = document.getElementById('explorerSortTree');
+    if (typeBtn) typeBtn.classList.toggle('btn-accent', mode === 'type');
+    if (treeBtn) treeBtn.classList.toggle('btn-accent', mode === 'tree');
 
     // 4. Guard check the tabs render engine pass
     if (Nexus.UI && typeof Nexus.UI.renderTabs === 'function') {
@@ -9697,12 +9831,20 @@ github: {
     },
     async pullAll() {
         if (!this.checkConfig()) return;
-        if (!confirm('Sync the entire project from GitHub? This overwrites any local files with matching names.')) return;
-        this.setStatus('Syncing project...', 'var(--text)');
+        if (!confirm('Pull the entire project from GitHub, including subfolders? This overwrites any local files with matching names.')) return;
+        this.setStatus('Pulling project...', 'var(--text)');
         const result = await Nexus.shell.commands['pull-all']();
         this.setStatus(result, result.includes('✅') ? 'var(--success)' : 'var(--danger)');
         Nexus.Vfs.renderAccordion();
         if (Nexus.state.activeFile) Nexus.Vfs.switchFile(Nexus.state.activeFile);
+    },
+    async pushAll() {
+        if (!this.checkConfig()) return;
+        const fileCount = Object.keys(Nexus.state.Vfs).length;
+        if (!confirm(`Push all ${fileCount} file(s) to GitHub? Existing remote files with the same names will be updated.`)) return;
+        this.setStatus('Pushing project...', 'var(--text)');
+        const result = await Nexus.shell.commands['push-all']();
+        this.setStatus(result, result.includes('✅') && !result.includes('failed') ? 'var(--success)' : 'var(--danger)');
     }
 },
 
@@ -9865,27 +10007,129 @@ shell: {
            } catch (e) { return `Error: ${e.message}`; }
        },
 
+       // FIX (the reported crash, and the real underlying bug): the
+       // GitHub contents API returns an ARRAY only when you list a
+       // directory — the previous version assumed the repo root's
+       // response was always that array and looped it directly with no
+       // shape check, so any non-array response (a bad/expired token, a
+       // rate limit, a wrong repo name — all of which return an error
+       // OBJECT like {message:"Bad credentials"}) threw exactly "items is
+       // not iterable" with zero indication of what actually went wrong.
+       // Separately: even when it didn't crash, this only ever listed the
+       // repo ROOT — GitHub's contents endpoint is per-directory, not
+       // recursive, so it never descended into subfolders at all; a file
+       // in src/utils/ was silently never even attempted, not just
+       // skipped with a warning.
        'pull-all': async () => {
            const token = Nexus.state.prefs.ghToken;
            const repo = Nexus.state.prefs.ghRepo;
-           const url = `https://api.github.com/repos/${repo}/contents/`;
-           try {
-               const res = await Nexus.github.fetchWithTimeout(url, { headers: { "Authorization": `token ${token}` } });
+           if (!token || !repo) return "Error: set a repo and token in Settings first.";
+
+           const results = { count: 0, failed: [], errors: [] };
+
+           async function walk(dirPath, depth) {
+               // Depth-capped the same defensive way this app's own
+               // recursive CSS @import inliner already is — a
+               // pathological or unexpectedly cyclic API response can't
+               // spin this forever.
+               if (depth > 12) { results.errors.push(`${dirPath || '(root)'}: too deeply nested, stopped descending`); return; }
+               const listUrl = `https://api.github.com/repos/${repo}/contents/${dirPath}`;
+               const res = await Nexus.github.fetchWithTimeout(listUrl, { headers: { "Authorization": `token ${token}` } });
+               if (!res.ok) { results.errors.push(`${dirPath || '(root)'}: HTTP ${res.status}`); return; }
                const items = await res.json();
-               let count = 0;
+               if (!Array.isArray(items)) {
+                   results.errors.push(`${dirPath || '(root)'}: GitHub returned an error, not a file listing — ${items && items.message || 'check your repo name and token'}`);
+                   return;
+               }
                for (const item of items) {
-                   if (item.type === "file") {
-                       const fRes = await Nexus.github.fetchWithTimeout(item.url, { headers: { "Authorization": `token ${token}` } });
-                       const fData = await fRes.json();
-                       const pulled = decodeURIComponent(escape(atob(fData.content.replace(/\s/g, ''))));
-                       Nexus.state.Vfs[item.path] = pulled;
-                       Nexus.state.lastSavedContent[item.path] = pulled;
-                       count++;
+                   if (item.type === 'file') {
+                       try {
+                           const fRes = await Nexus.github.fetchWithTimeout(item.url, { headers: { "Authorization": `token ${token}` } });
+                           if (!fRes.ok) { results.failed.push(item.path); continue; }
+                           const fData = await fRes.json();
+                           const pulled = decodeURIComponent(escape(atob(fData.content.replace(/\s/g, ''))));
+                           // item.path already comes back from GitHub as
+                           // the full "folder/file.ext" form — exactly
+                           // the flat-path-with-slashes convention this
+                           // app's own file explorer now uses for
+                           // subfolder display, so no translation needed.
+                           Nexus.state.Vfs[item.path] = pulled;
+                           Nexus.state.originals[item.path] = pulled;
+                           Nexus.state.lastSavedContent[item.path] = pulled;
+                           results.count++;
+                       } catch (e) {
+                           results.failed.push(item.path);
+                       }
+                   } else if (item.type === 'dir') {
+                       await walk(item.path, depth + 1);
                    }
                }
-               Nexus.Vfs.renderAccordion();
-               return `Synced ${count} files ✅`;
-           } catch (e) { return `Sync failed: ${e.message}`; }
+           }
+
+           try {
+               await walk('', 0);
+           } catch (e) {
+               return `Sync failed: ${e.message}`;
+           }
+
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+
+           let msg = `Pulled ${results.count} file(s) ✅`;
+           if (results.failed.length) msg += ` — ${results.failed.length} failed: ${results.failed.join(', ')}`;
+           if (results.errors.length) msg += ` — ${results.errors.join('; ')}`;
+           return msg;
+       },
+
+       // Push-all's own equivalent of pull-all: walk every file currently
+       // in the Vfs and push each one individually, reusing the exact
+       // same create-vs-update logic the single-file 'push' command
+       // already has (GET first to discover whether a sha exists — that's
+       // what tells GitHub's PUT endpoint "update this" vs "create this
+       // as new"). Vfs paths already use the same "folder/file.ext" flat
+       // convention GitHub itself uses, so no path translation is needed
+       // in either direction.
+       'push-all': async () => {
+           const token = Nexus.state.prefs.ghToken;
+           const repo = Nexus.state.prefs.ghRepo;
+           if (!token || !repo) return "Error: set a repo and token in Settings first.";
+
+           const files = Object.keys(Nexus.state.Vfs);
+           if (files.length === 0) return "Nothing to push — the project is empty.";
+
+           let created = 0, updated = 0;
+           const failed = [];
+
+           for (const path of files) {
+               const content = Nexus.state.Vfs[path];
+               const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+               try {
+                   const getRes = await Nexus.github.fetchWithTimeout(url, { headers: { "Authorization": `token ${token}` } });
+                   let sha = '';
+                   if (getRes.ok) {
+                       const getData = await getRes.json();
+                       sha = getData.sha;
+                   }
+                   const payload = {
+                       message: `Push all via divIDE — ${path}`,
+                       content: btoa(unescape(encodeURIComponent(content))),
+                       sha: sha
+                   };
+                   const putRes = await Nexus.github.fetchWithTimeout(url, {
+                       method: "PUT",
+                       headers: { "Authorization": `token ${token}`, "Content-Type": "application/json" },
+                       body: JSON.stringify(payload)
+                   });
+                   if (!putRes.ok) { failed.push(path); continue; }
+                   if (sha) updated++; else created++;
+               } catch (e) {
+                   failed.push(path);
+               }
+           }
+
+           let msg = `Pushed: ${created} created, ${updated} updated ✅`;
+           if (failed.length) msg += ` — ${failed.length} failed: ${failed.join(', ')}`;
+           return msg;
        },
 
        'push': async (args) => {
