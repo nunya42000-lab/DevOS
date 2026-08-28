@@ -101,6 +101,19 @@
           "type": "image/png"
         }
       ]
+    },
+    {
+      "name": "Wipe Project",
+      "short_name": "Wipe",
+      "description": "Permanently delete every file in the current project (asks for confirmation first)",
+      "url": "./?action=wipe-vfs",
+      "icons": [
+        {
+          "src": "./icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ],
   "prefer_related_applications": false

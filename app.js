@@ -14524,6 +14524,29 @@ window.addEventListener('DOMContentLoaded', async () => {
         // 2. Safe execution of the UI Boot sequence
         await Nexus.UI.boot(); 
 
+        // Wipe VFS shortcut (long-press app icon -> "Wipe Project", or
+        // manually visiting ?action=wipe-vfs). Deliberately handled HERE —
+        // after boot, not alongside force-update's own early-exit check
+        // above — because a full project wipe genuinely needs Nexus.Vfs/
+        // Nexus.state to exist and be populated first; force-update
+        // intentionally skips booting at all, so the two can't share a
+        // spot. Reuses Vfs.clearAll() rather than duplicating its wipe
+        // logic — that function already carries its own confirm() gate,
+        // which matters MORE here than from the in-app button: a
+        // shortcut fires with zero context (no prior screen, no "are you
+        // sure you meant this project" signal), so the very first thing
+        // the person sees after tapping it is the confirmation prompt
+        // itself, not an already-wiped project.
+        if (new URLSearchParams(location.search).get('action') === 'wipe-vfs') {
+            if (Nexus.Vfs && typeof Nexus.Vfs.clearAll === 'function') {
+                Nexus.Vfs.clearAll();
+            }
+            // Strip the query param regardless of whether the confirm was
+            // accepted or declined, so a later reload/re-launch of the app
+            // from this same tab doesn't silently re-trigger the prompt.
+            history.replaceState(null, '', location.pathname);
+        }
+
         // File Handling API safety net: if the launchQueue consumer (set
         // up in <head>, before Nexus.pwa existed) already fired and
         // stashed files on Nexus._pendingLaunchFiles, drain them now that
