@@ -2058,6 +2058,15 @@ Vfs: {
         // Failure already surfaces its own toast from save() above.
     },
 setEmptyState() {
+    // The image viewer replaces #editorView while an image tab is open, so
+    // an empty workspace has to tear it down too — otherwise closing the
+    // last (image) tab left the picture and its whole tool panel sitting
+    // there, and it only disappeared once you happened to open a different
+    // file. hide() restores #editorView, which the rest of this function
+    // then correctly resets.
+    if (Nexus.imageViewer && typeof Nexus.imageViewer.hide === 'function') {
+        Nexus.imageViewer.hide();
+    }
     Nexus.state.activeFile = "";
     
     // No file open at all is a distinct situation from either edit mode —
@@ -2125,21 +2134,40 @@ setEmptyState() {
 
 
     // --- 2. CORE FILE OPERATIONS ---
-    newFile() {
-        const name = prompt("Enter filename (e.g., index.html, or src/app.js to place it in a folder):");
+    async newFile() {
+        // Validates before accepting rather than after: the old flow took
+        // whatever you typed, then popped a SECOND modal saying the name
+        // was already taken — losing what you'd typed and making you start
+        // over. Now a conflict is caught inline with the text still there
+        // to edit.
+        const existing = Object.keys(Nexus.state.Vfs);
+        const name = await Nexus.UI.askInput({
+            title: 'NEW FILE',
+            label: 'Filename — include a folder to nest it (src/app.js)',
+            placeholder: 'index.html',
+            hint: existing.length ? `${existing.length} file(s) already in this project` : 'This will be the first file',
+            validate: (v) => {
+                const t = (v || '').trim();
+                if (!t) return 'Enter a filename.';
+                if (Nexus.state.Vfs[t] !== undefined) return `"${t}" already exists — pick another name.`;
+                if (t.endsWith('/')) return 'That is a folder path, not a filename.';
+                if (!t.split('/').pop()) return 'Missing a filename after the folder.';
+                return null;
+            }
+        });
         if (!name) return;
-        if (Nexus.state.Vfs[name] !== undefined) return alert("CONFLICT: File already exists.");
+        const trimmed = name.trim();
 
-        Nexus.state.Vfs[name] = ""; 
-        Nexus.state.originals[name] = "";
+        Nexus.state.Vfs[trimmed] = ""; 
+        Nexus.state.originals[trimmed] = "";
         // Seed the dirty-tracking baseline to match — a brand-new empty
         // file hasn't diverged from anything yet, so it shouldn't
         // immediately read as having "unsaved work" the instant it's
         // created, before the user has typed a single character.
-        Nexus.state.lastSavedContent[name] = "";
+        Nexus.state.lastSavedContent[trimmed] = "";
         
         this.renderAccordion();
-        this.switchFile(name);
+        this.switchFile(trimmed);
         this.save();
         
         // Route through the real state machine instead of poking
@@ -2301,18 +2329,37 @@ setEmptyState() {
         }
     },
 
-    renameFile(oldName) {
-        const newName = prompt("Rename file to:", oldName);
-        if (!newName || newName === oldName || Nexus.state.Vfs[newName] !== undefined) return;
+    async renameFile(oldName) {
+        // The old guard bailed silently on a name collision — you'd type a
+        // new name, tap OK, and nothing whatsoever would happen, with no
+        // clue why. Now the conflict is reported inline while the name is
+        // still editable.
+        const newName = await Nexus.UI.askInput({
+            title: 'RENAME FILE',
+            label: 'New name — change the folder part to move it',
+            value: oldName,
+            hint: 'e.g. src/app.js moves it into the src folder',
+            validate: (v) => {
+                const t = (v || '').trim();
+                if (!t) return 'Enter a filename.';
+                if (t === oldName) return 'That is the current name — change it or cancel.';
+                if (Nexus.state.Vfs[t] !== undefined) return `"${t}" already exists — pick another name.`;
+                if (t.endsWith('/')) return 'That is a folder path, not a filename.';
+                if (!t.split('/').pop()) return 'Missing a filename after the folder.';
+                return null;
+            }
+        });
+        if (!newName) return;
+        const trimmedNew = newName.trim();
         
-        Nexus.state.Vfs[newName] = Nexus.state.Vfs[oldName];
-        Nexus.state.originals[newName] = Nexus.state.originals[oldName];
+        Nexus.state.Vfs[trimmedNew] = Nexus.state.Vfs[oldName];
+        Nexus.state.originals[trimmedNew] = Nexus.state.originals[oldName];
         // Carry the dirty-tracking baseline over under the new key too —
         // a rename doesn't change the file's actual content or its saved
         // state, so it shouldn't make an otherwise-clean file suddenly
         // look dirty just because lastSavedContent[newName] doesn't exist
         // yet (it would read as undefined !== <content>, i.e. dirty).
-        Nexus.state.lastSavedContent[newName] = Nexus.state.lastSavedContent[oldName];
+        Nexus.state.lastSavedContent[trimmedNew] = Nexus.state.lastSavedContent[oldName];
         delete Nexus.state.Vfs[oldName];
         delete Nexus.state.originals[oldName];
         delete Nexus.state.lastSavedContent[oldName];
@@ -2323,15 +2370,15 @@ setEmptyState() {
         // tab pointing at it anymore).
         const tabIdx = Nexus.state.openTabs.indexOf(oldName);
         if (tabIdx !== -1) {
-            Nexus.state.openTabs[tabIdx] = newName;
+            Nexus.state.openTabs[tabIdx] = trimmedNew;
             this.saveOpenTabs();
         }
         
-        if (Nexus.state.activeFile === oldName) Nexus.state.activeFile = newName;
+        if (Nexus.state.activeFile === oldName) Nexus.state.activeFile = trimmedNew;
         
         this.save();
         this.renderAccordion();
-        if (Nexus.state.activeFile === newName) this.switchFile(newName);
+        if (Nexus.state.activeFile === trimmedNew) this.switchFile(trimmedNew);
     },
 
     deleteFile(fn) {
@@ -2554,7 +2601,13 @@ _renderTreeNode(node, depth) {
             }
         } else {
             const activeClass = (child.path === Nexus.state.activeFile) ? 'active-file' : '';
-            const icon = Nexus.Vfs.isImageFile(child.path) ? '🖼️' : '📄';
+            // Flag images whose stored content isn't a data URL — they
+            // were corrupted by the old text-based loader and can't be
+            // displayed, which is worth seeing in the list rather than
+            // discovering one file at a time.
+            const isImg = Nexus.Vfs.isImageFile(child.path);
+            const broken = isImg && !Nexus.Vfs.isDataUrl(Nexus.state.Vfs[child.path] || '');
+            const icon = broken ? '⚠️' : (isImg ? '🖼️' : '📄');
             html += `<div class="item-row ${activeClass}" style="padding-left:${indent + 18}px;" onclick="Nexus.Vfs.switchFile('${child.path.replace(/'/g, "\\'")}')">
                 <span>${icon} ${child.name}</span>
                 <div style="display:flex; align-items:center; gap:12px;">
@@ -7055,6 +7108,33 @@ self.addEventListener('fetch', (e) => {
            host.style.display = 'flex';
 
            const src = Nexus.state.Vfs[fn] || '';
+
+           // A file named like an image whose content isn't a data URL was
+           // almost certainly loaded before image support existed, when
+           // everything went through readAsText() — which runs binary
+           // through a UTF-8 decode and destroys it irreversibly. That's
+           // worth naming precisely, and worth offering the one thing that
+           // actually fixes it (re-importing), rather than just reporting
+           // that decoding failed and leaving you stuck.
+           if (!Nexus.Vfs.isDataUrl(src)) {
+               const info = document.getElementById('imageViewerInfo');
+               if (info) {
+                   info.innerHTML =
+                       '<div style="color:var(--danger); font-size:12px; line-height:1.5;">' +
+                       '<b>This image can\'t be displayed.</b><br>' +
+                       'It was loaded before image support existed, so it was stored as text — which permanently corrupts binary data. The original pixels are not recoverable from what\'s saved here.' +
+                       '</div>' +
+                       '<button class="tool-btn btn-accent" style="width:100%; margin-top:10px;" onclick="Nexus.imageViewer.reimport()">📂 RE-IMPORT THIS IMAGE</button>' +
+                       '<div style="font-size:10px; opacity:0.6; margin-top:6px;">Pick the original file again — it will replace <b>' + fn + '</b> in place, keeping its name and path.</div>';
+               }
+               const canvasWrap = document.getElementById('imageViewerCanvasWrap');
+               if (canvasWrap) canvasWrap.innerHTML = '<div style="opacity:0.4; font-size:12px; text-align:center;">no preview</div>';
+               this._img = null;
+               const st0 = document.getElementById('footStatus');
+               if (st0) { st0.innerText = 'IMAGE UNREADABLE'; st0.style.color = 'var(--danger)'; }
+               return;
+           }
+
            const img = new Image();
            img.onload = () => { this._img = img; this.render(); };
            img.onerror = () => {
@@ -7068,6 +7148,43 @@ self.addEventListener('fetch', (e) => {
 
            const st = document.getElementById('footStatus');
            if (st) { st.innerText = 'IMAGE'; st.style.color = 'var(--accent)'; }
+       },
+
+       // Replaces a corrupted (or simply outdated) image in place, keeping
+       // its existing name and folder path so every reference to it
+       // elsewhere in the project stays valid. Reads as a data URL, which
+       // is the whole point — this is the recovery path for files that
+       // were originally read as text and destroyed.
+       reimport() {
+           const fn = this.currentFile;
+           if (!fn) return;
+           const picker = document.createElement('input');
+           picker.type = 'file';
+           picker.accept = 'image/*';
+           picker.style.display = 'none';
+           picker.onchange = () => {
+               const file = picker.files && picker.files[0];
+               if (!file) { picker.remove(); return; }
+               const reader = new FileReader();
+               reader.onload = (e) => {
+                   const dataUrl = e.target.result;
+                   Nexus.state.Vfs[fn] = dataUrl;
+                   Nexus.state.originals[fn] = dataUrl;
+                   Nexus.state.lastSavedContent[fn] = dataUrl;
+                   Nexus.Vfs.save();
+                   Nexus.Vfs.renderAccordion();
+                   Nexus.shell.out(`${fn} replaced — image restored.`, 'success');
+                   this.show(fn); // re-render, this time with valid data
+                   picker.remove();
+               };
+               reader.onerror = () => {
+                   Nexus.shell.out('Could not read that file.', 'error');
+                   picker.remove();
+               };
+               reader.readAsDataURL(file);
+           };
+           document.body.appendChild(picker);
+           picker.click();
        },
 
        hide() {
@@ -8236,7 +8353,7 @@ merge: {
 
     _esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;'); },
 
-    finish() {
+    async finish() {
         let mergedContent;
 
         if (this.mode === 'manual') {
@@ -8270,7 +8387,19 @@ merge: {
         const rightFile = document.getElementById('mergeRightSel').value;
         const dot = leftFile.lastIndexOf('.');
         const suggestedName = dot === -1 ? leftFile + '.merged' : leftFile.slice(0, dot) + '.merged' + leftFile.slice(dot);
-        const mergedName = prompt("Save the merged result as:", suggestedName);
+        const mergedName = await Nexus.UI.askInput({
+            title: 'SAVE MERGED FILE',
+            label: 'Filename for the merged result',
+            value: suggestedName,
+            hint: 'An existing name will be overwritten — you will be warned first.',
+            validate: (v) => {
+                const t = (v || '').trim();
+                if (!t) return 'Enter a filename.';
+                if (Nexus.state.Vfs[t] !== undefined) return `"${t}" already exists. Change the name, or tap OK again to overwrite it.`;
+                return null;
+            },
+            allowOverwriteOnSecondSubmit: true
+        });
         if (!mergedName) return;
 
         const isNewFile = Nexus.state.Vfs[mergedName] === undefined;
@@ -8562,7 +8691,7 @@ variantMerge: {
         }, { passive: true });
     },
 
-    build() {
+    async build() {
         if (this.regions.length === 0) return alert("Nothing compared yet.");
         const masterLines = this._masterLines();
         const out = [];
@@ -8577,7 +8706,19 @@ variantMerge: {
 
         const dot = this.master.lastIndexOf('.');
         const suggested = dot === -1 ? this.master + '.merged' : this.master.slice(0, dot) + '.merged' + this.master.slice(dot);
-        const name = prompt("Save the assembled file as:", suggested);
+        const name = await Nexus.UI.askInput({
+            title: 'SAVE ASSEMBLED FILE',
+            label: 'Filename for the assembled result',
+            value: suggested,
+            hint: 'An existing name will be overwritten — you will be warned first.',
+            validate: (v) => {
+                const t = (v || '').trim();
+                if (!t) return 'Enter a filename.';
+                if (Nexus.state.Vfs[t] !== undefined) return `"${t}" already exists. Change the name, or tap OK again to overwrite it.`;
+                return null;
+            },
+            allowOverwriteOnSecondSubmit: true
+        });
         if (!name) return;
 
         const isNew = Nexus.state.Vfs[name] === undefined;
@@ -11297,16 +11438,41 @@ insertUUID() {
        
      
 
-               jumpPrompt(directLine) {
+               async jumpPrompt(directLine) {
            if (!Nexus.state.activeFile) return Nexus.shell.out("No file open — open or create a file first.", "warn");
            
            // 1. Safety Guard: Ignore accidental MouseEvents from button clicks
            let ln = directLine;
            if (typeof directLine === 'object') ln = null; 
            
-           // 2. Trigger prompt if no valid line was passed
-           if (!ln) ln = prompt("Jump to Line:");
-           if (!ln) return; // User cancelled
+           // 2. Ask, if no valid line was passed in. Shows the file's real
+           // line count and rejects out-of-range values up front — the old
+           // prompt took any number, then either silently clamped or did
+           // nothing, so "jump to 900" in a 300-line file gave no clue what
+           // went wrong.
+           if (!ln) {
+               const total = (Nexus.editorCore.isCM6 && Nexus.editorCore.view)
+                   ? Nexus.editorCore.view.state.doc.lines
+                   : ((Nexus.state.Vfs[Nexus.state.activeFile] || '').split('\n').length);
+               const answer = await Nexus.UI.askInput({
+                   title: 'JUMP TO LINE',
+                   label: 'Line number',
+                   numeric: true,
+                   placeholder: '1',
+                   hint: `${Nexus.state.activeFile} has ${total} line${total === 1 ? '' : 's'}`,
+                   validate: (v) => {
+                       const t = (v || '').trim();
+                       if (!t) return 'Enter a line number.';
+                       if (!/^\d+$/.test(t)) return 'Numbers only.';
+                       const n = parseInt(t, 10);
+                       if (n < 1) return 'Line numbers start at 1.';
+                       if (n > total) return `This file only has ${total} line${total === 1 ? '' : 's'}.`;
+                       return null;
+                   }
+               });
+               if (!answer) return; // cancelled
+               ln = answer.trim();
+           }
            
            // 3. The NaN Guard: Prevent letters from crashing the CM6 document state!
            const line = parseInt(ln);
@@ -11417,6 +11583,7 @@ insertUUID() {
            { group: 'Selection & Lines', key: 'selectNext', label: 'Select Next Occurrence (multi-cursor)' },
            { group: 'Selection & Lines', key: 'selectAllMatches', label: 'Select All Occurrences (multi-cursor)' },
            { group: 'Selection & Lines', key: 'jumpBracket', label: 'Jump to Matching Bracket' },
+           { group: 'Selection & Lines', key: 'jumpLine', label: 'Go to Line Number' },
            { group: 'Selection & Lines', key: 'bookmarkHere', label: 'Toggle Bookmark on Current Line' },
            { group: 'Selection & Lines', key: 'bookmarksList', label: 'View All Bookmarks' },
            { group: 'Fix & Format', key: 'expandLine', label: 'Expand/Restore from One Line' },
@@ -11591,7 +11758,7 @@ insertUUID() {
        // Settings -> Customize Utility Bar for anyone who specifically
        // wants them closer to their thumb — removed from the DEFAULT,
        // not deleted from the tool map entirely.
-       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, bookmarkHere, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
+       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, jumpLine, bookmarkHere, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
 
        // Populates #modalUtilLayout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -11697,6 +11864,7 @@ insertUUID() {
                'selectNext': `<button class="sleek-btn" onclick="Nexus.UI.selectNextOccurrence()" title="Add the next occurrence of the current selection as another cursor"><span style="font-size:16px;">⊕</span><span class="util-lbl">+1 Match</span></button>`,
                'selectAllMatches': `<button class="sleek-btn" onclick="Nexus.UI.selectAllOccurrences()" title="Select every occurrence of the current selection at once"><span style="font-size:16px;">⊛</span><span class="util-lbl">All Matches</span></button>`,
                'jumpBracket': `<button class="sleek-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to the bracket matching the one next to the cursor"><span style="font-size:16px;">↔{}</span><span class="util-lbl">Match Bracket</span></button>`,
+               'jumpLine': `<button class="sleek-btn" onclick="Nexus.UI.jumpPrompt()" title="Jump to a specific line number"><span style="font-size:16px;">#</span><span class="util-lbl">Go to Line</span></button>`,
                'bookmarkHere': `<button class="sleek-btn" onclick="Nexus.UI.toggleBookmarkHere()" title="Toggle a bookmark on the current line"><span style="font-size:16px;">🔖</span><span class="util-lbl">Bookmark</span></button>`,
                'bookmarksList': `<button class="sleek-btn" onclick="Nexus.UI.openBookmarksPanel()" title="View and jump to all bookmarks"><span style="font-size:16px;">📑</span><span class="util-lbl">Bookmarks</span></button>`,
                'expandLine': `<button class="sleek-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat function/class/const under cursor"><span style="font-size:16px;">⟵⟶</span><span class="util-lbl">Expand</span></button>`,
@@ -11759,6 +11927,7 @@ insertUUID() {
                 'selectNext': `<button class="tool-btn" onclick="Nexus.UI.selectNextOccurrence()" title="Add next occurrence as cursor" style="flex:1;">⊕ Next</button>`,
                 'selectAllMatches': `<button class="tool-btn" onclick="Nexus.UI.selectAllOccurrences()" title="Select all occurrences" style="flex:1;">⊛ All</button>`,
                 'jumpBracket': `<button class="tool-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to matching bracket" style="flex:1;">↔{} Bracket</button>`,
+                'jumpLine': `<button class="tool-btn" onclick="Nexus.UI.jumpPrompt()" title="Jump to a specific line number" style="flex:1;"># Go to Line</button>`,
                 'bookmarkHere': `<button class="tool-btn" onclick="Nexus.UI.toggleBookmarkHere()" title="Toggle bookmark on current line" style="flex:1;">🔖 Bk</button>`,
                 'bookmarksList': `<button class="tool-btn" onclick="Nexus.UI.openBookmarksPanel()" title="View all bookmarks" style="flex:1;">📑 All</button>`,
                 'expandLine': `<button class="tool-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat" style="flex:1;">⟵⟶ Exp</button>`,
@@ -12058,6 +12227,98 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
    // you to dismiss the modal, find the edit-mode toggle, unlock, and tap
    // the tool again. Unlocking is a single known action, so it's offered
    // inline and the original tool re-runs afterwards.
+   // Promise-based replacement for the browser's prompt(). Resolves to the
+   // entered string, or null if cancelled — same contract as prompt(), so
+   // call sites convert cleanly, except this one can validate BEFORE
+   // accepting rather than making you discover the problem afterwards.
+   //
+   //   const name = await Nexus.UI.askInput({
+   //       title: 'NEW FILE',
+   //       label: 'Filename',
+   //       value: 'index.html',
+   //       hint: '3 files in this project',
+   //       validate: (v) => v.includes('.') ? null : 'Needs a file extension.'
+   //   });
+   //
+   // validate() returns null/undefined when the value is acceptable, or a
+   // message string to show and keep the dialog open.
+   _askInputState: null,
+
+   askInput(opts) {
+       const o = opts || {};
+       return new Promise((resolve) => {
+           const titleEl = document.getElementById('askInputTitle');
+           const labelEl = document.getElementById('askInputLabel');
+           const field = document.getElementById('askInputField');
+           const hintEl = document.getElementById('askInputHint');
+           const errEl = document.getElementById('askInputError');
+
+           // If the modal markup is missing for any reason, fall back to
+           // the native prompt rather than hanging forever on a Promise
+           // that can never resolve.
+           if (!field) {
+               resolve(window.prompt(o.label || o.title || '', o.value || ''));
+               return;
+           }
+
+           if (titleEl) titleEl.innerText = o.title || 'INPUT';
+           if (labelEl) labelEl.innerText = o.label || '';
+           if (hintEl) hintEl.innerText = o.hint || '';
+           if (errEl) errEl.innerText = '';
+           field.value = o.value != null ? String(o.value) : '';
+           field.setAttribute('inputmode', o.numeric ? 'numeric' : 'text');
+           field.setAttribute('placeholder', o.placeholder || '');
+
+           this._askInputState = { resolve, validate: o.validate, allowOverwriteOnSecondSubmit: !!o.allowOverwriteOnSecondSubmit, _lastRejected: null };
+           Nexus.UI.openModal('ask-input');
+
+           // Focus and select so the suggested value can be replaced by
+           // typing, or kept by just tapping OK.
+           setTimeout(() => {
+               try { field.focus(); field.select(); } catch (e) {}
+           }, 50);
+       });
+   },
+
+   _askInputSubmit() {
+       const st = this._askInputState;
+       if (!st) return;
+       const field = document.getElementById('askInputField');
+       const errEl = document.getElementById('askInputError');
+       const value = field ? field.value : '';
+
+       if (typeof st.validate === 'function') {
+           let problem = null;
+           try { problem = st.validate(value); }
+           catch (e) { problem = 'Could not check that value: ' + e.message; }
+           if (problem) {
+               // With allowOverwriteOnSecondSubmit, a repeated OK on the
+               // SAME value is treated as "yes, I meant it" — used for
+               // save-as, where blocking outright would strand finished
+               // work behind a name you can't use, but silently
+               // overwriting would destroy an existing file. Warn once,
+               // then let it through. Changing the text resets this, so
+               // the confirmation can't carry over to a different name.
+               if (st.allowOverwriteOnSecondSubmit && st._lastRejected === value) {
+                   this._askInputResolve(value);
+                   return;
+               }
+               st._lastRejected = value;
+               if (errEl) errEl.innerText = problem;
+               if (field) { try { field.focus(); } catch (e) {} }
+               return;
+           }
+       }
+       this._askInputResolve(value);
+   },
+
+   _askInputResolve(value) {
+       const st = this._askInputState;
+       this._askInputState = null;
+       Nexus.UI.closeModal('ask-input');
+       if (st && typeof st.resolve === 'function') st.resolve(value);
+   },
+
    needUnlocked(label, retry) {
        const ed = document.getElementById('rawTerminal');
        const locked = ed ? ed.hasAttribute('readonly') : false;

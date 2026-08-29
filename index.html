@@ -1187,6 +1187,32 @@
     
 <!-- N-way variant merge: master + any number of variants, walked
      difference by difference. See Nexus.variantMerge in app.js. -->
+<!-- Reusable input modal, replacing the browser's own prompt(). A system
+     prompt on mobile is a cramped field with no validation, no context,
+     and no way to correct a mistake except retyping the whole thing —
+     and it can't tell you "that filename already exists" until after
+     you've committed. This can validate before accepting, show a live
+     hint, and keep the field editable when input is rejected.
+     Driven by Nexus.UI.askInput(), which returns a Promise. -->
+<div id="modalAskInput" class="modal-overlay">
+    <div class="modal-content" style="height:auto; max-height:70%;">
+        <div class="p-head">
+            <span id="askInputTitle">INPUT</span>
+            <button class="close-x" title="Cancel" aria-label="Cancel" onclick="Nexus.UI._askInputResolve(null)">&times;</button>
+        </div>
+        <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
+            <label id="askInputLabel" for="askInputField" style="font-size:11px; opacity:0.75;"></label>
+            <input type="text" id="askInputField" class="sleek-input" style="font-size:14px; padding:12px;" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault();Nexus.UI._askInputSubmit();}else if(event.key==='Escape'){event.preventDefault();Nexus.UI._askInputResolve(null);}">
+            <div id="askInputHint" style="font-size:10px; opacity:0.55;"></div>
+            <div id="askInputError" style="font-size:11px; color:var(--danger); min-height:14px;"></div>
+            <div style="display:flex; gap:8px;">
+                <button class="tool-btn" style="flex:1;" onclick="Nexus.UI._askInputResolve(null)">CANCEL</button>
+                <button class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.UI._askInputSubmit()">OK</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="modalVariantMerge" class="modal-overlay">
     <div class="modal-content">
         <div class="p-head">
