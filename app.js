@@ -2790,7 +2790,7 @@ combineFiles() {
     this.renderAccordion();
     this.switchFile(newName);
     Nexus.UI.closeModal('combine');
-    alert("Sovereign Merge Complete.");
+    Nexus.shell.out("Merged into one file.", "success");
 },
 
 clearAll() {
@@ -2805,7 +2805,7 @@ clearAll() {
     if (ed) ed.value = '';
     this.save();
     this.renderAccordion();
-    alert("Vortex cleared.");
+    Nexus.shell.out("Project cleared.", "success");
 },
 
 mergeAllJS() {
@@ -4983,7 +4983,7 @@ Sentinel : {
 
 intel: {
    scan() {
-       if(!Nexus.state.activeFile) return alert("No active file to scan.");
+       if(!Nexus.state.activeFile) return Nexus.shell.out("No active file to scan.", "warn");
        const code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
        
@@ -5122,9 +5122,7 @@ chunkEditor: {
    // there's no selection to honor, preserving the original "just place
    // your cursor inside a function" behavior for that case.
    openForCursor() {
-       if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-           return alert("Chunk Editor requires the CM6 Engine.");
-       }
+       if (!Nexus.UI.needCM6('The Chunk Editor', () => Nexus.chunkEditor.openForCursor())) return;
        const view = Nexus.editorCore.view;
        const sel = view.state.selection.main;
        let target;
@@ -5368,7 +5366,7 @@ compressor: {
            const gutter = document.getElementById('gutter');
            const cmContainer = document.getElementById('cm6Container');
            
-           if (!Nexus.state.activeFile) return alert("VORTEX EMPTY: Load a file first.");
+           if (!Nexus.state.activeFile) return Nexus.shell.out("VORTEX EMPTY: Load a file first.", "warn");
            const currentCode = Nexus.state.Vfs[Nexus.state.activeFile] || "";
 
            if (Nexus.editorCore.isCM6) {
@@ -6669,7 +6667,7 @@ inject() {
    // 1. Safety Check — engine-aware lock detection (the old check tested the
    // vanilla textarea's readonly attribute and skipped the check entirely in
    // CM6 mode, so a locked file could still be injected into under CM6).
-   if (Nexus.Sentinel.isLocked()) return alert("VORTEX LOCKED");
+   if (!Nexus.UI.needUnlocked('Injecting a snippet', () => Nexus.dreamer.inject())) return;
 
    const type = document.getElementById('dreamerType').value;
    const label = document.getElementById('dreamerLabel').value;
@@ -7031,7 +7029,7 @@ self.addEventListener('fetch', (e) => {
                    Nexus.state.vault.push({ name, code: e.target.result }); 
                    Nexus.vault.save(); 
                    Nexus.vault.render(); 
-                   alert("Secured in Vault."); 
+                   Nexus.shell.out("Saved to Vault.", "success"); 
                }
            };
            reader.readAsDataURL(file);
@@ -7439,7 +7437,7 @@ self.addEventListener('fetch', (e) => {
 
        async run() {
            if (Object.keys(Nexus.state.Vfs).length === 0) {
-               return alert("No files to build — the project is empty.");
+               return Nexus.shell.out("No files to build — the project is empty.", "warn");
            }
            if (typeof JSZip === 'undefined') {
                return alert("JSZip failed to load — check network/CDN access.");
@@ -7889,7 +7887,7 @@ grab() {
        },
        inject(i) { 
            const ed = document.getElementById('rawTerminal'); 
-           if (ed.hasAttribute('readonly')) return alert("LOCKED"); 
+           if (!Nexus.UI.needUnlocked('Injecting a snippet', () => Nexus.vault.inject(i))) return; 
            const pos = ed.selectionStart; 
            ed.value = ed.value.substring(0, pos) + Nexus.state.vault[i].code + ed.value.substring(ed.selectionEnd); 
            Nexus.state.Vfs[Nexus.state.activeFile] = ed.value; 
@@ -7897,9 +7895,9 @@ grab() {
            Nexus.UI.closeModal('vault'); 
        },
        cutFile() {
-           if(!Nexus.state.activeFile) return alert("No file active.");
+           if(!Nexus.state.activeFile) return Nexus.shell.out("No file active.", "warn");
            const ed = document.getElementById('rawTerminal');
-           if (ed.hasAttribute('readonly')) return alert("LOCKED");
+           if (!Nexus.UI.needUnlocked('Cut', () => Nexus.vault.cutFile())) return;
            if (confirm(`✂ Strip all code from ${Nexus.state.activeFile} and archive to Vault?`)) { 
                Nexus.state.vault.push({ name: Nexus.state.activeFile + ' (Cut)', code: ed.value });
                ed.value = "";
@@ -7908,7 +7906,7 @@ grab() {
            } 
        },
        copyFile() { 
-           if(!Nexus.state.activeFile) return alert("No file active.");
+           if(!Nexus.state.activeFile) return Nexus.shell.out("No file active.", "warn");
            const ed = document.getElementById('rawTerminal');
            Nexus.state.vault.push({ name: Nexus.state.activeFile + ' (Copy)', code: ed.value });
            this.save(); this.render(); 
@@ -7950,7 +7948,7 @@ grab() {
            }); 
            if (Nexus.state.snapshots.length > 10) Nexus.state.snapshots.shift(); 
            this.save(); this.render(); 
-           alert("Snapshot Created."); 
+           Nexus.shell.out("Snapshot saved.", "success"); 
        },
        // Renders into BOTH surfaces snapshots can now be acted on from:
        // #mergeSnapshotList (unchanged — the existing per-file diff-against-
@@ -8938,7 +8936,7 @@ stepViz: {
     },
 
     start() {
-        if (!Nexus.state.activeFile) return alert("No active file to step through.");
+        if (!Nexus.state.activeFile) return Nexus.shell.out("No active file to step through.", "warn");
         const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
         let code = Nexus.state.Vfs[Nexus.state.activeFile] || '';
         if (ext === 'html') {
@@ -9055,7 +9053,7 @@ docStats: {
         };
     },
     show() {
-        if (!Nexus.state.activeFile) return alert("No active file.");
+        if (!Nexus.state.activeFile) return Nexus.shell.out("No active file.", "warn");
         const fullText = Nexus.Sentinel.getLiveCode();
         const full = this._compute(fullText);
 
@@ -9083,7 +9081,7 @@ docStats: {
  
           outline: {
    scan() {
-       if (!Nexus.state.activeFile) return alert("No active file.");
+       if (!Nexus.state.activeFile) return Nexus.shell.out("No active file.", "warn");
        const code = Nexus.state.Vfs[Nexus.state.activeFile] || "";
        const ext = Nexus.state.activeFile.split('.').pop().toLowerCase();
        let out = [];
@@ -10125,7 +10123,7 @@ writer: {
    },
    go() {
        const ed = document.getElementById('rawTerminal');
-       if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
+       if (!Nexus.UI.needUnlocked('Boilerplate injection', () => Nexus.writer.go())) return;
        
        const mode = document.getElementById('writeMode').value;
        const result = this.templates[mode];
@@ -10758,7 +10756,7 @@ UI: {
       try {
           // 2. Acorn attempts a strict parse
           acorn.parse(code, { ecmaVersion: 2022, sourceType: "module" });
-          alert("Structure is VALID. The terminal issue is likely a logic bug, not syntax.");
+          Nexus.shell.out("Structure is valid — no syntax errors. Any problem is logic, not syntax.", "success");
       } catch (e) {
           // 3. Catch the exact line/column where the browser is choking
           const { line, column } = e.loc;
@@ -11300,7 +11298,7 @@ insertUUID() {
      
 
                jumpPrompt(directLine) {
-           if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
+           if (!Nexus.state.activeFile) return Nexus.shell.out("No file open — open or create a file first.", "warn");
            
            // 1. Safety Guard: Ignore accidental MouseEvents from button clicks
            let ln = directLine;
@@ -11351,7 +11349,7 @@ insertUUID() {
        },
 
        jumpRelative(offset) {
-           if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
+           if (!Nexus.state.activeFile) return Nexus.shell.out("No file open — open or create a file first.", "warn");
            
            // --- CM6 ROUTING ---
            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
@@ -11835,7 +11833,7 @@ insertUUID() {
        setTimeout(() => document.addEventListener('click', closeMenu), 50);
    },
    async runPrettier() {
-       if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
+       if (!Nexus.state.activeFile) return Nexus.shell.out("No file open — open or create a file first.", "warn");
        const ed = document.getElementById('rawTerminal');
        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
        
@@ -11922,7 +11920,7 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
 },
 
    runJSBeautify() {
-       if (!Nexus.state.activeFile) return alert("No file open — open or create a file first.");
+       if (!Nexus.state.activeFile) return Nexus.shell.out("No file open — open or create a file first.", "warn");
        const ed = document.getElementById('rawTerminal');
        if (ed.hasAttribute('readonly')) return alert("UNLOCK EDITOR FIRST");
        
@@ -12043,18 +12041,84 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        return ranges;
    },
 
+   // Sixteen tools used to dead-end in vanilla mode with a modal saying
+   // "switch engines first" — leaving you to dismiss it, find the engine
+   // toggle, switch, then come back and tap the tool again. That's the
+   // single most repeated bit of friction in daily use, since it covers
+   // most of the good tools (folding, chunk editor, multi-cursor, bracket
+   // jump, minimap, lint, autocomplete, whitespace, change gutter).
+   //
+   // This turns each of those into one tap: it offers to switch for you
+   // and then re-runs whatever you originally tried. Returns true when
+   // CM6 is already active (caller just proceeds), false otherwise —
+   // in which case the caller returns immediately and the retry callback
+   // takes over once the engine is up.
+   // Same dead-end problem as needCM6, for the edit lock: several tools
+   // used to just say "LOCKED" or "UNLOCK EDITOR FIRST" and stop, leaving
+   // you to dismiss the modal, find the edit-mode toggle, unlock, and tap
+   // the tool again. Unlocking is a single known action, so it's offered
+   // inline and the original tool re-runs afterwards.
+   needUnlocked(label, retry) {
+       const ed = document.getElementById('rawTerminal');
+       const locked = ed ? ed.hasAttribute('readonly') : false;
+       if (!locked) return true;
+
+       if (!confirm(`${label} needs the editor unlocked.\n\nUnlock it and continue?`)) {
+           Nexus.shell.out(`${label} skipped — editor still locked.`, 'warn');
+           return false;
+       }
+       Nexus.UI.setEditMode('full');
+       Nexus.shell.out('Editor unlocked.', 'success');
+       if (typeof retry === 'function') {
+           // Let setEditMode's own DOM updates settle before re-running,
+           // since the tool will immediately re-check the same attribute.
+           setTimeout(retry, 0);
+       }
+       return false;
+   },
+
+   needCM6(label, retry) {
+       if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) return true;
+
+       if (!confirm(`${label} needs the CodeMirror engine, which isn't active right now.\n\nSwitch to it and continue?`)) {
+           Nexus.shell.out(`${label} skipped — still on the basic editor.`, 'warn');
+           return false;
+       }
+
+       Nexus.shell.out('Switching to the CodeMirror engine…', 'accent');
+       Promise.resolve(Nexus.toggleEditor()).then(() => {
+           // toggleEditor loads CM6's modules over the network on first
+           // use, so the view may not exist the instant it resolves.
+           // Poll briefly rather than assume, and give up with a real
+           // message instead of silently doing nothing.
+           let waited = 0;
+           const tick = () => {
+               if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
+                   if (typeof retry === 'function') retry();
+                   return;
+               }
+               waited += 150;
+               if (waited > 6000) {
+                   Nexus.shell.out(`Engine didn't finish loading — try ${label} again in a moment.`, 'error');
+                   return;
+               }
+               setTimeout(tick, 150);
+           };
+           tick();
+       }).catch((e) => {
+           Nexus.shell.out('Could not switch engines: ' + (e && e.message || e), 'error');
+       });
+       return false;
+   },
+
    collapseAll() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("Folding is only supported in the CM6 Engine.");
-           }
+           if (!Nexus.UI.needCM6('Folding', () => Nexus.UI.collapseAll())) return;
            const { foldAll } = Nexus.editorCore.modules;
            foldAll(Nexus.editorCore.view);
        },
 
        expandAll() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("Folding is only supported in the CM6 Engine.");
-           }
+           if (!Nexus.UI.needCM6('Folding', () => Nexus.UI.expandAll())) return;
            const { unfoldAll } = Nexus.editorCore.modules;
            unfoldAll(Nexus.editorCore.view);
        },
@@ -12083,9 +12147,7 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        },
 
        foldToLayer() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("Folding is only supported in the CM6 Engine.");
-           }
+           if (!Nexus.UI.needCM6('Folding', () => Nexus.UI.foldToLayer())) return;
            const view = Nexus.editorCore.view;
            this._ensureFullyParsed(view);
            const { foldEffect, foldedRanges } = Nexus.editorCore.modules;
@@ -12132,9 +12194,7 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        // outward-in from the top level down, undoing a Full Fold one
        // layer per press instead of all at once.
        unfoldOnce() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("Folding is only supported in the CM6 Engine.");
-           }
+           if (!Nexus.UI.needCM6('Folding', () => Nexus.UI.unfoldOnce())) return;
            const view = Nexus.editorCore.view;
            this._ensureFullyParsed(view);
            const { unfoldEffect, foldedRanges } = Nexus.editorCore.modules;
@@ -12251,9 +12311,7 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        // selected — preserving the original "just place your cursor
        // inside a function" behavior for that case, unchanged.
        collapseSelectionToOneLine() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("This tool requires the CM6 Engine.");
-           }
+           if (!Nexus.UI.needCM6('This tool', () => Nexus.UI.collapseSelectionToOneLine())) return;
            const view = Nexus.editorCore.view;
            const sel = view.state.selection.main;
            let target;
@@ -12315,9 +12373,7 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        // a throwaway container so the parser accepts a bare
        // function/class/object fragment standalone.
        async expandSelectionFromOneLine() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("This tool requires the CM6 Engine.");
-           }
+           if (!Nexus.UI.needCM6('This tool', () => Nexus.UI.expandSelectionFromOneLine())) return;
            const view = Nexus.editorCore.view;
            const cursorPos = view.state.selection.main.head;
            const snapshots = Nexus.state._foldSnapshots || {};
@@ -13366,9 +13422,7 @@ initInfiniteRibbon() {
        // silently doing nothing on the vanilla engine (confusing — "I
        // toggled it, why didn't anything change?"), this says so directly.
        toggleShowWhitespace() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Whitespace visualization requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('Whitespace visualization', () => Nexus.UI.toggleShowWhitespace())) return;
 
            Nexus.state.prefs.showWhitespace = !Nexus.state.prefs.showWhitespace;
            Nexus.settings.update('showWhitespace', Nexus.state.prefs.showWhitespace);
@@ -13407,9 +13461,7 @@ initInfiniteRibbon() {
        // requiring you to already know to go place your cursor next to a
        // bracket yourself first.
        toggleBracketTracing() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Bracket tracing requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('Bracket match highlighting', () => Nexus.UI.toggleBracketTracing())) return;
 
            const newValue = !(Nexus.state.prefs.bracketTracing !== false);
            Nexus.state.prefs.bracketTracing = newValue;
@@ -13449,9 +13501,7 @@ initInfiniteRibbon() {
        // needed since "off" already means "recompute always yields an
        // empty RangeSet" rather than "the extension isn't loaded at all."
        toggleChangeGutter() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("The change gutter requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('The change gutter', () => Nexus.UI.toggleChangeGutter())) return;
            const newValue = !(Nexus.state.prefs.showChangeGutter !== false);
            Nexus.state.prefs.showChangeGutter = newValue;
            Nexus.settings.update('showChangeGutter', newValue);
@@ -13565,9 +13615,7 @@ initInfiniteRibbon() {
        // confirmation before trusting it, more so than anything else
        // shipped this session.
        toggleMinimap() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Minimap requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('The minimap', () => Nexus.UI.toggleMinimap())) return;
 
            const newValue = !Nexus.state.prefs.minimap;
            Nexus.state.prefs.minimap = newValue;
@@ -13616,9 +13664,7 @@ initInfiniteRibbon() {
        // UIs (the Hub's cards, and now optionally CM6's own inline
        // markers) instead of two disagreeing engines.
        toggleLint() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Inline linting requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('Inline linting', () => Nexus.UI.toggleLint())) return;
 
            const newValue = !Nexus.state.prefs.lintEnabled;
            Nexus.state.prefs.lintEnabled = newValue;
@@ -13640,9 +13686,7 @@ initInfiniteRibbon() {
        // on for someone without them asking for it first, unlike a purely
        // passive visual aid.
        toggleAutocomplete() {
-           if (!Nexus.editorCore.isCM6) {
-               return alert("Autocomplete requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('Autocomplete', () => Nexus.UI.toggleAutocomplete())) return;
 
            const newValue = !Nexus.state.prefs.autocomplete;
            Nexus.state.prefs.autocomplete = newValue;
@@ -13789,9 +13833,7 @@ initInfiniteRibbon() {
        // system and drawSelection (already included via basicSetup) to
        // even render as more than one visible highlighted region.
        selectNextOccurrence() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("Multi-cursor selection requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('Multi-cursor selection', () => Nexus.UI.selectNextOccurrence())) return;
            const { selectNextOccurrence } = Nexus.editorCore.modules;
            if (typeof selectNextOccurrence !== 'function') {
                return alert("Multi-cursor selection isn't available (module failed to load).");
@@ -13814,9 +13856,7 @@ initInfiniteRibbon() {
        // (word-boundary-aware per its changelog) instead of risking a
        // second, subtly different definition living in this file.
        selectAllOccurrences() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("Multi-cursor selection requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('Multi-cursor selection', () => Nexus.UI.selectAllOccurrences())) return;
            const { selectNextOccurrence } = Nexus.editorCore.modules;
            if (typeof selectNextOccurrence !== 'function') {
                return alert("Multi-cursor selection isn't available (module failed to load).");
@@ -13900,9 +13940,7 @@ initInfiniteRibbon() {
        // the enclosing element, which is now the FALLBACK, not the first
        // thing tried.
        jumpToMatchingBracket() {
-           if (!Nexus.editorCore.isCM6 || !Nexus.editorCore.view) {
-               return alert("Jump to matching bracket requires the CM6 Engine — switch engines first (🔄 in the top bar).");
-           }
+           if (!Nexus.UI.needCM6('Jump to matching bracket', () => Nexus.UI.jumpToMatchingBracket())) return;
            const view = Nexus.editorCore.view;
            const useSelect = !!(Nexus.DpadEngine && Nexus.DpadEngine.selectLock);
            const pos = view.state.selection.main.head;
