@@ -1871,6 +1871,50 @@ async processCommand(cmd) {
 
    
 Vfs: {
+    // --- 0. IMAGE / BINARY SUPPORT ---
+    // Images can't go through FileReader.readAsText() — that runs binary
+    // bytes through a UTF-8 decode, which is lossy and irreversible.
+    // Verified directly: a 62-byte PNG comes back as 70 bytes and no
+    // longer matches the original, so loading an image used to silently
+    // CORRUPT it rather than merely fail to display it. Images are stored
+    // as data URLs instead ("data:image/png;base64,...") which round-trip
+    // byte-for-byte, are valid strings (so the whole existing Vfs /
+    // storage / snapshot machinery keeps working untouched), and can be
+    // dropped straight into an <img src> with no conversion.
+    IMAGE_EXTS: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif'],
+
+    isImageFile(filename) {
+        if (!filename) return false;
+        const ext = filename.split('.').pop().toLowerCase();
+        return this.IMAGE_EXTS.includes(ext);
+    },
+
+    // True for content already stored as a data URL. Checked by content
+    // rather than by filename alone, because that's what actually decides
+    // whether something can be rendered or must be treated as text.
+    isDataUrl(content) {
+        return typeof content === 'string' && /^data:[^;,]+;base64,/.test(content);
+    },
+
+    imageMimeFor(filename) {
+        const ext = (filename || '').split('.').pop().toLowerCase();
+        const map = {
+            png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+            gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+            bmp: 'image/bmp', ico: 'image/x-icon', avif: 'image/avif'
+        };
+        return map[ext] || 'application/octet-stream';
+    },
+
+    // Rough decoded byte count from a base64 data URL, without actually
+    // decoding it — base64 encodes 3 bytes per 4 chars, minus padding.
+    dataUrlByteSize(dataUrl) {
+        if (!this.isDataUrl(dataUrl)) return 0;
+        const b64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
+        const padding = (b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0);
+        return Math.max(0, Math.floor(b64.length * 3 / 4) - padding);
+    },
+
     // --- 1. LIFECYCLE & PERSISTENCE ---
     async boot() {
         try {
@@ -2169,6 +2213,18 @@ setEmptyState() {
         }
 
         // Engine Routing
+        // Images bypass the text engines entirely — dumping a base64 data
+        // URL into a code editor would be both useless to look at and
+        // dangerously easy to corrupt with a stray keystroke. imageViewer
+        // takes over the editor area instead, and hides itself again the
+        // moment a normal text file is opened.
+        if (this.isImageFile(fn) && Nexus.imageViewer) {
+            Nexus.imageViewer.show(fn);
+            Nexus.UI.renderTabs();
+            return;
+        }
+        if (Nexus.imageViewer) Nexus.imageViewer.hide();
+
         if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
             const view = Nexus.editorCore.view;
             view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
@@ -2498,8 +2554,9 @@ _renderTreeNode(node, depth) {
             }
         } else {
             const activeClass = (child.path === Nexus.state.activeFile) ? 'active-file' : '';
+            const icon = Nexus.Vfs.isImageFile(child.path) ? '🖼️' : '📄';
             html += `<div class="item-row ${activeClass}" style="padding-left:${indent + 18}px;" onclick="Nexus.Vfs.switchFile('${child.path.replace(/'/g, "\\'")}')">
-                <span>📄 ${child.name}</span>
+                <span>${icon} ${child.name}</span>
                 <div style="display:flex; align-items:center; gap:12px;">
                     <span style="color:var(--gold); font-size:14px;" onclick="event.stopPropagation(); Nexus.Vfs.renameFile('${child.path.replace(/'/g, "\\'")}')">✏️</span>
                     <span style="color:var(--danger); font-size:18px; line-height:0.8;" onclick="event.stopPropagation(); Nexus.Vfs.deleteFile('${child.path.replace(/'/g, "\\'")}')">&times;</span>
@@ -2621,7 +2678,15 @@ loadFiles(fileList) {
             if (!Nexus.state.activeFile) this.switchFile(file.name);
             this.save(); 
         };
-        r.readAsText(file);
+        // Images MUST go through readAsDataURL — readAsText would run the
+        // binary through a UTF-8 decode and permanently corrupt it (see
+        // the IMAGE_EXTS comment at the top of this object; measured, not
+        // assumed). Everything else stays on readAsText exactly as before.
+        if (this.isImageFile(file.name)) {
+            r.readAsDataURL(file);
+        } else {
+            r.readAsText(file);
+        }
     });
 },
 
@@ -2633,9 +2698,27 @@ async importZIP(file) {
         for (const relativePath of Object.keys(zip.files)) {
             const entry = zip.files[relativePath];
             if (!entry.dir) {
-                const content = await entry.async("string");
-                const fn = relativePath.split('/').pop(); 
-                if (fn && !fn.startsWith(".")) {
+                // Keep the ZIP's own folder structure instead of flattening
+                // to a bare filename. This used to do relativePath.split('/')
+                // .pop(), which threw away directories entirely — so two
+                // files with the same name in different folders silently
+                // overwrote each other, and nothing could ever land in the
+                // tree view's folders. Vfs keys already use exactly this
+                // "folder/file.ext" form.
+                const fn = relativePath.replace(/^\/+/, '');
+                const base = fn.split('/').pop();
+                if (fn && base && !base.startsWith(".")) {
+                    // Images have to come out as base64, not "string" —
+                    // JSZip's string mode does the same lossy UTF-8 decode
+                    // FileReader.readAsText does, which permanently
+                    // corrupts binary content.
+                    let content;
+                    if (this.isImageFile(fn)) {
+                        const b64 = await entry.async("base64");
+                        content = `data:${this.imageMimeFor(fn)};base64,${b64}`;
+                    } else {
+                        content = await entry.async("string");
+                    }
                     Nexus.state.Vfs[fn] = content;
                     Nexus.state.originals[fn] = content;
                     // Same reasoning as loadFiles(): freshly imported,
@@ -6955,6 +7038,273 @@ self.addEventListener('fetch', (e) => {
        }
    },
 
+   // Image viewing + light editing. Deliberately NOT a photo editor —
+   // resize, rotate, flip, crop-to-square, format conversion, and icon-set
+   // generation, which are the operations that actually come up while
+   // building a web project on a phone. Everything runs through a canvas
+   // and writes back into the Vfs as a data URL, the same storage form
+   // images already load as.
+   imageViewer: {
+       currentFile: null,
+       _img: null,
+
+       show(fn) {
+           this.currentFile = fn;
+           const host = document.getElementById('imageViewerHost');
+           const editorView = document.getElementById('editorView');
+           if (!host) return;
+           if (editorView) editorView.style.display = 'none';
+           host.style.display = 'flex';
+
+           const src = Nexus.state.Vfs[fn] || '';
+           const img = new Image();
+           img.onload = () => { this._img = img; this.render(); };
+           img.onerror = () => {
+               this._img = null;
+               const info = document.getElementById('imageViewerInfo');
+               if (info) info.innerHTML = '<div style="color:var(--danger); font-size:12px;">This file could not be decoded as an image. It may have been saved as text before image support existed, which corrupts binary data.</div>';
+               const canvasWrap = document.getElementById('imageViewerCanvasWrap');
+               if (canvasWrap) canvasWrap.innerHTML = '';
+           };
+           img.src = src;
+
+           const st = document.getElementById('footStatus');
+           if (st) { st.innerText = 'IMAGE'; st.style.color = 'var(--accent)'; }
+       },
+
+       hide() {
+           const host = document.getElementById('imageViewerHost');
+           const editorView = document.getElementById('editorView');
+           if (host) host.style.display = 'none';
+           if (editorView) editorView.style.display = '';
+           this.currentFile = null;
+           this._img = null;
+       },
+
+       render() {
+           if (!this._img || !this.currentFile) return;
+           const fn = this.currentFile;
+           const src = Nexus.state.Vfs[fn] || '';
+
+           const wrap = document.getElementById('imageViewerCanvasWrap');
+           if (wrap) {
+               wrap.innerHTML = '<img src="' + src + '" alt="' + fn + '" style="max-width:100%; max-height:100%; object-fit:contain; display:block; margin:auto;">';
+           }
+
+           const info = document.getElementById('imageViewerInfo');
+           if (info) {
+               const bytes = Nexus.Vfs.dataUrlByteSize(src);
+               const sizeText = bytes < 1024 ? bytes + ' B'
+                   : bytes < 1024 * 1024 ? (bytes / 1024).toFixed(1) + ' KB'
+                   : (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+               const mimeMatch = src.match(/^data:([^;]+);/);
+               const mime = mimeMatch ? mimeMatch[1] : 'unknown';
+               const ratio = this._gcdRatio(this._img.naturalWidth, this._img.naturalHeight);
+               const row = (k, v) => '<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid var(--border); font-size:11px;"><span style="opacity:0.6;">' + k + '</span><span style="font-family:monospace; text-align:right; word-break:break-all;">' + v + '</span></div>';
+               info.innerHTML =
+                   row('File', fn) +
+                   row('Dimensions', this._img.naturalWidth + ' x ' + this._img.naturalHeight + ' px') +
+                   row('Aspect ratio', ratio) +
+                   row('Format', mime) +
+                   row('Size on disk', sizeText) +
+                   row('Megapixels', ((this._img.naturalWidth * this._img.naturalHeight) / 1e6).toFixed(2) + ' MP');
+           }
+       },
+
+       _gcdRatio(w, h) {
+           if (!w || !h) return '-';
+           const gcd = (a, b) => b === 0 ? a : gcd(b, a % b);
+           const g = gcd(w, h);
+           return (w / g) + ':' + (h / g);
+       },
+
+       // Every edit funnels through here: draw the current image into a
+       // canvas via a caller-supplied setup function, then write the
+       // result back to the Vfs. Centralised so the Vfs/dirty-tracking/
+       // re-render bookkeeping is identical for every operation rather
+       // than repeated (and eventually diverging) in each one.
+       _applyCanvasOp(setup, opLabel) {
+           if (!this._img || !this.currentFile) return alert('No image loaded.');
+           const fn = this.currentFile;
+           const canvas = document.createElement('canvas');
+           const ctx = canvas.getContext('2d');
+           try {
+               setup(canvas, ctx, this._img);
+           } catch (e) {
+               console.error('image op failed:', e);
+               return alert('That edit failed: ' + e.message);
+           }
+
+           // An SVG can't be re-encoded through a canvas without
+           // rasterising it, which throws away the whole point of a vector
+           // file — so edits output PNG unless the source was already a
+           // lossy raster format worth preserving in kind.
+           const ext = fn.split('.').pop().toLowerCase();
+           const outMime = (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg'
+               : (ext === 'webp') ? 'image/webp'
+               : 'image/png';
+           const dataUrl = outMime === 'image/png'
+               ? canvas.toDataURL(outMime)
+               : canvas.toDataURL(outMime, 0.92);
+
+           Nexus.state.Vfs[fn] = dataUrl;
+           Nexus.Vfs.save();
+
+           const img = new Image();
+           img.onload = () => { this._img = img; this.render(); Nexus.Vfs.renderAccordion(); };
+           img.src = dataUrl;
+
+           if (Nexus.shell && typeof Nexus.shell.out === 'function') {
+               Nexus.shell.out(opLabel + ' applied to ' + fn + '.', 'success');
+           }
+       },
+
+       resize() {
+           if (!this._img) return alert('No image loaded.');
+           const input = prompt('New width in pixels (current: ' + this._img.naturalWidth + '). Height scales to match.', String(this._img.naturalWidth));
+           if (!input) return;
+           const targetW = parseInt(input, 10);
+           if (!targetW || targetW < 1) return alert('Enter a positive number.');
+           if (targetW > 8000) return alert('That is larger than 8000px - likely a typo, and big enough to run a phone out of memory.');
+
+           this._applyCanvasOp((canvas, ctx, img) => {
+               const scale = targetW / img.naturalWidth;
+               canvas.width = targetW;
+               canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+               ctx.imageSmoothingQuality = 'high';
+               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+           }, 'Resize');
+       },
+
+       rotate(deg) {
+           this._applyCanvasOp((canvas, ctx, img) => {
+               const w = img.naturalWidth, h = img.naturalHeight;
+               // 90 and 270 swap the output canvas dimensions; 180 doesn't.
+               const swaps = (deg === 90 || deg === 270);
+               canvas.width = swaps ? h : w;
+               canvas.height = swaps ? w : h;
+               ctx.translate(canvas.width / 2, canvas.height / 2);
+               ctx.rotate(deg * Math.PI / 180);
+               ctx.drawImage(img, -w / 2, -h / 2);
+           }, 'Rotate ' + deg + ' degrees');
+       },
+
+       flip(axis) {
+           this._applyCanvasOp((canvas, ctx, img) => {
+               canvas.width = img.naturalWidth;
+               canvas.height = img.naturalHeight;
+               ctx.translate(axis === 'h' ? canvas.width : 0, axis === 'v' ? canvas.height : 0);
+               ctx.scale(axis === 'h' ? -1 : 1, axis === 'v' ? -1 : 1);
+               ctx.drawImage(img, 0, 0);
+           }, axis === 'h' ? 'Flip horizontal' : 'Flip vertical');
+       },
+
+       cropSquare() {
+           this._applyCanvasOp((canvas, ctx, img) => {
+               // Centre-crop to the shorter side - the standard way to turn
+               // an arbitrary image into a square icon source without
+               // distorting it by stretching.
+               const size = Math.min(img.naturalWidth, img.naturalHeight);
+               const sx = Math.floor((img.naturalWidth - size) / 2);
+               const sy = Math.floor((img.naturalHeight - size) / 2);
+               canvas.width = size;
+               canvas.height = size;
+               ctx.drawImage(img, sx, sy, size, size, 0, 0, size, size);
+           }, 'Crop to square');
+       },
+
+       convertTo(targetExt) {
+           if (!this._img || !this.currentFile) return alert('No image loaded.');
+           const fn = this.currentFile;
+           const canvas = document.createElement('canvas');
+           canvas.width = this._img.naturalWidth;
+           canvas.height = this._img.naturalHeight;
+           const ctx = canvas.getContext('2d');
+
+           // JPEG has no alpha channel, so anything transparent would come
+           // out black without flattening onto a white background first -
+           // which is what every other tool does when exporting to JPEG.
+           if (targetExt === 'jpg') {
+               ctx.fillStyle = '#ffffff';
+               ctx.fillRect(0, 0, canvas.width, canvas.height);
+           }
+           ctx.drawImage(this._img, 0, 0);
+
+           const mime = targetExt === 'jpg' ? 'image/jpeg' : targetExt === 'webp' ? 'image/webp' : 'image/png';
+           const dataUrl = mime === 'image/png' ? canvas.toDataURL(mime) : canvas.toDataURL(mime, 0.92);
+
+           const base = fn.replace(/\.[^.]+$/, '');
+           const newName = base + '.' + targetExt;
+           if (Nexus.state.Vfs[newName] !== undefined && !confirm('"' + newName + '" already exists. Overwrite it?')) return;
+
+           Nexus.state.Vfs[newName] = dataUrl;
+           Nexus.state.originals[newName] = dataUrl;
+           Nexus.state.lastSavedContent[newName] = dataUrl;
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           Nexus.Vfs.switchFile(newName);
+       },
+
+       // Generates a whole PWA-style icon set in one pass. Each size is
+       // centre-cropped square first, so a non-square source doesn't come
+       // out stretched, and written as its own file using the same
+       // icon-<size>.png naming this app's own manifest already expects.
+       makeIcons() {
+           if (!this._img) return alert('No image loaded.');
+           const defaults = [16, 32, 48, 64, 128, 192, 256, 512];
+           const chosen = prompt('Icon sizes to generate (comma-separated px):', defaults.join(', '));
+           if (!chosen) return;
+           const list = chosen.split(',').map(s => parseInt(s.trim(), 10)).filter(n => n > 0 && n <= 2048);
+           if (list.length === 0) return alert('No valid sizes given.');
+
+           const base = this.currentFile.replace(/\.[^.]+$/, '').split('/').pop();
+           const img = this._img;
+           const srcSize = Math.min(img.naturalWidth, img.naturalHeight);
+           const sx = Math.floor((img.naturalWidth - srcSize) / 2);
+           const sy = Math.floor((img.naturalHeight - srcSize) / 2);
+
+           let made = 0;
+           list.forEach(size => {
+               const canvas = document.createElement('canvas');
+               canvas.width = size;
+               canvas.height = size;
+               const ctx = canvas.getContext('2d');
+               ctx.imageSmoothingQuality = 'high';
+               ctx.drawImage(img, sx, sy, srcSize, srcSize, 0, 0, size, size);
+               const dataUrl = canvas.toDataURL('image/png');
+               const name = base + '-' + size + '.png';
+               Nexus.state.Vfs[name] = dataUrl;
+               Nexus.state.originals[name] = dataUrl;
+               Nexus.state.lastSavedContent[name] = dataUrl;
+               made++;
+           });
+
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           alert('Generated ' + made + ' icon' + (made === 1 ? '' : 's') + ' from ' + this.currentFile + '.');
+       },
+
+       // Hands the already-open image straight to the sprite tool instead
+       // of making you re-pick it from the filesystem - that tool only
+       // accepted a fresh file-picker upload before, so an image already
+       // in the project simply couldn't be used with it at all.
+       sendToSpriteTool() {
+           if (!this._img || !this.currentFile) return alert('No image loaded.');
+           Nexus.spriteSheet._img = this._img;
+           Nexus.spriteSheet._sourceName = this.currentFile;
+           Nexus.UI.openModal('sprite');
+           const dims = document.getElementById('spriteDims');
+           if (dims) dims.innerText = 'Loaded from project: ' + this.currentFile + ' (' + this._img.naturalWidth + 'x' + this._img.naturalHeight + 'px)';
+           const canvas = document.getElementById('spriteCanvasPreview');
+           if (canvas) {
+               canvas.width = this._img.naturalWidth;
+               canvas.height = this._img.naturalHeight;
+               canvas.style.display = 'block';
+               canvas.getContext('2d').drawImage(this._img, 0, 0);
+           }
+       }
+   },
+
    // Ported from an earlier standalone version of this app that had a
    // dedicated sprite-sheet tool never carried forward into this rewrite.
    // Purely a CSS-generation tool: the uploaded image is only ever drawn
@@ -6973,6 +7323,11 @@ self.addEventListener('fetch', (e) => {
                const img = new Image();
                img.onload = () => {
                    Nexus.spriteSheet._img = img;
+                   // A fresh upload isn't a project file, so clear any
+                   // source path left over from a previous "use in sprite
+                   // tool" handoff — otherwise the generated CSS would
+                   // point at the wrong image entirely.
+                   Nexus.spriteSheet._sourceName = null;
                    const canvas = document.getElementById('spriteCanvasPreview');
                    const dims = document.getElementById('spriteDims');
                    canvas.width = img.width;
@@ -7008,12 +7363,25 @@ self.addEventListener('fetch', (e) => {
            const rows = Math.floor(this._img.height / h);
            const total = cols * rows;
 
+           // When the sheet came from a file already in the project (sent
+           // over from the image viewer), the CSS can reference its real
+           // path directly instead of leaving a placeholder to hand-edit.
+           // A fresh file-picker upload still gets the placeholder, since
+           // in that case the image genuinely isn't in the project and
+           // this tool never saves it.
+           const srcPath = this._sourceName || null;
+           const urlValue = srcPath || 'YOUR_IMAGE_HERE';
+
            let css = `/* Generated by divIDE's Sprite Sheet tool.\n`;
            css += ` * Source sheet: ${this._img.width}x${this._img.height}px, ${w}x${h}px frames, ${cols}x${rows} grid (${total} frames).\n`;
-           css += ` * Replace YOUR_IMAGE_HERE below with the actual path/URL to this sheet\n`;
-           css += ` * once it's part of your project — this tool only reads pixel\n`;
-           css += ` * dimensions from what you uploaded, it doesn't save the image itself. */\n\n`;
-           css += `.sprite {\n    background-image: url('YOUR_IMAGE_HERE');\n    display: inline-block;\n    width: ${w}px;\n    height: ${h}px;\n    background-repeat: no-repeat;\n}\n\n`;
+           if (srcPath) {
+               css += ` * Source file: ${srcPath} (already in this project — the url() below points at it).\n */\n\n`;
+           } else {
+               css += ` * Replace YOUR_IMAGE_HERE below with the actual path/URL to this sheet\n`;
+               css += ` * once it's part of your project — this tool only reads pixel\n`;
+               css += ` * dimensions from what you uploaded, it doesn't save the image itself. */\n\n`;
+           }
+           css += `.sprite {\n    background-image: url('${urlValue}');\n    display: inline-block;\n    width: ${w}px;\n    height: ${h}px;\n    background-repeat: no-repeat;\n}\n\n`;
 
            let index = 0;
            for (let r = 0; r < rows; r++) {

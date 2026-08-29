@@ -227,6 +227,48 @@
             <div id="fileTabsBar" style="border-bottom:none; flex:1; min-width:0;"></div>
             <button id="fileTabMenuBtn" class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleRibbonMenu()" title="More" aria-label="Open menu">⋮</button>
         </div>
+<!-- Image viewer: replaces #editorView while an image file is the active
+     tab (Vfs.switchFile routes there instead of the text engines, since
+     dumping a base64 data URL into a code editor is both useless to look
+     at and one stray keystroke away from corrupting the file). Hidden by
+     default; Nexus.imageViewer.show()/hide() swap the two. -->
+<div id="imageViewerHost" style="display:none; flex:1; min-height:0; flex-direction:column; background:var(--bg); overflow:hidden;">
+    <div id="imageViewerCanvasWrap" style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px; overflow:auto; background:repeating-conic-gradient(#2a2f37 0% 25%, #21252b 0% 50%) 50% / 20px 20px;"></div>
+
+    <div style="flex-shrink:0; border-top:1px solid var(--border); background:var(--panel); max-height:45vh; overflow-y:auto;">
+        <div style="padding:10px 12px;">
+            <div style="font-size:9px; opacity:0.6; letter-spacing:1px; margin-bottom:6px;">IMAGE INFO</div>
+            <div id="imageViewerInfo"></div>
+        </div>
+
+        <div style="padding:0 12px 12px;">
+            <div style="font-size:9px; opacity:0.6; letter-spacing:1px; margin:8px 0 6px;">TRANSFORM</div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px;">
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.resize()">↔️ RESIZE</button>
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.rotate(90)">↻ 90°</button>
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.rotate(270)">↺ 90°</button>
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.rotate(180)">↻ 180°</button>
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.flip('h')">⇋ FLIP H</button>
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.flip('v')">⇵ FLIP V</button>
+            </div>
+
+            <div style="font-size:9px; opacity:0.6; letter-spacing:1px; margin:12px 0 6px;">CONVERT (saves as a new file)</div>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:6px;">
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.convertTo('png')">→ PNG</button>
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.convertTo('jpg')">→ JPG</button>
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.convertTo('webp')">→ WEBP</button>
+            </div>
+
+            <div style="font-size:9px; opacity:0.6; letter-spacing:1px; margin:12px 0 6px;">ICONS &amp; SPRITES</div>
+            <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:6px;">
+                <button class="tool-btn" style="font-size:10px;" onclick="Nexus.imageViewer.cropSquare()">⬜ CROP SQUARE</button>
+                <button class="tool-btn btn-accent" style="font-size:10px;" onclick="Nexus.imageViewer.makeIcons()">✨ MAKE ICON SET</button>
+                <button class="tool-btn" style="font-size:10px; grid-column:span 2;" onclick="Nexus.imageViewer.sendToSpriteTool()">🖼️ USE IN SPRITE SHEET TOOL</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="editorView">
     <div id="gutter" onclick="Nexus.UI.handleGutterClick(event)">1</div>
     <div style="position: relative; flex: 1; overflow: hidden; background: var(--bg);">
