@@ -5738,6 +5738,28 @@ try {
         // a risk for too uncertain a payoff and intentionally left as-is.
         // If this is revisited later, do it as its OWN isolated, on-device-
         // tested change — not bundled in alongside unrelated feature work.
+        // THE "APP LOCKS UP ON STARTUP" FIX.
+        //
+        // These 13 imports come from esm.sh over the network, and each pulls
+        // its own dependencies — realistically 30+ requests. On a slow or
+        // flaky mobile connection that is many seconds of nothing, and until
+        // now it happened SILENTLY: boot finished, the engine restore fired
+        // 300ms later, and the editor simply sat there unresponsive with no
+        // indication anything was happening. The old 15s timeout meant up to
+        // fifteen seconds of apparent lock-up before it gave up.
+        //
+        // It only reproduced with files open because the restore is gated on
+        // an active file — which is exactly why wiping the project "fixed"
+        // it: an empty project has no active file, so CM6 never loaded at
+        // all. That made a network stall look like corrupted project data.
+        //
+        // Now: say what's happening, keep the basic editor usable while it
+        // loads, and fail over in 8s instead of 15.
+        const st0 = document.getElementById('footStatus');
+        if (st0) { st0.innerText = 'LOADING EDITOR ENGINE…'; st0.style.color = 'var(--gold)'; }
+        if (Nexus.shell && Nexus.shell.out) {
+            Nexus.shell.out('Downloading the CodeMirror engine — the basic editor stays usable meanwhile.', 'accent');
+        }
         const [cm6, cmState, cmView, cmTheme, cmLang, cmIndentMarkers, cmLangData, cmSearch, cmCommands, cmSticky, cmMinimap, cmLint, cmAutocomplete] = await Nexus.editorCore.withTimeout(Promise.all([
             import("codemirror"),
             import("@codemirror/state"),
@@ -5752,7 +5774,7 @@ try {
             import("@replit/codemirror-minimap"),
             import("@codemirror/lint"),
             import("@codemirror/autocomplete")
-        ]), 15000, "Loading the CM6 editor engine");
+        ]), 8000, "Loading the CM6 editor engine");
         
         Nexus.editorCore.modules = {
             basicSetup: cm6.basicSetup,
@@ -6434,9 +6456,17 @@ try {
     }
     
 } catch (e) {
-    document.getElementById('footStatus').innerText = "ENGINE: VANILLA (FAIL)";
+    document.getElementById('footStatus').innerText = "ENGINE: BASIC (CM6 UNAVAILABLE)";
     console.error("CM6 Ignition Fault:", e);
-    alert("Engine Swap Crashed.\n\n" + e.message);
+    // Deliberately NOT a blocking alert. This fires automatically at boot
+    // whenever the engine can't be fetched, so an alert here means every
+    // offline or slow-connection startup opens with a modal the user has
+    // to dismiss before touching anything — punishing them for a network
+    // condition they can't control. The basic editor works fine; say so
+    // without stopping the app.
+    if (Nexus.shell && Nexus.shell.out) {
+        Nexus.shell.out('Could not load the CodeMirror engine (' + (e && e.message || e) + '). Using the basic editor — retry from the ⋮ menu.', 'error');
+    }
     
     // Failsafe revert to Vanilla UI mapping
     const actualCmContainer = document.getElementById('cm6Container');
@@ -7640,6 +7670,235 @@ self.addEventListener('fetch', (e) => {
                canvas.style.display = 'block';
                canvas.getContext('2d').drawImage(this._img, 0, 0);
            }
+       }
+   },
+
+   // Format converters. Everything here is dependency-free on purpose —
+   // this is an offline-capable PWA, and a converter that needs a CDN is a
+   // converter that fails exactly when you're on a train with no signal.
+   // Each one reads the current file (or selection) and writes the result
+   // to a NEW file rather than overwriting, so a bad conversion can never
+   // eat your source.
+   converters: {
+
+       // --- CSV / TSV core -------------------------------------------
+       // Hand-written parser rather than a split(',') shortcut: real CSV
+       // has quoted fields containing commas, newlines, and doubled quotes,
+       // and a naive split silently corrupts all three.
+       _parseDelimited(text, delim) {
+           const rows = []; let row = [], field = '', inQuotes = false;
+           for (let i = 0; i < text.length; i++) {
+               const c = text[i];
+               if (inQuotes) {
+                   if (c === '"') {
+                       if (text[i + 1] === '"') { field += '"'; i++; }  // escaped quote
+                       else inQuotes = false;
+                   } else field += c;
+               } else {
+                   if (c === '"') inQuotes = true;
+                   else if (c === delim) { row.push(field); field = ''; }
+                   else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+                   else if (c === '\r') { /* handled by the \n case */ }
+                   else field += c;
+               }
+           }
+           if (field.length || row.length) { row.push(field); rows.push(row); }
+           return rows;
+       },
+
+       _quoteField(v, delim) {
+           const s = (v === null || v === undefined) ? '' : String(v);
+           const needs = s.includes(delim) || s.includes('"') || s.includes('\n') || s.includes('\r');
+           return needs ? '"' + s.replace(/"/g, '""') + '"' : s;
+       },
+
+       // --- conversions ----------------------------------------------
+       csvToJson(text, delim) {
+           const rows = this._parseDelimited(text, delim || ',');
+           if (!rows.length) return '[]';
+           const head = rows[0];
+           const out = rows.slice(1)
+               .filter(r => r.length > 1 || (r[0] || '').trim() !== '')  // drop trailing blank line
+               .map(r => { const o = {}; head.forEach((h, i) => o[h] = r[i] !== undefined ? r[i] : ''); return o; });
+           return JSON.stringify(out, null, 2);
+       },
+
+       jsonToCsv(text, delim) {
+           const d = delim || ',';
+           const data = JSON.parse(text);
+           const arr = Array.isArray(data) ? data : [data];
+           if (!arr.length) return '';
+           // Union of all keys, so rows with differing shapes don't lose columns.
+           const keys = [...new Set(arr.flatMap(o => Object.keys(o || {})))];
+           const lines = [keys.map(k => this._quoteField(k, d)).join(d)];
+           arr.forEach(o => lines.push(keys.map(k => {
+               let v = o ? o[k] : '';
+               if (v && typeof v === 'object') v = JSON.stringify(v); // nested objects survive as JSON
+               return this._quoteField(v, d);
+           }).join(d)));
+           return lines.join('\n');
+       },
+
+       jsonToTs(text, rootName) {
+           const data = JSON.parse(text);
+           const out = []; const seen = new Map();
+           const nameOf = s => s.charAt(0).toUpperCase() + s.slice(1).replace(/[^\w$]/g, '');
+           const tsType = (v, name) => {
+               if (v === null) return 'null';
+               if (Array.isArray(v)) return v.length ? tsType(v[0], name) + '[]' : 'unknown[]';
+               switch (typeof v) {
+                   case 'string': return 'string';
+                   case 'number': return 'number';
+                   case 'boolean': return 'boolean';
+                   case 'object': {
+                       // Reuse an interface for an identical shape instead of
+                       // emitting a near-duplicate for every occurrence.
+                       const shape = JSON.stringify(Object.keys(v).sort());
+                       if (seen.has(shape)) return seen.get(shape);
+                       const iname = nameOf(name || 'Nested');
+                       seen.set(shape, iname);
+                       const lines = Object.entries(v).map(([k, val]) => {
+                           const safe = /^[A-Za-z_$][\w$]*$/.test(k) ? k : JSON.stringify(k);
+                           return `  ${safe}: ${tsType(val, k)};`;
+                       });
+                       out.push(`interface ${iname} {\n${lines.join('\n')}\n}`);
+                       return iname;
+                   }
+                   default: return 'unknown';
+               }
+           };
+           const root = nameOf(rootName || 'Root');
+           const t = tsType(Array.isArray(data) ? (data[0] || {}) : data, root);
+           return out.join('\n\n') + (Array.isArray(data) ? `\n\ntype ${root}List = ${t}[];\n` : '\n');
+       },
+
+       qsToJson(text) {
+           const p = new URLSearchParams(String(text).trim().replace(/^\?/, ''));
+           const o = {};
+           for (const [k, v] of p) o[k] = o[k] === undefined ? v : [].concat(o[k], v);
+           return JSON.stringify(o, null, 2);
+       },
+
+       jsonToQs(text) {
+           const o = JSON.parse(text);
+           const p = new URLSearchParams();
+           Object.entries(o).forEach(([k, v]) =>
+               Array.isArray(v) ? v.forEach(x => p.append(k, x)) : p.append(k, v));
+           return p.toString();
+       },
+
+       cssToJs(css) {
+           // Strip a selector wrapper if present, so both a full rule and a
+           // bare declaration list work.
+           const body = css.replace(/^[^{]*\{/, '').replace(/\}\s*$/, '');
+           const lines = body.split(';').map(s => s.trim()).filter(Boolean).map(p => {
+               const i = p.indexOf(':');
+               if (i < 0) return null;
+               const k = p.slice(0, i).trim().replace(/-([a-z])/g, (m, c) => c.toUpperCase());
+               const v = p.slice(i + 1).trim();
+               // Unitless numbers stay numbers; everything else is a string.
+               return `  ${k}: ${/^-?\d+(\.\d+)?$/.test(v) ? v : JSON.stringify(v)},`;
+           }).filter(Boolean);
+           return `{\n${lines.join('\n')}\n}`;
+       },
+
+       jsToCss(js) {
+           const obj = js.replace(/^[^{]*\{/, '').replace(/\}\s*$/, '');
+           const lines = obj.split(/,\s*\n|,(?=\s*[A-Za-z_$"'])/).map(s => s.trim()).filter(Boolean).map(p => {
+               const i = p.indexOf(':');
+               if (i < 0) return null;
+               let k = p.slice(0, i).trim().replace(/^["']|["']$/g, '');
+               k = k.replace(/([A-Z])/g, (m, c) => '-' + c.toLowerCase());
+               let v = p.slice(i + 1).trim().replace(/,$/, '').replace(/^["']|["']$/g, '');
+               return `  ${k}: ${v};`;
+           }).filter(Boolean);
+           return lines.join('\n');
+       },
+
+       toLF(text)   { return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n'); },
+       toCRLF(text) { return this.toLF(text).replace(/\n/g, '\r\n'); },
+
+       textToHex(text) {
+           return Array.from(new TextEncoder().encode(text))
+               .map(b => b.toString(16).padStart(2, '0')).join(' ');
+       },
+       hexToText(hex) {
+           const bytes = (hex.match(/[0-9a-fA-F]{2}/g) || []).map(h => parseInt(h, 16));
+           return new TextDecoder().decode(new Uint8Array(bytes));
+       },
+
+       escapeHtml(text) {
+           return text.replace(/&/g, '&amp;').replace(/</g, '&lt;')
+                      .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+       },
+       unescapeHtml(text) {
+           return text.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                      .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+       },
+
+       minifyJson(text) { return JSON.stringify(JSON.parse(text)); },
+
+       // --- plumbing --------------------------------------------------
+       // Every conversion writes to a NEW file. Overwriting the source
+       // would mean one bad conversion destroys the original with only
+       // undo standing between you and losing it.
+       _run(label, newExt, fn) {
+           const fname = Nexus.state.activeFile;
+           if (!fname) return Nexus.shell.out('Open a file first.', 'warn');
+           if (Nexus.Vfs.isImageFile(fname)) return Nexus.shell.out('Converters work on text files, not images.', 'warn');
+           const src = Nexus.state.Vfs[fname] || '';
+           if (!src.trim()) return Nexus.shell.out('This file is empty — nothing to convert.', 'warn');
+
+           let result;
+           try { result = fn(src); }
+           catch (e) {
+               return Nexus.shell.out(`${label} failed: ${e.message}`, 'error');
+           }
+           if (result === undefined || result === null) return Nexus.shell.out(`${label} produced no output.`, 'warn');
+
+           const base = fname.replace(/\.[^.]+$/, '');
+           let out = `${base}.${newExt}`;
+           let n = 2;
+           while (Nexus.state.Vfs[out] !== undefined) out = `${base}-${n++}.${newExt}`;
+
+           Nexus.state.Vfs[out] = result;
+           Nexus.state.originals[out] = result;
+           Nexus.state.lastSavedContent[out] = result;
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           Nexus.Vfs.switchFile(out);
+           Nexus.shell.out(`${label} → ${out}`, 'success');
+       },
+
+       csvJson()    { this._run('CSV to JSON', 'json', s => this.csvToJson(s, ',')); },
+       tsvJson()    { this._run('TSV to JSON', 'json', s => this.csvToJson(s, '\t')); },
+       jsonCsv()    { this._run('JSON to CSV', 'csv',  s => this.jsonToCsv(s, ',')); },
+       jsonTsv()    { this._run('JSON to TSV', 'tsv',  s => this.jsonToCsv(s, '\t')); },
+       jsonTs()     { this._run('JSON to TypeScript', 'ts', s => this.jsonToTs(s, (Nexus.state.activeFile || 'Root').split('/').pop().replace(/\.[^.]+$/, ''))); },
+       qsJson()     { this._run('Query string to JSON', 'json', s => this.qsToJson(s)); },
+       jsonQs()     { this._run('JSON to query string', 'txt', s => this.jsonToQs(s)); },
+       cssJs()      { this._run('CSS to JS object', 'js', s => this.cssToJs(s)); },
+       jsCss()      { this._run('JS object to CSS', 'css', s => this.jsToCss(s)); },
+       jsonMin()    { this._run('Minify JSON', 'min.json', s => this.minifyJson(s)); },
+       hexEncode()  { this._run('Text to hex', 'hex', s => this.textToHex(s)); },
+       hexDecode()  { this._run('Hex to text', 'txt', s => this.hexToText(s)); },
+       htmlEscape() { this._run('Escape HTML', 'txt', s => this.escapeHtml(s)); },
+       htmlUnescape(){ this._run('Unescape HTML', 'html', s => this.unescapeHtml(s)); },
+
+       // Line endings rewrite in place — this is a whitespace normalisation
+       // of the same file, not a format change, so a new file would just be
+       // clutter. Content is otherwise untouched.
+       lineEndings(kind) {
+           const fname = Nexus.state.activeFile;
+           if (!fname) return Nexus.shell.out('Open a file first.', 'warn');
+           if (Nexus.Vfs.isImageFile(fname)) return Nexus.shell.out('Not applicable to images.', 'warn');
+           const src = Nexus.state.Vfs[fname] || '';
+           const out = kind === 'crlf' ? this.toCRLF(src) : this.toLF(src);
+           if (out === src) return Nexus.shell.out(`Already ${kind.toUpperCase()} — nothing changed.`, 'info');
+           Nexus.state.Vfs[fname] = out;
+           Nexus.Vfs.save();
+           Nexus.Vfs.switchFile(fname);
+           Nexus.shell.out(`Line endings converted to ${kind.toUpperCase()}.`, 'success');
        }
    },
 

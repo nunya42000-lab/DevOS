@@ -649,6 +649,45 @@
         </details>
 
         <details class="diag-section">
+            <summary>Convert Formats</summary>
+            <div class="diag-body">
+                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Converts the OPEN file and saves the result as a new file — your original is never overwritten.</div>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:6px 0 4px;">TABULAR DATA</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.converters.csvJson()">CSV &rarr; JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonCsv()">JSON &rarr; CSV</button>
+                    <button class="tool-btn" onclick="Nexus.converters.tsvJson()">TSV &rarr; JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonTsv()">JSON &rarr; TSV</button>
+                </div>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">CODE</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.converters.jsonTs()">JSON &rarr; TS types</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonMin()">Minify JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.cssJs()">CSS &rarr; JS object</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsCss()">JS object &rarr; CSS</button>
+                </div>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">WEB / TEXT</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.converters.qsJson()">Query &rarr; JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonQs()">JSON &rarr; Query</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlEscape()">Escape HTML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlUnescape()">Unescape HTML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.hexEncode()">Text &rarr; Hex</button>
+                    <button class="tool-btn" onclick="Nexus.converters.hexDecode()">Hex &rarr; Text</button>
+                </div>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">LINE ENDINGS (edits this file directly)</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.converters.lineEndings('lf')">To LF (Unix)</button>
+                    <button class="tool-btn" onclick="Nexus.converters.lineEndings('crlf')">To CRLF (Windows)</button>
+                </div>
+            </div>
+        </details>
+
+        <details class="diag-section">
             <summary>Dev Utilities</summary>
             <div class="diag-body">
                 <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Selection, or whole file if nothing's selected:</div>
