@@ -7195,8 +7195,28 @@ inject() {
            for (const handle of handles) {
                try {
                    const file = await handle.getFile();
-                   const text = await file.text();
                    let name = file.name;
+                   // THE BUG BEHIND "my .docx opened as PK garbage": this
+                   // path read EVERY launched file with file.text(), which
+                   // UTF-8 decodes binary and destroys it — the same defect
+                   // already fixed in loadFiles() and importZIP(), but this
+                   // third entry point (Android's "Open with" handing files
+                   // straight to the app) was missed. A .docx or .png
+                   // arriving this way was corrupted before it was ever
+                   // stored, so it could never open correctly afterwards.
+                   // Binary formats are read as data URLs, exactly as the
+                   // other two import paths do.
+                   let text;
+                   if (Nexus.Vfs.isBinaryFile(name)) {
+                       text = await new Promise((resolve, reject) => {
+                           const r = new FileReader();
+                           r.onload = () => resolve(r.result);
+                           r.onerror = () => reject(new Error('Could not read ' + name));
+                           r.readAsDataURL(file);
+                       });
+                   } else {
+                       text = await file.text();
+                   }
                    // Same collision handling as a manual New File — don't
                    // silently clobber an existing same-named file in the
                    // Vortex.

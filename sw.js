@@ -10,7 +10,10 @@
 // reasoning as the v1->v2 bump: reusing an existing cache name reopens the
 // same store rather than resetting it, so a version bump is what actually
 // triggers the activate handler's cleanup and a real re-fetch.
-const CACHE = 'divide-shell-v3';
+// Bumped v3 -> v4. The shell files changed substantially (binary/document
+// support, converters, the CM6 loading fix), and a stale cached app.js is
+// itself a bug source - it makes fixed code look broken on device.
+const CACHE = 'divide-shell-v4';
 
 const APP_SHELL = [
   './',
