@@ -673,12 +673,46 @@
                     <button class="tool-btn" onclick="Nexus.converters.jsonTsv()">JSON &rarr; TSV</button>
                 </div>
 
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">MARKUP &amp; CONFIG</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.converters.mdHtml()">MD &rarr; HTML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlMd()">HTML &rarr; MD</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonYaml()">JSON &rarr; YAML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.yamlJson()">YAML &rarr; JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.xmlJson()">XML &rarr; JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonXml()">JSON &rarr; XML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.envJson()">.env &rarr; JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonEnv()">JSON &rarr; .env</button>
+                </div>
+
                 <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">CODE</div>
                 <div class="grid-2">
                     <button class="tool-btn" onclick="Nexus.converters.jsonTs()">JSON &rarr; TS types</button>
                     <button class="tool-btn" onclick="Nexus.converters.jsonMin()">Minify JSON</button>
                     <button class="tool-btn" onclick="Nexus.converters.cssJs()">CSS &rarr; JS object</button>
                     <button class="tool-btn" onclick="Nexus.converters.jsCss()">JS object &rarr; CSS</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlJsx()">HTML &rarr; JSX</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonSql()">JSON &rarr; SQL</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonFlatten()">Flatten JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonUnflatten()">Unflatten JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.csvMd()">CSV &rarr; MD table</button>
+                </div>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">CONFIG &amp; SUBTITLES</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.converters.iniJson()">INI &rarr; JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonIni()">JSON &rarr; INI</button>
+                    <button class="tool-btn" onclick="Nexus.converters.srtVtt()">SRT &rarr; VTT</button>
+                    <button class="tool-btn" onclick="Nexus.converters.vttSrt()">VTT &rarr; SRT</button>
+                    <button class="tool-btn" style="grid-column:span 2;" onclick="Nexus.converters.subsText()">Subtitles &rarr; plain text</button>
+                </div>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">TEXT UTILITIES</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.converters.sortLines()">Sort lines</button>
+                    <button class="tool-btn" onclick="Nexus.converters.sortUnique()">Sort + dedupe</button>
+                    <button class="tool-btn" onclick="Nexus.converters.baseConvert()">Number bases</button>
+                    <button class="tool-btn" onclick="Nexus.converters.timeConvert()">Timestamps</button>
                 </div>
 
                 <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">WEB / TEXT</div>

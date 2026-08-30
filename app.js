@@ -2029,7 +2029,7 @@ Vfs: {
     // readAsText() and the ZIP central directory is destroyed, so the file
     // can never be opened again. They load as data URLs for the same
     // reason images do.
-    DOC_EXTS: ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'epub'],
+    DOC_EXTS: ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'epub', 'pdf', 'rtf'],
 
     isDocFile(filename) {
         if (!filename) return false;
@@ -7509,8 +7509,32 @@ self.addEventListener('fetch', (e) => {
                    'It was loaded before document support existed, so it was stored as text — which destroys the ZIP structure these formats depend on. Re-import the original file to fix it.';
                return;
            }
-           if (typeof JSZip === 'undefined') {
+           if (typeof JSZip === 'undefined' && !['pdf', 'rtf'].includes(fn.split('.').pop().toLowerCase())) {
                if (body) body.textContent = 'JSZip didn\'t load, so documents can\'t be opened this session. Check your connection and reload.';
+               return;
+           }
+
+           const ext0 = fn.split('.').pop().toLowerCase();
+
+           // PDF and RTF are binary but NOT zip archives, so they must be
+           // handled before anything reaches JSZip.
+           if (ext0 === 'pdf' || ext0 === 'rtf') {
+               try {
+                   const b64 = src.slice(src.indexOf(',') + 1);
+                   const bin = atob(b64);
+                   const bytes = new Uint8Array(bin.length);
+                   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+                   const text = ext0 === 'pdf'
+                       ? await Nexus.converters.pdfToText(bytes)
+                       : Nexus.converters.rtfToText(new TextDecoder('utf-8').decode(bytes));
+                   this.lastText = text;
+                   if (body) body.textContent = text;
+                   const words = (text.match(/\S+/g) || []).length;
+                   if (meta) meta.textContent = `${fn} · ${words} words · read-only`;
+               } catch (e) {
+                   console.error('docViewer (pdf/rtf) failed:', e);
+                   if (body) body.textContent = 'Could not read this file.\n\n' + (e && e.message || e);
+               }
                return;
            }
 
@@ -8081,6 +8105,500 @@ self.addEventListener('fetch', (e) => {
 
        minifyJson(text) { return JSON.stringify(JSON.parse(text)); },
 
+       // ---- Markdown / HTML -------------------------------------------
+       // A deliberate CommonMark SUBSET: headings, emphasis, code, links,
+       // lists, blockquotes, fenced blocks. Everything is HTML-escaped
+       // first so a document containing <script> can't inject anything
+       // when previewed.
+       mdToHtml(md) {
+           const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+           const inline = s => esc(s)
+               .replace(/`([^`]+)`/g, '<code>$1</code>')
+               .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+               .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+               .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+           const out = [];
+           md.replace(/\r\n/g, '\n').split(/\n{2,}/).forEach(block => {
+               const b = block.trim();
+               if (!b) return;
+               if (/^```/.test(b)) {
+                   const body = b.replace(/^```[^\n]*\n?/, '').replace(/```$/, '');
+                   out.push('<pre><code>' + esc(body) + '</code></pre>');
+                   return;
+               }
+               const h = b.match(/^(#{1,6})\s+(.*)$/);
+               if (h && b.split('\n').length === 1) { out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); return; }
+               if (/^[-*+]\s/.test(b)) { out.push('<ul>\n' + b.split('\n').map(l => '  <li>' + inline(l.replace(/^[-*+]\s+/, '')) + '</li>').join('\n') + '\n</ul>'); return; }
+               if (/^\d+\.\s/.test(b)) { out.push('<ol>\n' + b.split('\n').map(l => '  <li>' + inline(l.replace(/^\d+\.\s+/, '')) + '</li>').join('\n') + '\n</ol>'); return; }
+               if (/^>/.test(b)) { out.push('<blockquote>' + inline(b.replace(/^>\s?/gm, '')) + '</blockquote>'); return; }
+               out.push('<p>' + inline(b).replace(/\n/g, '<br>\n') + '</p>');
+           });
+           return out.join('\n\n') + '\n';
+       },
+
+       htmlToMd(html) {
+           let s = html
+               .replace(/<!--[\s\S]*?-->/g, '')
+               .replace(/<script[\s\S]*?<\/script>/gi, '')
+               .replace(/<style[\s\S]*?<\/style>/gi, '');
+           s = s
+               .replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, (m, n, t) => '\n' + '#'.repeat(+n) + ' ' + t.trim() + '\n')
+               .replace(/<(strong|b)[^>]*>([\s\S]*?)<\/\1>/gi, '**$2**')
+               .replace(/<(em|i)[^>]*>([\s\S]*?)<\/\1>/gi, '*$2*')
+               .replace(/<code[^>]*>([\s\S]*?)<\/code>/gi, '`$1`')
+               .replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, '[$2]($1)')
+               .replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (m, t) => '- ' + t.trim() + '\n')
+               .replace(/<blockquote[^>]*>([\s\S]*?)<\/blockquote>/gi, (m, t) => '> ' + t.trim() + '\n')
+               .replace(/<br\s*\/?>/gi, '\n')
+               .replace(/<\/p>/gi, '\n\n')
+               .replace(/<[^>]+>/g, '');
+           return Nexus.converters.unescapeHtml(s).replace(/\n{3,}/g, '\n\n').trim() + '\n';
+       },
+
+       // ---- YAML ------------------------------------------------------
+       // Emitting YAML from JSON is safe (we control the output). Parsing
+       // is a documented SUBSET — nested maps, simple lists, scalars — not
+       // a full YAML implementation. Anchors, multi-line blocks and flow
+       // style aren't supported, and pretending otherwise would silently
+       // mangle real config files.
+       jsonToYaml(text) {
+           const data = JSON.parse(text);
+           const needsQuote = s => /^[\s]|[\s]$|^[-?:,\[\]{}#&*!|>'"%@`]|^(true|false|null|~|-?\d+(\.\d+)?)$/i.test(s) || s === '';
+           const emit = (v, ind) => {
+               const pad = '  '.repeat(ind);
+               if (v === null) return 'null';
+               if (Array.isArray(v)) {
+                   if (!v.length) return '[]';
+                   return '\n' + v.map(x => pad + '- ' + emit(x, ind + 1).replace(/^\n/, '')).join('\n');
+               }
+               if (typeof v === 'object') {
+                   const k = Object.keys(v);
+                   if (!k.length) return '{}';
+                   return '\n' + k.map(key => {
+                       const val = emit(v[key], ind + 1);
+                       return pad + key + ':' + (val.startsWith('\n') ? val : ' ' + val);
+                   }).join('\n');
+               }
+               if (typeof v === 'string') return needsQuote(v) ? JSON.stringify(v) : v;
+               return String(v);
+           };
+           return emit(data, 0).replace(/^\n/, '') + '\n';
+       },
+
+       yamlToJson(text) {
+           const lines = text.replace(/\r\n/g, '\n').split('\n').filter(l => l.trim() && !/^\s*#/.test(l));
+           const root = {}; const stack = [{ indent: -1, node: root }];
+           const coerce = s => {
+               s = s.trim();
+               if (s === '') return '';
+               if (/^".*"$/.test(s) || /^'.*'$/.test(s)) return s.slice(1, -1);
+               if (/^(true|false)$/i.test(s)) return s.toLowerCase() === 'true';
+               if (/^null$|^~$/i.test(s)) return null;
+               if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+               return s;
+           };
+           lines.forEach(line => {
+               const indent = line.match(/^\s*/)[0].length;
+               const body = line.trim();
+               while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop();
+               const top = stack[stack.length - 1];
+               if (body.startsWith('- ')) {
+                   if (top.lastKey) {
+                       const parent = top.node;
+                       if (!Array.isArray(parent[top.lastKey])) parent[top.lastKey] = [];
+                       parent[top.lastKey].push(coerce(body.slice(2)));
+                   }
+                   return;
+               }
+               const ci = body.indexOf(':');
+               if (ci < 0) return;
+               const key = body.slice(0, ci).trim();
+               const val = body.slice(ci + 1).trim();
+               top.lastKey = key;
+               if (val === '') {
+                   const child = {};
+                   top.node[key] = child;
+                   stack.push({ indent, node: child });
+               } else top.node[key] = coerce(val);
+           });
+           return JSON.stringify(root, null, 2);
+       },
+
+       // ---- XML -------------------------------------------------------
+       xmlToJson(xml) {
+           let i = 0;
+           const s = xml.replace(/<\?[\s\S]*?\?>/g, '').replace(/<!--[\s\S]*?-->/g, '').trim();
+           const self = this;
+           function parseNode() {
+               while (i < s.length && s[i] !== '<') i++;
+               if (i >= s.length) return null;
+               const close = s.indexOf('>', i);
+               if (close < 0) return null;
+               const raw = s.slice(i + 1, close);
+               if (raw.startsWith('/')) { i = close + 1; return null; }
+               const selfClose = raw.endsWith('/');
+               const inner = selfClose ? raw.slice(0, -1) : raw;
+               const nameMatch = inner.match(/^([\w:.-]+)/);
+               const name = nameMatch ? nameMatch[1] : 'node';
+               const node = {};
+               const attrRe = /([\w:.-]+)\s*=\s*"([^"]*)"/g; let a;
+               while ((a = attrRe.exec(inner))) node['@' + a[1]] = self.unescapeHtml(a[2]);
+               i = close + 1;
+               if (selfClose) return { name, node };
+               let text = '';
+               while (i < s.length) {
+                   if (s[i] === '<') {
+                       if (s.slice(i, i + 2 + name.length) === '</' + name) { i = s.indexOf('>', i) + 1; break; }
+                       const child = parseNode();
+                       if (child) {
+                           // Repeated element names collapse into an array,
+                           // which is the only shape that survives round-trip.
+                           if (node[child.name] === undefined) node[child.name] = child.node;
+                           else {
+                               if (!Array.isArray(node[child.name])) node[child.name] = [node[child.name]];
+                               node[child.name].push(child.node);
+                           }
+                       }
+                   } else { text += s[i]; i++; }
+               }
+               text = self.unescapeHtml(text.trim());
+               if (text && Object.keys(node).length === 0) return { name, node: text };
+               if (text) node['#text'] = text;
+               return { name, node };
+           }
+           const root = parseNode();
+           return JSON.stringify(root ? { [root.name]: root.node } : {}, null, 2);
+       },
+
+       jsonToXml(text) {
+           const data = JSON.parse(text);
+           const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+           const build = (name, val, ind) => {
+               const pad = '  '.repeat(ind);
+               if (val === null || val === undefined) return `${pad}<${name}/>`;
+               if (Array.isArray(val)) return val.map(v => build(name, v, ind)).join('\n');
+               if (typeof val === 'object') {
+                   const attrs = Object.keys(val).filter(k => k.startsWith('@'))
+                       .map(k => ` ${k.slice(1)}="${esc(val[k])}"`).join('');
+                   const kids = Object.keys(val).filter(k => !k.startsWith('@') && k !== '#text');
+                   const txt = val['#text'];
+                   if (!kids.length && txt === undefined) return `${pad}<${name}${attrs}/>`;
+                   const body = kids.map(k => build(k, val[k], ind + 1)).join('\n');
+                   const inner = txt !== undefined ? `${'  '.repeat(ind + 1)}${esc(txt)}` + (body ? '\n' + body : '') : body;
+                   return `${pad}<${name}${attrs}>\n${inner}\n${pad}</${name}>`;
+               }
+               return `${pad}<${name}>${esc(val)}</${name}>`;
+           };
+           const keys = Object.keys(data);
+           const rootName = keys.length === 1 ? keys[0] : 'root';
+           const rootVal = keys.length === 1 ? data[rootName] : data;
+           return '<?xml version="1.0" encoding="UTF-8"?>\n' + build(rootName, rootVal, 0) + '\n';
+       },
+
+       // ---- HTML -> JSX -----------------------------------------------
+       htmlToJsx(html) {
+           const attrMap = { tabindex:'tabIndex', readonly:'readOnly', maxlength:'maxLength',
+               colspan:'colSpan', rowspan:'rowSpan', autocomplete:'autoComplete', autofocus:'autoFocus',
+               contenteditable:'contentEditable', spellcheck:'spellCheck', enctype:'encType',
+               novalidate:'noValidate', usemap:'useMap', srcset:'srcSet' };
+           return html
+               .replace(/\bclass=/g, 'className=')
+               .replace(/\bfor=/g, 'htmlFor=')
+               .replace(/\b([a-z]+)=/gi, (m, a) => (attrMap[a.toLowerCase()] || a) + '=')
+               // Void elements must be explicitly self-closed in JSX.
+               .replace(/<(br|hr|img|input|meta|link|source|track|area|base|col|embed|param|wbr)\b([^>]*?)\s*\/?>/gi,
+                   (m, tag, attrs) => `<${tag}${attrs.replace(/\s+$/, '')} />`)
+               .replace(/<!--([\s\S]*?)-->/g, '{/*$1*/}')
+               .replace(/\bstyle="([^"]*)"/g, (m, css) => {
+                   const props = css.split(';').map(x => x.trim()).filter(Boolean).map(p => {
+                       const i = p.indexOf(':'); if (i < 0) return null;
+                       const k = p.slice(0, i).trim().replace(/-([a-z])/g, (x, c) => c.toUpperCase());
+                       return `${k}: '${p.slice(i + 1).trim()}'`;
+                   }).filter(Boolean);
+                   return `style={{ ${props.join(', ')} }}`;
+               });
+       },
+
+       // ---- data / misc -----------------------------------------------
+       jsonToSql(text, table) {
+           const data = JSON.parse(text);
+           const rows = Array.isArray(data) ? data : [data];
+           if (!rows.length) return '';
+           const t = table || 'my_table';
+           const q = v => v === null || v === undefined ? 'NULL'
+               : typeof v === 'number' || typeof v === 'boolean' ? String(v)
+               : `'${String(typeof v === 'object' ? JSON.stringify(v) : v).replace(/'/g, "''")}'`;
+           const keys = [...new Set(rows.flatMap(r => Object.keys(r || {})))];
+           return rows.map(r => `INSERT INTO ${t} (${keys.join(', ')}) VALUES (${keys.map(k => q(r ? r[k] : null)).join(', ')});`).join('\n') + '\n';
+       },
+
+       csvToMarkdown(text, delim) {
+           const rows = this._parseDelimited(text, delim || ',');
+           if (!rows.length) return '';
+           const esc = c => String(c).replace(/\|/g, '\\|');
+           const out = ['| ' + rows[0].map(esc).join(' | ') + ' |',
+                        '|' + rows[0].map(() => ' --- ').join('|') + '|'];
+           rows.slice(1).filter(r => r.length > 1 || (r[0] || '').trim() !== '')
+               .forEach(r => out.push('| ' + rows[0].map((_, i) => esc(r[i] !== undefined ? r[i] : '')).join(' | ') + ' |'));
+           return out.join('\n') + '\n';
+       },
+
+       envToJson(text) {
+           const o = {};
+           text.split('\n').forEach(line => {
+               const l = line.trim();
+               if (!l || l.startsWith('#')) return;
+               const i = l.indexOf('=');
+               if (i < 0) return;
+               let v = l.slice(i + 1).trim();
+               if (/^".*"$/.test(v) || /^'.*'$/.test(v)) v = v.slice(1, -1);
+               o[l.slice(0, i).trim()] = v;
+           });
+           return JSON.stringify(o, null, 2);
+       },
+
+       jsonToEnv(text) {
+           const o = JSON.parse(text);
+           return Object.entries(o).map(([k, v]) => {
+               const s = v === null || v === undefined ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v));
+               return `${k}=${/[\s#"']/.test(s) ? JSON.stringify(s) : s}`;
+           }).join('\n') + '\n';
+       },
+
+       // Flatten nested JSON to dotted paths (and back), which is what
+       // makes deep config diffable and greppable.
+       flattenJson(text) {
+           const data = JSON.parse(text);
+           const out = {};
+           (function walk(v, prefix) {
+               if (v && typeof v === 'object' && !Array.isArray(v)) {
+                   const k = Object.keys(v);
+                   if (!k.length) { out[prefix] = {}; return; }
+                   k.forEach(key => walk(v[key], prefix ? prefix + '.' + key : key));
+               } else if (Array.isArray(v)) {
+                   if (!v.length) { out[prefix] = []; return; }
+                   v.forEach((x, i) => walk(x, `${prefix}[${i}]`));
+               } else out[prefix] = v;
+           })(data, '');
+           return JSON.stringify(out, null, 2);
+       },
+
+       unflattenJson(text) {
+           const flat = JSON.parse(text);
+           const root = {};
+           Object.entries(flat).forEach(([path, val]) => {
+               const parts = path.replace(/\[(\d+)\]/g, '.$1').split('.').filter(Boolean);
+               let cur = root;
+               parts.forEach((p, i) => {
+                   const last = i === parts.length - 1;
+                   const nextIsIndex = !last && /^\d+$/.test(parts[i + 1]);
+                   if (last) cur[p] = val;
+                   else {
+                       if (cur[p] === undefined) cur[p] = nextIsIndex ? [] : {};
+                       cur = cur[p];
+                   }
+               });
+           });
+           return JSON.stringify(root, null, 2);
+       },
+
+       sortLinesUnique(text, unique) {
+           let lines = text.replace(/\r\n/g, '\n').split('\n');
+           const trailing = lines[lines.length - 1] === '' ? '\n' : '';
+           if (trailing) lines.pop();
+           if (unique) lines = [...new Set(lines)];
+           lines.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+           return lines.join('\n') + trailing;
+       },
+
+       numberBases(text) {
+           const out = [];
+           text.split(/\s+/).filter(Boolean).forEach(tok => {
+               let n;
+               if (/^0x/i.test(tok)) n = parseInt(tok, 16);
+               else if (/^0b/i.test(tok)) n = parseInt(tok.slice(2), 2);
+               else if (/^0o/i.test(tok)) n = parseInt(tok.slice(2), 8);
+               else n = Number(tok);
+               if (!Number.isFinite(n)) { out.push(`${tok}  ->  (not a number)`); return; }
+               out.push(`${tok}  ->  dec ${n}  hex 0x${(n >>> 0).toString(16)}  bin 0b${(n >>> 0).toString(2)}  oct 0o${(n >>> 0).toString(8)}`);
+           });
+           return out.join('\n') + '\n';
+       },
+
+       timestamps(text) {
+           const out = [];
+           text.split(/\s+/).filter(Boolean).forEach(tok => {
+               let d = null;
+               if (/^\d{10}$/.test(tok)) d = new Date(+tok * 1000);        // seconds
+               else if (/^\d{13}$/.test(tok)) d = new Date(+tok);           // milliseconds
+               else { const p = Date.parse(tok); if (!isNaN(p)) d = new Date(p); }
+               if (!d || isNaN(d.getTime())) { out.push(`${tok}  ->  (unrecognised)`); return; }
+               out.push(`${tok}\n  ISO    ${d.toISOString()}\n  local  ${d.toString()}\n  epoch  ${Math.floor(d.getTime() / 1000)} s / ${d.getTime()} ms`);
+           });
+           return out.join('\n\n') + '\n';
+       },
+
+       // ---- PDF -------------------------------------------------------
+       // Text extraction with NO library. PDF content streams are usually
+       // FlateDecode-compressed, and browsers ship a native inflater
+       // (DecompressionStream), so pulling in pdf.js just to read text
+       // would be ~1MB of CDN for something the platform already does.
+       //
+       // Honest limits, stated rather than discovered: this reads TEXT
+       // PDFs. A scanned document is images of text and needs OCR, which
+       // this does not attempt — it says so instead of returning an empty
+       // file and letting you think the PDF was blank.
+       async _inflate(bytes) {
+           if (typeof DecompressionStream === 'function' && typeof ReadableStream === 'function') {
+               // Built from a ReadableStream rather than Blob.stream() —
+               // one less API to depend on, and Blob.stream() is the piece
+               // most likely to be missing or shimmed differently.
+               const src = new ReadableStream({
+                   start(c) { c.enqueue(bytes); c.close(); }
+               });
+               const out = src.pipeThrough(new DecompressionStream('deflate'));
+               return new Uint8Array(await new Response(out).arrayBuffer());
+           }
+           if (typeof pako !== 'undefined' && pako.inflate) return pako.inflate(bytes);
+           throw new Error('No inflater available in this browser.');
+       },
+
+       _pdfUnescape(s) {
+           return s.replace(/\\n/g, '\n').replace(/\\r/g, '\r').replace(/\\t/g, '\t')
+                   .replace(/\\([()\\])/g, '$1')
+                   .replace(/\\([0-7]{1,3})/g, (m, o) => String.fromCharCode(parseInt(o, 8)));
+       },
+
+       async pdfToText(bytes) {
+           // latin1 keeps every byte addressable as one character, which is
+           // what lets the stream boundaries be found reliably in binary.
+           let latin = '';
+           const CH = 0x8000;
+           for (let i = 0; i < bytes.length; i += CH) {
+               latin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+           }
+
+           const streamRe = /<<([\s\S]*?)>>\s*stream\r?\n([\s\S]*?)\r?\nendstream/g;
+           const chunks = [];
+           let m, compressedSkipped = 0;
+           while ((m = streamRe.exec(latin))) {
+               const dict = m[1], raw = m[2];
+               if (/FlateDecode/.test(dict)) {
+                   try {
+                       const buf = new Uint8Array(raw.length);
+                       for (let i = 0; i < raw.length; i++) buf[i] = raw.charCodeAt(i) & 0xff;
+                       const inflated = await this._inflate(buf);
+                       let s = '';
+                       for (let i = 0; i < inflated.length; i += CH) {
+                           s += String.fromCharCode.apply(null, inflated.subarray(i, i + CH));
+                       }
+                       chunks.push(s);
+                   } catch (e) { compressedSkipped++; }
+               } else if (!/DCTDecode|JPXDecode|CCITTFaxDecode|JBIG2Decode/.test(dict)) {
+                   chunks.push(raw); // plain text stream; image codecs skipped outright
+               }
+           }
+
+           const out = [];
+           chunks.forEach(c => {
+               // Tj shows one string; TJ shows an array of strings + kerning
+               const tjRe = /\(((?:[^()\\]|\\.)*)\)\s*Tj|\[((?:[^\][]|\\.)*)\]\s*TJ/g;
+               let t;
+               while ((t = tjRe.exec(c))) {
+                   if (t[1] !== undefined) out.push(this._pdfUnescape(t[1]));
+                   else out.push((t[2].match(/\((?:[^()\\]|\\.)*\)/g) || [])
+                       .map(s => this._pdfUnescape(s.slice(1, -1))).join(''));
+               }
+           });
+
+           const text = out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+           if (!text) {
+               return compressedSkipped
+                   ? `No text could be extracted.\n\n${compressedSkipped} compressed stream(s) could not be decoded in this browser.`
+                   : 'No text found in this PDF.\n\nIt is most likely a SCANNED document — images of text rather than text — which needs OCR to read. This tool extracts real text only.';
+           }
+           return text + '\n';
+       },
+
+       // ---- INI / TOML-ish / properties --------------------------------
+       iniToJson(text) {
+           const out = {}; let section = null;
+           text.split('\n').forEach(line => {
+               const l = line.trim();
+               if (!l || /^[;#]/.test(l)) return;
+               const sec = l.match(/^\[(.+)\]$/);
+               if (sec) { section = sec[1].trim(); out[section] = out[section] || {}; return; }
+               const i = l.indexOf('=');
+               if (i < 0) return;
+               const k = l.slice(0, i).trim();
+               let v = l.slice(i + 1).trim().replace(/^["']|["']$/g, '');
+               const target = section ? out[section] : out;
+               target[k] = /^(true|false)$/i.test(v) ? v.toLowerCase() === 'true'
+                         : /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v;
+           });
+           return JSON.stringify(out, null, 2);
+       },
+
+       jsonToIni(text) {
+           const data = JSON.parse(text);
+           const flat = [], sections = [];
+           Object.entries(data).forEach(([k, v]) => {
+               if (v && typeof v === 'object' && !Array.isArray(v)) sections.push([k, v]);
+               else flat.push(`${k}=${v === null ? '' : v}`);
+           });
+           const parts = [];
+           if (flat.length) parts.push(flat.join('\n'));
+           sections.forEach(([name, obj]) => {
+               parts.push(`[${name}]\n` + Object.entries(obj)
+                   .map(([k, v]) => `${k}=${v === null ? '' : (typeof v === 'object' ? JSON.stringify(v) : v)}`).join('\n'));
+           });
+           return parts.join('\n\n') + '\n';
+       },
+
+       // ---- subtitles --------------------------------------------------
+       srtToVtt(text) {
+           const body = text.replace(/\r\n/g, '\n').trim()
+               // VTT uses a dot for the millisecond separator, SRT a comma
+               .replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+           return 'WEBVTT\n\n' + body + '\n';
+       },
+
+       vttToSrt(text) {
+           const lines = text.replace(/\r\n/g, '\n').replace(/^WEBVTT[^\n]*\n+/, '').trim().split('\n');
+           const blocks = []; let cur = [];
+           lines.forEach(l => {
+               if (l.trim() === '') { if (cur.length) { blocks.push(cur); cur = []; } }
+               else cur.push(l);
+           });
+           if (cur.length) blocks.push(cur);
+           return blocks.map((b, i) => {
+               // Drop any VTT cue identifier; SRT numbers sequentially itself
+               const timeIdx = b.findIndex(l => l.includes('-->'));
+               const time = (b[timeIdx] || '').replace(/\./g, ',').replace(/\s*-->\s*/, ' --> ').split(' ').slice(0, 3).join(' ');
+               const textLines = b.slice(timeIdx + 1);
+               return `${i + 1}\n${time}\n${textLines.join('\n')}`;
+           }).join('\n\n') + '\n';
+       },
+
+       srtToText(text) {
+           return text.replace(/\r\n/g, '\n')
+               .replace(/^\d+\s*$/gm, '')
+               .replace(/^[\d:,.]+\s*-->\s*[\d:,.]+.*$/gm, '')
+               .replace(/<[^>]+>/g, '')
+               .replace(/\n{3,}/g, '\n\n').trim() + '\n';
+       },
+
+       // ---- RTF ---------------------------------------------------------
+       rtfToText(rtf) {
+           let s = rtf.replace(/\{\\\*[\s\S]*?\}/g, '');           // drop annotations
+           s = s.replace(/\\'([0-9a-fA-F]{2})/g, (m, h) => String.fromCharCode(parseInt(h, 16)));
+           s = s.replace(/\\u(-?\d+)\s?\??/g, (m, n) => String.fromCharCode(((+n) + 65536) % 65536));
+           s = s.replace(/\\par[d]?\b/g, '\n').replace(/\\line\b/g, '\n').replace(/\\tab\b/g, '\t');
+           s = s.replace(/\\[a-zA-Z]+-?\d*\s?/g, '');               // remaining control words
+           s = s.replace(/[{}]/g, '');
+           return s.replace(/\n{3,}/g, '\n\n').trim() + '\n';
+       },
+
        // --- plumbing --------------------------------------------------
        // Every conversion writes to a NEW file. Overwriting the source
        // would mean one bad conversion destroys the original with only
@@ -8114,6 +8632,28 @@ self.addEventListener('fetch', (e) => {
        },
 
        csvJson()    { this._run('CSV to JSON', 'json', s => this.csvToJson(s, ',')); },
+       mdHtml()     { this._run('Markdown to HTML', 'html', s => this.mdToHtml(s)); },
+       iniJson()    { this._run('INI to JSON', 'json', s => this.iniToJson(s)); },
+       jsonIni()    { this._run('JSON to INI', 'ini', s => this.jsonToIni(s)); },
+       srtVtt()     { this._run('SRT to VTT', 'vtt', s => this.srtToVtt(s)); },
+       vttSrt()     { this._run('VTT to SRT', 'srt', s => this.vttToSrt(s)); },
+       subsText()   { this._run('Subtitles to plain text', 'txt', s => this.srtToText(s)); },
+       htmlMd()     { this._run('HTML to Markdown', 'md', s => this.htmlToMd(s)); },
+       jsonYaml()   { this._run('JSON to YAML', 'yaml', s => this.jsonToYaml(s)); },
+       yamlJson()   { this._run('YAML to JSON', 'json', s => this.yamlToJson(s)); },
+       xmlJson()    { this._run('XML to JSON', 'json', s => this.xmlToJson(s)); },
+       jsonXml()    { this._run('JSON to XML', 'xml', s => this.jsonToXml(s)); },
+       htmlJsx()    { this._run('HTML to JSX', 'jsx', s => this.htmlToJsx(s)); },
+       jsonSql()    { this._run('JSON to SQL inserts', 'sql', s => this.jsonToSql(s, (Nexus.state.activeFile||'my_table').split('/').pop().replace(/\.[^.]+$/, '').replace(/[^\w]/g, '_'))); },
+       csvMd()      { this._run('CSV to Markdown table', 'md', s => this.csvToMarkdown(s, ',')); },
+       envJson()    { this._run('.env to JSON', 'json', s => this.envToJson(s)); },
+       jsonEnv()    { this._run('JSON to .env', 'env', s => this.jsonToEnv(s)); },
+       jsonFlatten(){ this._run('Flatten JSON', 'flat.json', s => this.flattenJson(s)); },
+       jsonUnflatten(){ this._run('Unflatten JSON', 'json', s => this.unflattenJson(s)); },
+       sortLines()  { this._run('Sort lines', 'sorted.txt', s => this.sortLinesUnique(s, false)); },
+       sortUnique() { this._run('Sort + dedupe lines', 'sorted.txt', s => this.sortLinesUnique(s, true)); },
+       baseConvert(){ this._run('Number bases', 'txt', s => this.numberBases(s)); },
+       timeConvert(){ this._run('Timestamps', 'txt', s => this.timestamps(s)); },
        tsvJson()    { this._run('TSV to JSON', 'json', s => this.csvToJson(s, '\t')); },
        jsonCsv()    { this._run('JSON to CSV', 'csv',  s => this.jsonToCsv(s, ',')); },
        jsonTsv()    { this._run('JSON to TSV', 'tsv',  s => this.jsonToCsv(s, '\t')); },
