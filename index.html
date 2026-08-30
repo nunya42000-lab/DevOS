@@ -28,8 +28,8 @@
          real sibling file rather than another inline data: URI, same class
          of hard platform constraint as the sw.js note below. -->
     <link rel="manifest" href="./manifest.json">
-    <link rel="apple-touch-icon" href="./icon-192.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
+    <link rel="apple-touch-icon" href="./icon192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="./icon192.png">
     <script>
        // Register the real sibling sw.js. Wrapped in a same-origin check
        // because this file is also opened directly from disk (file://) or
@@ -147,7 +147,7 @@
     
     <input type="color" id="colorPickerInput" style="display:none;" onchange="Nexus.UI.injectChar(this.value)">
 
-    <canvas id="omniCanvas" style="position:fixed; inset:0; z-index:9999; pointer-events:none; transition: background 0.2s;"></canvas>
+    <canvas id="omniCanvas" style="position:fixed; inset:0; z-index:var(--z-fx); pointer-events:none; transition: background 0.2s;"></canvas>
 
     <nav id="ribbonContainer" aria-label="Main toolbar" style="padding-right: 48px;">
         <div id="ribbonTrack">
@@ -297,7 +297,7 @@
     </div>
 
 
-<div id="searchDrawer" class="transform-drawer" style="width: 280px; z-index: 8700;">
+<div id="searchDrawer" class="transform-drawer" style="width: 280px; z-index: var(--z-drawer);">
     <div style="display:flex; flex-direction:column; gap:6px;">
         <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
             <span style="font-size:10px; color:var(--accent); font-weight:bold;">FIND & REPLACE</span>
@@ -323,7 +323,7 @@
     </div>
 </div>
 
-<div id="writerDrawer" class="transform-drawer" style="width: 260px; z-index: 8700;">
+<div id="writerDrawer" class="transform-drawer" style="width: 260px; z-index: var(--z-drawer);">
      <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
          <span style="font-size:10px; color:var(--gold); font-weight:bold;">BOILERPLATE ARCHITECT</span>
          <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.UI.toggleDrawer('writerDrawer')">&times;</span>
@@ -345,7 +345,7 @@
           written to provide. -->
      <div id="writerStatus" style="font-size:10px; text-align:center; margin-top:8px; opacity:0.5;">IDLE</div>
 </div>
-    <div id="suggestionsDrawer" class="transform-drawer" style="width: 280px; z-index: 8700;">
+    <div id="suggestionsDrawer" class="transform-drawer" style="width: 280px; z-index: var(--z-drawer);">
     <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
     <span style="font-size:10px; color:var(--success); font-weight:bold;">INTELLISENSE & SNIPPETS</span>
     <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.UI.toggleDrawer('suggestionsDrawer')">&times;</span>

@@ -18,10 +18,10 @@ const APP_SHELL = [
   './app.js',
   './styles.css',
   './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-192-maskable.png',
-  './icon-512-maskable.png'
+  './icon192.png',
+  './icon512.png',
+  './icon192maskable.png',
+  './icon512maskable.png'
 ];
 
 // Every version-pinned, plain <script src>/<link> CDN dependency this app

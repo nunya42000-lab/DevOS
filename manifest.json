@@ -16,25 +16,25 @@
   },
   "icons": [
     {
-      "src": "./icon-192.png",
+      "src": "./icon192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icon-512.png",
+      "src": "./icon512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icon-192-maskable.png",
+      "src": "./icon192maskable.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "./icon-512-maskable.png",
+      "src": "./icon512maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -57,7 +57,7 @@
       },
       "icons": [
         {
-          "src": "./icon-512.png",
+          "src": "./icon512.png",
           "sizes": "512x512",
           "type": "image/png"
         }
@@ -83,7 +83,7 @@
       "url": "./?action=new",
       "icons": [
         {
-          "src": "./icon-192.png",
+          "src": "./icon192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -96,7 +96,7 @@
       "url": "./?action=force-update",
       "icons": [
         {
-          "src": "./icon-192.png",
+          "src": "./icon192.png",
           "sizes": "192x192",
           "type": "image/png"
         }
@@ -109,7 +109,7 @@
       "url": "./?action=wipe-vfs",
       "icons": [
         {
-          "src": "./icon-192.png",
+          "src": "./icon192.png",
           "sizes": "192x192",
           "type": "image/png"
         }

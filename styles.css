@@ -1,4 +1,30 @@
     :root {
+        /* ---- STACKING ORDER ----------------------------------------
+           One documented scale, so a new layer never has to be guessed
+           at against scattered magic numbers. The ordering rule is:
+           persistent chrome sits below transient UI, because anything
+           you deliberately opened should cover what was already there.
+
+           That's the bug this replaced: the ⋮ dropdown was 2000 while
+           the floating utility bar was 8000, so a menu opened from the
+           top ribbon rendered UNDERNEATH the toolbar strip beside it.
+           Gaps of 500+ leave room to slot layers in without renumbering.
+        */
+        --z-editor:     1;      /* text surface, gutters, backdrops */
+        --z-dock:       1000;   /* ribbon, footer, keyboard rows */
+        --z-diag:       3000;   /* diagnostics hub slide */
+        --z-shell:      4000;   /* terminal slide */
+        --z-regex:      5000;   /* regex slide */
+        --z-floating:   8000;   /* utility bar, d-pad: draggable but persistent */
+        --z-drawer:     8500;   /* search / writer / suggestions / nav drawers */
+        --z-sidepanel:  9000;   /* files + tools side panels */
+        --z-dropdown:   9500;   /* transient menus — must clear ALL chrome above */
+        --z-spotlight:  9800;
+        --z-modal:      10000;  /* full-screen modals win over everything interactive */
+        --z-fx:         10500;  /* gesture canvas: pointer-events:none, so being
+                                   topmost costs nothing and it must never be
+                                   clipped by a modal it's drawn over */
+
         --bg: #0d1117; 
         --panel: #161b22; 
         --surface: #21262d;
@@ -74,7 +100,15 @@
         margin: 0; 
         padding: 0; 
         width: 100vw; 
-        height: 100vh; 
+        /* 100vh on a phone measures the viewport as if the browser chrome
+           weren't there, so the page runs taller than the visible area and
+           the bottom (this app's dock and keyboard rows) gets pushed under
+           the address bar. 100dvh tracks the ACTUAL visible height as that
+           chrome shows and hides. The plain 100vh stays as a first
+           declaration so a browser without dvh support still gets a
+           working value instead of no height at all. */
+        height: 100vh;
+        height: 100dvh; 
         background: var(--bg); 
         color: var(--text); 
         font-family: var(--font-UI); 
@@ -93,7 +127,7 @@
         overflow-x: scroll; 
         white-space: nowrap; 
         position: relative; 
-        z-index: 1000; 
+        z-index: var(--z-dock); 
         display: flex; 
         align-items: center; 
         -webkit-overflow-scrolling: touch;
@@ -120,9 +154,10 @@
         box-shadow: 0 8px 24px rgba(0,0,0,0.4);
         min-width: 220px;
         max-height: calc(100vh - 70px);
+        max-height: calc(100dvh - 70px); /* same dvh reasoning as body/html above */
         overflow-y: auto;
         padding: 6px;
-        z-index: 2000;
+        z-index: var(--z-dropdown);
     }
     .ribbon-dropdown.open { display: flex; flex-direction: column; gap: 2px; }
     .ribbon-dropdown button {
@@ -254,7 +289,7 @@
     flex-shrink: 0; /* Forces the dock to never compress, acting as a hard boundary */
     position: relative; /* Remove fixed positioning so flexbox naturally stacks it */
     width: 100%;
-    z-index: 1000;
+    z-index: var(--z-dock);
     background-color: var(--dock-bg);
     border-top: 1px solid var(--dock-border);
     box-sizing: border-box;
@@ -590,7 +625,7 @@
         max-width: var(--sidebar-max); 
         background: var(--panel); 
         border: 1px solid var(--border); 
-        z-index: 9000; 
+        z-index: var(--z-sidepanel); 
         transition: transform 0.4s cubic-bezier(0.19, 1, 0.22, 1); 
         display: flex; 
         flex-direction: column; 
@@ -650,7 +685,7 @@
         height: 60vh; 
         background: var(--panel); 
         border-bottom: 4px solid var(--danger); 
-        z-index: 3000; 
+        z-index: var(--z-diag); 
         transform: translateY(-105%); 
         transition: transform 0.4s ease; 
         padding: 10px; 
@@ -666,7 +701,7 @@
         height: 100px; 
         background: var(--surface); 
         border-top: 4px solid var(--accent); 
-        z-index: 4000; 
+        z-index: var(--z-shell); 
         transform: translateY(105%); 
         transition: transform 0.3s ease; 
         display: flex; 
@@ -691,7 +726,7 @@
         position: fixed; 
         inset: 0; 
         background: rgba(0,0,0,0.85); 
-        z-index: 10000;
+        z-index: var(--z-modal);
         display: none;
         align-items: center; 
         justify-content: center; 
@@ -750,7 +785,7 @@
         backdrop-filter: blur(12px);
         border: 1px solid var(--dock-border); 
         border-radius: 12px; 
-        z-index: 8000;
+        z-index: var(--z-floating);
         box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
         display: none; 
         flex-direction: column;
@@ -778,7 +813,25 @@
         border-radius: 12px 12px 0 0; font-size: 14px; letter-spacing: 2px;
     }
     .util-vertical .util-grip::before { content: '⋯⋯'; }
-    .util-vertical .sleek-bar-content { flex-direction: column; padding: 4px; gap: 6px; }
+    .util-vertical .sleek-bar-content {
+        flex-direction: column; padding: 4px; gap: 6px;
+        /* The bar's own height is set by flex stretch between the ribbon
+           and the dock, but its CONTENT had no overflow handling — so with
+           a full tool layout the last several buttons were simply clipped
+           off the bottom edge with no way to reach them. flex:1 + the
+           min-height:0 that flex items need before overflow-y can take
+           effect (a flex item's default min-height is "tall enough for all
+           its content", which otherwise defeats scrolling entirely) makes
+           the surplus scrollable instead of unreachable. */
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain; /* don't drag the editor behind it */
+        scrollbar-width: none;
+    }
+    .util-vertical .sleek-bar-content::-webkit-scrollbar { display: none; }
     .util-vertical .util-lbl { display: block; font-size: 9px; margin-top: 2px; color: var(--dock-label); font-weight: 800; text-transform: uppercase; text-align: center; }
     .util-vertical .sleek-btn { flex-direction: column; padding: 8px 2px; width: 100%; }
 
@@ -1022,18 +1075,6 @@
    ======================================================= */
 
 /* 1. THE TRIGGER HANDLES: Locked to the right edge */
-.transform-handle-zone {
-    left: auto !important;
-    right: 0 !important;
-    top: 25% !important;
-}
-
-.transform-handle {
-    border-right: none !important;
-    border-left: 1px solid var(--border) !important;
-    border-radius: 10px 0 0 10px !important; /* Rounded on the left where you tap */
-}
-
 /* 2. THE SLIDING DRAWERS: Locked to fly out from the left edge.
    CONSOLIDATED: there used to be TWO separate .transform-drawer blocks in
    this file (this one, and another ~130 lines below with the positioning
@@ -1056,7 +1097,7 @@
     border-left: none !important;
     border-right: 1px solid var(--border) !important;
     border-radius: 0 16px 16px 0 !important; /* Rounded on the right side */
-    z-index: 8500;
+    z-index: var(--z-drawer);
     padding: 15px;
     box-shadow: 10px 10px 40px rgba(0,0,0,0.9);
     max-width: 85vw;
@@ -1185,19 +1226,6 @@
         opacity: 0.4;
         font-size: 9px;
     }
-/* Edge Handles */
-.transform-handle-zone {
-    position: fixed; left: 0; top: 25%; z-index: 8600; pointer-events: none; 
-    display: flex; flex-direction: column; gap: 15px;
-}
-.transform-handle {
-    background: var(--surface); border: 1px solid var(--border); border-left: none;
-    padding: 15px 10px; border-radius: 0 10px 10px 0; cursor: pointer; color: var(--gold);
-    font-size: 16px; box-shadow: 2px 0 10px rgba(0,0,0,0.5); pointer-events: auto;
-    transition: background 0.2s;
-}
-.transform-handle:active { background: var(--accent); color: #fff; }
-
 /* The Drawers — see the consolidated .transform-drawer rule earlier in this
    file. The duplicate definition that used to live here was removed. */
 
@@ -1356,7 +1384,7 @@
     /* --- devIDE: CM6 & SPOTLIGHT STYLES --- */
     #spotlightModal { 
     display: none; position: fixed; inset: 0; 
-    background: rgba(0,0,0,0.85); z-index: 9999; 
+    background: rgba(0,0,0,0.85); z-index: var(--z-spotlight); 
     justify-content: center; align-items: start; padding-top: 10vh; 
     backdrop-filter: blur(5px);
     }
@@ -1462,7 +1490,7 @@
     height: 45vh; 
     background: var(--surface); 
     border-top: 4px solid #a371f7; /* Purple for Regex */
-    z-index: 5000; 
+    z-index: var(--z-regex); 
     transform: translateY(105%); 
     transition: transform 0.3s cubic-bezier(0.19, 1, 0.22, 1); 
     display: flex; 

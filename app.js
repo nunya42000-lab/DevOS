@@ -1202,6 +1202,14 @@ auditor: {
  // at EOF) for every tag name, in one pass, with nothing silently skipped.
  {
      const stripped = srcCode
+         // HTML COMMENTS MUST GO FIRST. Without this the scanner happily
+         // parses "tags" out of commented-out prose: this very file has a
+         // comment describing merge markers as <<<LEFT / === / RIGHT>>>,
+         // which was being read as an opening <left> tag and then reported
+         // as a nesting error against a real </div> 50 lines away. Blanked
+         // with spaces rather than deleted so every subsequent line number
+         // stays correct.
+         .replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, ' '))
          .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, m => ' '.repeat(m.length))
          .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, m => ' '.repeat(m.length));
      const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!doctype']);
@@ -1486,17 +1494,41 @@ _resolveVfsPath(refPath) {
 //      anywhere in the same file — dead on a touchscreen.
 _detectMobileIssues(srcCode, ext) {
     const issues = []; // { line, text }
-    const lines = srcCode.split('\n');
+    // Blank out comments before scanning, keeping newlines so every
+    // reported line number still points at the right place. Without this
+    // the rules match their own documentation: a CSS comment explaining
+    // WHY 100vh is a problem was itself reported as a 100vh problem, and
+    // an HTML comment mentioning an <input> would be linted as markup.
+    // Same defect class as the tag scanner reading tags out of comments.
+    const blankComments = (text, kind) => {
+        let out = text.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '));
+        if (kind === 'html') out = out.replace(/<!--[\s\S]*?-->/g, m => m.replace(/[^\n]/g, ' '));
+        return out;
+    };
+    const scanSrc = blankComments(srcCode, (ext === 'html' || ext === 'htm') ? 'html' : 'code');
+    const lines = scanSrc.split('\n');
 
     if (ext === 'css') {
         lines.forEach((line, i) => {
-            if (/\b100vh\b/.test(line) && !/\bdvh\b/.test(line)) {
+            // Recognise the standard progressive-enhancement idiom:
+            //     height: 100vh;
+            //     height: 100dvh;
+            // The vh line is a deliberate fallback for browsers without
+            // dvh support, not a bug — flagging it would push you to
+            // delete the very thing keeping older browsers working.
+            const nextLine = lines[i + 1] || '';
+            // NB: \bdvh\b can never match "100dvh" — there's no word boundary
+            // between the '0' and the 'd', so the original guard was dead and
+            // this rule would have flagged even a correct dvh fallback.
+            const DVH = /\d+dvh\b/;
+            const hasDvhFallback = DVH.test(line) || DVH.test(nextLine);
+            if (/\b100vh\b/.test(line) && !hasDvhFallback) {
                 issues.push({ line: i + 1, text: '100vh ignores mobile browser chrome (address bar) — use 100dvh, or account for it explicitly.' });
             }
             const hoverMatch = line.match(/([.#][\w-]+):hover/);
             if (hoverMatch) {
                 const selector = hoverMatch[1];
-                if (!srcCode.includes(selector + ':active') && !srcCode.includes(selector + ':focus')) {
+                if (!scanSrc.includes(selector + ':active') && !scanSrc.includes(selector + ':focus')) {
                     issues.push({ line: i + 1, text: `${selector}:hover has no :active/:focus fallback — invisible on touch-only devices.` });
                 }
             }
@@ -1504,26 +1536,53 @@ _detectMobileIssues(srcCode, ext) {
     }
 
     if (ext === 'html' || ext === 'htm') {
-        const viewportMatch = srcCode.match(/<meta[^>]+name=["']viewport["'][^>]*>/i);
+        const viewportMatch = scanSrc.match(/<meta[^>]+name=["']viewport["'][^>]*>/i);
         if (!viewportMatch) {
             issues.push({ line: 1, text: 'No <meta name="viewport"> tag — page will render tiny/zoomed-out on phones.' });
         } else {
             const contentMatch = viewportMatch[0].match(/content=["']([^"']*)["']/i);
             if (!contentMatch || !/width\s*=/.test(contentMatch[1])) {
-                const line = srcCode.slice(0, viewportMatch.index).split('\n').length;
+                const line = scanSrc.slice(0, viewportMatch.index).split('\n').length;
                 issues.push({ line, text: 'Viewport meta tag is missing width= in its content — likely won\'t fit the actual screen.' });
             }
         }
-        const inputRe = /<input\b(?![^>]*(?:type=["'](?:tel|email|number|url|search|checkbox|radio|hidden|submit|button)["']|inputmode=))[^>]*>/gi;
+        // Rewritten to be actionable instead of blanket. The old rule
+        // flagged EVERY input lacking a type/inputmode, which on this very
+        // project meant 21 warnings covering a colour picker, a file
+        // picker, and a pile of search boxes — all already correct. A
+        // linter that fires on correct code just trains you to ignore it.
+        //
+        // It now fires only where the field's own name/id/placeholder says
+        // it expects a particular kind of content while the markup doesn't
+        // ask the OS for the matching keyboard. That's a real, fixable
+        // mobile defect (typing a phone number on an alphabetic keyboard),
+        // and it stays silent about genuine free-text fields.
+        const EXEMPT_TYPES = /type=["'](?:tel|email|number|url|search|checkbox|radio|hidden|submit|button|file|color|range|date|time|datetime-local|month|week|password)["']/i;
+        const HINTS = [
+            { re: /phone|tel(?![a-z])|mobile/i, want: 'type="tel"', noun: 'a phone number' },
+            { re: /e-?mail/i, want: 'type="email"', noun: 'an email address' },
+            { re: /\burl\b|website|link|href/i, want: 'type="url"', noun: 'a URL' },
+            { re: /number|count|qty|quantity|amount|price|width|height|size|port|zip|postal|age|year/i, want: 'inputmode="numeric"', noun: 'numbers' }
+        ];
+        const inputRe = /<input\b[^>]*>/gi;
         let m;
-        while ((m = inputRe.exec(srcCode))) {
-            const line = srcCode.slice(0, m.index).split('\n').length;
-            issues.push({ line, text: 'This <input> has no type hint or inputmode — the OS will show a generic keyboard instead of one matched to the expected content.' });
+        while ((m = inputRe.exec(scanSrc))) {
+            const tag = m[0];
+            if (EXEMPT_TYPES.test(tag) || /inputmode=/i.test(tag)) continue;
+            // Only descriptive attributes count as intent — testing the
+            // whole tag would let an unrelated onclick handler or style
+            // value trip the keyword match.
+            const descriptors = (tag.match(/(?:id|name|placeholder|aria-label)=["'][^"']*["']/gi) || []).join(' ');
+            if (!descriptors) continue;
+            const hit = HINTS.find(h => h.re.test(descriptors));
+            if (!hit) continue;
+            const line = scanSrc.slice(0, m.index).split('\n').length;
+            issues.push({ line, text: `This input looks like it expects ${hit.noun} but doesn't set ${hit.want} — phones will show a plain alphabetic keyboard for it.` });
         }
     }
 
     if (ext === 'js' || ext === 'mjs') {
-        const hasTouchEquivalent = /touchstart|pointerdown|pointerenter/.test(srcCode);
+        const hasTouchEquivalent = /touchstart|pointerdown|pointerenter/.test(scanSrc);
         lines.forEach((line, i) => {
             if (/addEventListener\(\s*['"](?:mouseover|mouseenter)['"]/.test(line) && !hasTouchEquivalent) {
                 issues.push({ line: i + 1, text: 'mouseover/mouseenter listener with no touch/pointer equivalent anywhere in this file — has no effect on a touchscreen.' });
