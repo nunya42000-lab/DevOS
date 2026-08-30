@@ -2293,7 +2293,20 @@ setEmptyState() {
 
         if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
             const view = Nexus.editorCore.view;
-            view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
+            // Keep the file swap OUT of the undo history. Switching files
+            // reuses one EditorState and replaces its whole document, so
+            // without this the swap is just another undoable edit — press
+            // undo right after switching and CM6 faithfully restores the
+            // previous file's entire text into the file you're now looking
+            // at, which then autosaves over it. Marking it
+            // addToHistory:false makes undo skip straight back to your last
+            // real edit in this file instead.
+            const { Transaction } = Nexus.editorCore.modules;
+            const swapSpec = { changes: { from: 0, to: view.state.doc.length, insert: code } };
+            if (Transaction && Transaction.addToHistory) {
+                swapSpec.annotations = Transaction.addToHistory.of(false);
+            }
+            view.dispatch(swapSpec);
             document.getElementById('footStatus').innerText = "ENGINE: CM6 ACTIVE";
 
             // Restore this file's saved bookmarks into the gutter. The
@@ -5670,6 +5683,11 @@ try {
             GutterMarker: cmView.GutterMarker,
             StateField: cmState.StateField,
             StateEffect: cmState.StateEffect,
+            // Needed to mark the file-switch document swap as NOT undoable.
+            // Without it that swap is an ordinary transaction in the shared
+            // history, so pressing undo just after switching files restores
+            // the PREVIOUS file's entire text into the current one.
+            Transaction: cmState.Transaction,
             RangeSet: cmState.RangeSet,
             EditorState: cmState.EditorState,
             Compartment: cmState.Compartment,
@@ -13891,7 +13909,71 @@ initInfiniteRibbon() {
        },
        _buildAutocompleteExtension() {
            const { autocompletion } = Nexus.editorCore.modules || {};
-           return autocompletion ? autocompletion() : [];
+           if (!autocompletion) return [];
+
+           // Completion from words already in the document, on top of
+           // whatever the language pack provides. This is the single
+           // biggest typing win on a phone: long identifiers get typed
+           // once and then recalled with two or three characters, instead
+           // of being retyped in full on a cramped keyboard every time.
+           // Language packs alone don't do this — they only know library
+           // and keyword names, never the names you invented five minutes
+           // ago, which are exactly the ones worth not retyping.
+           const documentWords = (context) => {
+               const before = context.matchBefore(/[A-Za-z_$][\w$]*/);
+               if (!before) return null;
+               // Require a couple of characters unless completion was
+               // asked for explicitly — on mobile an panel that appears
+               // after one keystroke covers the code you're reading and
+               // fights every word you type.
+               if (!context.explicit && (before.to - before.from) < 2) return null;
+
+               const typed = before.text;
+               const docText = context.state.doc.toString();
+               const freq = new Map();
+               const re = /[A-Za-z_$][\w$]*/g;
+               let m;
+               while ((m = re.exec(docText))) {
+                   const w = m[0];
+                   if (w.length < 3) continue;      // "id", "el" etc. cost more to pick than to type
+                   if (w === typed) continue;        // don't offer the word being typed back to itself
+                   freq.set(w, (freq.get(w) || 0) + 1);
+               }
+
+               const lower = typed.toLowerCase();
+               const options = [...freq.entries()]
+                   .filter(([w]) => w.toLowerCase().startsWith(lower))
+                   // Most-used first: in practice the name you want is
+                   // usually the one already used most in this file.
+                   .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                   .slice(0, 40) // a phone screen can't show more, and scanning a longer list is slower than typing
+                   .map(([label]) => ({ label, type: 'text' }));
+
+               if (options.length === 0) return null;
+               return { from: before.from, options };
+           };
+
+           // Registered through languageData rather than `override`.
+           // `override` REPLACES every completion source, which would
+           // throw away the language pack's own knowledge of keywords and
+           // library names — the goal here is document words IN ADDITION
+           // to those, not instead of them. Falls back to override only if
+           // EditorState isn't available for some reason, since having
+           // document words alone still beats having none.
+           const { EditorState } = Nexus.editorCore.modules || {};
+           const config = {
+               activateOnTyping: true,
+               maxRenderedOptions: 12,   // fits a phone screen without burying the code
+               icons: false,             // on a narrow screen the label matters, the icon column just costs width
+               closeOnBlur: true
+           };
+           if (EditorState && EditorState.languageData) {
+               return [
+                   autocompletion(config),
+                   EditorState.languageData.of(() => [{ autocomplete: documentWords }])
+               ];
+           }
+           return autocompletion({ ...config, override: [documentWords] });
        },
 
        // Minimap toggle. Defaults OFF, unlike bracket tracing/sticky
