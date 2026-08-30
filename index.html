@@ -232,6 +232,18 @@
      dumping a base64 data URL into a code editor is both useless to look
      at and one stray keystroke away from corrupting the file). Hidden by
      default; Nexus.imageViewer.show()/hide() swap the two. -->
+<!-- Reader for ZIP-based office documents. Read-only by design: see the
+     Nexus.docViewer comment in app.js for why editing one in place isn't
+     offered. "Save as Markdown" is the editable path. -->
+<div id="docViewerHost" style="display:none; flex:1; min-height:0; flex-direction:column; background:var(--bg); overflow:hidden;">
+    <div style="flex-shrink:0; padding:8px 12px; border-bottom:1px solid var(--border); background:var(--panel); display:flex; align-items:center; gap:8px;">
+        <span id="docViewerMeta" style="flex:1; font-size:10px; opacity:0.7; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+        <button class="tool-btn" style="font-size:10px; padding:5px 9px;" onclick="Nexus.docViewer.copyText()">COPY</button>
+        <button class="tool-btn btn-accent" style="font-size:10px; padding:5px 9px;" onclick="Nexus.docViewer.saveAsMarkdown()">SAVE AS .MD</button>
+    </div>
+    <pre id="docViewerBody" style="flex:1; min-height:0; overflow:auto; margin:0; padding:14px; font-family:monospace; font-size:12px; line-height:1.6; white-space:pre-wrap; word-break:break-word; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;"></pre>
+</div>
+
 <div id="imageViewerHost" style="display:none; flex:1; min-height:0; flex-direction:column; background:var(--bg); overflow:hidden;">
     <div id="imageViewerCanvasWrap" style="flex:1; min-height:0; display:flex; align-items:center; justify-content:center; padding:12px; overflow:auto; background:repeating-conic-gradient(#2a2f37 0% 25%, #21252b 0% 50%) 50% / 20px 20px;"></div>
 

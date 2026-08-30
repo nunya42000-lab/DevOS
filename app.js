@@ -2024,6 +2024,23 @@ Vfs: {
     // dropped straight into an <img src> with no conversion.
     IMAGE_EXTS: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico', 'avif'],
 
+    // Office formats are ZIP archives of XML, and ODF/EPUB are the same
+    // idea. They are every bit as binary as a PNG: run one through
+    // readAsText() and the ZIP central directory is destroyed, so the file
+    // can never be opened again. They load as data URLs for the same
+    // reason images do.
+    DOC_EXTS: ['docx', 'xlsx', 'pptx', 'odt', 'ods', 'odp', 'epub'],
+
+    isDocFile(filename) {
+        if (!filename) return false;
+        return this.DOC_EXTS.includes(filename.split('.').pop().toLowerCase());
+    },
+
+    // Anything that must never be read or written as text.
+    isBinaryFile(filename) {
+        return this.isImageFile(filename) || this.isDocFile(filename);
+    },
+
     isImageFile(filename) {
         if (!filename) return false;
         const ext = filename.split('.').pop().toLowerCase();
@@ -2042,7 +2059,16 @@ Vfs: {
         const map = {
             png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
             gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
-            bmp: 'image/bmp', ico: 'image/x-icon', avif: 'image/avif'
+            bmp: 'image/bmp', ico: 'image/x-icon', avif: 'image/avif',
+            // Office/ODF types so a re-exported file keeps a MIME the OS
+            // actually recognises instead of a generic octet-stream.
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            odt: 'application/vnd.oasis.opendocument.text',
+            ods: 'application/vnd.oasis.opendocument.spreadsheet',
+            odp: 'application/vnd.oasis.opendocument.presentation',
+            epub: 'application/epub+zip'
         };
         return map[ext] || 'application/octet-stream';
     },
@@ -2207,6 +2233,9 @@ setEmptyState() {
     // then correctly resets.
     if (Nexus.imageViewer && typeof Nexus.imageViewer.hide === 'function') {
         Nexus.imageViewer.hide();
+    }
+    if (Nexus.docViewer && typeof Nexus.docViewer.hide === 'function') {
+        Nexus.docViewer.hide();
     }
     Nexus.state.activeFile = "";
     
@@ -2388,11 +2417,22 @@ setEmptyState() {
         // takes over the editor area instead, and hides itself again the
         // moment a normal text file is opened.
         if (this.isImageFile(fn) && Nexus.imageViewer) {
+            if (Nexus.docViewer) Nexus.docViewer.hide();
             Nexus.imageViewer.show(fn);
             Nexus.UI.renderTabs();
             return;
         }
+        // Office documents get their own reader for the same reason images
+        // do: they're binary archives, and putting a base64 data URL in a
+        // code editor is unreadable and one keystroke from corruption.
+        if (this.isDocFile(fn) && Nexus.docViewer) {
+            if (Nexus.imageViewer) Nexus.imageViewer.hide();
+            Nexus.docViewer.show(fn);
+            Nexus.UI.renderTabs();
+            return;
+        }
         if (Nexus.imageViewer) Nexus.imageViewer.hide();
+        if (Nexus.docViewer) Nexus.docViewer.hide();
 
         if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
             const view = Nexus.editorCore.view;
@@ -2889,7 +2929,7 @@ loadFiles(fileList) {
         // binary through a UTF-8 decode and permanently corrupt it (see
         // the IMAGE_EXTS comment at the top of this object; measured, not
         // assumed). Everything else stays on readAsText exactly as before.
-        if (this.isImageFile(file.name)) {
+        if (this.isBinaryFile(file.name)) {
             r.readAsDataURL(file);
         } else {
             r.readAsText(file);
@@ -2920,7 +2960,7 @@ async importZIP(file) {
                     // FileReader.readAsText does, which permanently
                     // corrupts binary content.
                     let content;
-                    if (this.isImageFile(fn)) {
+                    if (this.isBinaryFile(fn)) {
                         const b64 = await entry.async("base64");
                         content = `data:${this.imageMimeFor(fn)};base64,${b64}`;
                     } else {
@@ -4645,8 +4685,8 @@ Sentinel : {
            // are stored as base64 data URLs, so a text "cleanup" run
            // against one silently destroys the file. Guarding both choke
            // points covers every transformer in the app.
-           if (Nexus.Vfs.isImageFile(Nexus.state.activeFile)) {
-               Nexus.shell.out('That tool edits text — it can\'t run on an image file.', 'warn');
+           if (Nexus.Vfs.isBinaryFile(Nexus.state.activeFile)) {
+               Nexus.shell.out('That tool edits text — it can\'t run on a binary file (image or document).', 'warn');
                return;
            }
            if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
@@ -4802,8 +4842,8 @@ Sentinel : {
            // replaceRange covers every transformer that writes through it
            // at once, rather than needing the same check remembered in
            // each one (and inevitably missed in the next one added).
-           if (Nexus.Vfs.isImageFile(Nexus.state.activeFile)) {
-               Nexus.shell.out('That tool edits text — it can\'t run on an image file.', 'warn');
+           if (Nexus.Vfs.isBinaryFile(Nexus.state.activeFile)) {
+               Nexus.shell.out('That tool edits text — it can\'t run on a binary file (image or document).', 'warn');
                return;
            }
            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
@@ -7339,6 +7379,189 @@ self.addEventListener('fetch', (e) => {
                }
            };
            reader.readAsDataURL(file);
+       }
+   },
+
+   // Reader for ZIP-based office documents (.docx and friends). These are
+   // archives of XML, so JSZip — already loaded for ZIP import/export —
+   // can open them with no extra dependency. Extraction is READ-ONLY on
+   // purpose: rewriting a valid .docx means regenerating the whole package
+   // (styles, relationships, content types) and getting any of it wrong
+   // produces a file Word refuses to open. Reading it and letting you save
+   // the text as Markdown is honest and useful; pretending to edit it in
+   // place would not be.
+   docViewer: {
+       currentFile: null,
+       lastText: '',
+
+       _xmlUnescape(s) {
+           return s.replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+                   .replace(/&quot;/g, '"').replace(/&apos;/g, "'")
+                   .replace(/&#(\d+);/g, (m, d) => String.fromCharCode(+d))
+                   .replace(/&amp;/g, '&'); // last, so &amp;lt; doesn't double-decode
+       },
+
+       // Text of one paragraph/cell, preserving explicit breaks and tabs.
+       _runText(chunk) {
+           let s = '';
+           const partRe = /<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>|<w:br\s*\/>|<w:tab\s*\/>/g;
+           let p;
+           while ((p = partRe.exec(chunk))) {
+               if (p[0].startsWith('<w:br')) s += '\n';
+               else if (p[0].startsWith('<w:tab')) s += '\t';
+               else s += this._xmlUnescape(p[1]);
+           }
+           return s;
+       },
+
+       // word/document.xml -> Markdown-ish text. Walks blocks in document
+       // order so tables stay where they belong rather than being hoisted
+       // or flattened into the surrounding prose.
+       _docXmlToText(xml) {
+           const bodyMatch = xml.match(/<w:body[^>]*>([\s\S]*)<\/w:body>/);
+           const body = bodyMatch ? bodyMatch[1] : xml;
+           const out = [];
+           const blockRe = /<w:tbl[\s>][\s\S]*?<\/w:tbl>|<w:p\b[^>]*\/>|<w:p\b[^>]*>[\s\S]*?<\/w:p>/g;
+           let m;
+           while ((m = blockRe.exec(body))) {
+               const block = m[0];
+               if (block.startsWith('<w:tbl')) {
+                   const rows = block.match(/<w:tr[\s>][\s\S]*?<\/w:tr>/g) || [];
+                   rows.forEach((r, ri) => {
+                       const cells = (r.match(/<w:tc[\s>][\s\S]*?<\/w:tc>/g) || [])
+                           .map(c => this._runText(c).replace(/\n/g, ' ').trim());
+                       out.push('| ' + cells.join(' | ') + ' |');
+                       // Markdown needs a separator row after the header.
+                       if (ri === 0) out.push('|' + cells.map(() => ' --- ').join('|') + '|');
+                   });
+                   out.push('');
+                   continue;
+               }
+               const text = this._runText(block);
+               const heading = block.match(/w:pStyle w:val="Heading(\d)"/);
+               const isList = /<w:numPr[\s>]/.test(block);
+               if (heading) out.push('#'.repeat(Math.min(6, +heading[1])) + ' ' + text.trim());
+               else if (isList) out.push('- ' + text.trim());
+               else out.push(text);
+           }
+           return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+       },
+
+       // ODF (.odt) uses a completely different schema: text:p / text:h
+       // inside content.xml rather than WordprocessingML.
+       _odtXmlToText(xml) {
+           const out = [];
+           const blockRe = /<text:(h|p|list-item)\b[^>]*>([\s\S]*?)<\/text:\1>/g;
+           let m;
+           while ((m = blockRe.exec(xml))) {
+               const tag = m[1];
+               const inner = m[2].replace(/<[^>]+>/g, '');
+               const text = this._xmlUnescape(inner).trim();
+               if (tag === 'h') {
+                   const lvl = (m[0].match(/text:outline-level="(\d)"/) || [, '1'])[1];
+                   out.push('#'.repeat(Math.min(6, +lvl)) + ' ' + text);
+               } else if (tag === 'list-item') out.push('- ' + text);
+               else out.push(text);
+           }
+           return out.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+       },
+
+       async show(fn) {
+           this.currentFile = fn;
+           const host = document.getElementById('docViewerHost');
+           const editorView = document.getElementById('editorView');
+           if (!host) return;
+           if (editorView) editorView.style.display = 'none';
+           host.style.display = 'flex';
+
+           const body = document.getElementById('docViewerBody');
+           const meta = document.getElementById('docViewerMeta');
+           if (body) body.textContent = 'Reading document…';
+           if (meta) meta.textContent = '';
+
+           const st = document.getElementById('footStatus');
+           if (st) { st.innerText = 'DOCUMENT'; st.style.color = 'var(--accent)'; }
+
+           const src = Nexus.state.Vfs[fn] || '';
+           if (!Nexus.Vfs.isDataUrl(src)) {
+               if (body) body.textContent =
+                   'This document can\'t be read.\n\n' +
+                   'It was loaded before document support existed, so it was stored as text — which destroys the ZIP structure these formats depend on. Re-import the original file to fix it.';
+               return;
+           }
+           if (typeof JSZip === 'undefined') {
+               if (body) body.textContent = 'JSZip didn\'t load, so documents can\'t be opened this session. Check your connection and reload.';
+               return;
+           }
+
+           try {
+               const b64 = src.slice(src.indexOf(',') + 1);
+               const zip = await JSZip.loadAsync(b64, { base64: true });
+               const ext = fn.split('.').pop().toLowerCase();
+               let text = '';
+
+               if (ext === 'docx') {
+                   const f = zip.file('word/document.xml');
+                   if (!f) throw new Error('No word/document.xml — is this really a .docx?');
+                   text = this._docXmlToText(await f.async('string'));
+               } else if (ext === 'odt') {
+                   const f = zip.file('content.xml');
+                   if (!f) throw new Error('No content.xml — is this really an .odt?');
+                   text = this._odtXmlToText(await f.async('string'));
+               } else {
+                   // Anything else zip-based: list what's inside rather than
+                   // guessing at a schema and producing plausible nonsense.
+                   const names = Object.keys(zip.files).filter(n => !zip.files[n].dir);
+                   text = `Text extraction isn't supported for .${ext} yet.\n\n`
+                        + `This archive contains ${names.length} entries:\n\n`
+                        + names.slice(0, 200).map(n => '  ' + n).join('\n');
+               }
+
+               this.lastText = text;
+               if (body) body.textContent = text;
+               const words = (text.match(/\S+/g) || []).length;
+               if (meta) meta.textContent = `${fn} · ${words} words · ${text.split('\n').length} lines · read-only`;
+           } catch (e) {
+               console.error('docViewer failed:', e);
+               if (body) body.textContent = 'Could not read this document.\n\n' + (e && e.message || e);
+           }
+       },
+
+       hide() {
+           const host = document.getElementById('docViewerHost');
+           const editorView = document.getElementById('editorView');
+           if (host) host.style.display = 'none';
+           if (editorView) editorView.style.display = '';
+           this.currentFile = null;
+           this.lastText = '';
+       },
+
+       // The editable escape hatch: extracted text becomes a real Markdown
+       // file you can work on, leaving the original document untouched.
+       saveAsMarkdown() {
+           if (!this.lastText || !this.currentFile) return Nexus.shell.out('Nothing extracted yet.', 'warn');
+           const base = this.currentFile.replace(/\.[^.]+$/, '');
+           let out = `${base}.md`;
+           let n = 2;
+           while (Nexus.state.Vfs[out] !== undefined) out = `${base}-${n++}.md`;
+           Nexus.state.Vfs[out] = this.lastText;
+           Nexus.state.originals[out] = this.lastText;
+           Nexus.state.lastSavedContent[out] = this.lastText;
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           Nexus.Vfs.switchFile(out);
+           Nexus.shell.out(`Extracted text saved as ${out}.`, 'success');
+       },
+
+       copyText() {
+           if (!this.lastText) return Nexus.shell.out('Nothing extracted yet.', 'warn');
+           if (navigator.clipboard && navigator.clipboard.writeText) {
+               navigator.clipboard.writeText(this.lastText)
+                   .then(() => Nexus.shell.out('Document text copied.', 'success'))
+                   .catch(() => Nexus.shell.out('Clipboard access denied — long-press to copy.', 'warn'));
+           } else {
+               Nexus.shell.out('Clipboard unavailable — long-press to copy.', 'warn');
+           }
        }
    },
 
