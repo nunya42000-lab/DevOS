@@ -1536,10 +1536,17 @@ _detectMobileIssues(srcCode, ext) {
     }
 
     if (ext === 'html' || ext === 'htm') {
+        // Only a full HTML document can be missing a viewport tag. Without
+        // this guard the rule fired on an empty file, a bare fragment, or a
+        // partial template — none of which are pages, and none of which
+        // should ever carry a viewport meta. Mirrors the same
+        // looksLikeFullDoc gate _detectHtmlIssues already uses for its own
+        // copy of this check, so the two can't disagree.
+        const looksLikeFullDoc = /<html[\s>]/i.test(scanSrc);
         const viewportMatch = scanSrc.match(/<meta[^>]+name=["']viewport["'][^>]*>/i);
-        if (!viewportMatch) {
+        if (looksLikeFullDoc && !viewportMatch) {
             issues.push({ line: 1, text: 'No <meta name="viewport"> tag — page will render tiny/zoomed-out on phones.' });
-        } else {
+        } else if (viewportMatch) {
             const contentMatch = viewportMatch[0].match(/content=["']([^"']*)["']/i);
             if (!contentMatch || !/width\s*=/.test(contentMatch[1])) {
                 const line = scanSrc.slice(0, viewportMatch.index).split('\n').length;
@@ -4553,6 +4560,16 @@ Sentinel : {
            return ed ? ed.value : (Nexus.state.Vfs[Nexus.state.activeFile] || "");
        },
        setLiveCode(code) {
+           // Second write path alongside replaceRange — the whole-file
+           // transformers (removeBlankLines, alignLeft, reindent, etc.)
+           // come through here instead. Same guard, same reason: images
+           // are stored as base64 data URLs, so a text "cleanup" run
+           // against one silently destroys the file. Guarding both choke
+           // points covers every transformer in the app.
+           if (Nexus.Vfs.isImageFile(Nexus.state.activeFile)) {
+               Nexus.shell.out('That tool edits text — it can\'t run on an image file.', 'warn');
+               return;
+           }
            if (Nexus.editorCore && Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
                const view = Nexus.editorCore.view;
                view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: code } });
@@ -4698,6 +4715,18 @@ Sentinel : {
            return { text: ed.value.slice(ed.selectionStart, ed.selectionEnd), from: ed.selectionStart, to: ed.selectionEnd, hasSelection: true };
        },
        replaceRange(from, to, newText) {
+           // Refuse to rewrite image files. Images now live in the Vfs as
+           // base64 data URLs, so a text transformer pointed at one will
+           // happily "clean" it — removeBlankLines was measurably
+           // corrupting a PNG's data URL, which destroys the image with no
+           // warning and no undo path once autosave fires. Guarding at
+           // replaceRange covers every transformer that writes through it
+           // at once, rather than needing the same check remembered in
+           // each one (and inevitably missed in the next one added).
+           if (Nexus.Vfs.isImageFile(Nexus.state.activeFile)) {
+               Nexus.shell.out('That tool edits text — it can\'t run on an image file.', 'warn');
+               return;
+           }
            if (Nexus.editorCore.isCM6 && Nexus.editorCore.view) {
                Nexus.editorCore.view.dispatch({ changes: { from, to, insert: newText } });
                return;
