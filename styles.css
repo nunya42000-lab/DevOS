@@ -466,7 +466,8 @@
         width: 18px;
         cursor: pointer;
     }
-    .cm-bookmark-gutter:hover {
+    .cm-bookmark-gutter:hover,
+    .cm-bookmark-gutter:active {
         background: rgba(255, 255, 255, 0.05);
     }
     /* Diff-as-you-type gutter (Feature 4) — narrow and non-interactive on
@@ -548,7 +549,8 @@
         opacity: 0.6; 
         line-height: 1; 
     }
-    .tab-close:hover { opacity: 1; }
+    .tab-close:hover,
+    .tab-close:active { opacity: 1; }
     .tab-dirty-dot {
         color: var(--gold);
         font-size: 8px;
@@ -856,7 +858,8 @@
         min-width: 44px;
         touch-action: manipulation;
     }
-    .sleek-btn:hover { background: var(--dock-hover-bg); color: var(--dock-hover-text); }
+    .sleek-btn:hover,
+    .sleek-btn:active { background: var(--dock-hover-bg); color: var(--dock-hover-text); }
     .sleek-btn.active { background: var(--dock-active-bg); color: var(--dock-active-text); box-shadow: 0 0 10px rgba(255,255,255,0.1); }
 
     /* AUDIT FIX: `btn-active` is toggled from JS in five places (the
@@ -1189,7 +1192,8 @@
         transition: background 0.15s;
         border-left: 2px solid transparent;
     }
-    .outline-item:hover {
+    .outline-item:hover,
+    .outline-item:active {
         background: rgba(255, 255, 255, 0.05);
     }
     .outline-item.active {
@@ -1301,7 +1305,8 @@
         transform: translate(-50%, -50%);
         z-index: 3;
     }
-    .graph-node:hover {
+    .graph-node:hover,
+    .graph-node:active {
         border-color: var(--accent);
         box-shadow: 0 0 10px rgba(47, 129, 247, 0.4);
     }

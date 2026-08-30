@@ -151,7 +151,7 @@
 
     <nav id="ribbonContainer" aria-label="Main toolbar" style="padding-right: 48px;">
         <div id="ribbonTrack">
-            <button id="ribbonEditModeBtn" class="tool-btn edit-btn-trigger btn-edit-util" onclick="Nexus.UI.toggleEditMode()" title="Utility Mode — tap to switch to Full Edit" aria-label="Editor is in utility mode, tap to enable full editing">🛠️</button>
+            <button class="tool-btn edit-btn-trigger btn-edit-util" onclick="Nexus.UI.toggleEditMode()" title="Utility Mode — tap to switch to Full Edit" aria-label="Editor is in utility mode, tap to enable full editing">🛠️</button>
             <button id="ribbonSaveBtn" class="tool-btn btn-success" onclick="Nexus.Vfs.manualSave()" title="Save Now" aria-label="Save current file now">💾</button>
             <button class="tool-btn" onclick="Nexus.Vfs.refreshCurrent()" title="Refresh File" aria-label="Refresh current file">♻️</button>
             <button class="tool-btn" onclick="Nexus.history.undo()" title="Undo" aria-label="Undo">↶</button>
@@ -222,8 +222,8 @@
              SIBLINGS of it, not children, specifically so they survive
              every tab-bar re-render instead of being wiped out along with
              the old tab elements. -->
-        <div id="fileTabsEdgeRow" style="display:flex; align-items:stretch; background:var(--panel); border-bottom:1px solid var(--border);">
-            <button id="filesPanelToggleBtn" class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleSidebar('left')" title="Files" aria-label="Toggle files panel">📁</button>
+        <div style="display:flex; align-items:stretch; background:var(--panel); border-bottom:1px solid var(--border);">
+            <button class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleSidebar('left')" title="Files" aria-label="Toggle files panel">📁</button>
             <div id="fileTabsBar" style="border-bottom:none; flex:1; min-width:0;"></div>
             <button id="fileTabMenuBtn" class="tool-btn" style="flex-shrink:0; border-radius:0; background:transparent;" onclick="Nexus.UI.toggleRibbonMenu()" title="More" aria-label="Open menu">⋮</button>
         </div>
@@ -304,9 +304,9 @@
             <span style="color:var(--danger); cursor:pointer;" onclick="Nexus.UI.toggleDrawer('searchDrawer')">&times;</span>
         </div>
         <div style="display:flex; gap:6px;">
-            <button class="sleek-btn" id="caseBtn" onclick="Nexus.search.toggleOpt('case')" style="flex:1; padding:4px;" title="Match Case" aria-label="Toggle match case">Aa</button>
-            <button class="sleek-btn" id="regexBtn" onclick="Nexus.search.toggleOpt('regex')" style="flex:1; padding:4px;" title="Regex Mode" aria-label="Toggle regex mode">.*</button>
-            <button class="sleek-btn" id="globalBtn" onclick="Nexus.search.toggleOpt('global')" style="flex:1; padding:4px;" title="Global (all matches)" aria-label="Toggle global match">/g</button>
+            <button class="sleek-btn" onclick="Nexus.search.toggleOpt('case')" style="flex:1; padding:4px;" title="Match Case" aria-label="Toggle match case">Aa</button>
+            <button class="sleek-btn" onclick="Nexus.search.toggleOpt('regex')" style="flex:1; padding:4px;" title="Regex Mode" aria-label="Toggle regex mode">.*</button>
+            <button class="sleek-btn" onclick="Nexus.search.toggleOpt('global')" style="flex:1; padding:4px;" title="Global (all matches)" aria-label="Toggle global match">/g</button>
         </div>
         <input type="text" id="findInput" class="sleek-input" placeholder="Find...">
         <div style="display:flex; gap:6px;">
@@ -491,7 +491,7 @@
 
     <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
 
-        <details class="diag-section" open id="diagSecCore">
+        <details class="diag-section" open>
             <summary>Diagnostics<span class="diag-badge" id="diagBadgeCore">0</span></summary>
             <div class="diag-body">
                 <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">One tap checks lint, structure, syntax, CSS, orphaned IDs, and brackets together.</div>
@@ -551,7 +551,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecPower">
+        <details class="diag-section">
             <summary>Power Tools</summary>
             <div class="diag-body">
                 <div style="font-size:9px; opacity:0.6; margin-bottom:8px;">Auto-fixers and single-purpose checks, for when you want just one thing.</div>
@@ -569,7 +569,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecUnderstand">
+        <details class="diag-section">
             <summary>Understand Your Code</summary>
             <div class="diag-body">
                 <button class="tool-btn btn-accent" style="width:100%; margin-bottom:8px;" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ PROJECT RADAR</button>
@@ -582,7 +582,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecProject">
+        <details class="diag-section">
             <summary>Project Tools</summary>
             <div class="diag-body">
                 <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Compare, merge, and reshape files within the project.</div>
@@ -598,7 +598,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecFormat">
+        <details class="diag-section">
             <summary>Fix &amp; Format</summary>
             <div class="diag-body">
                 <div class="grid-2">
@@ -628,7 +628,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecVault">
+        <details class="diag-section">
             <summary>Snippets &amp; Vault</summary>
             <div class="diag-body">
                 <div class="grid-2">
@@ -638,7 +638,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecLearn">
+        <details class="diag-section">
             <summary>Learn</summary>
             <div class="diag-body">
                 <div class="grid-2">
@@ -648,7 +648,7 @@
             </div>
         </details>
 
-        <details class="diag-section" id="diagSecDevUtils">
+        <details class="diag-section">
             <summary>Dev Utilities</summary>
             <div class="diag-body">
                 <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Selection, or whole file if nothing's selected:</div>
@@ -668,7 +668,7 @@
             </div>
         </details>
 
-          <details class="diag-section" id="diagSecBuild">
+          <details class="diag-section">
             <summary>Build &amp; Export</summary>
             <div class="diag-body">
                 <div class="grid-2">
@@ -687,7 +687,7 @@
             </label>
         </div>
 
-        <details class="diag-section" id="diagSecUtilMirror" style="margin-top: 16px;">
+        <details class="diag-section" style="margin-top: 16px;">
             <summary>Quick Tools (Mirror)</summary>
             <div class="diag-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="utilMirrorContainer">
                 <!-- Populated by Nexus.UI.renderUtilMirror() on boot and after every util layout change -->
@@ -996,7 +996,7 @@
             <div class="p-head"><span>💾 SOVEREIGN VAULT</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('vault')">&times;</button></div>
             <div class="modal-body">
                 <div style="display:flex; flex-wrap: wrap; gap:10px; margin-bottom:20px;">
-                    <input type="text" id="vaultSearch" placeholder="Search..." style="flex:1; min-width: 150px; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;" oninput="Nexus.vault.render(this.value)">
+                    <input type="text" placeholder="Search..." style="flex:1; min-width: 150px; padding:12px; background:var(--bg); color:#fff; border:1px solid var(--border); border-radius:8px;" oninput="Nexus.vault.render(this.value)">
                     <button class="tool-btn btn-accent" onclick="Nexus.vault.grab()">+ GRAB</button>
                     <button class="tool-btn btn-warn" onclick="Nexus.vault.cutFile()">✂️ CUT FILE</button>
                     <button class="tool-btn" onclick="Nexus.vault.copyFile()">📄 COPY FILE</button>
@@ -1108,7 +1108,7 @@
             <div class="p-head"><span>🖼️ SPRITE SHEET → CSS</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('sprite')">&times;</button></div>
             <div class="modal-body" style="display:flex; flex-direction:column; gap:15px;">
                 <p style="font-size:12px; opacity:0.7;">Upload a sprite sheet image, specify one frame's size, and get a <code>.sprite-N</code> CSS rule per cell.</p>
-                <input type="file" id="spriteUpload" accept="image/*" class="sleek-input" style="padding:12px;" onchange="Nexus.spriteSheet.handleUpload(event)">
+                <input type="file" accept="image/*" class="sleek-input" style="padding:12px;" onchange="Nexus.spriteSheet.handleUpload(event)">
                 <canvas id="spriteCanvasPreview" style="display:none; max-width:100%; border:1px solid var(--border); border-radius:8px; image-rendering:pixelated;"></canvas>
                 <div id="spriteDims" style="font-size:11px; opacity:0.6;"></div>
                 <div style="display:flex; gap:10px;">
@@ -1295,7 +1295,7 @@
 
             <textarea id="mergeManualView" class="sleek-input" style="display:none; flex:1; font-family:monospace; font-size:12px; resize:none; white-space:pre; overflow:auto;" spellcheck="false"></textarea>
         </div>
-        <div id="mergeControls" class="p-head" style="background:var(--bg); border-top:1px solid var(--border); flex-wrap:wrap; gap:6px;">
+        <div class="p-head" style="background:var(--bg); border-top:1px solid var(--border); flex-wrap:wrap; gap:6px;">
             <span id="mergeProgress">Select two files to begin.</span>
             <button class="tool-btn btn-success" onclick="Nexus.merge.finish()">✔ BUILD RESULT</button>
         </div>
@@ -1354,7 +1354,7 @@
     <div id="modalIntel" class="modal-overlay">
         <div class="modal-content">
             <div class="p-head"><span>🧠 NEURAL HEURISTICS</span><button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('intel')">&times;</button></div>
-            <div class="modal-body" id="intelRoot">
+            <div class="modal-body">
                 <div style="text-align:center; padding:20px; background:rgba(0,0,0,0.2); border-radius:15px; margin-bottom:20px; border:1px solid var(--border);">
                     <div style="font-size:10px; color:var(--gold); letter-spacing:2px; margin-bottom:10px;">STRUCTURAL INTEGRITY</div>
                     <div id="intelHealthDisplay" style="font-size:42px; font-weight:900; color:var(--success);">100%</div>
@@ -1699,7 +1699,7 @@
      .dock-toolbar's own `gap: 8px` between children; it's cancelled on
      the group BEFORE this one instead (margin-right), which closes the
      same gap without moving this container's buttons under anything. -->
-<div id="ribbonDrawerControls" style="display: flex; gap: 6px; padding-right: 6px; align-items: center;">
+<div style="display: flex; gap: 6px; padding-right: 6px; align-items: center;">
     <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('searchDrawer')" style="background: rgba(121, 192, 255, 0.1); border-color: var(--accent);" title="Find &amp; Replace" aria-label="Open find and replace">🔍</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleDrawer('writerDrawer')" style="background: rgba(255, 193, 7, 0.1); border-color: var(--warning);" title="Boilerplate Architect" aria-label="Open boilerplate snippet writer">✍️</button>
     <button class="sleek-btn" onclick="Nexus.UI.toggleSlide('shell')" title="Command Shell" aria-label="Toggle command shell">⌨️</button>

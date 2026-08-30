@@ -1055,11 +1055,34 @@ auditor: {
     // get their own card rather than inflating the issue counts elsewhere.
     _detectTodos(srcCode) {
         const lines = srcCode.split('\n');
-        const marker = /\b(TODO|FIXME|HACK|XXX)\b:?\s*(.*)/i;
+        // A TODO marker is a COMMENT convention, so only comment text
+        // counts. Matching the bare word anywhere made the scanner detect
+        // its own implementation — the regex literal on this very line,
+        // plus the UI strings that mention "TODO/FIXME/HACK" — reporting
+        // six phantom reminders in a file that has none. Requiring a
+        // comment prefix (// or * or #) and a following ':' or description
+        // keeps real markers while ignoring the word used as ordinary
+        // prose or code.
+        // Two accepted shapes, matching how these markers are actually
+        // written: either the marker opens the comment, or it appears
+        // later but carries a colon. Prose that merely mentions one of
+        // these words in passing matches neither, which is what stops the
+        // scanner reporting its own documentation as outstanding work.
+        // (Deliberately no literal examples in this comment — spelling one
+        //  out here would make this very block self-match, which is the
+        //  exact bug being fixed.)
+        const atStart  = /(?:\/\/|\/\*|^\s*\*|#|<!--)\s*(TODO|FIXME|HACK|XXX)\b\s*[:\-]?\s*(.*)/i;
+        const withColon = /(?:\/\/|\/\*|^\s*\*|#|<!--).*?\b(TODO|FIXME|HACK|XXX)\s*:\s*(.*)/i;
         const todos = [];
         lines.forEach((lineText, i) => {
-            const m = lineText.match(marker);
-            if (m) todos.push({ tag: m[1].toUpperCase(), text: m[2].trim() || '(no description)', line: i + 1 });
+            const m = lineText.match(atStart) || lineText.match(withColon);
+            if (!m) return;
+            // Skip a marker that is itself part of a string or regex on a
+            // code line (e.g. a literal listing the marker names) rather
+            // than an actual note left for a human.
+            const desc = (m[2] || '').trim();
+            if (/^[|)\]}'"`\/]/.test(desc)) return;
+            todos.push({ tag: m[1].toUpperCase(), text: desc || '(no description)', line: i + 1 });
         });
         return todos;
     },
@@ -1663,6 +1686,20 @@ _detectOrphanIssues(srcCode) {
         const resolved = this._resolveVfsPath(scr.getAttribute('src'));
         if (resolved) scriptContent += Nexus.state.Vfs[resolved] + '\n';
     });
+    // Inline event-handler attributes are JavaScript too. This app wires a
+    // lot of UI that way — onclick="document.getElementById('loadTrigger')
+    // .click()" and friends — and because only <script> content was being
+    // collected, every id referenced ONLY from an inline handler looked
+    // completely unused. That produced confident "orphan" reports for
+    // elements that are wired up and working (the LOAD button's file
+    // input, the ZIP import trigger, the asset encoder, the peer-sync
+    // join field), which is the worst kind of false positive: it invites
+    // you to delete something load-bearing.
+    const HANDLER_ATTRS = /\bon[a-z]+\s*=\s*(?:"([^"]*)"|'([^']*)')/gi;
+    let hm;
+    while ((hm = HANDLER_ATTRS.exec(srcCode))) {
+        scriptContent += (hm[1] || hm[2] || '') + '\n';
+    }
     doc.querySelectorAll('style').forEach(st => styleContent += st.innerHTML + '\n');
     doc.querySelectorAll('link').forEach(link => {
         const rel = (link.getAttribute('rel') || '').toLowerCase();
@@ -3232,11 +3269,27 @@ _mapJs(code) {
 // by the HTML nesting/balance checks in the auditor.
 _mapHtml(code) {
     const errors = [];
-    const scriptRe = /<script\b[^>]*>([\s\S]*?)<\/script>/gi;
+    const scriptRe = /<script\b([^>]*)>([\s\S]*?)<\/script>/gi;
     let m;
     while ((m = scriptRe.exec(code))) {
-        const inner = m[1];
+        const attrs = m[1] || '';
+        const inner = m[2];
         if (!inner.trim()) continue;
+        // Only parse blocks that actually CONTAIN JavaScript. A <script>
+        // tag is also the standard carrier for non-JS payloads —
+        // type="importmap" (JSON), application/json, text/template,
+        // text/x-handlebars — and running a JS parser over those reports a
+        // guaranteed syntax error that is nothing but noise. This app's own
+        // index.html carries a large importmap, which was being reported as
+        // a bracket error on every single scan.
+        const typeMatch = attrs.match(/\btype\s*=\s*["']([^"']*)["']/i);
+        if (typeMatch) {
+            const t = typeMatch[1].trim().toLowerCase();
+            const isJs = t === '' || t === 'module' || t === 'text/javascript' ||
+                         t === 'application/javascript' || t === 'text/ecmascript' ||
+                         t === 'application/ecmascript';
+            if (!isJs) continue;
+        }
         const blockStart = m.index + m[0].indexOf(inner);
         const startLine = code.slice(0, blockStart).split('\n').length - 1;
         try {
@@ -10374,7 +10427,29 @@ kb: {
            // reference was off by one, silently producing scrambled output
            // (e.g. "foo_bar" -> "$2_$1" landed on "foo_foo_bar" instead of
            // the correct "bar_foo").
-           return rep.replace(/\$(\d+)/g, (m, n) => args[Number(n)] ?? m).replace(/\$&/g, args[0]);
+           // Two fixes over the previous one-liner:
+           //
+           // 1. LITERAL MODE MUST STAY LITERAL. This expansion used to run
+           //    unconditionally, so with regex mode OFF a replacement of
+           //    "$1.99" or "$&" got mangled into capture-group references
+           //    the user never asked for. $-expansion is a regex feature;
+           //    in plain-text mode the replacement goes in verbatim.
+           //
+           // 2. $n WAS INDEXING PAST THE GROUPS. The callback signature is
+           //    (match, p1..pn, offset, string), so with NO capture groups
+           //    args[1] is the OFFSET — a number. "$1" therefore expanded
+           //    to a character position (replacing "b" with "$1" in "abc"
+           //    produced "a1c"). Group count is args.length - 3; anything
+           //    outside that range is left as typed instead of grabbing
+           //    whatever happens to sit at that index.
+           if (!Nexus.state.searchOpts.regex) return rep;
+           const groupCount = Math.max(0, args.length - 3);
+           return rep
+               .replace(/\$(\d+)/g, (m, n) => {
+                   const i = Number(n);
+                   return (i >= 1 && i <= groupCount) ? (args[i] ?? '') : m;
+               })
+               .replace(/\$&/g, args[0]);
        });
        // The manual $-substitution above (rather than just returning `rep`
        // directly) exists because the callback form of String.replace does
