@@ -545,7 +545,7 @@
                     </div>
                 </div>
 
-                <div id="auditorReportBox" style="min-height: 120px; max-height: 240px; overflow-y: auto; background: #0f1218; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.5;">
+                <div id="auditorReportBox" style="min-height: 200px; max-height: 65vh; overflow-y: auto; overflow-x: auto; background: #0f1218; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.5; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
                     <div style="color: #5c6370;">Run the full sweep, or tap a card above, to see findings here.</div>
                 </div>
             </div>
@@ -560,7 +560,7 @@
                      <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Sentinel.runMedicAST()">MEDIC: AST BUILD</button>
                      <button class="tool-btn btn-accent" style="grid-column: span 2;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Sentinel.scanDeps()">SCAN IMPORTS (LOG VIEW)</button>
                 </div>
-                <div id="diagOut" class="mini-console" style="margin-top:10px; height: 100px; overflow-y: auto;">[System Standby]</div>
+                <div id="diagOut" class="mini-console" style="margin-top:10px; min-height: 100px; max-height: 45vh; overflow-y: auto; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">[System Standby]</div>
                 <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
                     <button class="dock-btn special" style="height: 22px; font-size: 10px; padding: 0 8px; background: #21262d; border-radius: 4px;" onclick="Nexus.auditor.copyBox('diagOut', 'DIAGNOSTICS LOGS')">COPY</button>
                     <button class="dock-btn special" style="height: 22px; font-size: 10px; padding: 0 8px; border-radius: 4px;" onclick="Nexus.auditor.clearBox('diagOut', '[System Standby]')">CLEAR</button>
