@@ -3123,9 +3123,48 @@ splitJSFile() {
 
     const base = file.replace(/\.js$/i, '');
     let created = 0;
+
+    // A declaration's leading comments belong WITH it. Slicing from one
+    // declaration's start to the NEXT one's start put the next function's
+    // doc comment at the bottom of the PREVIOUS file, describing nothing.
+    // Each start walks backwards over contiguous comment lines, stopping at
+    // a blank line (which separates unrelated commentary).
+    const startWithComments = (declStart) => {
+        const before = code.slice(0, declStart);
+        const lines = before.split('\n');
+        let take = 0;
+        for (let i = lines.length - 2; i >= 0; i--) {
+            const l = lines[i].trim();
+            if (l.startsWith('//') || l.startsWith('*') || l.startsWith('/*') || l.endsWith('*/')) { take++; continue; }
+            break;
+        }
+        if (!take) return declStart;
+        return before.length - lines.slice(lines.length - 1 - take).join('\n').length;
+    };
+    const endWithTrailing = (declEnd) => {
+        const nl = code.indexOf('\n', declEnd);
+        const rest = code.slice(declEnd, nl < 0 ? code.length : nl);
+        return /^[ \t]*(\/\/.*)?$/.test(rest) ? declEnd + rest.length : declEnd;
+    };
+
+    const starts = found.map(f => startWithComments(f.start));
+
+    // Anything before the first declaration — imports, constants, a file
+    // header — used to be DELETED, with only an alert admitting it after
+    // the fact. It is kept as its own file now instead of thrown away.
+    const preamble = code.slice(0, starts[0]).trim();
+    if (preamble) {
+        const pName = `${base}.preamble.js`;
+        const body = preamble + '\n';
+        Nexus.state.Vfs[pName] = body;
+        Nexus.state.originals[pName] = body;
+        Nexus.state.lastSavedContent[pName] = body;
+        created++;
+    }
+
     for (let i = 0; i < found.length; i++) {
-        const start = found[i].start;
-        const end = i + 1 < found.length ? found[i + 1].start : code.length;
+        const start = starts[i];
+        const end = endWithTrailing(found[i].end);
         const chunk = code.substring(start, end).trim();
         const newName = `${base}.${found[i].name}.js`;
         Nexus.state.Vfs[newName] = chunk;
@@ -3143,7 +3182,7 @@ splitJSFile() {
 
     this.save();
     this.renderAccordion();
-    alert(`Split '${file}' into ${created} files. (Any code before the first function/class declaration, like imports, was not preserved — copy it manually if needed.)`);
+    Nexus.shell.out(`Split "${file}" into ${created} files.` + (preamble ? ' Code before the first declaration was kept in .preamble.js.' : ''), 'success');
 },
 
 bundleToHTML() {
@@ -4731,6 +4770,24 @@ Sentinel : {
            
            this.log("[MEDIC STRING] Deep string scrub complete. Whitespace optimized.", "success"); 
        },
+       // These auto-fix paths regenerate the file from its syntax tree,
+       // because the fixes change the tree's STRUCTURE (removing or
+       // rewriting nodes) rather than swapping text in place — so the
+       // positional-splice approach used by rename and defrag doesn't
+       // apply here. Acorn keeps no comments in the tree, so regeneration
+       // drops them.
+       //
+       // That's an acceptable trade only if it isn't a surprise. This
+       // counts the comments at risk and asks first, instead of quietly
+       // deleting them and leaving you to notice later.
+       _confirmCommentLoss(code, label) {
+           const comments = (code.match(/(^|[^:"'\\])\/\/[^\n]*|\/\*[\s\S]*?\*\//g) || []).length;
+           if (!comments) return true;
+           return confirm(
+               `${label} rebuilds the file from its syntax tree, which will REMOVE all ${comments} comment(s) and reformat it.\n\n` +
+               `Your comments cannot be recovered except with undo.\n\nContinue?`);
+       },
+
        runMedicAST() { 
            if (!Nexus.state.activeFile) return this.log("[MEDIC AST] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[MEDIC] EDITOR LOCKED. Cannot rebuild.", "danger");
@@ -4747,6 +4804,9 @@ Sentinel : {
                    return this.log("[MEDIC AST] Code structure optimal. No mutations required.", "success");
                }
                
+               if (!this._confirmCommentLoss(this.getLiveCode(), 'Medic AST rebuild')) {
+                   return this.log('[MEDIC AST] Cancelled — file untouched.', 'warn');
+               }
                const rebuiltCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
                
                this.setLiveCode(rebuiltCode);
@@ -5514,14 +5574,31 @@ chunkEditor: {
        // Defensive check: if the live document's content at this range
        // no longer matches what was loaded, the file changed underneath
        // us — refuse rather than silently overwriting the wrong text.
-       const currentAtRange = view.state.doc.sliceString(this._target.declFrom, this._target.declTo);
+       // The end offset must come from the SAME source as the safety
+       // check. This previously verified the range declFrom..declTo but
+       // then wrote to declFrom..(declFrom + _originalText.length) — two
+       // independent measurements of one range. Any drift between them
+       // (an edit elsewhere in the file while the chunk modal was open,
+       // shifting offsets) meant the write landed on a different span
+       // than the one that was validated, truncating or overwriting
+       // neighbouring code.
+       const declFrom = this._target.declFrom;
+       const declTo = Math.min(this._target.declTo, view.state.doc.length);
+       const currentAtRange = view.state.doc.sliceString(declFrom, declTo);
+
        if (currentAtRange !== this._originalText) {
-           const proceed = confirm("The file changed since this chunk was opened (possibly at this exact spot). Save anyway? This may overwrite something unexpected.");
-           if (!proceed) return;
+           // Offsets are stale, so there is no safe range to write to —
+           // "save anyway" here would put your edit at whatever now
+           // occupies those positions. Refuse and say what to do instead.
+           alert(
+               "The file changed since this chunk was opened, so the original position is no longer valid.\n\n" +
+               "Saving now could overwrite unrelated code. Your edit has not been lost — copy it, close this, and reopen the chunk."
+           );
+           return;
        }
 
        view.dispatch({
-           changes: { from: this._target.declFrom, to: this._target.declFrom + this._originalText.length, insert: newText }
+           changes: { from: declFrom, to: declTo, insert: newText }
        });
 
        Nexus.state.Vfs[Nexus.state.activeFile] = view.state.doc.toString();
@@ -9295,17 +9372,57 @@ self.addEventListener('fetch', (e) => {
        runJS() {
            if (!Nexus.state.activeFile.endsWith('.js')) return alert("Select .js file.");
            try {
-               const ast = acorn.parse(Nexus.state.Vfs[Nexus.state.activeFile], { ecmaVersion: 2022, sourceType: 'module' });
+               const code = Nexus.state.Vfs[Nexus.state.activeFile];
+               const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', ranges: true });
+               if (!ast.body.length) return Nexus.shell.out('Nothing to reorder.', 'info');
+
+               // Move the ORIGINAL TEXT of each declaration, not a
+               // regenerated version of it. This used to run
+               // astring.generate(ast), which rebuilds source from the
+               // syntax tree — and since acorn puts no comments in the
+               // tree, reordering a file silently DELETED every comment in
+               // it. Slicing the real source keeps comments, spacing and
+               // formatting exactly as written.
+               //
+               // Each segment runs from the end of the previous declaration
+               // to the end of this one, so a comment written above a
+               // function travels WITH that function instead of being
+               // stranded next to whatever ends up in its old position.
+               // A trailing comment on the SAME line as a declaration
+               // belongs to that declaration, not to whatever follows it.
+               // Without this, "const CONFIG = {};  // config note" left the
+               // note behind and it got carried to the top of the file with
+               // the next segment.
+               const endOfDecl = (n) => {
+                   const nl = code.indexOf('\n', n.end);
+                   const lineRest = code.slice(n.end, nl < 0 ? code.length : nl);
+                   return /^[ \t]*(\/\/.*)?$/.test(lineRest) ? n.end + lineRest.length : n.end;
+               };
+               const ends = ast.body.map(endOfDecl);
+               const segs = ast.body.map((n, i) => ({
+                   node: n,
+                   // Leading comments/blank lines come from the gap after the
+                   // previous declaration, so they travel with this one.
+                   text: code.slice(i === 0 ? 0 : ends[i - 1], ends[i]).replace(/^\n+/, '').replace(/\s+$/, '')
+               }));
+               const tail = code.slice(ends[ends.length - 1]).replace(/^\s*\n/, '');
+
                const b = { imp: [], var: [], cls: [], fun: [], exe: [] };
-               ast.body.forEach(n => {
-                   if (n.type === 'ImportDeclaration') b.imp.push(n);
-                   else if (n.type === 'VariableDeclaration') b.var.push(n);
-                   else if (n.type === 'ClassDeclaration') b.cls.push(n);
-                   else if (n.type === 'FunctionDeclaration') b.fun.push(n);
-                   else b.exe.push(n);
+               segs.forEach(seg => {
+                   const t = seg.node.type;
+                   if (t === 'ImportDeclaration') b.imp.push(seg);
+                   else if (t === 'VariableDeclaration') b.var.push(seg);
+                   else if (t === 'ClassDeclaration') b.cls.push(seg);
+                   else if (t === 'FunctionDeclaration') b.fun.push(seg);
+                   else b.exe.push(seg);
                });
-               ast.body = [...b.imp, ...b.var, ...b.cls, ...b.fun, ...b.exe];
-               Nexus.state.Vfs[Nexus.state.activeFile] = js_beautify(astring.generate(ast), { indent_size: Nexus.state.prefs.tabWidth });
+               const ordered = [...b.imp, ...b.var, ...b.cls, ...b.fun, ...b.exe];
+               // Joined with real line breaks; without this the last
+               // declaration and the first executable statement ended up
+               // fused on one line ("}runFirst();").
+               const rebuilt = ordered.map(s => s.text).filter(Boolean).join('\n\n')
+                   + (tail.trim() ? '\n' + tail.replace(/^\n+/, '') : '\n');
+               Nexus.state.Vfs[Nexus.state.activeFile] = rebuilt;
                Nexus.Vfs.save(); 
                Nexus.Vfs.switchFile(Nexus.state.activeFile);
            } catch (e) { alert("AST Syntax Fault: " + e.message); }
