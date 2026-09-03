@@ -2068,7 +2068,14 @@ Vfs: {
             odt: 'application/vnd.oasis.opendocument.text',
             ods: 'application/vnd.oasis.opendocument.spreadsheet',
             odp: 'application/vnd.oasis.opendocument.presentation',
-            epub: 'application/epub+zip'
+            epub: 'application/epub+zip',
+            // Fonts were reaching the generic octet-stream fallback, so an
+            // exported or bundled font carried a MIME no browser treats as
+            // a font. The sandbox MIME map already had these; this one
+            // (used by export, GitHub sync and the asset encoder) did not.
+            woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', otf: 'font/otf',
+            mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
+            mp4: 'video/mp4', webm: 'video/webm', zip: 'application/zip'
         };
         return map[ext] || 'application/octet-stream';
     },
@@ -3194,8 +3201,36 @@ bundleToHTML() {
     const cssFiles = Object.keys(Vfs).filter(f => f.toLowerCase().endsWith('.css'));
     const jsFiles = Object.keys(Vfs).filter(f => f.toLowerCase().endsWith('.js'));
 
-    const cssBlock = cssFiles.map(f => `<style>\n/* ${f} */\n${Vfs[f]}\n</style>`).join('\n');
-    const jsBlock = jsFiles.map(f => '<scr' + 'ipt>\n/* ' + f + ' */\n' + Vfs[f] + '\n</scr' + 'ipt>').join('\n');
+    // Any text inside an inlined script that literally spells the closing
+    // tag ENDS the script block early — the browser stops parsing JS there
+    // and treats the rest of the file as markup, wrecking the whole page.
+    // A file containing `const s = "</script>";` did exactly that. Splitting
+    // the sequence keeps the JS identical while making it unrecognisable to
+    // the HTML parser. Same for </style> inside CSS content.
+    const safeJs  = t => String(t).replace(/<\/script>/gi, '<\\/script>');
+    const safeCss = t => String(t).replace(/<\/style>/gi, '<\\/style>');
+
+    // Skip binary files that merely end in .css/.js by name, and never
+    // inline an image data URL as if it were source.
+    const isText = f => !Nexus.Vfs.isBinaryFile(f) && typeof Vfs[f] === 'string';
+    const cssUse = cssFiles.filter(isText);
+    const jsUse  = jsFiles.filter(isText);
+
+    const cssBlock = cssUse.map(f => `<style>\n/* ${f} */\n${safeCss(Vfs[f])}\n</style>`).join('\n');
+    const jsBlock = jsUse.map(f => '<scr' + 'ipt>\n/* ' + f + ' */\n' + safeJs(Vfs[f]) + '\n</scr' + 'ipt>').join('\n');
+
+    // Strip the ORIGINAL external references. Without this the bundle
+    // carried both the inlined copy AND the <link>/<script src> pointing at
+    // files that don't exist beside it — so a "self-contained" bundle
+    // 404'd on every asset and could execute the same script twice.
+    cssUse.forEach(f => {
+        const esc = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        base = base.replace(new RegExp(`<link\\b[^>]*href=["'](?:\\./|/)?${esc}["'][^>]*>\\s*`, 'gi'), '');
+    });
+    jsUse.forEach(f => {
+        const esc = f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        base = base.replace(new RegExp(`<script\\b[^>]*src=["'](?:\\./|/)?${esc}["'][^>]*>\\s*<\\/script>\\s*`, 'gi'), '');
+    });
 
     base = base.includes('</head>') ? base.replace('</head>', cssBlock + '\n</head>') : cssBlock + base;
     base = base.includes('</body>') ? base.replace('</body>', jsBlock + '\n</body>') : base + jsBlock;
@@ -3207,7 +3242,7 @@ bundleToHTML() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    alert(`Bundled ${1 + cssFiles.length + jsFiles.length} files into bundle.html.`);
+    Nexus.shell.out(`Bundled ${1 + cssUse.length + jsUse.length} files into bundle.html.`, 'success');
 }
 },
 
@@ -4416,9 +4451,18 @@ Sentinel : {
                initDefaultCheckers() {
                    // --- 1. LOGIC & CRITICAL FLOW ---
                    this.use({ check: (node) => {
-                       if (['WhileStatement', 'ForStatement'].includes(node.type)) {
-                           if (node.test?.value === true && !this.findInNode(node.body, 'BreakStatement')) {
-                               return { id: 'INF_LOOP', message: "Infinite Loop: No break found.", severity: 'CRITICAL' };
+                       if (['WhileStatement', 'ForStatement', 'DoWhileStatement'].includes(node.type)) {
+                           // `break` is not the only way out of a loop.
+                           // Checking for it alone flagged
+                           //     while (true) { return 1; }
+                           // as an infinite loop — it exits on the first
+                           // pass. `return` and `throw` both terminate the
+                           // loop just as definitively, so all three count.
+                           const hasExit = this.findInNode(node.body, 'BreakStatement')
+                                        || this.findInNode(node.body, 'ReturnStatement')
+                                        || this.findInNode(node.body, 'ThrowStatement');
+                           if (node.test?.value === true && !hasExit) {
+                               return { id: 'INF_LOOP', message: "Infinite Loop: no break, return or throw inside.", severity: 'CRITICAL' };
                            }
                        }
                    }});
@@ -9036,7 +9080,17 @@ self.addEventListener('fetch', (e) => {
                }
 
                for (const file of otherFiles) {
-                   buildFolder.file(file, Nexus.state.Vfs[file]);
+                   // Same fix the ZIP export needed: binary files are data
+                   // URLs in the Vfs, and writing that string raw produced
+                   // a build containing a "logo.png" that was actually text
+                   // reading "data:image/png;base64,...". Every image and
+                   // document in a production build came out broken.
+                   const content = Nexus.state.Vfs[file];
+                   if (Nexus.Vfs.isBinaryFile(file) && Nexus.Vfs.isDataUrl(content)) {
+                       buildFolder.file(file, content.slice(content.indexOf(',') + 1), { base64: true });
+                   } else {
+                       buildFolder.file(file, content);
+                   }
                }
 
                const content = await zip.generateAsync({ type: "blob" });
@@ -11812,6 +11866,31 @@ github: {
     // reloading the whole app — pull-all() in particular loops through
     // fetches SEQUENTIALLY, so one stalled file mid-loop would block
     // every file after it too.
+    // GitHub's contents API always wants base64. A text file must be
+    // UTF-8 encoded first; a binary file is ALREADY base64 inside its data
+    // URL and only needs the "data:...;base64," prefix removed. Running
+    // the text path over a data URL base64-encoded the URL STRING, so the
+    // repo received a text file containing "data:image/png;base64,..."
+    // instead of the image — the same defect the ZIP export had.
+    // Mirror of encodeForGitHub. A binary file coming back must stay
+    // base64 and be rebuilt as a data URL — UTF-8 decoding it (the text
+    // path) destroys the bytes exactly the way reading a PNG with
+    // readAsText does.
+    decodeFromGitHub(path, b64) {
+        const clean = String(b64 || '').replace(/\s/g, '');
+        if (Nexus.Vfs.isBinaryFile(path)) {
+            return `data:${Nexus.Vfs.imageMimeFor(path)};base64,${clean}`;
+        }
+        return decodeURIComponent(escape(atob(clean)));
+    },
+
+    encodeForGitHub(path, content) {
+        if (Nexus.Vfs.isBinaryFile(path) && Nexus.Vfs.isDataUrl(content)) {
+            return content.slice(content.indexOf(',') + 1);
+        }
+        return btoa(unescape(encodeURIComponent(content)));
+    },
+
     async fetchWithTimeout(url, options = {}, ms = 15000) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), ms);
@@ -12000,7 +12079,7 @@ shell: {
                const res = await Nexus.github.fetchWithTimeout(url, { headers: { "Authorization": `token ${token}` } });
                if (!res.ok) throw new Error("File not found.");
                const data = await res.json();
-               const pulled = decodeURIComponent(escape(atob(data.content.replace(/\s/g, ''))));
+               const pulled = Nexus.github.decodeFromGitHub(path, data.content);
                Nexus.state.Vfs[path] = pulled;
                // Treats a pull the same as a fresh load for dirty-tracking
                // purposes: content just came from the remote, so it isn't
@@ -12056,7 +12135,7 @@ shell: {
                            const fRes = await Nexus.github.fetchWithTimeout(item.url, { headers: { "Authorization": `token ${token}` } });
                            if (!fRes.ok) { results.failed.push(item.path); continue; }
                            const fData = await fRes.json();
-                           const pulled = decodeURIComponent(escape(atob(fData.content.replace(/\s/g, ''))));
+                           const pulled = Nexus.github.decodeFromGitHub(item.path, fData.content);
                            // item.path already comes back from GitHub as
                            // the full "folder/file.ext" form — exactly
                            // the flat-path-with-slashes convention this
@@ -12121,7 +12200,7 @@ shell: {
                    }
                    const payload = {
                        message: `Push all via divIDE — ${path}`,
-                       content: btoa(unescape(encodeURIComponent(content))),
+                       content: Nexus.github.encodeForGitHub(path, content),
                        sha: sha
                    };
                    const putRes = await Nexus.github.fetchWithTimeout(url, {
@@ -12166,7 +12245,7 @@ shell: {
 
                const payload = {
                    message: commitMsg,
-                   content: btoa(unescape(encodeURIComponent(content))), 
+                   content: Nexus.github.encodeForGitHub(path, content), 
                    sha: sha 
                };
 
@@ -16694,15 +16773,34 @@ const inj = "<scr" + "ipt>\n" +
                const zip = new JSZip(); 
                const folder = zip.folder("Nexus_Project"); 
                
+               // Binary files live in the Vfs as data URLs. Writing that
+               // string straight into the archive produced a "logo.png"
+               // that was actually a TEXT file containing
+               // "data:image/png;base64,..." — every image and document in
+               // an exported project came out broken. The payload has to be
+               // decoded back to real bytes, which JSZip does natively when
+               // told the content is base64.
                Object.entries(Nexus.state.Vfs).forEach(([f, c]) => {
-                   folder.file(f, c);
+                   if (Nexus.Vfs.isBinaryFile(f) && Nexus.Vfs.isDataUrl(c)) {
+                       folder.file(f, c.slice(c.indexOf(',') + 1), { base64: true });
+                   } else {
+                       folder.file(f, c);
+                   }
                });
 
                const content = await zip.generateAsync({ type: "blob" }); 
                const a = document.createElement('a'); 
-               a.href = URL.createObjectURL(content); 
+               const objectUrl = URL.createObjectURL(content);
+               a.href = objectUrl; 
                a.download = `Nexus_v40_Bundle.zip`; 
-               a.click(); 
+               // Attached before clicking: a detached anchor's click is
+               // ignored by some browsers, and the object URL is revoked
+               // afterwards so the blob isn't held in memory for the rest
+               // of the session.
+               document.body.appendChild(a);
+               a.click();
+               document.body.removeChild(a);
+               setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 
                status.innerText = "EXPORTED"; 
                setTimeout(() => { status.innerText = "READY"; }, 3000); 
