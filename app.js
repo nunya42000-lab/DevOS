@@ -8058,7 +8058,20 @@ self.addEventListener('fetch', (e) => {
            // Strip a selector wrapper if present, so both a full rule and a
            // bare declaration list work.
            const body = css.replace(/^[^{]*\{/, '').replace(/\}\s*$/, '');
-           const lines = body.split(';').map(s => s.trim()).filter(Boolean).map(p => {
+           // Split on ';' only when it is NOT inside a quoted value —
+           // content:"a;b" is one declaration, and a plain split(';')
+           // tore it in half and silently produced a broken value.
+           const decls = [];
+           let buf = '', q = null;
+           for (let i = 0; i < body.length; i++) {
+               const c = body[i];
+               if (q) { buf += c; if (c === q && body[i - 1] !== '\\') q = null; continue; }
+               if (c === '"' || c === "'") { q = c; buf += c; continue; }
+               if (c === ';') { decls.push(buf); buf = ''; continue; }
+               buf += c;
+           }
+           if (buf.trim()) decls.push(buf);
+           const lines = decls.map(s => s.trim()).filter(Boolean).map(p => {
                const i = p.indexOf(':');
                if (i < 0) return null;
                const k = p.slice(0, i).trim().replace(/-([a-z])/g, (m, c) => c.toUpperCase());
@@ -8300,11 +8313,26 @@ self.addEventListener('fetch', (e) => {
            const attrMap = { tabindex:'tabIndex', readonly:'readOnly', maxlength:'maxLength',
                colspan:'colSpan', rowspan:'rowSpan', autocomplete:'autoComplete', autofocus:'autoFocus',
                contenteditable:'contentEditable', spellcheck:'spellCheck', enctype:'encType',
-               novalidate:'noValidate', usemap:'useMap', srcset:'srcSet' };
+               novalidate:'noValidate', usemap:'useMap', srcset:'srcSet', class:'className', for:'htmlFor' };
+
+           // Attribute renaming must happen ONLY inside a tag, and only on
+           // attribute NAMES. The first version ran the replacements over
+           // the whole document, so <p>use class=foo</p> became
+           // "className=foo" in visible body text, and an attribute whose
+           // VALUE contained class= or for= was rewritten too. Tags are
+           // isolated first, then names are rewritten only where a name can
+           // legally appear — after '<tag' or whitespace, never inside a
+           // quoted value.
+           const renameAttrs = tag => tag.replace(
+               /([<\s])([a-zA-Z-]+)(\s*=)/g,
+               (m, lead, name, eq) => lead + (attrMap[name.toLowerCase()] || name) + eq);
+
            return html
-               .replace(/\bclass=/g, 'className=')
-               .replace(/\bfor=/g, 'htmlFor=')
-               .replace(/\b([a-z]+)=/gi, (m, a) => (attrMap[a.toLowerCase()] || a) + '=')
+               .replace(/<[a-zA-Z!\/][^>]*>/g, tag => {
+                   // Leave comments alone here; they're handled below.
+                   if (tag.startsWith('<!--')) return tag;
+                   return renameAttrs(tag);
+               })
                // Void elements must be explicitly self-closed in JSX.
                .replace(/<(br|hr|img|input|meta|link|source|track|area|base|col|embed|param|wbr)\b([^>]*?)\s*\/?>/gi,
                    (m, tag, attrs) => `<${tag}${attrs.replace(/\s+$/, '')} />`)
@@ -13694,7 +13722,28 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
 
            const doc = view.state.doc;
            const changes = [];
-           let collapsed = 0, skipped = 0;
+           let collapsed = 0, skipped = 0, unsafe = 0, wouldBreak = 0;
+
+           // If the file parses NOW, every collapse must leave it parsing.
+           // Text-joining can't respect automatic semicolon insertion —
+           // "const a = 1" + "const b = 2" on one line is a syntax error —
+           // and no amount of careful whitespace handling fixes that. So
+           // each candidate is parsed before it is accepted, and anything
+           // that would break the file is skipped instead of written.
+           const fname = Nexus.state.activeFile || '';
+           const ext = fname.split('.').pop().toLowerCase();
+           const isJs = ['js', 'mjs', 'jsx', 'ts', 'tsx'].includes(ext);
+           const canParse = isJs && typeof acorn !== 'undefined' && acorn.parse;
+           let baselineParses = false;
+           if (canParse) {
+               try { acorn.parse(doc.toString(), { ecmaVersion: 2022, sourceType: 'module' }); baselineParses = true; }
+               catch (e) { baselineParses = false; }
+           }
+           const stillParses = (candidate) => {
+               if (!canParse || !baselineParses) return true; // nothing to protect
+               try { acorn.parse(candidate, { ecmaVersion: 2022, sourceType: 'module' }); return true; }
+               catch (e) { return false; }
+           };
 
            ranges.forEach(r => {
                // Expand to whole lines so a collapse never leaves a half
@@ -13705,58 +13754,118 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
                const from = startLine.from, to = endLine.to;
                const original = doc.sliceString(from, to);
                const indent = (original.match(/^[ \t]*/) || [''])[0];
-               const oneLine = indent + Nexus.UI._collapseBlockText(original);
+               const body = Nexus.UI._collapseBlockText(original);
+               if (body === null) { unsafe++; return; }   // would change meaning (multi-line template literal)
+               const oneLine = indent + body;
                if (oneLine.trim() === original.trim()) { skipped++; return; }
+
+               // Verify against the WHOLE document, not the fragment alone —
+               // a region often isn't standalone-parseable, and what matters
+               // is whether the finished file is still valid.
+               const full = doc.toString();
+               const candidate = full.slice(0, from) + oneLine + full.slice(to);
+               if (!stillParses(candidate)) { wouldBreak++; return; }
+
                changes.push({ from, to, insert: oneLine });
                collapsed++;
            });
 
            if (!changes.length) {
-               return Nexus.shell.out('Folded regions are already single lines — nothing to flatten.', 'info');
+               const why = [];
+               if (skipped) why.push(`${skipped} already flat`);
+               if (unsafe) why.push(`${unsafe} contain multi-line template literals`);
+               if (wouldBreak) why.push(`${wouldBreak} would break syntax`);
+               return Nexus.shell.out('Nothing was flattened' + (why.length ? ': ' + why.join(', ') : ' — folded regions are already single lines') + '.', 'info');
            }
 
            // Apply back-to-front so earlier edits can't shift later offsets.
            changes.sort((a, b) => b.from - a.from);
            view.dispatch({ changes });
 
+           const notes = [];
+           if (skipped) notes.push(`${skipped} already flat`);
+           if (unsafe) notes.push(`${unsafe} skipped — contains a multi-line template literal`);
+           if (wouldBreak) notes.push(`${wouldBreak} skipped — would break syntax (missing semicolons)`);
            Nexus.shell.out(
                `Flattened ${collapsed} folded section${collapsed === 1 ? '' : 's'} to single lines` +
-               (skipped ? ` (${skipped} already flat)` : '') + '. Undo restores them.',
+               (notes.length ? ' (' + notes.join('; ') + ')' : '') + '. Undo restores them.',
                'success');
        },
 
-       // Join a multi-line block into one line without changing meaning.
-       // The subtle part is line comments: naively joining makes a trailing
-       // // swallow everything after it, silently commenting out real code.
-       // They're stripped — but only when genuinely a comment, not when the
-       // slashes sit inside a string (a URL like "http://x" must survive).
+       // Join a multi-line block into one line WITHOUT changing meaning.
+       //
+       // The first version of this was regex-based and silently corrupted
+       // files. Measured failures it produced:
+       //   "a,b"  -> "a, b"     string CONTENT rewritten
+       //   "{x}"  -> " { x } "  string CONTENT rewritten
+       //   `a\nb` -> `a b`      template literal VALUE changed
+       // Those all still parsed, so nothing complained — the file just
+       // quietly meant something different. Cosmetic tidying can never be
+       // applied to a whole line, because a line contains strings.
+       //
+       // This walks the text once, tracking whether it is inside a string,
+       // template literal, or comment, and only collapses whitespace in
+       // real code. Returns null when collapsing would change meaning
+       // rather than only layout, so the caller can skip that region
+       // instead of damaging it.
        _collapseBlockText(text) {
-           const lines = text.split('\n').map(line => {
-               let inString = null, out = '';
-               for (let i = 0; i < line.length; i++) {
-                   const c = line[i], next = line[i + 1];
-                   if (inString) {
-                       out += c;
-                       if (c === inString && line[i - 1] !== '\\') inString = null;
-                       continue;
-                   }
-                   if (c === '"' || c === "'" || c === '`') { inString = c; out += c; continue; }
-                   if (c === '/' && next === '/') break;   // real line comment: drop the rest
-                   out += c;
-               }
-               return out.trim();
-           }).filter(l => l.length);
+           let i = 0, out = '', unsafe = false, pendingSpace = false;
+           const n = text.length;
+           const flushSpace = () => {
+               if (pendingSpace && out && !/\s$/.test(out)) out += ' ';
+               pendingSpace = false;
+           };
+           while (i < n) {
+               const c = text[i], next = text[i + 1];
 
-           return lines.join(' ')
-               .replace(/\s*\{\s*/g, ' { ')
-               .replace(/\s*\}\s*/g, ' } ')
-               .replace(/\s*;\s*/g, '; ')
-               .replace(/\s*,\s*/g, ', ')
-               .replace(/\s+/g, ' ')
-               .replace(/\(\s+/g, '(')
-               .replace(/\s+\)/g, ')')
-               .replace(/\s+;/g, ';')
-               .trim();
+               // Line comment: drop it. Joining lines would otherwise make a
+               // trailing // swallow every statement after it.
+               if (c === '/' && next === '/') { while (i < n && text[i] !== '\n') i++; continue; }
+
+               // Block comment: valid inline, so keep it, flattened.
+               if (c === '/' && next === '*') {
+                   const e = text.indexOf('*/', i + 2);
+                   const stop = e < 0 ? n : e + 2;
+                   flushSpace();
+                   out += text.slice(i, stop).replace(/\s*\n\s*/g, ' ');
+                   i = stop; continue;
+               }
+
+               // Quoted strings: copied byte-for-byte, never reformatted.
+               if (c === '"' || c === "'") {
+                   flushSpace();
+                   const q = c; let j = i + 1; out += c;
+                   while (j < n) {
+                       const d = text[j]; out += d;
+                       if (d === '\\') { if (j + 1 < n) out += text[++j]; j++; continue; }
+                       j++; if (d === q) break;
+                   }
+                   i = j; continue;
+               }
+
+               // Template literals: a newline inside one is DATA. Collapsing
+               // it changes the string's value, so the whole region is
+               // refused rather than silently altered.
+               if (c === '`') {
+                   flushSpace();
+                   let j = i + 1, hasNewline = false; out += c;
+                   while (j < n) {
+                       const d = text[j];
+                       if (d === '\n') hasNewline = true;
+                       out += d;
+                       if (d === '\\') { if (j + 1 < n) out += text[++j]; j++; continue; }
+                       j++; if (d === '`') break;
+                   }
+                   if (hasNewline) unsafe = true;
+                   i = j; continue;
+               }
+
+               if (c === '\n' || c === '\r' || c === ' ' || c === '\t') { pendingSpace = true; i++; continue; }
+               flushSpace();
+               out += c; i++;
+           }
+           if (unsafe) return null;
+           return out.trim();
        },
 
    collapseAll() {
