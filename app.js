@@ -4858,10 +4858,29 @@ Sentinel : {
            Nexus.Vfs.save();
        },
 
+       // Some transforms are only meaningful on a chosen span. Applied to a
+       // whole file with nothing selected they are destructive in a way no
+       // one intends: uppercasing a source file destroys every identifier,
+       // URL-encoding one mangles the entire text. getSelectionRange()
+       // falls back to the WHOLE FILE when nothing is selected — which is
+       // fine for stripComments or reindent, and catastrophic for these.
+       // Same guard sortLines already uses, factored out so the next tool
+       // added to this group inherits it.
+       _requireSelection(label) {
+           const sel = this.getSelectionRange();
+           if (!sel.hasSelection) {
+               this.log(`[${label}] Select the text to transform first — running this on the whole file would rewrite every line, including code you didn't mean to touch.`, 'warn');
+               return null;
+           }
+           return sel;
+       },
+
        changeCase(mode) {
            if (!Nexus.state.activeFile) return this.log("[CHANGE CASE] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[CHANGE CASE] EDITOR LOCKED. Cannot modify.", "danger");
-           const { text, from, to } = this.getSelectionRange();
+           const sel = this._requireSelection('CHANGE CASE');
+           if (!sel) return;
+           const { text, from, to } = sel;
            if (!text) return;
            let out;
            // Word-splitting shared by camel/snake/kebab: breaks on existing
@@ -5198,7 +5217,9 @@ Sentinel : {
        base64Decode() {
            if (!Nexus.state.activeFile) return this.log("[BASE64] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[BASE64] EDITOR LOCKED. Cannot modify.", "danger");
-           const { text, from, to } = this.getSelectionRange();
+           const sel = this._requireSelection('BASE64 DECODE');
+           if (!sel) return;
+           const { text, from, to } = sel;
            if (!text) return;
            try {
                this.replaceRange(from, to, decodeURIComponent(escape(atob(text.trim()))));
@@ -5210,7 +5231,9 @@ Sentinel : {
        urlEncode() {
            if (!Nexus.state.activeFile) return this.log("[URL ENCODE] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[URL ENCODE] EDITOR LOCKED. Cannot modify.", "danger");
-           const { text, from, to } = this.getSelectionRange();
+           const sel = this._requireSelection('URL ENCODE');
+           if (!sel) return;
+           const { text, from, to } = sel;
            if (!text) return;
            this.replaceRange(from, to, encodeURIComponent(text));
            this.log("[URL ENCODE] Encoded.", "success");
@@ -5218,7 +5241,9 @@ Sentinel : {
        urlDecode() {
            if (!Nexus.state.activeFile) return this.log("[URL DECODE] No file open — open or create a file first.", "warn");
            if (this.isLocked()) return this.log("[URL DECODE] EDITOR LOCKED. Cannot modify.", "danger");
-           const { text, from, to } = this.getSelectionRange();
+           const sel = this._requireSelection('URL DECODE');
+           if (!sel) return;
+           const { text, from, to } = sel;
            if (!text) return;
            try {
                this.replaceRange(from, to, decodeURIComponent(text));
@@ -8125,11 +8150,24 @@ self.addEventListener('fetch', (e) => {
        // when previewed.
        mdToHtml(md) {
            const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-           const inline = s => esc(s)
-               .replace(/`([^`]+)`/g, '<code>$1</code>')
-               .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-               .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
-               .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+           // Code spans are LITERAL — emphasis and links must not be applied
+           // inside them. Running the replacements in sequence meant the
+           // `*` rule reached content already wrapped in <code>, so
+           // `a*b*c` came out as <code>a<em>b</em>c</code>. Code spans are
+           // therefore lifted out first, replaced by placeholders that
+           // contain no markdown-significant characters, and restored last.
+           const inline = s => {
+               const spans = [];
+               let t = esc(s).replace(/`([^`]+)`/g, (m, code) => {
+                   spans.push(code);
+                   return '\u0000CODE' + (spans.length - 1) + '\u0000';
+               });
+               t = t
+                   .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                   .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+                   .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+               return t.replace(/\u0000CODE(\d+)\u0000/g, (m, i) => '<code>' + spans[+i] + '</code>');
+           };
            const out = [];
            md.replace(/\r\n/g, '\n').split(/\n{2,}/).forEach(block => {
                const b = block.trim();
