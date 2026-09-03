@@ -12871,6 +12871,7 @@ insertUUID() {
            { group: 'Selection & Lines', key: 'selectAllMatches', label: 'Select All Occurrences (multi-cursor)' },
            { group: 'Selection & Lines', key: 'jumpBracket', label: 'Jump to Matching Bracket' },
            { group: 'Selection & Lines', key: 'jumpLine', label: 'Go to Line Number' },
+           { group: 'Folding', key: 'flattenFolds', label: 'Flatten Folded Sections to One Line' },
            { group: 'Selection & Lines', key: 'bookmarkHere', label: 'Toggle Bookmark on Current Line' },
            { group: 'Selection & Lines', key: 'bookmarksList', label: 'View All Bookmarks' },
            { group: 'Fix & Format', key: 'expandLine', label: 'Expand/Restore from One Line' },
@@ -13045,7 +13046,7 @@ insertUUID() {
        // Settings -> Customize Utility Bar for anyone who specifically
        // wants them closer to their thumb — removed from the DEFAULT,
        // not deleted from the tool map entirely.
-       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, map, selectNext, selectAllMatches, jumpBracket, jumpLine, bookmarkHere, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
+       DEFAULT_UTIL_LAYOUT: 'fullFold, oneFold, unfold, oneUnfold, flattenFolds, map, selectNext, selectAllMatches, jumpBracket, jumpLine, bookmarkHere, duplicate, comment, copyline, zoomin, zoomout, color, oneLine, editChunk, expandLine, cleanchars, stripcomments, sortlines, blanklines, alignleft, reindent',
 
        // Populates #modalUtilLayout from current prefs. Two sections:
        // "Your Utility Bar" shows enabled tools in their actual saved order
@@ -13152,6 +13153,7 @@ insertUUID() {
                'selectAllMatches': `<button class="sleek-btn" onclick="Nexus.UI.selectAllOccurrences()" title="Select every occurrence of the current selection at once"><span style="font-size:16px;">⊛</span><span class="util-lbl">All Matches</span></button>`,
                'jumpBracket': `<button class="sleek-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to the bracket matching the one next to the cursor"><span style="font-size:16px;">↔{}</span><span class="util-lbl">Match Bracket</span></button>`,
                'jumpLine': `<button class="sleek-btn" onclick="Nexus.UI.jumpPrompt()" title="Jump to a specific line number"><span style="font-size:16px;">#</span><span class="util-lbl">Go to Line</span></button>`,
+               'flattenFolds': `<button class="sleek-btn" onclick="Nexus.UI.flattenToFoldLayout()" title="Rewrite every folded section as a real one-liner"><span style="font-size:16px;">⇲</span><span class="util-lbl">Flatten Folds</span></button>`,
                'bookmarkHere': `<button class="sleek-btn" onclick="Nexus.UI.toggleBookmarkHere()" title="Toggle a bookmark on the current line"><span style="font-size:16px;">🔖</span><span class="util-lbl">Bookmark</span></button>`,
                'bookmarksList': `<button class="sleek-btn" onclick="Nexus.UI.openBookmarksPanel()" title="View and jump to all bookmarks"><span style="font-size:16px;">📑</span><span class="util-lbl">Bookmarks</span></button>`,
                'expandLine': `<button class="sleek-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat function/class/const under cursor"><span style="font-size:16px;">⟵⟶</span><span class="util-lbl">Expand</span></button>`,
@@ -13215,6 +13217,7 @@ insertUUID() {
                 'selectAllMatches': `<button class="tool-btn" onclick="Nexus.UI.selectAllOccurrences()" title="Select all occurrences" style="flex:1;">⊛ All</button>`,
                 'jumpBracket': `<button class="tool-btn" onclick="Nexus.UI.jumpToMatchingBracket()" title="Jump to matching bracket" style="flex:1;">↔{} Bracket</button>`,
                 'jumpLine': `<button class="tool-btn" onclick="Nexus.UI.jumpPrompt()" title="Jump to a specific line number" style="flex:1;"># Go to Line</button>`,
+                'flattenFolds': `<button class="tool-btn" onclick="Nexus.UI.flattenToFoldLayout()" title="Rewrite every folded section as a real one-liner" style="flex:1;">⇲ Flatten Folds</button>`,
                 'bookmarkHere': `<button class="tool-btn" onclick="Nexus.UI.toggleBookmarkHere()" title="Toggle bookmark on current line" style="flex:1;">🔖 Bk</button>`,
                 'bookmarksList': `<button class="tool-btn" onclick="Nexus.UI.openBookmarksPanel()" title="View all bookmarks" style="flex:1;">📑 All</button>`,
                 'expandLine': `<button class="tool-btn" onclick="Nexus.UI.expandSelectionFromOneLine()" title="Restore/reformat" style="flex:1;">⟵⟶ Exp</button>`,
@@ -13658,6 +13661,103 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        });
        return false;
    },
+
+       // "Flatten to current fold layout".
+       //
+       // Fold and unfold sections by hand until the shape is exactly what
+       // you want to see, then press this once: every region that is
+       // CURRENTLY FOLDED gets rewritten as a real one-liner in the actual
+       // text, and everything you left unfolded is untouched. The result is
+       // a file whose literal contents match the outline you arranged —
+       // which is what makes a large file readable on a phone screen.
+       //
+       // This edits the document, so it is a single undoable transaction:
+       // one Ctrl+Z puts every collapsed region back.
+       flattenToFoldLayout() {
+           if (!Nexus.UI.needCM6('Flatten to fold layout', () => Nexus.UI.flattenToFoldLayout())) return;
+           if (!Nexus.UI.needUnlocked('Flatten to fold layout', () => Nexus.UI.flattenToFoldLayout())) return;
+
+           const view = Nexus.editorCore.view;
+           const { foldedRanges } = Nexus.editorCore.modules || {};
+           if (!foldedRanges) return Nexus.shell.out('This build of the editor engine has no fold API.', 'error');
+
+           // Collect folded regions first. Iterating the RangeSet while
+           // dispatching edits would invalidate the positions mid-walk.
+           const ranges = [];
+           const set = foldedRanges(view.state);
+           const iter = set.iter();
+           while (iter.value) { ranges.push({ from: iter.from, to: iter.to }); iter.next(); }
+
+           if (!ranges.length) {
+               return Nexus.shell.out('Nothing is folded — fold the sections you want collapsed, then run this again.', 'warn');
+           }
+
+           const doc = view.state.doc;
+           const changes = [];
+           let collapsed = 0, skipped = 0;
+
+           ranges.forEach(r => {
+               // Expand to whole lines so a collapse never leaves a half
+               // line behind or merges into the following statement.
+               const startLine = doc.lineAt(r.from);
+               const endLine = doc.lineAt(r.to);
+               if (startLine.number === endLine.number) { skipped++; return; }
+               const from = startLine.from, to = endLine.to;
+               const original = doc.sliceString(from, to);
+               const indent = (original.match(/^[ \t]*/) || [''])[0];
+               const oneLine = indent + Nexus.UI._collapseBlockText(original);
+               if (oneLine.trim() === original.trim()) { skipped++; return; }
+               changes.push({ from, to, insert: oneLine });
+               collapsed++;
+           });
+
+           if (!changes.length) {
+               return Nexus.shell.out('Folded regions are already single lines — nothing to flatten.', 'info');
+           }
+
+           // Apply back-to-front so earlier edits can't shift later offsets.
+           changes.sort((a, b) => b.from - a.from);
+           view.dispatch({ changes });
+
+           Nexus.shell.out(
+               `Flattened ${collapsed} folded section${collapsed === 1 ? '' : 's'} to single lines` +
+               (skipped ? ` (${skipped} already flat)` : '') + '. Undo restores them.',
+               'success');
+       },
+
+       // Join a multi-line block into one line without changing meaning.
+       // The subtle part is line comments: naively joining makes a trailing
+       // // swallow everything after it, silently commenting out real code.
+       // They're stripped — but only when genuinely a comment, not when the
+       // slashes sit inside a string (a URL like "http://x" must survive).
+       _collapseBlockText(text) {
+           const lines = text.split('\n').map(line => {
+               let inString = null, out = '';
+               for (let i = 0; i < line.length; i++) {
+                   const c = line[i], next = line[i + 1];
+                   if (inString) {
+                       out += c;
+                       if (c === inString && line[i - 1] !== '\\') inString = null;
+                       continue;
+                   }
+                   if (c === '"' || c === "'" || c === '`') { inString = c; out += c; continue; }
+                   if (c === '/' && next === '/') break;   // real line comment: drop the rest
+                   out += c;
+               }
+               return out.trim();
+           }).filter(l => l.length);
+
+           return lines.join(' ')
+               .replace(/\s*\{\s*/g, ' { ')
+               .replace(/\s*\}\s*/g, ' } ')
+               .replace(/\s*;\s*/g, '; ')
+               .replace(/\s*,\s*/g, ', ')
+               .replace(/\s+/g, ' ')
+               .replace(/\(\s+/g, '(')
+               .replace(/\s+\)/g, ')')
+               .replace(/\s+;/g, ';')
+               .trim();
+       },
 
    collapseAll() {
            if (!Nexus.UI.needCM6('Folding', () => Nexus.UI.collapseAll())) return;
