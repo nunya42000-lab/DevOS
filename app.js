@@ -6588,45 +6588,77 @@ try {
 
        refactor: {
        async renameGlobal() {
-           const oldName = prompt("Rename identifier (Global AST pass):");
+           const oldName = await Nexus.UI.askInput({
+               title: 'RENAME IDENTIFIER',
+               label: 'Current name (exact match)',
+               hint: 'Renames across every .js file in the project.',
+               validate: v => /^[A-Za-z_$][\w$]*$/.test((v || '').trim()) ? null : 'Must be a valid identifier.'
+           });
            if (!oldName) return;
-           
-           const newName = prompt(`Change all instances of '${oldName}' to:`);
+           const newName = await Nexus.UI.askInput({
+               title: 'RENAME IDENTIFIER',
+               label: `Rename "${oldName.trim()}" to`,
+               validate: v => {
+                   const t = (v || '').trim();
+                   if (!/^[A-Za-z_$][\w$]*$/.test(t)) return 'Must be a valid identifier.';
+                   if (t === oldName.trim()) return 'That is the same name.';
+                   return null;
+               }
+           });
            if (!newName) return;
+           const from = oldName.trim(), to = newName.trim();
 
-           let filesModified = 0;
-           const files = Object.keys(Nexus.state.Vfs);
-
-           files.forEach(filename => {
-               let code = Nexus.state.Vfs[filename];
-               if (!filename.endsWith('.js')) return;
-
+           // POSITION-BASED REPLACEMENT, not AST regeneration.
+           //
+           // This used to run astring.generate(ast) over every file, which
+           // rebuilds the source purely from the syntax tree. Acorn does not
+           // put comments in the tree, so every comment in every .js file
+           // was DELETED, and all original formatting was replaced by
+           // astring's defaults — a whole-project rewrite as the side effect
+           // of renaming one variable.
+           //
+           // Instead the AST is used only to LOCATE identifiers, and the
+           // edits are spliced into the original text at those exact offsets.
+           // Comments, spacing and everything else are untouched, and only
+           // real identifiers are hit — never a matching word inside a
+           // string or comment.
+           Nexus.Sentinel.initEngine();
+           const plan = [];
+           Object.keys(Nexus.state.Vfs).forEach(filename => {
+               if (!/\.(js|mjs|jsx)$/i.test(filename)) return;
+               const code = Nexus.state.Vfs[filename];
+               if (Nexus.Vfs.isBinaryFile(filename) || typeof code !== 'string') return;
                try {
-                   Nexus.Sentinel.initEngine();
-                   const { ast } = Nexus.Sentinel.engine.analyzeAndMutate(code, 'LINT');
-                   let changed = false;
-
+                   const ast = acorn.parse(code, { ecmaVersion: 2022, sourceType: 'module', ranges: true });
+                   const hits = [];
                    Nexus.Sentinel.engine.traverse(ast, (node) => {
-                       if (node.type === 'Identifier' && node.name === oldName) {
-                           node.name = newName;
-                           changed = true;
+                       if (node.type === 'Identifier' && node.name === from &&
+                           typeof node.start === 'number' && typeof node.end === 'number') {
+                           hits.push([node.start, node.end]);
                        }
                    });
-
-                   if (changed) {
-                       const newCode = astring.generate(ast, { indent: ' '.repeat(Nexus.state.prefs.tabWidth) });
-                       Nexus.state.Vfs[filename] = newCode;
-                       Nexus.state.originals[filename] = newCode;
-                       filesModified++;
-                   }
-               } catch(e) { console.warn(`Refactor skipped ${filename}: Syntax error.`); }
+                   if (hits.length) plan.push({ filename, code, hits });
+               } catch (e) {
+                   console.warn(`Rename skipped ${filename}: ${e.message}`);
+               }
            });
 
-           if (filesModified > 0) {
-               Nexus.Vfs.switchFile(Nexus.state.activeFile);
-               Nexus.Vfs.save();
-               alert(`SUCCESS: Refactored '${oldName}' -> '${newName}' across ${filesModified} sectors.`);
-           }
+           const total = plan.reduce((n, f) => n + f.hits.length, 0);
+           if (!total) return Nexus.shell.out(`No identifier named "${from}" found in any .js file.`, 'warn');
+           if (!confirm(`Rename ${total} occurrence(s) of "${from}" to "${to}" across ${plan.length} file(s)?\n\nComments and formatting are preserved.`)) return;
+
+           plan.forEach(({ filename, code, hits }) => {
+               // Apply back-to-front so earlier edits can't shift later offsets.
+               hits.sort((a, b) => b[0] - a[0]);
+               let out = code;
+               hits.forEach(([a, b]) => { out = out.slice(0, a) + to + out.slice(b); });
+               Nexus.state.Vfs[filename] = out;
+           });
+
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           if (Nexus.state.activeFile) Nexus.Vfs.switchFile(Nexus.state.activeFile);
+           Nexus.shell.out(`Renamed ${total} occurrence(s) of "${from}" to "${to}" across ${plan.length} file(s).`, 'success');
        }
    }, // <--- This now correctly closes the Refactor engine.
 
