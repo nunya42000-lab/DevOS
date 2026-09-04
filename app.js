@@ -4521,7 +4521,16 @@ Sentinel : {
 
                    this.use({ check: (node) => {
                        if (node.type === 'Literal' && typeof node.value === 'string') {
-                           if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/.test(node.value)) {
+                           // example.com / example.org / example.net are
+                           // RESERVED by RFC 2606 precisely so documentation
+                           // can show an address that belongs to nobody.
+                           // Flagging them as a privacy leak is backwards —
+                           // they are the correct thing to use, and this rule
+                           // was reporting its OWN help text (which advises
+                           // "use test@example.com") as a PII leak. Same for
+                           // the standard placeholder domains.
+                           const SAFE = /@(example\.(com|org|net)|test|localhost|domain\.com|email\.com|yoursite\.com)\b/i;
+                           if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/.test(node.value) && !SAFE.test(node.value)) {
                                return { id: 'PII_LEAK', message: "Privacy Risk: Potential PII (Email) detected in string.", severity: 'HIGH' };
                            }
                        }
@@ -4782,14 +4791,45 @@ Sentinel : {
                    // a name shadows only if some OTHER node declares it.
                    if (!scopeNode.__declCache) {
                        const cache = new Map();
-                       this.traverse(scopeNode, (n) => {
-                           let declName = null;
-                           if (n.type === 'VariableDeclarator' && n.id && n.id.name) declName = n.id.name;
-                           else if (n.type === 'FunctionDeclaration' && n.id && n.id.name) declName = n.id.name;
-                           if (declName === null) return;
-                           if (!cache.has(declName)) cache.set(declName, []);
-                           cache.get(declName).push(n);
-                       });
+                       // Collect only declarations DIRECTLY in this scope —
+                       // do not descend into nested scopes.
+                       //
+                       // The previous version walked the entire subtree, so a
+                       // variable in one block could "shadow" one in a
+                       // SIBLING block that it can't even see:
+                       //     for (let i...) {}   for (let i...) {}
+                       // Two sequential loops, each with their own `i`, were
+                       // reported as shadowing each other. Sibling scopes are
+                       // invisible to one another; only ANCESTOR scopes can be
+                       // shadowed, and those are reached by walking up the
+                       // parent chain, not by searching downwards.
+                       const NESTED = ['FunctionDeclaration', 'FunctionExpression',
+                                       'ArrowFunctionExpression', 'BlockStatement',
+                                       'ForStatement', 'ForOfStatement', 'ForInStatement',
+                                       'ClassDeclaration', 'ClassExpression'];
+                       const collect = (node, isRoot) => {
+                           if (!node || typeof node.type !== 'string') return;
+                           if (!isRoot && NESTED.includes(node.type)) return; // a scope of its own
+                           if (node.type === 'VariableDeclarator' && node.id && node.id.name) {
+                               if (!cache.has(node.id.name)) cache.set(node.id.name, []);
+                               cache.get(node.id.name).push(node);
+                           } else if (node.type === 'FunctionDeclaration' && node.id && node.id.name) {
+                               if (!cache.has(node.id.name)) cache.set(node.id.name, []);
+                               cache.get(node.id.name).push(node);
+                           }
+                           for (const k in node) {
+                               if (k === 'parent' || k === '__declCache') continue;
+                               const v = node[k];
+                               if (Array.isArray(v)) v.forEach(c => c && typeof c === 'object' && collect(c, false));
+                               else if (v && typeof v === 'object' && typeof v.type === 'string') collect(v, false);
+                           }
+                       };
+                       // The scope's own body is walked as the root so its
+                       // direct contents are seen, while anything nested
+                       // inside it forms a separate scope and is skipped.
+                       const body = scopeNode.body || scopeNode;
+                       if (Array.isArray(body)) body.forEach(st => collect(st, false));
+                       else collect(body, true);
                        // Non-enumerable so this helper field can never leak
                        // into anything that serialises or re-walks the AST.
                        Object.defineProperty(scopeNode, '__declCache', { value: cache, enumerable: false, configurable: true });
@@ -16402,7 +16442,10 @@ initInfiniteRibbon() {
            const lineCount = lines.length;
            
            // Only re-render if the number of lines actually changed
-           if (gutter.dataset.lastCount != lineCount) {
+           // dataset values are always strings, so != was relying on implicit
+           // type coercion to compare against a number. Comparing as strings
+           // is explicit and does the same job without the coercion.
+           if (String(gutter.dataset.lastCount) !== String(lineCount)) {
                let gutterHTML = '';
                // Pro-Tip: Cache the line numbers in a single string to reduce DOM thrashing
                for (let i = 1; i <= lineCount; i++) {
