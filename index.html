@@ -505,10 +505,15 @@
          part of using this panel, and on a phone it's most of the work.
          Typing two letters beats scrolling every time. -->
     <div style="padding:10px 10px 0; flex-shrink:0;">
-        <input type="text" id="toolFilter" class="sleek-input" placeholder="Filter tools…"
-               autocomplete="off" autocapitalize="off" spellcheck="false"
-               oninput="Nexus.UI.filterTools(this.value)"
-               style="width:100%; font-size:13px; padding:10px;">
+        <div style="position:relative;">
+            <input type="text" id="toolFilter" class="sleek-input" placeholder="Filter tools…"
+                   autocomplete="off" autocapitalize="off" spellcheck="false"
+                   oninput="Nexus.UI.filterTools(this.value)"
+                   onkeydown="if(event.key==='Escape'){event.preventDefault();Nexus.UI.clearToolFilter();}"
+                   style="width:100%; font-size:13px; padding:10px 34px 10px 10px;">
+            <button type="button" onclick="Nexus.UI.clearToolFilter()" title="Clear filter" aria-label="Clear filter"
+                    style="position:absolute; right:4px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text); opacity:0.5; font-size:18px; line-height:1; padding:6px 8px; cursor:pointer;">&times;</button>
+        </div>
         <div id="toolFilterCount" style="font-size:9px; opacity:0.55; margin-top:4px; min-height:12px;"></div>
     </div>
 

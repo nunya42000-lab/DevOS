@@ -4578,10 +4578,40 @@ Sentinel : {
                    }});
      // --- 3. PERFORMANCE & PWA ---
                    this.use({ check: (node, parent, context) => {
-                       if ((node.type === 'FunctionDeclaration' || node.type === 'ArrowFunctionExpression') && node.async) context.inAsync = true;
-                       if (context?.inAsync && ['WhileStatement', 'ForStatement'].includes(node.type)) {
-                           if (!this.findInNode(node.body, 'AwaitExpression')) {
-                               return { id: 'ASYNC_FREEZE', message: "UI Thread Alert: Async loop missing 'await'. Tab will freeze.", severity: 'CRITICAL' };
+                       // REWRITTEN — the previous version set context.inAsync
+                       // when it entered an async function and NEVER cleared
+                       // it. After the first async function anywhere in a
+                       // file, every loop that followed was flagged, including
+                       // loops in ordinary synchronous functions. On this
+                       // app's own source that was 118 CRITICAL warnings,
+                       // nearly all of them meaningless.
+                       //
+                       // Two corrections. First, the enclosing function is
+                       // found by walking the ancestor chain, so the state
+                       // can't leak between unrelated functions. Second, a
+                       // loop is only suspicious if it actually STARTS async
+                       // work — a plain synchronous loop inside an async
+                       // function is completely normal and was never a bug.
+                       if (['WhileStatement', 'ForStatement', 'ForOfStatement', 'ForInStatement'].includes(node.type)) {
+                           let fn = node.parent;
+                           while (fn && !['FunctionDeclaration', 'FunctionExpression', 'ArrowFunctionExpression', 'Program'].includes(fn.type)) fn = fn.parent;
+                           if (!fn || !fn.async) return;
+                           if (this.findInNode(node.body, 'AwaitExpression')) return;
+
+                           // Evidence of async work being kicked off without
+                           // being awaited: a promise chain, or a call to a
+                           // known promise-returning API.
+                           let startsAsync = false;
+                           this.traverse(node.body, (n) => {
+                               if (n.type === 'CallExpression') {
+                                   const c = n.callee;
+                                   if (c?.type === 'MemberExpression' && ['then', 'catch', 'finally'].includes(c.property?.name)) startsAsync = true;
+                                   if (c?.type === 'Identifier' && ['fetch'].includes(c.name)) startsAsync = true;
+                                   if (c?.type === 'MemberExpression' && ['fetch', 'json', 'text', 'blob', 'arrayBuffer'].includes(c.property?.name)) startsAsync = true;
+                               }
+                           });
+                           if (startsAsync) {
+                               return { id: 'ASYNC_FREEZE', message: "Async work started inside a loop without 'await' — results may arrive out of order or never be waited for.", severity: 'HIGH' };
                            }
                        }
                    }});
@@ -4635,9 +4665,24 @@ Sentinel : {
 
                    this.use({ check: (node) => {
                        if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier') {
+                           // A scope is created by ANY function form, not just
+                           // a `function foo(){}` declaration. Treating only
+                           // FunctionDeclaration and Program as scopes meant
+                           // object methods, arrow functions and function
+                           // expressions were invisible — so a local `const out`
+                           // inside one method was compared against every other
+                           // `out` in the entire file and reported as shadowing
+                           // it. On this app's own app.js, which is almost
+                           // entirely object methods, that produced 1735
+                           // "shadowed variable" reports where the real count is
+                           // a tiny fraction of that. A linter at that noise
+                           // level is worse than none.
+                           const SCOPES = ['FunctionDeclaration', 'FunctionExpression',
+                                           'ArrowFunctionExpression', 'ClassDeclaration',
+                                           'ClassExpression', 'Program'];
                            let tracer = node.parent;
                            while (tracer) {
-                               if (['FunctionDeclaration', 'Program'].includes(tracer.type)) {
+                               if (SCOPES.includes(tracer.type)) {
                                    if (this.findDeclarationsInScope(tracer, node.id.name, node)) {
                                        return { id: 'SHADOW_VAR', message: `Ambiguity: '${node.id.name}' shadows an outer scope variable.`, severity: 'MEDIUM' };
                                    }
@@ -13946,6 +13991,17 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
                try { out.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
            }, 60);
        }
+   },
+
+   // Resets the tools filter and restores the panel to its resting state.
+   // Also the reason #toolFilter carries an id at all — without a real
+   // reference the element was a genuine orphan, and the honest fix for an
+   // unused id is to either use it or drop it, not to silence the check.
+   clearToolFilter() {
+       const box = document.getElementById('toolFilter');
+       if (box) box.value = '';
+       this.filterTools('');
+       if (box) { try { box.focus(); } catch (e) {} }
    },
 
    filterTools(query) {
