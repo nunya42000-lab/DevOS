@@ -497,289 +497,239 @@
 
 <aside id="panelRight" class="side-panel right-p">
     <div class="p-head">
-        <span>TOOLS &amp; DIAGNOSTICS</span>
+        <span>TOOLS</span>
         <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.toggleSidebar('right')">&times;</button>
     </div>
 
-    <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+    <!-- Filter first. With ~80 tools, scrolling to find one is the slowest
+         part of using this panel, and on a phone it's most of the work.
+         Typing two letters beats scrolling every time. -->
+    <div style="padding:10px 10px 0; flex-shrink:0;">
+        <input type="text" id="toolFilter" class="sleek-input" placeholder="Filter tools…"
+               autocomplete="off" autocapitalize="off" spellcheck="false"
+               oninput="Nexus.UI.filterTools(this.value)"
+               style="width:100%; font-size:13px; padding:10px;">
+        <div id="toolFilterCount" style="font-size:9px; opacity:0.55; margin-top:4px; min-height:12px;"></div>
+    </div>
 
-        <details class="diag-section" open>
-            <summary>Diagnostics<span class="diag-badge" id="diagBadgeCore">0</span></summary>
+    <div class="p-body" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+
+        <!-- ============ 1. CHECK — what's wrong with this? ============ -->
+        <details class="diag-section" open data-tools>
+            <summary>Check<span class="diag-badge" id="diagBadgeCore">0</span></summary>
             <div class="diag-body">
-                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">One tap checks lint, structure, syntax, CSS, orphaned IDs, and brackets together.</div>
+                <button class="tool-btn btn-accent" style="width:100%; padding:14px; font-weight:900; letter-spacing:0.5px;" onclick="Nexus.auditor.runFullSweep()">🔍 RUN FULL SWEEP</button>
 
-                <button class="tool-btn btn-danger" style="width:100%; padding:14px; font-weight:800; margin-bottom:8px;" onclick="Nexus.auditor.runFullSweep()">🔍 RUN FULL DIAGNOSTIC SWEEP</button>
-
-                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-bottom: 10px;">
-                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runLintCard()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #d2a8ff; font-weight: 700;">LINT ➔</span>
-                        <span id="auditCountLint" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
-                    <div class="slab" data-langs="html,htm" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runHtmlAudit()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #ff7b72; font-weight: 700;">HTML ➔</span>
-                        <span id="auditCountHtml" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
-                    <div class="slab" data-langs="js,mjs,ts,tsx,jsx" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runJsAudit()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #79c0ff; font-weight: 700;">JS ➔</span>
-                        <span id="auditCountJs" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
-                    <div class="slab" data-langs="css,scss,less" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runCssAudit()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--warn); font-weight: 700;">CSS ➔</span>
-                        <span id="auditCountCss" style="font-size: 16px; font-weight: 900; color: var(--warn);">0</span>
-                    </div>
-                    <div class="slab" data-langs="html,htm" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runOrphanAudit()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--warn); font-weight: 700;">ORPHANS ➔</span>
-                        <span id="auditCountOrphans" style="font-size: 16px; font-weight: 900; color: var(--warn);">0</span>
-                    </div>
-                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runBracketsCard()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: #ffa198; font-weight: 700;">BRACKETS ➔</span>
-                        <span id="auditCountBrackets" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
-                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runTodoScan()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">TODOS ➔</span>
-                        <span id="auditCountTodo" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
-                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runMissingImportsAudit()">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--danger); font-weight: 700;">IMPORTS ➔</span>
-                        <span id="auditCountMissingImports" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
-                    <div class="slab" style="padding: 8px 4px; text-align: center; cursor: pointer; border: 1px solid var(--border);" onclick="Nexus.auditor.runMobileAudit()" title="Mobile-specific web pitfalls: fixed 100vh, hover-only interactions, missing viewport/input hints" aria-label="Run mobile pitfalls audit">
-                        <span style="font-size: 9px; opacity: 0.6; display: block; color: var(--gold); font-weight: 700;">MOBILE ➔</span>
-                        <span id="auditCountMobile" style="font-size: 16px; font-weight: 900; color: var(--text);">0</span>
-                    </div>
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">RESULTS BY CATEGORY — tap to run just one</div>
+                <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:5px;">
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runJsAudit()"><span class="diag-tile-l" style="color:var(--danger);">JS</span><span id="auditCountJs" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runHtmlAudit()"><span class="diag-tile-l" style="color:var(--gold);">HTML</span><span id="auditCountHtml" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runCssAudit()"><span class="diag-tile-l" style="color:var(--accent);">CSS</span><span id="auditCountCss" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runLintCard()"><span class="diag-tile-l" style="color:var(--success);">LINT</span><span id="auditCountLint" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runOrphanAudit()"><span class="diag-tile-l" style="color:var(--gold);">IDS</span><span id="auditCountOrphans" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runBracketsCard()"><span class="diag-tile-l" style="color:var(--danger);">{ }</span><span id="auditCountBrackets" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runMissingImportsAudit()"><span class="diag-tile-l" style="color:var(--danger);">LINKS</span><span id="auditCountMissingImports" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runMobileAudit()"><span class="diag-tile-l" style="color:var(--gold);">MOBILE</span><span id="auditCountMobile" class="diag-tile-n">0</span></div>
+                    <div class="slab diag-tile" onclick="Nexus.auditor.runTodoScan()"><span class="diag-tile-l" style="color:var(--success);">TODO</span><span id="auditCountTodo" class="diag-tile-n">0</span></div>
                 </div>
 
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <span style="font-size: 11px; font-weight: 800; color: var(--accent);" id="auditorModeTitle">ACTIVE: FULL SYSTEM IDLE</span>
-                    <div style="display: flex; gap: 6px;">
-                        <button class="dock-btn special" style="height: 24px; font-size: 10px; padding: 0 8px; background: #21262d; border-radius: 4px;" onclick="Nexus.auditor.copyBox('auditorReportBox', 'DIAGNOSTIC REPORT')">COPY</button>
-                        <button class="dock-btn special" style="height: 24px; font-size: 10px; padding: 0 8px; border-radius: 4px;" onclick="Nexus.auditor.clearAuditor()">CLEAR</button>
-                    </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 4px;">
+                    <span id="auditorModeTitle" style="font-size:10px; font-weight:800; letter-spacing:0.5px; color:var(--accent);">RESULTS</span>
+                    <span style="display:flex; gap:6px;">
+                        <button class="tool-btn" style="padding:4px 9px; font-size:9px;" onclick="Nexus.auditor.copyBox('auditorReportBox','RESULTS')">COPY</button>
+                        <button class="tool-btn" style="padding:4px 9px; font-size:9px;" onclick="Nexus.auditor.clearAuditor()">CLEAR</button>
+                    </span>
+                </div>
+                <div id="auditorReportBox" style="min-height:200px; max-height:65vh; overflow:auto; background:#0f1218; border:1px solid var(--border); border-radius:6px; padding:10px; font-family:monospace; font-size:11px; line-height:1.5; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;">
+                    Run a sweep, or tap a category above.
                 </div>
 
-                <div id="auditorReportBox" style="min-height: 200px; max-height: 65vh; overflow-y: auto; overflow-x: auto; background: #0f1218; border: 1px solid var(--border); border-radius: 6px; padding: 10px; font-family: monospace; font-size: 11px; line-height: 1.5; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">
-                    <div style="color: #5c6370;">Run the full sweep, or tap a card above, to see findings here.</div>
+                <label style="display:flex; align-items:center; gap:8px; font-size:10px; opacity:0.75; margin-top:8px;">
+                    <input type="checkbox" id="diagFilterToggle" onchange="Nexus.auditor.toggleDiagFilter && Nexus.auditor.toggleDiagFilter(this.checked)" style="width:15px; height:15px;">
+                    Only show issues for the open file
+                </label>
+            </div>
+        </details>
+
+        <!-- ============ 2. UNDERSTAND — how does this fit together? ==== -->
+        <details class="diag-section" data-tools>
+            <summary>Understand</summary>
+            <div class="diag-body">
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ Outline</button>
+                    <button class="tool-btn" onclick="Nexus.idMap.open()">🔗 ID map</button>
+                    <button class="tool-btn" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ Dependencies</button>
+                    <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 Code stats</button>
+                    <button class="tool-btn" onclick="Nexus.docStats.show()">📊 Doc stats</button>
+                    <button class="tool-btn" onclick="Nexus.clones.scan()">🐼 Find clones</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.scanDeps()">📎 List imports</button>
+                    <button class="tool-btn" onclick="Nexus.stepViz.start()">👣 Step through</button>
                 </div>
             </div>
         </details>
 
-        <details class="diag-section">
-            <summary>Power Tools</summary>
+        <!-- ============ 3. TIDY — reshape THIS file ================== -->
+        <details class="diag-section" data-tools>
+            <summary>Tidy this file</summary>
             <div class="diag-body">
-                <div style="font-size:9px; opacity:0.6; margin-bottom:8px;">Auto-fixers and single-purpose checks, for when you want just one thing.</div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                     <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm" onclick="Nexus.Sentinel.runMedicString()">MEDIC: STR PATCH</button>
-                     <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Sentinel.runMedicAST()">MEDIC: AST BUILD</button>
-                     <button class="tool-btn btn-accent" style="grid-column: span 2;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Sentinel.scanDeps()">SCAN IMPORTS (LOG VIEW)</button>
-                </div>
-                <div id="diagOut" class="mini-console" style="margin-top:10px; min-height: 100px; max-height: 45vh; overflow-y: auto; overflow-x: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;">[System Standby]</div>
-                <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px;">
-                    <button class="dock-btn special" style="height: 22px; font-size: 10px; padding: 0 8px; background: #21262d; border-radius: 4px;" onclick="Nexus.auditor.copyBox('diagOut', 'DIAGNOSTICS LOGS')">COPY</button>
-                    <button class="dock-btn special" style="height: 22px; font-size: 10px; padding: 0 8px; border-radius: 4px;" onclick="Nexus.auditor.clearBox('diagOut', '[System Standby]')">CLEAR</button>
-                </div>
-                <button class="tool-btn btn-accent" style="width:100%; margin-top:10px;" data-langs="js,mjs,ts,tsx,jsx,html,htm" onclick="Nexus.dreamer.startNightCycle()" title="Stress-tests every if-branch in your JS for exceptions" aria-label="Run night cycle stress test">🌙 RUN NIGHT CYCLE (STRESS TEST)</button>
-            </div>
-        </details>
-
-        <details class="diag-section">
-            <summary>Understand Your Code</summary>
-            <div class="diag-body">
-                <button class="tool-btn btn-accent" style="width:100%; margin-bottom:8px;" onclick="Nexus.graph.render(); Nexus.UI.openModal('graph')">🕸️ PROJECT RADAR</button>
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:0 0 5px;">FORMAT</div>
                 <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 INTEL</button>
-                    <button class="tool-btn" onclick="Nexus.outline.scan()">🗺️ OUTLINE</button>
+                    <button class="tool-btn" onclick="Nexus.UI.runPrettier()">✨ Prettier</button>
+                    <button class="tool-btn" onclick="Nexus.UI.runJSBeautify()">🧼 Beautify</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.formatJSON()">{ } Format JSON</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.formatSQL()">🗃️ Format SQL</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.validateYAML()">✓ Check YAML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonMin()">⊟ Minify JSON</button>
                 </div>
-                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.idMap.open()" title="Every id used anywhere in the project, grouped and searchable" aria-label="Open ID usage map">🔗 ID USAGE MAP</button>
-                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.docStats.show()" title="Line, word, character, and byte counts" aria-label="Show document statistics">📊 DOC STATS</button>
-            </div>
-        </details>
 
-        <details class="diag-section">
-            <summary>Project Tools</summary>
-            <div class="diag-body">
-                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Compare, merge, and reshape files within the project.</div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
-                    <button class="tool-btn btn-gold" onclick="Nexus.UI.openModal('diff')">👯 COMPARE</button>
-                    <button class="tool-btn btn-gold" onclick="Nexus.merge.open()">📥 MERGE</button>
-                    <button class="tool-btn btn-gold" onclick="Nexus.clones.scan()">🐼 CLONES</button>
-                    <button class="tool-btn btn-gold" style="justify-content:center;" onclick="Nexus.UI.openCombineModal()">📦 BUNDLE</button>
-                    <button class="tool-btn btn-gold" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.mergeAllJS()">⚡ MERGE JS</button>
-                    <button class="tool-btn btn-accent" style="justify-content:center;" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.Vfs.splitJSFile()">✂️ SPLIT JS</button>
-                </div>
-                <button class="tool-btn btn-accent" style="width:100%; margin-top:8px;" onclick="Nexus.variantMerge.open()" title="Set a master file, then cycle through every variant's version of each difference" aria-label="Open variant merge">🔀 VARIANT MERGE (N-WAY)</button>
-            </div>
-        </details>
-
-        <details class="diag-section">
-            <summary>Fix &amp; Format</summary>
-            <div class="diag-body">
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">REORGANISE</div>
                 <div class="grid-2">
-                    <button class="tool-btn btn-accent" data-langs="js,mjs,ts,tsx,jsx,html,htm,css,scss,less,json" onclick="Nexus.UI.runPrettier()">✨ PRETTIER</button>
-                    <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm,css,scss,less" onclick="Nexus.UI.runJSBeautify()">🧼 BEAUTIFY</button>
+                    <button class="tool-btn" onclick="Nexus.defrag.runJS()">🧹 Sort JS blocks</button>
+                    <button class="tool-btn" onclick="Nexus.defrag.sequenceHTML()">🧹 Sort HTML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.sortLines()">↕️ Sort lines</button>
+                    <button class="tool-btn" onclick="Nexus.converters.sortUnique()">↕️ Sort + dedupe</button>
+                    <button class="tool-btn" onclick="Nexus.converters.lineEndings('lf')">↵ To LF</button>
+                    <button class="tool-btn" onclick="Nexus.converters.lineEndings('crlf')">↵ To CRLF</button>
                 </div>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn" data-langs="js,mjs,ts,tsx,jsx" onclick="Nexus.defrag.runJS()">🧹 DEFRAG JS</button>
-                    <button class="tool-btn" data-langs="html,htm" onclick="Nexus.defrag.sequenceHTML()">🧹 DEFRAG HTML</button>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">CASE — needs a selection</div>
+                <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;">
+                    <button class="tool-btn" style="font-size:10px;" onclick="Nexus.Sentinel.changeCase('upper')">UPPER</button>
+                    <button class="tool-btn" style="font-size:10px;" onclick="Nexus.Sentinel.changeCase('lower')">lower</button>
+                    <button class="tool-btn" style="font-size:10px;" onclick="Nexus.Sentinel.changeCase('title')">Title</button>
+                    <button class="tool-btn" style="font-size:10px;" onclick="Nexus.Sentinel.changeCase('camel')">camelCase</button>
+                    <button class="tool-btn" style="font-size:10px;" onclick="Nexus.Sentinel.changeCase('snake')">snake_case</button>
+                    <button class="tool-btn" style="font-size:10px;" onclick="Nexus.Sentinel.changeCase('kebab')">kebab-case</button>
                 </div>
-                <button class="tool-btn" style="width:100%; margin-top:8px;" data-langs="json" onclick="Nexus.Sentinel.formatJSON()" title="Validate and pretty-print JSON" aria-label="Format JSON">{ } FORMAT JSON</button>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn" data-langs="yaml,yml" onclick="Nexus.Sentinel.validateYAML()" title="Check for tabs and unclosed quotes" aria-label="Validate YAML">✓ VALIDATE YAML</button>
-                    <button class="tool-btn" data-langs="sql" onclick="Nexus.Sentinel.formatSQL()" title="Add line breaks before SQL clauses" aria-label="Format SQL">🗃️ FORMAT SQL</button>
-                </div>
-                <div style="font-size:9px; opacity:0.6; margin:8px 0 4px;">Change case (selection, or whole file if nothing's selected):</div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px;">
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('upper')">UPPER</button>
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('lower')">lower</button>
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('title')">Title</button>
-                </div>
-                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; margin-top:8px;">
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('camel')">camelCase</button>
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('snake')">snake_case</button>
-                    <button class="tool-btn" style="justify-content:center; font-size:11px;" onclick="Nexus.Sentinel.changeCase('kebab')">kebab-case</button>
+
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">REPAIR</div>
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.Sentinel.runMedicString()">🩹 Quick patch</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.runMedicAST()">🔧 Deep rebuild</button>
+                    <button class="tool-btn" style="grid-column:span 2;" onclick="Nexus.refactor.renameGlobal()">✏️ Rename identifier everywhere</button>
                 </div>
             </div>
         </details>
 
-        <details class="diag-section">
-            <summary>Snippets &amp; Vault</summary>
+        <!-- ============ 4. CONVERT — turn X into Y =================== -->
+        <details class="diag-section" data-tools>
+            <summary>Convert</summary>
             <div class="diag-body">
-                <div class="grid-2">
-                    <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('vault')">💾 VAULT</button>
-                    <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('dreamer')" title="Insert pre-built UI component boilerplate" aria-label="Open boilerplate template picker">🧩 TEMPLATES</button>
-                </div>
-            </div>
-        </details>
+                <div style="font-size:9px; opacity:0.55; margin:0 0 8px;">Saves the result as a NEW file — your original is never overwritten.</div>
 
-        <details class="diag-section">
-            <summary>Learn</summary>
-            <div class="diag-body">
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:0 0 5px;">DATA</div>
                 <div class="grid-2">
-                    <button class="tool-btn btn-gold" onclick="Nexus.tutor.openGlossary()" title="Look up common terms" aria-label="Open glossary">📖 GLOSSARY</button>
-                    <button class="tool-btn btn-gold" data-langs="js,mjs,ts,tsx,jsx,html,htm" onclick="Nexus.stepViz.start()" title="Watch your code run one line at a time" aria-label="Start step through">👣 STEP THROUGH</button>
-                </div>
-            </div>
-        </details>
-
-        <details class="diag-section">
-            <summary>Convert Formats</summary>
-            <div class="diag-body">
-                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Converts the OPEN file and saves the result as a new file — your original is never overwritten.</div>
-
-                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:6px 0 4px;">TABULAR DATA</div>
-                <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.converters.csvJson()">CSV &rarr; JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonCsv()">JSON &rarr; CSV</button>
-                    <button class="tool-btn" onclick="Nexus.converters.tsvJson()">TSV &rarr; JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonTsv()">JSON &rarr; TSV</button>
+                    <button class="tool-btn" onclick="Nexus.converters.csvJson()">CSV → JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonCsv()">JSON → CSV</button>
+                    <button class="tool-btn" onclick="Nexus.converters.tsvJson()">TSV → JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonTsv()">JSON → TSV</button>
+                    <button class="tool-btn" onclick="Nexus.converters.csvMd()">CSV → MD table</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonSql()">JSON → SQL</button>
                 </div>
 
-                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">MARKUP &amp; CONFIG</div>
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">MARKUP &amp; CONFIG</div>
                 <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.converters.mdHtml()">MD &rarr; HTML</button>
-                    <button class="tool-btn" onclick="Nexus.converters.htmlMd()">HTML &rarr; MD</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonYaml()">JSON &rarr; YAML</button>
-                    <button class="tool-btn" onclick="Nexus.converters.yamlJson()">YAML &rarr; JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.xmlJson()">XML &rarr; JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonXml()">JSON &rarr; XML</button>
-                    <button class="tool-btn" onclick="Nexus.converters.envJson()">.env &rarr; JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonEnv()">JSON &rarr; .env</button>
+                    <button class="tool-btn" onclick="Nexus.converters.mdHtml()">MD → HTML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlMd()">HTML → MD</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonYaml()">JSON → YAML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.yamlJson()">YAML → JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.xmlJson()">XML → JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonXml()">JSON → XML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.iniJson()">INI → JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonIni()">JSON → INI</button>
+                    <button class="tool-btn" onclick="Nexus.converters.envJson()">.env → JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonEnv()">JSON → .env</button>
                 </div>
 
-                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">CODE</div>
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">CODE</div>
                 <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.converters.jsonTs()">JSON &rarr; TS types</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonMin()">Minify JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.cssJs()">CSS &rarr; JS object</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsCss()">JS object &rarr; CSS</button>
-                    <button class="tool-btn" onclick="Nexus.converters.htmlJsx()">HTML &rarr; JSX</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonSql()">JSON &rarr; SQL</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonTs()">JSON → TS types</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlJsx()">HTML → JSX</button>
+                    <button class="tool-btn" onclick="Nexus.converters.cssJs()">CSS → JS object</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsCss()">JS object → CSS</button>
                     <button class="tool-btn" onclick="Nexus.converters.jsonFlatten()">Flatten JSON</button>
                     <button class="tool-btn" onclick="Nexus.converters.jsonUnflatten()">Unflatten JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.csvMd()">CSV &rarr; MD table</button>
                 </div>
 
-                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">CONFIG &amp; SUBTITLES</div>
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">TEXT &amp; ENCODING</div>
                 <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.converters.iniJson()">INI &rarr; JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonIni()">JSON &rarr; INI</button>
-                    <button class="tool-btn" onclick="Nexus.converters.srtVtt()">SRT &rarr; VTT</button>
-                    <button class="tool-btn" onclick="Nexus.converters.vttSrt()">VTT &rarr; SRT</button>
-                    <button class="tool-btn" style="grid-column:span 2;" onclick="Nexus.converters.subsText()">Subtitles &rarr; plain text</button>
-                </div>
-
-                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">TEXT UTILITIES</div>
-                <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.converters.sortLines()">Sort lines</button>
-                    <button class="tool-btn" onclick="Nexus.converters.sortUnique()">Sort + dedupe</button>
+                    <button class="tool-btn" onclick="Nexus.converters.qsJson()">Query → JSON</button>
+                    <button class="tool-btn" onclick="Nexus.converters.jsonQs()">JSON → Query</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Encode()">Base64 encode</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Decode()">Base64 decode</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.urlEncode()">URL encode</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.urlDecode()">URL decode</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlEscape()">Escape HTML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.htmlUnescape()">Unescape HTML</button>
+                    <button class="tool-btn" onclick="Nexus.converters.hexEncode()">Text → hex</button>
+                    <button class="tool-btn" onclick="Nexus.converters.hexDecode()">Hex → text</button>
                     <button class="tool-btn" onclick="Nexus.converters.baseConvert()">Number bases</button>
                     <button class="tool-btn" onclick="Nexus.converters.timeConvert()">Timestamps</button>
                 </div>
 
-                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">WEB / TEXT</div>
+                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">SUBTITLES</div>
                 <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.converters.qsJson()">Query &rarr; JSON</button>
-                    <button class="tool-btn" onclick="Nexus.converters.jsonQs()">JSON &rarr; Query</button>
-                    <button class="tool-btn" onclick="Nexus.converters.htmlEscape()">Escape HTML</button>
-                    <button class="tool-btn" onclick="Nexus.converters.htmlUnescape()">Unescape HTML</button>
-                    <button class="tool-btn" onclick="Nexus.converters.hexEncode()">Text &rarr; Hex</button>
-                    <button class="tool-btn" onclick="Nexus.converters.hexDecode()">Hex &rarr; Text</button>
-                </div>
-
-                <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:10px 0 4px;">LINE ENDINGS (edits this file directly)</div>
-                <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.converters.lineEndings('lf')">To LF (Unix)</button>
-                    <button class="tool-btn" onclick="Nexus.converters.lineEndings('crlf')">To CRLF (Windows)</button>
+                    <button class="tool-btn" onclick="Nexus.converters.srtVtt()">SRT → VTT</button>
+                    <button class="tool-btn" onclick="Nexus.converters.vttSrt()">VTT → SRT</button>
+                    <button class="tool-btn" style="grid-column:span 2;" onclick="Nexus.converters.subsText()">Subtitles → plain text</button>
                 </div>
             </div>
         </details>
 
-        <details class="diag-section">
-            <summary>Dev Utilities</summary>
-            <div class="diag-body">
-                <div style="font-size:9px; opacity:0.6; margin:0 0 8px;">Selection, or whole file if nothing's selected:</div>
-                <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Encode()">🔐 BASE64 ENCODE</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.base64Decode()">🔓 BASE64 DECODE</button>
-                </div>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn" onclick="Nexus.Sentinel.urlEncode()">%20 URL ENCODE</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.urlDecode()">%20 URL DECODE</button>
-                </div>
-                <div class="grid-2" style="margin-top:8px;">
-                    <button class="tool-btn btn-gold" onclick="Nexus.UI.insertUUID()" title="Insert a random UUID at the cursor" aria-label="Insert UUID">🎲 UUID</button>
-                    <button class="tool-btn btn-gold" onclick="Nexus.UI.insertDateTime()" title="Insert current date/time at the cursor" aria-label="Insert date and time">🕐 DATE/TIME</button>
-                </div>
-                <button class="tool-btn" style="width:100%; margin-top:8px;" onclick="Nexus.UI.openModal('storage-inspector')" title="Inspect the previewed project's own localStorage" aria-label="Open localStorage inspector">🗄️ LOCALSTORAGE INSPECTOR</button>
-            </div>
-        </details>
-
-          <details class="diag-section">
-            <summary>Build &amp; Export</summary>
+        <!-- ============ 5. PROJECT — across many files =============== -->
+        <details class="diag-section" data-tools>
+            <summary>Whole project</summary>
             <div class="diag-body">
                 <div class="grid-2">
-                    <button class="tool-btn btn-danger" onclick="Nexus.UI.openModal('compressor')">🗜️ COMPRESS</button>
-                    <button class="tool-btn btn-gold" data-langs="html,htm" onclick="Nexus.pwa.forge()">🔨 FORGE PWA</button>
-                    <button class="tool-btn btn-accent" onclick="Nexus.UI.openModal('sprite')">🖼️ SPRITE SHEET</button>
-                    <button class="tool-btn btn-success" onclick="Nexus.buildPipeline.run()">📦 PRODUCTION BUILD</button>
+                    <button class="tool-btn" onclick="Nexus.UI.openModal('diff')">👯 Compare two files</button>
+                    <button class="tool-btn" onclick="Nexus.merge.open()">📥 Merge two files</button>
+                    <button class="tool-btn" style="grid-column:span 2;" onclick="Nexus.variantMerge.open()">🔀 Variant merge (many files)</button>
+                    <button class="tool-btn" onclick="Nexus.Vfs.mergeAllJS()">⚡ Merge all JS</button>
+                    <button class="tool-btn" onclick="Nexus.Vfs.splitJSFile()">✂️ Split JS file</button>
+                    <button class="tool-btn" onclick="Nexus.UI.openCombineModal()">📦 Bundle files</button>
+                    <button class="tool-btn" onclick="Nexus.Vfs.bundleToHTML()">📄 Bundle to 1 HTML</button>
+                </div>
+                <button class="tool-btn btn-gold" style="width:100%; margin-top:8px;" onclick="Nexus.buildPipeline.run()">🚀 Production build</button>
+            </div>
+        </details>
+
+        <!-- ============ 6. LIBRARY & LEARN ========================== -->
+        <details class="diag-section" data-tools>
+            <summary>Library</summary>
+            <div class="diag-body">
+                <div class="grid-2">
+                    <button class="tool-btn" onclick="Nexus.UI.openModal('vault')">💾 Vault</button>
+                    <button class="tool-btn" onclick="Nexus.UI.openModal('dreamer')">🧩 Templates</button>
+                    <button class="tool-btn" onclick="Nexus.tutor.openGlossary()">📖 Glossary</button>
+                    <button class="tool-btn" onclick="Nexus.UI.openModal('manual')">❓ Help</button>
                 </div>
             </div>
         </details>
 
-        <div style="display:flex; align-items:center; gap:8px; padding:2px 4px;">
-            <label style="display:flex; align-items:center; gap:6px; font-size:10px; opacity:0.7; cursor:pointer;">
-                <input type="checkbox" id="diagFilterToggle" onchange="Nexus.UI.toggleDiagFilter(this.checked)">
-                Only show tools relevant to the open file
-            </label>
-        </div>
+        <!-- ============ 7. ADVANCED — rarely needed, kept last ======= -->
+        <details class="diag-section" data-tools>
+            <summary>Advanced</summary>
+            <div class="diag-body">
+                <button class="tool-btn" style="width:100%;" onclick="Nexus.dreamer.startNightCycle()">🌙 Stress test (Night Cycle)</button>
+                <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('storage-inspector')">🗄️ localStorage inspector</button>
+                <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('sprite')">🖼️ Sprite sheet CSS</button>
+                <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('peer-sync')">📡 Send to another device</button>
 
-        <details class="diag-section" style="margin-top: 16px;">
-            <summary>Quick Tools (Mirror)</summary>
-            <div class="diag-body" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;" id="utilMirrorContainer">
-                <!-- Populated by Nexus.UI.renderUtilMirror() on boot and after every util layout change -->
+                <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 4px;">
+                    <span style="font-size:9px; opacity:0.5; letter-spacing:1px;">CONSOLE</span>
+                    <span style="display:flex; gap:6px;">
+                        <button class="tool-btn" style="padding:4px 9px; font-size:9px;" onclick="Nexus.auditor.copyBox('diagOut','DIAGNOSTICS')">COPY</button>
+                        <button class="tool-btn" style="padding:4px 9px; font-size:9px;" onclick="Nexus.auditor.clearBox('diagOut','[System Standby]')">CLEAR</button>
+                    </span>
+                </div>
+                <div id="diagOut" class="mini-console" style="min-height:100px; max-height:45vh; overflow-y:auto; overflow-x:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain;">[System Standby]</div>
             </div>
         </details>
+
+        <div id="utilMirrorContainer"></div>
     </div>
 </aside>
+
 
 
 

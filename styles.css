@@ -1528,3 +1528,14 @@
         outline: 2px solid var(--accent) !important;
         outline-offset: 2px !important;
     }
+
+    /* Diagnostic category tiles — compact 4-across grid so eight categories
+       fit above the fold on a phone instead of pushing results off screen. */
+    .diag-tile {
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        gap: 2px; padding: 8px 2px; cursor: pointer; text-align: center;
+        border-radius: 6px; min-height: 46px;
+    }
+    .diag-tile:hover, .diag-tile:active { background: var(--surface); }
+    .diag-tile-l { font-size: 8px; font-weight: 800; letter-spacing: 0.5px; }
+    .diag-tile-n { font-size: 15px; font-weight: 900; line-height: 1; }

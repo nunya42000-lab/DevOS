@@ -13903,6 +13903,61 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
        if (st && typeof st.resolve === 'function') st.resolve(value);
    },
 
+   // Live filter for the tools panel. With ~80 tools, hunting for one by
+   // scrolling is the slowest part of using this panel on a phone —
+   // typing two letters is faster than any amount of categorising.
+   //
+   // Matches the button's visible text, so "yaml" finds both "JSON → YAML"
+   // and "Check YAML" without needing a keyword list to maintain. Sections
+   // with no surviving match are hidden entirely rather than left as empty
+   // headers, and matching sections auto-open so results aren't buried
+   // inside a collapsed accordion.
+   filterTools(query) {
+       const panel = document.getElementById('panelRight');
+       if (!panel) return;
+       const q = (query || '').trim().toLowerCase();
+       const sections = panel.querySelectorAll('details[data-tools]');
+       let shown = 0;
+
+       sections.forEach(sec => {
+           if (!q) {
+               // Restore the resting state: everything visible, every
+               // button visible, and only the first section expanded.
+               sec.style.display = '';
+               sec.querySelectorAll('button').forEach(b => { b.style.display = ''; });
+               if (sec.dataset.wasOpen !== undefined) {
+                   sec.open = sec.dataset.wasOpen === 'true';
+                   delete sec.dataset.wasOpen;
+               }
+               return;
+           }
+           // Remember the user's own open/closed choice the first time a
+           // filter runs, so clearing the box restores it rather than
+           // leaving every section expanded.
+           if (sec.dataset.wasOpen === undefined) sec.dataset.wasOpen = String(sec.open);
+
+           let hits = 0;
+           sec.querySelectorAll('button').forEach(b => {
+               // Skip the small COPY/CLEAR controls; they're chrome, not tools.
+               const text = (b.innerText || b.textContent || '').trim().toLowerCase();
+               if (!text || text.length > 60) return;
+               const match = text.includes(q);
+               b.style.display = match ? '' : 'none';
+               if (match) hits++;
+           });
+           sec.style.display = hits ? '' : 'none';
+           if (hits) sec.open = true;
+           shown += hits;
+       });
+
+       const count = document.getElementById('toolFilterCount');
+       if (count) {
+           count.innerText = q
+               ? (shown ? `${shown} tool${shown === 1 ? '' : 's'} match "${query.trim()}"` : `No tools match "${query.trim()}"`)
+               : '';
+       }
+   },
+
    needUnlocked(label, retry) {
        const ed = document.getElementById('rawTerminal');
        const locked = ed ? ed.hasAttribute('readonly') : false;
