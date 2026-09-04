@@ -823,16 +823,42 @@ auditor: {
         sections.push({ label: 'LINT', count: lintIssues.length, items: lintIssues });
 
         // --- HTML / JS / CSS / Orphans (auditor's DOM-based checks) ---
-        const htmlIssues = this._detectHtmlIssues(srcCode).map(i => ({ text: i.text, line: i.line }));
+        // FILE-TYPE GATING.
+        //
+        // These four detectors used to run on EVERY file regardless of
+        // type, so a Full Sweep on a .js file ran HTML structure checks
+        // over JavaScript. app.js builds markup in template literals, so
+        // the scanner found <span>, <script> and SVG <g> inside strings and
+        // reported 19 "unclosed tag" errors in a file with no HTML in it.
+        // Markup checks belong to markup files; a .js file has no tags,
+        // no element ids and no stylesheet to check.
+        const isMarkupFile = ['html', 'htm', 'svg', 'vue'].includes(ext);
+        const isStyleFile = ['css', 'scss', 'less'].includes(ext);
+
+        const htmlIssues = isMarkupFile
+            ? this._detectHtmlIssues(srcCode).map(i => ({ text: i.text, line: i.line }))
+            : [];
         sections.push({ label: 'HTML STRUCTURE', count: htmlIssues.length, items: htmlIssues });
 
-        const jsIssues = this._detectJsIssues(srcCode).map(e => ({ text: `${e.label}: ${e.message}`, line: e.line }));
+        // Mirror of the markup gating above: parsing CSS or JSON with a
+        // JavaScript parser reports a guaranteed syntax error on line 1 of
+        // every non-JS file — "Unexpected token ':'" on a stylesheet is the
+        // parser working correctly on the wrong input, not a defect in the
+        // file. HTML is included because it can carry inline <script>.
+        const isScriptFile = ['js', 'mjs', 'cjs', 'jsx', 'ts', 'tsx'].includes(ext) || isMarkupFile;
+        const jsIssues = isScriptFile
+            ? this._detectJsIssues(srcCode).map(e => ({ text: `${e.label}: ${e.message}`, line: e.line }))
+            : [];
         sections.push({ label: 'JS SYNTAX', count: jsIssues.length, items: jsIssues });
 
-        const cssIssues = this._detectCssIssues(srcCode).map(u => ({ text: `Unused: ${u.selector}`, line: u.line }));
+        const cssIssues = (isMarkupFile || isStyleFile)
+            ? this._detectCssIssues(srcCode).map(u => ({ text: `Unused: ${u.selector}`, line: u.line }))
+            : [];
         sections.push({ label: 'UNUSED CSS', count: cssIssues.length, items: cssIssues });
 
-        const orphanIssues = this._detectOrphanIssues(srcCode).map(o => ({ text: `#${o.id} (${o.tag}) has no script reference`, line: o.line }));
+        const orphanIssues = isMarkupFile
+            ? this._detectOrphanIssues(srcCode).map(o => ({ text: `#${o.id} (${o.tag}) has no script reference`, line: o.line }))
+            : [];
         sections.push({ label: 'ORPHANED IDS', count: orphanIssues.length, items: orphanIssues });
 
         // --- Brackets ---
@@ -1408,6 +1434,16 @@ auditor: {
             const doc = this.getVirtualDoc(srcCode);
             doc.querySelectorAll('script').forEach((script, idx) => {
                 if (!script.innerHTML.trim()) return;
+                // A <script> tag is also the standard carrier for non-JS
+                // payloads. This file's own importmap is JSON, and parsing
+                // it as JavaScript produced a guaranteed "Unexpected token
+                // ':'" on every single sweep. Same fix the bracket checker
+                // needed — only parse blocks that actually contain JS.
+                const stype = (script.getAttribute && script.getAttribute('type') || '').trim().toLowerCase();
+                const isJsType = stype === '' || stype === 'module' || stype === 'text/javascript' ||
+                                 stype === 'application/javascript' || stype === 'text/ecmascript' ||
+                                 stype === 'application/ecmascript';
+                if (!isJsType) return;
                 try {
                     new Function(script.innerHTML);
                 } catch (err) {
@@ -1653,12 +1689,25 @@ _detectMissingImports(srcCode) {
     // looked at them — the worst failure mode for a diagnostic. Making
     // the `<bindings> from` portion optional catches both, verified
     // against all 8 real import/require/src/href forms.
-    const importRegex = /(?:import\s+(?:[^'"();]*?\sfrom\s+)?['"]([^'"]+)['"])|(?:require\(\s*['"]([^'"]+)['"]\s*\))|(?:\bsrc=['"]([^'"]+)['"])|(?:\bhref=['"]([^'"]+)['"])/g;
+    // src=/href= are MARKUP patterns. Scanning for them inside JavaScript
+    // matched regex literals and generated-HTML fragments, reporting
+    // nonsense like "Unresolved: '([^'" and "Unresolved: '$2'" — 11 such
+    // phantom dependencies on this app's own app.js. A .js file's real
+    // dependencies come from import/require; a markup file's come from
+    // src/href. Each type is scanned only for what it can actually contain.
+    const ext = (Nexus.state.activeFile || '').split('.').pop().toLowerCase();
+    const isMarkup = ['html', 'htm', 'svg', 'vue'].includes(ext);
+    const importRegex = isMarkup
+        ? /(?:\bsrc=['"]([^'"]+)['"])|(?:\bhref=['"]([^'"]+)['"])/g
+        : /(?:^|[\s;{}])import\s+(?:[^'"();]*?\sfrom\s+)?['"]([^'"]+)['"]|(?:\brequire\(\s*['"]([^'"]+)['"]\s*\))/g;
     const seen = new Set();
     const missing = [];
     let m;
     while ((m = importRegex.exec(srcCode)) !== null) {
         const raw = m[1] || m[2] || m[3] || m[4];
+        // Anything with markup, quotes, parens or spaces isn't a path —
+        // it's a fragment of code the regex happened to straddle.
+        if (raw && /[<>()\s`$]|^\.{3}$/.test(raw)) continue;
         if (!raw || seen.has(raw)) continue;
         seen.add(raw);
         if (/^(?:https?:)?\/\//i.test(raw) || raw.startsWith('data:') || raw.startsWith('#') || raw.startsWith('mailto:') || raw.startsWith('tel:')) continue; // remote URLs, same-page anchors, and mailto/tel links aren't local Vfs references at all
@@ -1761,6 +1810,11 @@ _detectOrphanIssues(srcCode) {
     allElements.forEach(el => {
         const id = el.id;
         if (!id) return;
+        // Ids built at runtime — id="explainsweep-' + idx + '" inside a
+        // template literal — are not real element ids and can never be
+        // "referenced" by a static scan. Reporting them as orphans is
+        // guaranteed noise.
+        if (/['"`+${}]|\s/.test(id)) return;
 
         // 1. Bypass explicit framework infrastructure elements
         if (nexusSafeList.includes(id)) return;
@@ -4530,7 +4584,18 @@ Sentinel : {
                            // "use test@example.com") as a PII leak. Same for
                            // the standard placeholder domains.
                            const SAFE = /@(example\.(com|org|net)|test|localhost|domain\.com|email\.com|yoursite\.com)\b/i;
-                           if (/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/.test(node.value) && !SAFE.test(node.value)) {
+
+                           // The top-level domain must be LETTERS. Without
+                           // that, "dexie@3.2.4/dist/..." reads as user
+                           // "dexie", domain "3.2", TLD "4" — so every npm
+                           // package@version URL in a CDN list was reported
+                           // as a personal email address. sw.js alone
+                           // produced 13 of these. A package URL is also
+                           // never an email, so anything inside a URL is
+                           // excluded outright.
+                           const looksLikeEmail = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b/;
+                           const insideUrl = /:\/\//.test(node.value);
+                           if (looksLikeEmail.test(node.value) && !insideUrl && !SAFE.test(node.value)) {
                                return { id: 'PII_LEAK', message: "Privacy Risk: Potential PII (Email) detected in string.", severity: 'HIGH' };
                            }
                        }
@@ -4647,10 +4712,38 @@ Sentinel : {
 
                    this.use({ check: (node) => {
                        if (node.type === 'CallExpression' && node.callee.name === 'fetch') {
-                           let tracer = node.parent; 
-                           let inTry = false;
-                           while (tracer) { if (tracer.type === 'TryStatement') { inTry = true; break; } tracer = tracer.parent; }
-                           if (!inTry) return { id: 'OFFLINE_FAIL', message: "PWA Reliability: 'fetch' outside try/catch will crash offline.", severity: 'CRITICAL' };
+                           // try/catch is not the only way to handle a failed
+                           // fetch — for a promise chain, .catch() IS the
+                           // idiomatic handler, and try/catch around it would
+                           // do nothing at all without await. Checking only
+                           // for TryStatement flagged all three correctly
+                           // handled fetches in this app's own service
+                           // worker, each of which has a .catch() attached.
+                           let tracer = node.parent;
+                           let handled = false;
+                           while (tracer) {
+                               if (tracer.type === 'TryStatement') { handled = true; break; }
+                               // .then(...).catch(...) anywhere up the chain
+                               if (tracer.type === 'MemberExpression' &&
+                                   ['catch', 'finally'].includes(tracer.property?.name)) { handled = true; break; }
+                               if (tracer.type === 'AwaitExpression') {
+                                   // awaited: only try/catch can help, keep looking
+                               }
+                               tracer = tracer.parent;
+                           }
+                           // Also accept a .catch() attached further along the
+                           // same statement, which sits beside rather than
+                           // above this node in the tree.
+                           if (!handled) {
+                               let stmt = node.parent;
+                               while (stmt && !/Statement|Declaration/.test(stmt.type)) stmt = stmt.parent;
+                               if (stmt) {
+                                   this.traverse(stmt, (n) => {
+                                       if (n.type === 'MemberExpression' && ['catch', 'finally'].includes(n.property?.name)) handled = true;
+                                   });
+                               }
+                           }
+                           if (!handled) return { id: 'OFFLINE_FAIL', message: "PWA Reliability: 'fetch' with no error handling (no try/catch and no .catch()) will fail hard offline.", severity: 'HIGH' };
                        }
                    }});
                  // --- 4. ARCHITECTURE & CLEAN CODE ---

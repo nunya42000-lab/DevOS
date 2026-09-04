@@ -13,7 +13,7 @@
 // Bumped v3 -> v4. The shell files changed substantially (binary/document
 // support, converters, the CM6 loading fix), and a stale cached app.js is
 // itself a bug source - it makes fixed code look broken on device.
-const CACHE = 'divide-shell-v4';
+const CACHE = 'divide-shell-v5';
 
 const APP_SHELL = [
   './',
