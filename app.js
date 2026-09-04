@@ -4544,11 +4544,42 @@ Sentinel : {
                                if (['IfStatement', 'SwitchStatement', 'ConditionalExpression'].includes(tracer.type)) { isGuarded = true; break; }
                                tracer = tracer.parent;
                            }
+                           // A guard clause counts even when it isn't wrapped
+                           // around the recursive call itself. The standard
+                           // shape —
+                           //     function r(n){ if (n<=0) return 0; return r(n-1); }
+                           // — has its exit condition BEFORE the call, so
+                           // checking only the call's ancestors reported the
+                           // most common correct recursion as unguarded.
+                           if (!isGuarded) {
+                               let fn = node.parent;
+                               while (fn && !['FunctionDeclaration','FunctionExpression','ArrowFunctionExpression'].includes(fn.type)) fn = fn.parent;
+                               if (fn && fn.body) {
+                                   this.traverse(fn.body, (n) => {
+                                       if (n.type === 'IfStatement' &&
+                                           (this.findInNode(n, 'ReturnStatement') || this.findInNode(n, 'ThrowStatement'))) isGuarded = true;
+                                   });
+                               }
+                           }
                            if (!isGuarded) return { id: 'STACK_OVERFLOW', message: `Recursion Risk: '${node.callee.name}' calls itself without an exit guard.`, severity: 'CRITICAL' };
                        }
                    }});
 
                    this.use({ check: (node) => {
+                       // Statements sitting after an unconditional return can
+                       // never run. This only caught `if (false)` before, which
+                       // is rare in real code; unreachable code after a return
+                       // is the common way this actually happens.
+                       if (node.type === 'BlockStatement' && Array.isArray(node.body)) {
+                           const idx = node.body.findIndex(st => ['ReturnStatement','ThrowStatement','ContinueStatement','BreakStatement'].includes(st.type));
+                           if (idx >= 0 && idx < node.body.length - 1) {
+                               const next = node.body[idx + 1];
+                               // Hoisted declarations still run, so they're fine.
+                               if (next && next.type !== 'FunctionDeclaration') {
+                                   return { id: 'DEAD_CODE', message: "Unreachable: this runs after a return/throw, so it never executes.", severity: 'LOW' };
+                               }
+                           }
+                       }
                        if (node.type === 'IfStatement' && node.test.type === 'Literal' && node.test.value === false) {
                            return { id: 'DEAD_CODE', message: "Dead Branch: This block will never execute.", severity: 'LOW' };
                        }
@@ -4602,10 +4633,43 @@ Sentinel : {
                    }});
 
                    this.use({ check: (node) => {
-                       const risky = ['eval', 'setTimeout', 'setInterval', 'Function'];
-                       if (node.type === 'CallExpression' && risky.includes(node.callee.name)) {
-                           if (node.arguments[0]?.type === 'Literal' && typeof node.arguments[0].value === 'string') {
-                               return { id: 'EVAL_CODE', message: `Security Risk: '${node.callee.name}' using string-to-code execution.`, severity: 'CRITICAL' };
+                       // Two distinct dangers, judged separately.
+                       //
+                       // eval / new Function: a NON-literal argument is the
+                       // real hole — eval("2+2") is static and harmless while
+                       // eval(userInput) runs whatever arrives. The original
+                       // rule fired only on the literal, i.e. it caught the
+                       // safe case and ignored the dangerous one.
+                       //
+                       // setTimeout / setInterval: passing a function is the
+                       // normal, correct usage, so only a STRING (literal,
+                       // template, or concatenation) is a code-execution risk.
+                       // Flagging setTimeout(fn, 100) would fire on virtually
+                       // every timer ever written.
+                       const EVALLERS = ['eval', 'Function'];
+                       const TIMERS = ['setTimeout', 'setInterval'];
+                       // NewExpression too: `new Function(src)` is the same
+                       // string-to-code hazard as eval, just written with new.
+                       if ((node.type === 'CallExpression' || node.type === 'NewExpression') && node.callee && typeof node.callee.name === 'string') {
+                           const name = node.callee.name;
+                           const arg = node.arguments[0];
+                           const isStringLiteral = arg && arg.type === 'Literal' && typeof arg.value === 'string';
+                           const isStringish = isStringLiteral ||
+                                               (arg && arg.type === 'TemplateLiteral') ||
+                                               (arg && arg.type === 'BinaryExpression' && arg.operator === '+');
+
+                           if (EVALLERS.includes(name) && arg) {
+                               const isFn = arg.type === 'FunctionExpression' || arg.type === 'ArrowFunctionExpression';
+                               if (!isFn) {
+                                   return { id: 'EVAL_CODE',
+                                            message: isStringLiteral
+                                              ? `Security Risk: '${name}' turns text into running code.`
+                                              : `Security Risk: '${name}' is executing a value computed at runtime — if that value can be influenced from outside, this runs attacker-controlled code.`,
+                                            severity: 'CRITICAL' };
+                               }
+                           }
+                           if (TIMERS.includes(name) && isStringish) {
+                               return { id: 'EVAL_CODE', message: `Security Risk: '${name}' given a string runs it as code. Pass a function instead.`, severity: 'CRITICAL' };
                            }
                        }
                    }});
