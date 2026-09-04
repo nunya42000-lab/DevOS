@@ -4297,6 +4297,20 @@ Sentinel : {
        entry.innerHTML = `[${new Date().toLocaleTimeString()}] ${msg}`;
        if (out.innerText.includes("OFFLINE")) out.innerHTML = "";
        out.prepend(entry);
+
+       // Reveal the console whenever anything writes to it.
+       //
+       // Roughly 76 tools report their results here, and the console lives
+       // inside the collapsed "Advanced" section. Tapping one of those
+       // tools therefore produced NO visible response at all — the output
+       // was written correctly, just into a closed accordion three
+       // sections down. Every one of them looked broken.
+       //
+       // Opening the section and scrolling to it means output always
+       // appears where you're looking, without having to remember which
+       // tools happen to report to the console rather than the main
+       // results box.
+       Nexus.UI.revealConsole && Nexus.UI.revealConsole();
    },
 
    // 2. The Linter Logic
@@ -13912,6 +13926,28 @@ const displayErrors = result.errors.filter(e => e.line < 6000).slice(0, 5);
    // with no surviving match are hidden entirely rather than left as empty
    // headers, and matching sections auto-open so results aren't buried
    // inside a collapsed accordion.
+   // Opens whichever collapsible section contains the diagnostics console
+   // and brings it into view. Deliberately finds the section by walking up
+   // from the console element rather than hardcoding "Advanced", so moving
+   // the console during a future panel reshuffle can't silently break this.
+   revealConsole() {
+       const out = document.getElementById('diagOut');
+       if (!out) return;
+       let node = out.parentElement;
+       while (node && node.tagName !== 'DETAILS') node = node.parentElement;
+       if (node && !node.open) node.open = true;
+
+       // Only scroll if the panel is actually on screen; scrolling a
+       // closed sidebar would yank the editor around for no reason.
+       const panel = document.getElementById('panelRight');
+       if (panel && panel.classList.contains('active')) {
+           clearTimeout(this._revealTimer);
+           this._revealTimer = setTimeout(() => {
+               try { out.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+           }, 60);
+       }
+   },
+
    filterTools(query) {
        const panel = document.getElementById('panelRight');
        if (!panel) return;

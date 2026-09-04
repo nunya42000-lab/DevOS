@@ -562,7 +562,7 @@
                     <button class="tool-btn" onclick="Nexus.intel.scan()">🧠 Code stats</button>
                     <button class="tool-btn" onclick="Nexus.docStats.show()">📊 Doc stats</button>
                     <button class="tool-btn" onclick="Nexus.clones.scan()">🐼 Find clones</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.scanDeps()">📎 List imports</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.scanDeps()" title="Lists imports in the output log below">📎 List imports</button>
                     <button class="tool-btn" onclick="Nexus.stepViz.start()">👣 Step through</button>
                 </div>
             </div>
@@ -604,8 +604,8 @@
 
                 <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">REPAIR</div>
                 <div class="grid-2">
-                    <button class="tool-btn" onclick="Nexus.Sentinel.runMedicString()">🩹 Quick patch</button>
-                    <button class="tool-btn" onclick="Nexus.Sentinel.runMedicAST()">🔧 Deep rebuild</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.runMedicString()" title="Reports to the output log">🩹 Quick patch</button>
+                    <button class="tool-btn" onclick="Nexus.Sentinel.runMedicAST()" title="Reports to the output log">🔧 Deep rebuild</button>
                     <button class="tool-btn" style="grid-column:span 2;" onclick="Nexus.refactor.renameGlobal()">✏️ Rename identifier everywhere</button>
                 </div>
             </div>
@@ -708,7 +708,7 @@
 
         <!-- ============ 7. ADVANCED — rarely needed, kept last ======= -->
         <details class="diag-section" data-tools>
-            <summary>Advanced</summary>
+            <summary>Console &amp; Advanced</summary>
             <div class="diag-body">
                 <button class="tool-btn" style="width:100%;" onclick="Nexus.dreamer.startNightCycle()">🌙 Stress test (Night Cycle)</button>
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('storage-inspector')">🗄️ localStorage inspector</button>
@@ -716,7 +716,7 @@
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('peer-sync')">📡 Send to another device</button>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 4px;">
-                    <span style="font-size:9px; opacity:0.5; letter-spacing:1px;">CONSOLE</span>
+                    <span style="font-size:9px; opacity:0.5; letter-spacing:1px;">TOOL OUTPUT LOG</span>
                     <span style="display:flex; gap:6px;">
                         <button class="tool-btn" style="padding:4px 9px; font-size:9px;" onclick="Nexus.auditor.copyBox('diagOut','DIAGNOSTICS')">COPY</button>
                         <button class="tool-btn" style="padding:4px 9px; font-size:9px;" onclick="Nexus.auditor.clearBox('diagOut','[System Standby]')">CLEAR</button>
