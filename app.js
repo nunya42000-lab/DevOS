@@ -9167,6 +9167,315 @@ self.addEventListener('fetch', (e) => {
    // compute how many full frames fit) and shown as an on-screen preview —
    // it is never saved into the Vfs or anywhere else. Only the generated
    // CSS text is written to disk, as sprites.css.
+   // Visual modal designer. Builds a modal as an ordered list of blocks you
+   // can reorder and edit, then emits real markup using this app's own
+   // conventions (modal-overlay / p-head / modal-body / tool-btn), so the
+   // output drops straight into index.html and looks native.
+   //
+   // Deliberately a REORDERABLE STACK rather than free-form canvas dragging.
+   // Modals here are single-column stacks anyway, and pixel-accurate dragging
+   // on a phone is fiddly and easy to get wrong — a drag handle plus explicit
+   // up/down buttons is faster and works with one thumb.
+   modalDesigner: {
+       model: null,
+       _sel: -1,
+
+       PALETTE: [
+           { type: 'heading',  label: 'Heading',    icon: 'H' },
+           { type: 'text',     label: 'Paragraph',  icon: '¶' },
+           { type: 'input',    label: 'Text field', icon: '▭' },
+           { type: 'textarea', label: 'Text area',  icon: '▤' },
+           { type: 'button',   label: 'Button',     icon: '⬢' },
+           { type: 'row',      label: 'Button row', icon: '⬓' },
+           { type: 'checkbox', label: 'Checkbox',   icon: '☑' },
+           { type: 'output',   label: 'Output box', icon: '▣' },
+           { type: 'divider',  label: 'Divider',    icon: '—' }
+       ],
+
+       _esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
+       _unesc(s) { return String(s == null ? '' : s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&'); },
+
+       open() {
+           if (!this.model) this.newModal(true);
+           Nexus.UI.openModal('modal-designer');
+           this.render();
+       },
+
+       newModal(silent) {
+           this.model = { id: 'modalMyTool', key: 'my-tool', title: 'MY TOOL', elements: [] };
+           this._sel = -1;
+           if (!silent) { this.render(); Nexus.shell.out('Started a blank modal.', 'success'); }
+       },
+
+       add(type) {
+           const defaults = {
+               heading:  { text: 'Section heading' },
+               text:     { text: 'Explain what this does.' },
+               input:    { text: 'Placeholder text', id: '' },
+               textarea: { text: 'Placeholder text', id: '' },
+               button:   { text: 'DO THE THING', variant: 'btn-accent', onclick: '' },
+               row:      { children: [ { type:'button', text:'CANCEL', variant:'' }, { type:'button', text:'OK', variant:'btn-accent' } ] },
+               checkbox: { text: 'Enable something', id: '' },
+               output:   { text: '', id: 'myToolOut' },
+               divider:  {}
+           };
+           this.model.elements.push(Object.assign({ type }, defaults[type] || {}));
+           this._sel = this.model.elements.length - 1;
+           this.render();
+       },
+
+       move(i, dir) {
+           const a = this.model.elements;
+           const j = i + dir;
+           if (j < 0 || j >= a.length) return;
+           [a[i], a[j]] = [a[j], a[i]];
+           this._sel = j;
+           this.render();
+       },
+
+       remove(i) {
+           this.model.elements.splice(i, 1);
+           if (this._sel >= this.model.elements.length) this._sel = this.model.elements.length - 1;
+           this.render();
+       },
+
+       select(i) { this._sel = (this._sel === i ? -1 : i); this.render(); },
+
+       setProp(i, prop, value) {
+           const el = this.model.elements[i];
+           if (!el) return;
+           el[prop] = value;
+           this.renderPreview();
+           this.renderCode();
+       },
+
+       setMeta(prop, value) {
+           this.model[prop] = value;
+           // Keep the element id and the openModal key in step automatically,
+           // since a mismatch between them is the single easiest way to end up
+           // with a modal that exists but can never be opened.
+           if (prop === 'title' && value) {
+               const slug = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+               const camel = slug.replace(/-([a-z])/g, (m, c) => c.toUpperCase());
+               this.model.key = slug || 'my-tool';
+               this.model.id = 'modal' + (camel.charAt(0).toUpperCase() + camel.slice(1) || 'MyTool');
+           }
+           this.render();
+       },
+
+       // ---- code generation ----
+       _elHtml(e, ind) {
+           const p = ' '.repeat(ind);
+           const E = this._esc.bind(this);
+           const id = e.id ? ` id="${E(e.id)}"` : '';
+           const oc = e.onclick ? ` onclick="${E(e.onclick)}"` : '';
+           switch (e.type) {
+               case 'heading':  return `${p}<div class="section-label"${id}>${E(e.text)}</div>`;
+               case 'text':     return `${p}<div${id} style="font-size:12px; opacity:0.8; line-height:1.5;">${E(e.text)}</div>`;
+               case 'input':    return `${p}<input type="text" class="sleek-input"${id} placeholder="${E(e.text)}">`;
+               case 'textarea': return `${p}<textarea class="sleek-input"${id} rows="4" placeholder="${E(e.text)}"></textarea>`;
+               case 'button':   return `${p}<button class="tool-btn${e.variant ? ' ' + E(e.variant) : ''}"${id}${oc}>${E(e.text)}</button>`;
+               case 'checkbox': return `${p}<label style="display:flex; align-items:center; gap:8px; font-size:11px;"><input type="checkbox"${id} style="width:15px; height:15px;"> ${E(e.text)}</label>`;
+               case 'divider':  return `${p}<div style="height:1px; background:var(--border); margin:4px 0;"></div>`;
+               case 'output':   return `${p}<div class="mini-console"${id} style="min-height:80px; max-height:40vh; overflow:auto;">${E(e.text)}</div>`;
+               case 'row':      return `${p}<div class="grid-2">\n${(e.children||[]).map(c => this._elHtml(c, ind + 4)).join('\n')}\n${p}</div>`;
+               default:         return `${p}<!-- unsupported block: ${E(e.type)} -->`;
+           }
+       },
+
+       generate() {
+           const m = this.model;
+           const E = this._esc.bind(this);
+           const body = (m.elements || []).map(e => this._elHtml(e, 12)).join('\n');
+           return `<div id="${E(m.id)}" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head">
+            <span>${E(m.title)}</span>
+            <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('${E(m.key)}')">&times;</button>
+        </div>
+        <div class="modal-body">
+${body}
+        </div>
+    </div>
+</div>`;
+       },
+
+       // ---- parse an existing modal back into editable blocks ----
+       parse(html) {
+           const U = this._unesc.bind(this);
+           const attr = (s, a) => { const r = new RegExp(a + '="([^"]*)"').exec(s || ''); return r ? r[1] : ''; };
+           const idm = html.match(/<div\s+id="([^"]+)"\s+class="modal-overlay"/);
+           const tm = html.match(/<div class="p-head">\s*<span[^>]*>([\s\S]*?)<\/span>/);
+           const km = html.match(/closeModal\('([^']+)'\)/);
+           const bm = html.match(/<div class="modal-body"[^>]*>([\s\S]*)<\/div>\s*<\/div>\s*<\/div>/);
+           const body = bm ? bm[1] : '';
+           const els = [];
+           const re = /<div class="section-label"([^>]*)>([\s\S]*?)<\/div>|<input type="text" class="sleek-input"([^>]*)>|<textarea class="sleek-input"([^>]*)>[\s\S]*?<\/textarea>|<button class="tool-btn([^"]*)"([^>]*)>([\s\S]*?)<\/button>|<div class="mini-console"([^>]*)>([\s\S]*?)<\/div>|<input type="checkbox"([^>]*)>\s*([^<]*)|<div([^>]*style="[^"]*font-size:12px[^"]*")>([\s\S]*?)<\/div>/g;
+           let m;
+           while ((m = re.exec(body))) {
+               if (m[2] !== undefined) els.push({ type:'heading', text:U(m[2]).trim(), id:attr(m[1],'id') });
+               else if (m[3] !== undefined) els.push({ type:'input', text:attr(m[3],'placeholder'), id:attr(m[3],'id') });
+               else if (m[4] !== undefined) els.push({ type:'textarea', text:attr(m[4],'placeholder'), id:attr(m[4],'id') });
+               else if (m[7] !== undefined) els.push({ type:'button', text:U(m[7]).trim(), id:attr(m[6],'id'), onclick:U(attr(m[6],'onclick')), variant:(m[5]||'').trim() });
+               else if (m[9] !== undefined) els.push({ type:'output', text:U(m[9]).trim(), id:attr(m[8],'id') });
+               else if (m[11] !== undefined) els.push({ type:'checkbox', text:U(m[11]).trim(), id:attr(m[10],'id') });
+               else if (m[13] !== undefined) els.push({ type:'text', text:U(m[13]).trim(), id:attr(m[12],'id') });
+           }
+           return { id: idm ? idm[1] : 'modalImported', key: km ? km[1] : 'imported',
+                    title: tm ? U(tm[1]).trim() : 'IMPORTED', elements: els };
+       },
+
+       // Lists every modal in the project so one can be loaded and edited.
+       listModals() {
+           const found = [];
+           Object.keys(Nexus.state.Vfs).forEach(fn => {
+               if (!/\.(html?|htm)$/i.test(fn)) return;
+               const src = Nexus.state.Vfs[fn];
+               if (typeof src !== 'string') return;
+               const re = /<div\s+id="([^"]+)"\s+class="modal-overlay"[\s\S]*?\n<\/div>/g;
+               let m;
+               while ((m = re.exec(src))) found.push({ file: fn, id: m[1], html: m[0] });
+           });
+           return found;
+       },
+
+       openImport() {
+           const list = this.listModals();
+           const box = document.getElementById('mdImportList');
+           if (!box) return;
+           if (!list.length) {
+               box.innerHTML = '<div style="opacity:0.6; font-size:11px; padding:10px;">No modals found. Open a project HTML file that contains a .modal-overlay block.</div>';
+           } else {
+               box.innerHTML = list.map((x, i) =>
+                   `<div class="item-row" onclick="Nexus.modalDesigner.importAt(${i})">
+                       <span>#${this._esc(x.id)}</span>
+                       <span style="opacity:0.5; font-size:9px;">${this._esc(x.file)}</span>
+                   </div>`).join('');
+           }
+           this._importCache = list;
+           Nexus.UI.openModal('md-import');
+       },
+
+       importAt(i) {
+           const item = (this._importCache || [])[i];
+           if (!item) return;
+           this.model = this.parse(item.html);
+           this._sel = -1;
+           Nexus.UI.closeModal('md-import');
+           this.render();
+           Nexus.shell.out(`Loaded #${item.id} — ${this.model.elements.length} block(s) recognised.`, 'success');
+       },
+
+       // ---- rendering ----
+       render() { this.renderPalette(); this.renderBlocks(); this.renderPreview(); this.renderCode(); this.renderMeta(); },
+
+       // Built from PALETTE rather than hardcoded in the markup. The two were
+       // duplicated before, which meant adding a block type required editing
+       // both and would silently drift the moment one was updated alone.
+       renderPalette() {
+           const host = document.getElementById('mdPalette');
+           if (!host) return;
+           host.innerHTML = this.PALETTE.map(p =>
+               `<button class="tool-btn" style="font-size:10px;" onclick="Nexus.modalDesigner.add('${p.type}')">${p.icon} ${p.label}</button>`
+           ).join('');
+       },
+
+       renderMeta() {
+           const t = document.getElementById('mdTitle');
+           const i = document.getElementById('mdIdOut');
+           if (t && t.value !== this.model.title) t.value = this.model.title;
+           if (i) i.innerText = `${this.model.id}  ·  openModal('${this.model.key}')`;
+       },
+
+       renderBlocks() {
+           const host = document.getElementById('mdBlocks');
+           if (!host) return;
+           const m = this.model;
+           if (!m.elements.length) {
+               host.innerHTML = '<div style="opacity:0.55; font-size:11px; padding:14px; text-align:center;">Empty. Add blocks from the row above.</div>';
+               return;
+           }
+           host.innerHTML = m.elements.map((e, i) => {
+               const sel = i === this._sel;
+               const label = (e.text || e.type).toString().slice(0, 30) || e.type;
+               return `<div style="border:1px solid ${sel ? 'var(--accent)' : 'var(--border)'}; border-radius:6px; margin-bottom:6px; overflow:hidden;">
+                   <div style="display:flex; align-items:center; gap:6px; padding:8px 10px; background:${sel ? 'var(--surface)' : 'transparent'};">
+                       <span style="opacity:0.4; font-size:14px;">⠿</span>
+                       <span onclick="Nexus.modalDesigner.select(${i})" style="flex:1; font-size:11px; cursor:pointer;">
+                           <b style="opacity:0.6;">${e.type}</b> · ${this._esc(label)}
+                       </span>
+                       <button class="tool-btn" style="padding:3px 7px; font-size:11px;" onclick="Nexus.modalDesigner.move(${i},-1)" aria-label="Move up">▲</button>
+                       <button class="tool-btn" style="padding:3px 7px; font-size:11px;" onclick="Nexus.modalDesigner.move(${i},1)" aria-label="Move down">▼</button>
+                       <button class="tool-btn" style="padding:3px 7px; font-size:11px; color:var(--danger);" onclick="Nexus.modalDesigner.remove(${i})" aria-label="Delete">&times;</button>
+                   </div>
+                   ${sel ? this._editorFor(e, i) : ''}
+               </div>`;
+           }).join('');
+       },
+
+       _editorFor(e, i) {
+           const f = (lbl, prop, val, ph) => `
+               <label style="display:block; font-size:9px; opacity:0.55; margin:6px 0 2px;">${lbl}</label>
+               <input class="sleek-input" style="width:100%; font-size:12px; padding:7px;" value="${this._esc(val || '')}" placeholder="${this._esc(ph || '')}"
+                      oninput="Nexus.modalDesigner.setProp(${i},'${prop}',this.value)">`;
+           let html = '<div style="padding:8px 10px; border-top:1px solid var(--border);">';
+           if (e.type !== 'divider' && e.type !== 'row') html += f(e.type === 'input' || e.type === 'textarea' ? 'Placeholder' : 'Text', 'text', e.text);
+           if (['input','textarea','output','checkbox','heading','text'].includes(e.type)) html += f('Element id (optional)', 'id', e.id, 'myFieldId');
+           if (e.type === 'button') {
+               html += f('id (optional)', 'id', e.id);
+               html += f('onclick', 'onclick', e.onclick, 'Nexus.myTool.run()');
+               html += `<label style="display:block; font-size:9px; opacity:0.55; margin:6px 0 2px;">Style</label>
+                   <select class="sleek-input" style="width:100%; font-size:12px; padding:7px;" onchange="Nexus.modalDesigner.setProp(${i},'variant',this.value)">
+                       ${['','btn-accent','btn-gold','btn-warn'].map(v => `<option value="${v}"${e.variant===v?' selected':''}>${v||'default'}</option>`).join('')}
+                   </select>`;
+           }
+           html += '</div>';
+           return html;
+       },
+
+       renderPreview() {
+           const host = document.getElementById('mdPreview');
+           if (!host) return;
+           // Rendered from the SAME generator as the exported code, so the
+           // preview can never drift from what you actually get.
+           host.innerHTML = `<div class="modal-content" style="position:static; width:100%; height:auto; max-height:none; box-shadow:none;">
+               <div class="p-head"><span>${this._esc(this.model.title)}</span><button class="close-x">&times;</button></div>
+               <div class="modal-body">${(this.model.elements||[]).map(e => this._elHtml(e, 0)).join('\n')}</div>
+           </div>`;
+       },
+
+       renderCode() {
+           const box = document.getElementById('mdCode');
+           if (box) box.textContent = this.generate();
+       },
+
+       copyCode() {
+           const code = this.generate();
+           if (navigator.clipboard && navigator.clipboard.writeText) {
+               navigator.clipboard.writeText(code)
+                   .then(() => Nexus.shell.out('Modal HTML copied.', 'success'))
+                   .catch(() => Nexus.shell.out('Clipboard denied — long-press the code to copy.', 'warn'));
+           } else Nexus.shell.out('Clipboard unavailable — long-press the code to copy.', 'warn');
+       },
+
+       // Writes to a NEW file rather than editing index.html directly —
+       // splicing generated markup into a live file is how you lose work.
+       saveToFile() {
+           const base = (this.model.key || 'modal').replace(/[^\w-]/g, '');
+           let name = `${base}.modal.html`;
+           let n = 2;
+           while (Nexus.state.Vfs[name] !== undefined) name = `${base}-${n++}.modal.html`;
+           const code = this.generate() + '\n';
+           Nexus.state.Vfs[name] = code;
+           Nexus.state.originals[name] = code;
+           Nexus.state.lastSavedContent[name] = code;
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           Nexus.Vfs.switchFile(name);
+           Nexus.shell.out(`Saved as ${name} — paste it into index.html when you're happy with it.`, 'success');
+       }
+   },
+
    spriteSheet: {
        _img: null,
 

@@ -718,6 +718,7 @@
                 <button class="tool-btn" style="width:100%;" onclick="Nexus.dreamer.startNightCycle()">🌙 Stress test (Night Cycle)</button>
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('storage-inspector')">🗄️ localStorage inspector</button>
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('sprite')">🖼️ Sprite sheet CSS</button>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:6px;" onclick="Nexus.modalDesigner.open()">🎨 Modal designer</button>
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('peer-sync')">📡 Send to another device</button>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 4px;">
@@ -1234,6 +1235,61 @@
      you've committed. This can validate before accepting, show a live
      hint, and keep the field editable when input is rejected.
      Driven by Nexus.UI.askInput(), which returns a Promise. -->
+<!-- Visual modal designer. A reorderable stack rather than free-form
+     canvas dragging: modals here are single-column anyway, and drag handles
+     plus explicit up/down buttons are far easier to hit with a thumb than
+     pixel-accurate dragging. -->
+<div id="modalModalDesigner" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head">
+            <span>MODAL DESIGNER</span>
+            <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('modal-designer')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <button class="tool-btn" style="flex:1;" onclick="Nexus.modalDesigner.newModal()">NEW</button>
+                <button class="tool-btn" style="flex:1;" onclick="Nexus.modalDesigner.openImport()">LOAD EXISTING</button>
+            </div>
+
+            <label style="display:block; font-size:9px; opacity:0.55; margin:6px 0 2px;">Modal title</label>
+            <input id="mdTitle" class="sleek-input" style="width:100%; font-size:13px; padding:8px;"
+                   oninput="Nexus.modalDesigner.setMeta('title', this.value)" placeholder="MY TOOL">
+            <div id="mdIdOut" style="font-size:9px; opacity:0.5; margin-top:4px; font-family:monospace;"></div>
+
+            <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">ADD A BLOCK</div>
+            <div id="mdPalette" style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;"></div>
+
+            <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">BLOCKS — tap to edit, ▲▼ to reorder</div>
+            <div id="mdBlocks"></div>
+
+            <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">LIVE PREVIEW</div>
+            <div id="mdPreview" style="border:1px solid var(--border); border-radius:8px; padding:8px; background:var(--bg);"></div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 4px;">
+                <span style="font-size:9px; opacity:0.5; letter-spacing:1px;">GENERATED HTML</span>
+                <span style="display:flex; gap:6px;">
+                    <button class="tool-btn" style="padding:4px 9px; font-size:9px;" onclick="Nexus.modalDesigner.copyCode()">COPY</button>
+                    <button class="tool-btn btn-accent" style="padding:4px 9px; font-size:9px;" onclick="Nexus.modalDesigner.saveToFile()">SAVE AS FILE</button>
+                </span>
+            </div>
+            <pre id="mdCode" style="background:#0f1218; border:1px solid var(--border); border-radius:6px; padding:10px; font-family:monospace; font-size:10px; line-height:1.45; overflow:auto; max-height:40vh; white-space:pre; margin:0;"></pre>
+        </div>
+    </div>
+</div>
+
+<div id="modalMdImport" class="modal-overlay">
+    <div class="modal-content" style="height:auto; max-height:70%;">
+        <div class="p-head">
+            <span>LOAD A MODAL</span>
+            <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('md-import')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size:10px; opacity:0.6; margin-bottom:8px;">Modals found in the HTML files in your project. Pick one to load it into the designer.</div>
+            <div id="mdImportList"></div>
+        </div>
+    </div>
+</div>
+
 <div id="modalAskInput" class="modal-overlay">
     <div class="modal-content" style="height:auto; max-height:70%;">
         <div class="p-head">
