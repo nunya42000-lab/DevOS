@@ -9192,6 +9192,16 @@ self.addEventListener('fetch', (e) => {
            { type: 'divider',  label: 'Divider',    icon: '—' }
        ],
 
+       // UI templates from the Architect library, offered as placeable
+       // blocks rather than blind cursor insertions. Only the HTML
+       // component templates belong here — the code boilerplates
+       // (fetch-async, py-class, sql-query…) aren't UI and stay in the
+       // snippet inserter where they make sense.
+       UI_TEMPLATES: ['btn-tactical','card-gold','grid-skill','nav-bottom','modal-box',
+                      'list-view','input-group','toggle-switch','loader-spinner','hero-section',
+                      'auth-matrix','toast-alert','chat-bubble','settings-panel','pricing-card',
+                      'progress-bar','accordion-menu','profile-header'],
+
        _esc(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); },
        _unesc(s) { return String(s == null ? '' : s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#39;/g,"'").replace(/&amp;/g,'&'); },
 
@@ -9205,6 +9215,12 @@ self.addEventListener('fetch', (e) => {
            this.model = { id: 'modalMyTool', key: 'my-tool', title: 'MY TOOL', elements: [] };
            this._sel = -1;
            if (!silent) { this.render(); Nexus.shell.out('Started a blank modal.', 'success'); }
+       },
+
+       addTemplate(key) {
+           this.model.elements.push({ type: 'template', key, text: 'Label', id: '' });
+           this._sel = this.model.elements.length - 1;
+           this.render();
        },
 
        add(type) {
@@ -9279,6 +9295,17 @@ self.addEventListener('fetch', (e) => {
                case 'divider':  return `${p}<div style="height:1px; background:var(--border); margin:4px 0;"></div>`;
                case 'output':   return `${p}<div class="mini-console"${id} style="min-height:80px; max-height:40vh; overflow:auto;">${E(e.text)}</div>`;
                case 'row':      return `${p}<div class="grid-2">\n${(e.children||[]).map(c => this._elHtml(c, ind + 4)).join('\n')}\n${p}</div>`;
+               case 'template': {
+                   // The UI Architect templates were previously injectable
+                   // only as blind text insertions at the cursor. Exposed
+                   // here they become real, reorderable blocks you can place
+                   // and preview like any other — which is what "Architect"
+                   // was supposed to mean.
+                   const t = (Nexus.dreamer && Nexus.dreamer.templates || {})[e.key];
+                   if (!t) return `${p}<!-- missing template: ${E(e.key)} -->`;
+                   const raw = typeof t === 'function' ? t(e.text || 'Label', e.id || '') : t;
+                   return raw.split('\n').map(l => p + l).join('\n');
+               }
                default:         return `${p}<!-- unsupported block: ${E(e.type)} -->`;
            }
        },
@@ -9378,6 +9405,14 @@ ${body}
            host.innerHTML = this.PALETTE.map(p =>
                `<button class="tool-btn" style="font-size:10px;" onclick="Nexus.modalDesigner.add('${p.type}')">${p.icon} ${p.label}</button>`
            ).join('');
+
+           const tHost = document.getElementById('mdTemplates');
+           if (tHost) {
+               const avail = (Nexus.dreamer && Nexus.dreamer.templates) || {};
+               tHost.innerHTML = this.UI_TEMPLATES.filter(k => avail[k]).map(k =>
+                   `<button class="tool-btn" style="font-size:10px;" onclick="Nexus.modalDesigner.addTemplate('${k}')">${k.replace(/-/g, ' ')}</button>`
+               ).join('');
+           }
        },
 
        renderMeta() {
@@ -9419,6 +9454,12 @@ ${body}
                <input class="sleek-input" style="width:100%; font-size:12px; padding:7px;" value="${this._esc(val || '')}" placeholder="${this._esc(ph || '')}"
                       oninput="Nexus.modalDesigner.setProp(${i},'${prop}',this.value)">`;
            let html = '<div style="padding:8px 10px; border-top:1px solid var(--border);">';
+           if (e.type === 'template') {
+               html += f('Label used by the template', 'text', e.text);
+               html += f('Element id (optional)', 'id', e.id);
+               html += `<div style="font-size:9px; opacity:0.5; margin-top:6px;">Template: ${this._esc(e.key)}</div></div>`;
+               return html;
+           }
            if (e.type !== 'divider' && e.type !== 'row') html += f(e.type === 'input' || e.type === 'textarea' ? 'Placeholder' : 'Text', 'text', e.text);
            if (['input','textarea','output','checkbox','heading','text'].includes(e.type)) html += f('Element id (optional)', 'id', e.id, 'myFieldId');
            if (e.type === 'button') {
@@ -9473,6 +9514,289 @@ ${body}
            Nexus.Vfs.renderAccordion();
            Nexus.Vfs.switchFile(name);
            Nexus.shell.out(`Saved as ${name} — paste it into index.html when you're happy with it.`, 'success');
+       }
+   },
+
+   // Menu organiser: reorganise an EXISTING settings menu — tabs,
+   // accordions, toggle rows, dropdowns, sliders — without rewriting any of
+   // it.
+   //
+   // The critical decision here is that every control's original HTML is
+   // kept VERBATIM. This is the opposite of the modal designer, which
+   // generates markup from a model. A real settings menu carries Tailwind
+   // classes, data attributes, inline handlers and ids that other code
+   // depends on; regenerating that from a simplified model would silently
+   // drop styling and break wiring. So blocks are parsed, labelled, and
+   // MOVED — never re-emitted from scratch. Reorganising is therefore
+   // lossless by construction.
+   menuOrganizer: {
+       tabs: [],
+       sourceFile: null,
+       sourceHtml: '',
+       _pre: '',
+       _post: '',
+       _sel: null,
+
+       open() {
+           Nexus.UI.openModal('menu-organizer');
+           if (!this.tabs.length) this.openImport(); else this.render();
+       },
+
+       // ---- parsing -------------------------------------------------
+       _matchEnd(s, start, tag) {
+           const open = new RegExp('<' + tag + '\\b', 'g');
+           const close = new RegExp('</' + tag + '>', 'g');
+           let depth = 1, pos = start + 1;
+           while (depth > 0) {
+               open.lastIndex = pos; close.lastIndex = pos;
+               const o = open.exec(s), c = close.exec(s);
+               if (!c) return -1;
+               if (o && o.index < c.index) { depth++; pos = o.index + 1; }
+               else { depth--; pos = c.index + 1; if (depth === 0) return c.index + ('</' + tag + '>').length; }
+           }
+           return -1;
+       },
+
+       // Best-effort human label for a block, tried in order of how likely
+       // each is to be the thing you'd actually recognise it by.
+       _labelOf(raw) {
+           const tries = [
+               /<span class="font-bold[^"]*">([^<]{1,60})</,
+               /<summary[^>]*>[\s\S]*?<span>([^<]{1,60})</,
+               /<label[^>]*>([^<]{1,60})</,
+               /<h4[^>]*>([^<]{1,60})</,
+               /<button[^>]*>([^<]{1,40})</
+           ];
+           for (const re of tries) {
+               const m = raw.match(re);
+               if (m && m[1].trim()) return m[1].trim().replace(/\s+/g, ' ');
+           }
+           const id = raw.match(/id="([^"]+)"/);
+           return id ? '#' + id[1] : '(block)';
+       },
+
+       _kindOf(raw) {
+           if (/^<details/.test(raw)) return 'accordion';
+           if (/<input[^>]+type="checkbox"/.test(raw)) return 'toggle';
+           if (/<input[^>]+type="range"/.test(raw)) return 'slider';
+           if (/<select\b/.test(raw)) return 'dropdown';
+           if (/<textarea\b/.test(raw)) return 'textarea';
+           if (/<button\b/.test(raw)) return 'buttons';
+           return 'block';
+       },
+
+       _parseChildren(body) {
+           const out = [];
+           const tagRe = /<(details|div)\b[^>]*>/g;
+           let m, i = 0;
+           while ((m = tagRe.exec(body))) {
+               if (m.index < i) continue;
+               const end = this._matchEnd(body, m.index, m[1]);
+               if (end < 0) continue;
+               const raw = body.slice(m.index, end);
+               out.push({ kind: this._kindOf(raw), title: this._labelOf(raw), raw });
+               i = end; tagRe.lastIndex = end;
+           }
+           return out;
+       },
+
+       parse(html) {
+           const labels = {};
+           const btnRe = /<div class="tab-btn[^"]*"\s+data-tab="([^"]+)"[^>]*>([^<]*)<\/div>/g;
+           let b;
+           while ((b = btnRe.exec(html))) labels[b[1]] = b[2].trim();
+
+           const paneRe = /<div id="tab-([\w-]+)" class="tab-content[^"]*"[^>]*>/g;
+           const starts = [];
+           let m;
+           while ((m = paneRe.exec(html))) starts.push({ key: m[1], from: m.index, bodyFrom: m.index + m[0].length });
+           if (!starts.length) return null;
+
+           // Everything before the first pane and after the last is kept
+           // untouched so the surrounding chrome (header buttons, footer,
+           // the tab bar itself) survives the round trip.
+           this._pre = html.slice(0, starts[0].from);
+           const lastEnd = this._matchEnd(html, starts[starts.length - 1].from, 'div');
+           this._post = lastEnd > 0 ? html.slice(lastEnd) : '';
+
+           const tabs = starts.map((s, i) => {
+               const end = i + 1 < starts.length ? starts[i + 1].from
+                         : (lastEnd > 0 ? lastEnd - '</div>'.length : html.length);
+               return { key: s.key, label: labels[s.key] || s.key,
+                        open: html.slice(s.from, s.bodyFrom),
+                        children: this._parseChildren(html.slice(s.bodyFrom, end)) };
+           });
+           return tabs;
+       },
+
+       // ---- import --------------------------------------------------
+       findMenus() {
+           const found = [];
+           Object.keys(Nexus.state.Vfs).forEach(fn => {
+               if (!/\.(html?|htm)$/i.test(fn)) return;
+               const src = Nexus.state.Vfs[fn];
+               if (typeof src !== 'string') return;
+               // Any block containing tab panes is a candidate menu.
+               const re = /<div[^>]+id="([^"]+)"[^>]*>[\s\S]*?<\/div>/g;
+               if (/class="tab-content/.test(src)) {
+                   const idm = src.match(/<div id="([^"]+)"[^>]*class="[^"]*(?:modal|settings)[^"]*"/);
+                   found.push({ file: fn, id: idm ? idm[1] : fn, html: src });
+               }
+           });
+           return found;
+       },
+
+       openImport() {
+           const list = this.findMenus();
+           const box = document.getElementById('moImportList');
+           if (box) {
+               box.innerHTML = list.length
+                   ? list.map((x, i) => `<div class="item-row" onclick="Nexus.menuOrganizer.importAt(${i})">
+                        <span>${x.id}</span><span style="opacity:0.5; font-size:9px;">${x.file}</span></div>`).join('')
+                   : '<div style="opacity:0.6; font-size:11px; padding:10px;">No tabbed menus found. Open an HTML file containing elements with class="tab-content".</div>';
+           }
+           this._cache = list;
+           Nexus.UI.openModal('mo-import');
+       },
+
+       importAt(i) {
+           const item = (this._cache || [])[i];
+           if (!item) return;
+           const tabs = this.parse(item.html);
+           if (!tabs) return Nexus.shell.out('No tab panes found in that file.', 'warn');
+           this.tabs = tabs;
+           this.sourceFile = item.file;
+           this.sourceHtml = item.html;
+           Nexus.UI.closeModal('mo-import');
+           this.render();
+           const total = tabs.reduce((n, t) => n + t.children.length, 0);
+           Nexus.shell.out(`Loaded ${tabs.length} tabs, ${total} blocks from ${item.file}.`, 'success');
+       },
+
+       // ---- editing -------------------------------------------------
+       moveBlock(ti, bi, dir) {
+           const c = this.tabs[ti].children;
+           const j = bi + dir;
+           if (j < 0 || j >= c.length) return;
+           [c[bi], c[j]] = [c[j], c[bi]];
+           this.render();
+       },
+
+       moveToTab(ti, bi, targetKey) {
+           const target = this.tabs.findIndex(t => t.key === targetKey);
+           if (target < 0 || target === ti) return;
+           const [block] = this.tabs[ti].children.splice(bi, 1);
+           this.tabs[target].children.push(block);
+           this.render();
+           Nexus.shell.out(`Moved "${block.title}" to ${this.tabs[target].label}.`, 'success');
+       },
+
+       moveTab(ti, dir) {
+           const j = ti + dir;
+           if (j < 0 || j >= this.tabs.length) return;
+           [this.tabs[ti], this.tabs[j]] = [this.tabs[j], this.tabs[ti]];
+           this.render();
+       },
+
+       renameTab(ti, label) { this.tabs[ti].label = label; this.renderTabBarPreview(); },
+
+       toggleTab(ti) { this._sel = (this._sel === ti ? null : ti); this.render(); },
+
+       // ---- output --------------------------------------------------
+       generate() {
+           // The tab BAR is rebuilt (order and labels can change); the panes
+           // and every block inside them are reassembled from the original
+           // fragments, so nothing but ordering is altered.
+           const bar = `<div class="settings-tab-bar flex border-b border-custom bg-black bg-opacity-20">\n` +
+               this.tabs.map((t, i) =>
+                   `    <div class="tab-btn${i === 0 ? ' active' : ''}" data-tab="${t.key}">${t.label}</div>`).join('\n') +
+               `\n</div>`;
+           const panes = this.tabs.map(t =>
+               `${t.open}\n${t.children.map(c => c.raw).join('\n')}\n</div>`).join('\n');
+           return bar + '\n' + panes + '\n';
+       },
+
+       saveToFile() {
+           const base = (this.sourceFile || 'menu').replace(/\.[^.]+$/, '').split('/').pop();
+           let name = `${base}.reorganised.html`;
+           let n = 2;
+           while (Nexus.state.Vfs[name] !== undefined) name = `${base}-${n++}.reorganised.html`;
+           const code = this.generate();
+           Nexus.state.Vfs[name] = code;
+           Nexus.state.originals[name] = code;
+           Nexus.state.lastSavedContent[name] = code;
+           Nexus.Vfs.save();
+           Nexus.Vfs.renderAccordion();
+           Nexus.Vfs.switchFile(name);
+           Nexus.shell.out(`Saved as ${name}. Paste the tab bar and panes back over the originals.`, 'success');
+       },
+
+       copyCode() {
+           const code = this.generate();
+           if (navigator.clipboard && navigator.clipboard.writeText) {
+               navigator.clipboard.writeText(code)
+                   .then(() => Nexus.shell.out('Reorganised menu copied.', 'success'))
+                   .catch(() => Nexus.shell.out('Clipboard denied — use SAVE AS FILE.', 'warn'));
+           } else Nexus.shell.out('Clipboard unavailable — use SAVE AS FILE.', 'warn');
+       },
+
+       // ---- rendering -----------------------------------------------
+       render() { this.renderTabBarPreview(); this.renderTree(); this.renderStats(); },
+
+       renderStats() {
+           const el = document.getElementById('moStats');
+           if (!el) return;
+           const total = this.tabs.reduce((n, t) => n + t.children.length, 0);
+           el.innerText = this.tabs.length
+               ? `${this.tabs.length} tabs · ${total} blocks · source: ${this.sourceFile || '(none)'}`
+               : 'Nothing loaded yet.';
+       },
+
+       renderTabBarPreview() {
+           const el = document.getElementById('moTabBar');
+           if (!el) return;
+           el.innerHTML = this.tabs.map((t, i) =>
+               `<div style="flex:1; text-align:center; padding:8px 4px; font-size:10px; font-weight:700;
+                    border-bottom:2px solid ${i === this._sel ? 'var(--accent)' : 'transparent'}; opacity:${i === this._sel ? 1 : 0.6};"
+                    onclick="Nexus.menuOrganizer.toggleTab(${i})">${t.label}</div>`).join('');
+       },
+
+       renderTree() {
+           const host = document.getElementById('moTree');
+           if (!host) return;
+           if (!this.tabs.length) {
+               host.innerHTML = '<div style="opacity:0.55; font-size:11px; padding:14px; text-align:center;">Load a menu to begin.</div>';
+               return;
+           }
+           const icon = { accordion:'▾', toggle:'☑', slider:'▬', dropdown:'▼', textarea:'▤', buttons:'⬢', block:'▪' };
+           host.innerHTML = this.tabs.map((t, ti) => {
+               const openTab = this._sel === ti;
+               const rows = openTab ? t.children.map((c, bi) => `
+                   <div style="display:flex; align-items:center; gap:5px; padding:6px 8px; border-top:1px solid var(--border); font-size:11px;">
+                       <span style="opacity:0.5; width:14px;">${icon[c.kind] || '▪'}</span>
+                       <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${c.title}</span>
+                       <button class="tool-btn" style="padding:2px 6px; font-size:10px;" onclick="Nexus.menuOrganizer.moveBlock(${ti},${bi},-1)" aria-label="Up">▲</button>
+                       <button class="tool-btn" style="padding:2px 6px; font-size:10px;" onclick="Nexus.menuOrganizer.moveBlock(${ti},${bi},1)" aria-label="Down">▼</button>
+                       <select class="sleek-input" style="font-size:10px; padding:2px 4px; max-width:88px;"
+                               onchange="Nexus.menuOrganizer.moveToTab(${ti},${bi},this.value); this.selectedIndex=0;">
+                           <option value="">move to…</option>
+                           ${this.tabs.filter((x, xi) => xi !== ti).map(x => `<option value="${x.key}">${x.label}</option>`).join('')}
+                       </select>
+                   </div>`).join('') : '';
+               return `<div style="border:1px solid ${openTab ? 'var(--accent)' : 'var(--border)'}; border-radius:6px; margin-bottom:6px;">
+                   <div style="display:flex; align-items:center; gap:6px; padding:8px 10px; background:${openTab ? 'var(--surface)' : 'transparent'};">
+                       <span onclick="Nexus.menuOrganizer.toggleTab(${ti})" style="flex:1; font-size:12px; font-weight:700; cursor:pointer;">
+                           ${t.label} <span style="opacity:0.5; font-weight:400;">· ${t.children.length}</span>
+                       </span>
+                       <button class="tool-btn" style="padding:3px 7px; font-size:10px;" onclick="Nexus.menuOrganizer.moveTab(${ti},-1)" aria-label="Tab up">◀</button>
+                       <button class="tool-btn" style="padding:3px 7px; font-size:10px;" onclick="Nexus.menuOrganizer.moveTab(${ti},1)" aria-label="Tab down">▶</button>
+                   </div>
+                   ${openTab ? `<div style="padding:0 8px 8px;">
+                       <input class="sleek-input" style="width:100%; font-size:11px; padding:5px; margin:6px 0;"
+                              value="${t.label}" oninput="Nexus.menuOrganizer.renameTab(${ti}, this.value)" placeholder="Tab label">
+                   </div>${rows}` : ''}
+               </div>`;
+           }).join('');
        }
    },
 

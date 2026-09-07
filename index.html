@@ -718,7 +718,7 @@
                 <button class="tool-btn" style="width:100%;" onclick="Nexus.dreamer.startNightCycle()">🌙 Stress test (Night Cycle)</button>
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('storage-inspector')">🗄️ localStorage inspector</button>
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('sprite')">🖼️ Sprite sheet CSS</button>
-                <button class="tool-btn btn-accent" style="width:100%; margin-top:6px;" onclick="Nexus.modalDesigner.open()">🎨 Modal designer</button>
+                <button class="tool-btn btn-accent" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('architect')">🏗️ UI Architect</button>
                 <button class="tool-btn" style="width:100%; margin-top:6px;" onclick="Nexus.UI.openModal('peer-sync')">📡 Send to another device</button>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 4px;">
@@ -1239,6 +1239,82 @@
      canvas dragging: modals here are single-column anyway, and drag handles
      plus explicit up/down buttons are far easier to hit with a thumb than
      pixel-accurate dragging. -->
+<!-- Menu organiser. Unlike the modal designer this does NOT regenerate
+     markup — every control keeps its original HTML verbatim and is only
+     moved, so Tailwind classes, ids and inline handlers survive intact. -->
+<!-- Architect hub. The Dreamer section was always labelled "UI Architect"
+     but only ever inserted snippets at the cursor. These three tools are what
+     that name described: build a modal, reorganise an existing menu, or drop
+     in a snippet. -->
+<div id="modalArchitect" class="modal-overlay">
+    <div class="modal-content" style="height:auto; max-height:70%;">
+        <div class="p-head">
+            <span>UI ARCHITECT</span>
+            <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('architect')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size:11px; opacity:0.7; margin-bottom:12px; line-height:1.5;">Three ways to build interfaces without hand-writing markup.</div>
+
+            <button class="tool-btn btn-accent" style="width:100%; padding:14px; text-align:left;" onclick="Nexus.UI.closeModal('architect'); Nexus.modalDesigner.open()">
+                🎨 &nbsp;DESIGN A MODAL
+            </button>
+            <div style="font-size:10px; opacity:0.55; margin:4px 0 12px; line-height:1.4;">Stack blocks and full UI components, reorder them, and get working HTML.</div>
+
+            <button class="tool-btn btn-accent" style="width:100%; padding:14px; text-align:left;" onclick="Nexus.UI.closeModal('architect'); Nexus.menuOrganizer.open()">
+                🗂️ &nbsp;REORGANISE A MENU
+            </button>
+            <div style="font-size:10px; opacity:0.55; margin:4px 0 12px; line-height:1.4;">Load an existing tabbed settings menu and move things between tabs. Original markup is preserved exactly — only the order changes.</div>
+
+            <button class="tool-btn" style="width:100%; padding:14px; text-align:left;" onclick="Nexus.UI.closeModal('architect'); Nexus.UI.openModal('dreamer')">
+                🧩 &nbsp;INSERT A SNIPPET
+            </button>
+            <div style="font-size:10px; opacity:0.55; margin:4px 0 0; line-height:1.4;">Drop a component or code boilerplate straight in at the cursor.</div>
+        </div>
+    </div>
+</div>
+
+<div id="modalMenuOrganizer" class="modal-overlay">
+    <div class="modal-content">
+        <div class="p-head">
+            <span>MENU ORGANISER</span>
+            <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('menu-organizer')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="display:flex; gap:6px; margin-bottom:8px;">
+                <button class="tool-btn" style="flex:1;" onclick="Nexus.menuOrganizer.openImport()">LOAD MENU</button>
+                <button class="tool-btn" style="flex:1;" onclick="Nexus.menuOrganizer.copyCode()">COPY</button>
+                <button class="tool-btn btn-accent" style="flex:1;" onclick="Nexus.menuOrganizer.saveToFile()">SAVE AS FILE</button>
+            </div>
+            <div id="moStats" style="font-size:9px; opacity:0.55; margin-bottom:8px;">Nothing loaded yet.</div>
+
+            <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:6px 0 4px;">TAB BAR PREVIEW</div>
+            <div id="moTabBar" style="display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; margin-bottom:10px;"></div>
+
+            <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:6px 0 4px;">
+                TABS — tap to expand · ◀▶ reorder tabs · ▲▼ reorder blocks
+            </div>
+            <div id="moTree"></div>
+
+            <div style="font-size:10px; opacity:0.6; margin-top:12px; line-height:1.5;">
+                Every control keeps its original markup exactly as written — classes, ids and handlers are untouched. Only the order and which tab things live in changes.
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modalMoImport" class="modal-overlay">
+    <div class="modal-content" style="height:auto; max-height:70%;">
+        <div class="p-head">
+            <span>LOAD A MENU</span>
+            <button class="close-x" title="Close" aria-label="Close" onclick="Nexus.UI.closeModal('mo-import')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div style="font-size:10px; opacity:0.6; margin-bottom:8px;">HTML files in your project containing tabbed menus (elements with class="tab-content").</div>
+            <div id="moImportList"></div>
+        </div>
+    </div>
+</div>
+
 <div id="modalModalDesigner" class="modal-overlay">
     <div class="modal-content">
         <div class="p-head">
@@ -1258,6 +1334,9 @@
 
             <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">ADD A BLOCK</div>
             <div id="mdPalette" style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;"></div>
+
+            <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">UI TEMPLATES — full components from the Architect library</div>
+            <div id="mdTemplates" style="display:grid; grid-template-columns:repeat(3,1fr); gap:5px;"></div>
 
             <div style="font-size:9px; opacity:0.5; letter-spacing:1px; margin:12px 0 5px;">BLOCKS — tap to edit, ▲▼ to reorder</div>
             <div id="mdBlocks"></div>
